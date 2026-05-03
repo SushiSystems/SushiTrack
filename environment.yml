@@ -1,0 +1,17 @@
+name: sushitrack
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - cmake
+  - gtest
+  - ninja
+  - pip
+  - pip:
+      - motmetrics
+      - trackeval
+      - numpy
+      - pandas
+      - scipy
+      - pytest

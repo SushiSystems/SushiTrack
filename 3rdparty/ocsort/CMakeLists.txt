@@ -1,0 +1,12 @@
+cmake_minimum_required(VERSION 3.10)
+project(libocsort)
+
+set(CMAKE_CXX_STANDARD 17)
+
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+file(GLOB SRC_LIST src/*.cpp)
+
+# Using STATIC to avoid DLL issues in test builds if not needed as shared
+add_library(${PROJECT_NAME} STATIC ${SRC_LIST})
+target_include_directories(${PROJECT_NAME} PUBLIC include)
+target_link_libraries(${PROJECT_NAME} Eigen3::Eigen)

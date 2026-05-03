@@ -1,0 +1,27 @@
+# Build artifacts
+build/
+test/build/
+bin/
+obj/
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Version control
+.git/
+.gitignore
+
+# GTest cache files
+cmake_test_discovery_*.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files
+Dockerfile
+.dockerignore

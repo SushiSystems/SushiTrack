@@ -1,0 +1,143 @@
+/**
+ * @file      MOTRunner.h
+ * @brief     Execution logic for Multi-Object Tracking (MOT) benchmarks.
+ * @author    Mustafa Garip (mustafagarip@sushisystems.io)
+ * @date      28.04.2026
+ * @version   v1.0.0
+ * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
+ */
+
+#pragma once
+
+#include "TestInfra.h"
+#include "ITrackerAdapter.h"
+
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <stdexcept>
+#include <string>
+
+namespace TestInfrastructure
+{
+    /**
+     * @brief Performance metrics for a completed benchmark run.
+     */
+    struct RunResult
+    {
+        int    frames_processed  = 0;  ///< Count of processed frames.
+        double total_tracking_us = 0.0; ///< Total execution time in microseconds.
+
+        /**
+         * @brief Calculates mean execution time per frame.
+         * 
+         * @return Mean time in microseconds.
+         */
+        double mean_us() const { return frames_processed ? total_tracking_us / frames_processed : 0.0; }
+        
+        /**
+         * @brief Calculates processing frequency.
+         * 
+         * @return Frames-per-second.
+         */
+        double fps()     const { return total_tracking_us > 0.0
+                                        ? frames_processed / (total_tracking_us * 1e-6)
+                                        : 0.0; }
+    };
+
+    /**
+     * @brief Orchestrates a benchmark run for a specific data sequence.
+     * 
+     * Loads detections, initializes the tracker adapter, executes tracking 
+     * on each frame, and writes results to an output file.
+     * 
+     * @param base_data_dir Root directory containing benchmark datasets.
+     * @param scenario Name of the specific sequence subdirectory.
+     * @param adapter Implementation of the tracker adapter interface.
+     * @param out_dir Optional directory for saving output prediction files.
+     * @return Metrics for the completed sequence run.
+     */
+    inline RunResult run_mot_sequence(
+        const std::string& base_data_dir,
+        const std::string& scenario,
+        ITrackerAdapter&   adapter,
+        const std::string& out_dir = "")
+    {
+        namespace fs = std::filesystem;
+
+        fs::path base          = fs::path(base_data_dir) / scenario;
+        fs::path det_path      = base / "det" / "det.txt";
+        fs::path seq_info_path = base / "seqinfo.ini";
+
+        if (!fs::exists(det_path))
+            throw std::runtime_error("det.txt not found: " + det_path.string());
+
+        int   seq_fps = 30; 
+        float dt      = 1.0f / 30.0f;
+        if (fs::exists(seq_info_path))
+        {
+            std::ifstream ini(seq_info_path);
+            std::string   line;
+            while (std::getline(ini, line))
+            {
+                if (line.rfind("frameRate=", 0) == 0)
+                {
+                    float fps = std::stof(line.substr(10));
+                    if (fps > 0.0f)
+                    {
+                        seq_fps = static_cast<int>(fps);
+                        dt      = 1.0f / fps;
+                    }
+                    break;
+                }
+            }
+        }
+
+        adapter.setFrameRate(seq_fps);
+
+        auto sequence = load_mot_detections(det_path.string());
+        if (sequence.empty())
+            return RunResult{};
+
+        fs::path pred_dir = out_dir.empty() ? base / "pred" : fs::path(out_dir);
+        fs::create_directories(pred_dir);
+
+        fs::path pred_path = pred_dir / (adapter.name() + ".txt");
+
+        std::ofstream out(pred_path);
+        if (!out.is_open())
+            throw std::runtime_error("Cannot open output: " + pred_path.string());
+
+        RunResult     result;
+        PerformanceTimer frame_timer;
+
+        for (const auto& [frame_id, frame_dets] : sequence)
+        {
+            frame_timer.reset();
+            auto tracks = adapter.update(frame_dets, dt);
+            result.total_tracking_us += frame_timer.elapsed_us();
+
+            for (const auto& t : tracks)
+            {
+                out << frame_id   << ","
+                    << t.track_id << ","
+                    << t.x        << ","
+                    << t.y        << ","
+                    << t.w        << ","
+                    << t.h        << ","
+                    << t.score    << ",-1,-1,-1\n";
+            }
+
+            ++result.frames_processed;
+        }
+
+        std::cout << "[ PERF " << adapter.name() << " ] "
+                  << scenario << ": "
+                  << result.mean_us() << " us/frame  ("
+                  << result.frames_processed << " frames, "
+                  << static_cast<int>(result.fps()) << " fps)\n";
+
+        return result;
+    }
+
+} // namespace TestInfrastructure

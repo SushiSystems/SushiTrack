@@ -1,0 +1,121 @@
+"""
+@file      data_loader.py
+@brief     File loader for MOT Challenge data and prediction files.
+@author    Mustafa Garip (mustafagarip@sushisystems.io)
+@date      28.04.2026
+@version   v1.0.0
+@copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
+"""
+
+import os
+from dataclasses import dataclass
+from typing import List
+
+
+@dataclass
+class Detection:
+    """
+    @brief Data structure for object bounding box.
+    @var id     Identity identifier.
+    @var bbox   Coordinates [x, y, w, h] in pixels.
+    @var ignore Flag for exclusion from scoring.
+    @var role   Classification role (valid, distractor, zero_marked).
+    @var score  Confidence score.
+    """
+    id:     int
+    bbox:   List[float]
+    ignore: bool  = False
+    role:   str   = "valid"
+    score:  float = 1.0
+
+
+PEDESTRIAN_CLASS         = 1
+DISTRACTOR_CLASSES_MOT17 = {2, 7, 8, 12}
+DISTRACTOR_CLASSES_MOT20 = {2, 6, 7, 8, 12}
+
+
+def _detect_benchmark(filepath: str) -> str:
+    """
+    @brief Identifies MOT17 or MOT20 benchmark from path.
+    @param filepath Path to data file.
+    @return Benchmark identifier string.
+    """
+    if "MOT20" in filepath.upper():
+        return "MOT20"
+    return "MOT17"
+
+
+def load_gt_file(filepath: str) -> dict:
+    """
+    @brief Parses MOTChallenge ground-truth file.
+    @param filepath Path to ground-truth file.
+    @return Frame identifier mapping to Detection lists.
+    """
+    data: dict = {}
+    if not os.path.exists(filepath):
+        return data
+
+    benchmark   = _detect_benchmark(filepath)
+    distractors = (DISTRACTOR_CLASSES_MOT20 if benchmark == "MOT20"
+                   else DISTRACTOR_CLASSES_MOT17)
+
+    with open(filepath, "r") as f:
+        for line in f:
+            parts = line.strip().split(",")
+            if len(parts) < 6:
+                continue
+
+            frame  = int(parts[0])
+            obj_id = int(float(parts[1]))
+            x, y, w, h = map(float, parts[2:6])
+
+            conf = float(parts[6]) if len(parts) >= 7 else 1.0
+            cls  = int(float(parts[7])) if len(parts) >= 8 else PEDESTRIAN_CLASS
+
+            if conf == 0:
+                role = "zero_marked"
+            elif cls in distractors:
+                role = "distractor"
+            elif cls != PEDESTRIAN_CLASS:
+                role = "zero_marked"
+            else:
+                role = "valid"
+
+            data.setdefault(frame, []).append(Detection(
+                id=obj_id,
+                bbox=[x, y, w, h],
+                ignore=(role != "valid"),
+                role=role,
+            ))
+
+    return data
+
+
+def load_pred_file(filepath: str) -> dict:
+    """
+    @brief Parses tracker prediction file.
+    @param filepath Path to prediction file.
+    @return Frame identifier mapping to Detection lists.
+    """
+    data: dict = {}
+    if not os.path.exists(filepath):
+        return data
+
+    with open(filepath, "r") as f:
+        for line in f:
+            parts = line.strip().split(",")
+            if len(parts) < 6:
+                continue
+
+            frame  = int(parts[0])
+            obj_id = int(float(parts[1]))
+            x, y, w, h = map(float, parts[2:6])
+            conf = float(parts[6]) if len(parts) >= 7 else 1.0
+
+            data.setdefault(frame, []).append(Detection(
+                id=obj_id,
+                bbox=[x, y, w, h],
+                score=conf,
+            ))
+
+    return data
