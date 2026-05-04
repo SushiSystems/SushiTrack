@@ -208,7 +208,8 @@ namespace SushiTrack
                         activated_tracklets,
                         tentative_next,
                         removed_tentative_curr,
-                        det_for_new_init);
+                        det_for_new_init,
+                        effective_dt);
 
             std::vector<TrackletPtr> newborn_tentative;
             initializeTentative(det_for_new_init, newborn_tentative);
@@ -295,25 +296,32 @@ namespace SushiTrack
     {
         det_high_remaining = det_high;
 
-        // Global LAPJV: single optimal assignment over all tracks
+        std::map<size_t, std::vector<TrackletPtr>> tracks_by_age;
+        for (auto& t : tracklet_pool)
+        {
+            size_t age = frame_id_ - t->getFrameId();
+            tracks_by_age[age].push_back(t);
+        }
+
+        for (auto const& [age, track_group] : tracks_by_age)
         {
             if (det_high_remaining.empty())
             {
-                for (auto& t : tracklet_pool)
+                for (auto& t : track_group)
                 {
                     if (t->getTrackState() == TrackState::Tracked)
                         track_remaining.push_back(t);
                 }
-                return;
+                continue;
             }
 
             std::vector<std::vector<int>> matches;
             std::vector<int> u_track, u_det;
 
-            high_conf_metric_->calculate(tracklet_pool, det_high_remaining, main_cost_matrix_);
+            high_conf_metric_->calculate(track_group, det_high_remaining, main_cost_matrix_);
 
             solver_->solve(main_cost_matrix_,
-                        (int)tracklet_pool.size(),
+                        (int)track_group.size(),
                         (int)det_high_remaining.size(),
                         config_.match_thresh,
                         matches, u_track, u_det);
@@ -323,7 +331,7 @@ namespace SushiTrack
 
             for (auto& m : matches)
             {
-                auto& track = tracklet_pool[m[0]];
+                auto& track = track_group[m[0]];
                 auto& det   = det_high_remaining[m[1]];
 
                 if (track->getTrackState() == TrackState::Tracked)
@@ -335,16 +343,16 @@ namespace SushiTrack
                 {
                     track->reActivate(*det, frame_id_);
                     refind_tracklets.push_back(track);
-                    SUSHITRACK_LOG_DEBUG("[Tracker] Track %llu recovered from Lost state (High-conf Global).", (unsigned long long)track->getTrackId());
+                    SUSHITRACK_LOG_DEBUG("[Tracker] Track %llu recovered from Lost state (High-conf cascade, age=%zu).", (unsigned long long)track->getTrackId(), age);
                 }
                 matched_det_indices.insert(static_cast<size_t>(m[1]));
             }
 
             for (int idx : u_track)
             {
-                if (tracklet_pool[idx]->getTrackState() == TrackState::Tracked)
+                if (track_group[idx]->getTrackState() == TrackState::Tracked)
                 {
-                    track_remaining.push_back(tracklet_pool[idx]);
+                    track_remaining.push_back(track_group[idx]);
                 }
             }
 
@@ -507,7 +515,8 @@ namespace SushiTrack
                                         std::vector<TrackletPtr>& activated_tracklets,
                                         std::vector<TrackletPtr>& tentative_next,
                                         std::vector<TrackletPtr>& removed_tentative_curr,
-                                        std::vector<TrackletPtr>& det_for_new_init)
+                                        std::vector<TrackletPtr>& det_for_new_init,
+                                        float dt)
     {
         auto get_dynamic_hits = [&](float score) -> int {
             if (score >= config_.tentative_fast_thresh) return config_.tentative_fast_hits;
@@ -591,19 +600,29 @@ namespace SushiTrack
             }
         }
 
+        (void)dt;
+
         for (int idx : u_tent_low)
         {
             auto& t = tentative_remaining[idx];
 
+            // Use frames-since-last-observation as the authoritative age measure.
+            // accumulated_lost_time_ is unreliable here because Tracklet::update()
+            // resets it to 0 and sets state=Tracked, which prevents predict() from
+            // re-accumulating it — causing tentative tracks to never expire in
+            // time_aware mode. Converting frame count to seconds via fps keeps both
+            // policies symmetric: they both expire at the same frame boundary.
+            const float frames_since_obs = static_cast<float>(frame_id_ - t->getFrameId());
             const float accumulated = config_.time_aware
-                ? t->getAccumulatedLostTime()
-                : static_cast<float>(frame_id_ - t->getFrameId());
+                ? frames_since_obs / static_cast<float>(std::max(1, config_.frame_rate))
+                : frames_since_obs;
 
             if (timing_policy_->isExpired(accumulated, config_.tentative_max_age))
             {
                 t->markAsRemoved();
                 removed_tentative_curr.push_back(t);
-                SUSHITRACK_LOG_DEBUG("[Tracker] Tentative track %llu (temp) aged out and removed.", (unsigned long long)t->getTrackId());
+                SUSHITRACK_LOG_DEBUG("[Tracker] Tentative track %llu aged out after %.0f frames without observation.",
+                    (unsigned long long)t->getTrackId(), frames_since_obs);
             }
             else
             {
@@ -848,10 +867,10 @@ namespace SushiTrack
             {
                 if (iou_cost_matrix_(i, j) < config_.duplicate_iou_thresh)
                 {
-                    int ta = (int)(a[i]->getFrameId() - a[i]->getStartFrameId());
-                    int tb = (int)(b[j]->getFrameId() - b[j]->getStartFrameId());
-                    if (ta > tb) b_dup[j] = true;
-                    else a_dup[i] = true;
+                    int ta = (int)(frame_id_ - a[i]->getFrameId());
+                    int tb = (int)(frame_id_ - b[j]->getFrameId());
+                    if (ta > tb) a_dup[i] = true;
+                    else b_dup[j] = true;
                 }
             }
         }

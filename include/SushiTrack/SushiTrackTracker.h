@@ -166,13 +166,18 @@ namespace SushiTrack
              * @param removed_tentative_curr Output list for tentative tracks that aged out.
              * @param det_for_new_init Output list for detections qualifying for track initiation.
              */
+            /**
+             * @param dt Time interval of the current frame, forwarded for
+             *           time-aware tentative expiry calculations.
+             */
             void matchTentative(std::vector<TrackletPtr>& tentative_tracks,
                                 std::vector<TrackletPtr>& det_high_remaining,
                                 std::vector<TrackletPtr>& det_low_remaining,
                                 std::vector<TrackletPtr>& activated_tracklets,
                                 std::vector<TrackletPtr>& tentative_next,
                                 std::vector<TrackletPtr>& removed_tentative_curr,
-                                std::vector<TrackletPtr>& det_for_new_init);
+                                std::vector<TrackletPtr>& det_for_new_init,
+                                float dt);
             
             /**
              * @brief Initializes new tentative tracks from detections.
