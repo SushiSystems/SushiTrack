@@ -118,19 +118,6 @@ namespace SushiTrack
          */
         int   primary_assoc_mode = 1;
 
-
-        /**
-         * @brief Number of frames after the transition to lost during which the
-         * tracker still publishes the track using its predicted bounding box.
-         *
-         * Setting this to a positive value reduces false negatives at the cost
-         * of additional false positives, by emitting a Kalman-predicted box for
-         * the configured number of frames before the track becomes silent. A
-         * value of zero retains the default precision-oriented behavior of
-         * suppressing lost tracks from the output.
-         */
-        int   output_lost_grace_frames = 0;
-
     };
     
 } // namespace SushiTrack

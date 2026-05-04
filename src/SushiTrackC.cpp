@@ -96,7 +96,6 @@ extern "C"
         params->reid_low_iou_weight  = 0.2f;
         params->reid_recovery_thresh = 0.4f;
         params->max_feature_history  = 100;
-        params->output_lost_grace_frames = 0;
     }
 
     /**
@@ -181,7 +180,6 @@ extern "C"
             config.reid_low_iou_weight  = params->reid_low_iou_weight;
             config.reid_recovery_thresh = params->reid_recovery_thresh;
             config.max_feature_history  = params->max_feature_history;
-            config.output_lost_grace_frames = params->output_lost_grace_frames;
 
             auto kf_factory = std::make_shared<SushiTrack::GenericKalmanFactory>(
                 config.kalman_type, config.std_weight_position, config.std_weight_velocity,
@@ -454,6 +452,7 @@ extern "C"
                 out_tracks[i].lost_time    = res->getAccumulatedLostTime();
                 out_tracks[i].hits         = res->getHits();
                 out_tracks[i].last_seen_frame = static_cast<int64_t>(res->getFrameId());
+                out_tracks[i].frames_since_last_update = static_cast<int>(impl->tracker->getGlobalFrameId() - res->getFrameId());
             }
 
             return count;

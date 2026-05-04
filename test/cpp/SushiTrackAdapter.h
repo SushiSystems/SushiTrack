@@ -212,7 +212,6 @@ namespace TestInfrastructure
                 p.reid_low_iou_weight  = gf("reid_low_iou_weight",  p.reid_low_iou_weight);
                 p.reid_recovery_thresh = gf("reid_recovery_thresh", p.reid_recovery_thresh);
                 p.max_feature_history  = gi("max_feature_history",  p.max_feature_history);
-                p.output_lost_grace_frames = gi("output_lost_grace_frames", p.output_lost_grace_frames);
 
                 // Note: The following fields are experimental and not exposed in the C API:
                 // - primary_assoc_mode (internal C++ only)

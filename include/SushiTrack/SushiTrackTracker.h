@@ -77,6 +77,13 @@ namespace SushiTrack
              */
             std::vector<TrackletPtr> getTracks() const;
 
+            /**
+             * @brief Retrieves the current global frame identifier.
+             * 
+             * @return Current frame sequence index.
+             */
+            size_t getGlobalFrameId() const { return frame_id_; }
+
         private:
             TrackerConfig                           config_;                ///< Configuration parameters.
             std::shared_ptr<ITimingPolicy>          timing_policy_;         ///< Timing policy implementation.

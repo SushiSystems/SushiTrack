@@ -413,15 +413,16 @@ namespace SushiTrack
         mean.block<1, 4>(0, 4) = Eigen::RowVector4f::Zero();
 
         float noise_scale = (score >= 0.0f) ? std::max(1.0f - score, 1e-2f) : 1.0f;
+        float linear_std_scale = std::sqrt(noise_scale);
 
         StateMean std_vec;
         if (enable_xyah_)
         {
             float height = std::max(1e-2f, measurement[3]);
-            std_vec(0) = kf_pos_weight_ * std_weight_position_ * height * noise_scale;
-            std_vec(1) = kf_pos_weight_ * std_weight_position_ * height * noise_scale;
+            std_vec(0) = kf_pos_weight_ * std_weight_position_ * height * linear_std_scale;
+            std_vec(1) = kf_pos_weight_ * std_weight_position_ * height * linear_std_scale;
             std_vec(2) = 1e-2f;
-            std_vec(3) = kf_pos_weight_ * std_weight_position_ * height * noise_scale;
+            std_vec(3) = kf_pos_weight_ * std_weight_position_ * height * linear_std_scale;
             std_vec(4) = kf_vel_weight_ * std_weight_velocity_ * height;
             std_vec(5) = kf_vel_weight_ * std_weight_velocity_ * height;
             std_vec(6) = 1e-5f;
@@ -431,10 +432,10 @@ namespace SushiTrack
         {
             float width  = std::max(1e-2f, measurement[2]);
             float height = std::max(1e-2f, measurement[3]);
-            std_vec(0) = kf_pos_weight_  * std_weight_position_ * width * noise_scale;
-            std_vec(1) = kf_pos_weight_  * std_weight_position_ * height * noise_scale;
-            std_vec(2) = kf_size_weight_ * std_weight_position_ * width * noise_scale;
-            std_vec(3) = kf_size_weight_ * std_weight_position_ * height * noise_scale;
+            std_vec(0) = kf_pos_weight_  * std_weight_position_ * width * linear_std_scale;
+            std_vec(1) = kf_pos_weight_  * std_weight_position_ * height * linear_std_scale;
+            std_vec(2) = kf_size_weight_ * std_weight_position_ * width * linear_std_scale;
+            std_vec(3) = kf_size_weight_ * std_weight_position_ * height * linear_std_scale;
             std_vec(4) = kf_vel_weight_  * std_weight_velocity_ * width;
             std_vec(5) = kf_vel_weight_  * std_weight_velocity_ * height;
             std_vec(6) = kf_vel_weight_  * std_weight_velocity_ * width;
@@ -465,21 +466,22 @@ namespace SushiTrack
         float width = std::max(1e-2f, mean(2));
         float height = std::max(1e-2f, mean(3));
         float noise_scale = (score >= 0.0f) ? std::max(1.0f - score, 1e-2f) : 1.0f;
+        float linear_std_scale = std::sqrt(noise_scale);
 
         DetectBox std_vec;
         if (enable_xyah_)
         {
-            std_vec << kf_pos_weight_ * std_weight_position_ * height * noise_scale,
-                    kf_pos_weight_ * std_weight_position_ * height * noise_scale,
+            std_vec << kf_pos_weight_ * std_weight_position_ * height * linear_std_scale,
+                    kf_pos_weight_ * std_weight_position_ * height * linear_std_scale,
                     1e-1f,
-                    kf_pos_weight_ * std_weight_position_ * height * noise_scale;
+                    kf_pos_weight_ * std_weight_position_ * height * linear_std_scale;
         }
         else
         {
-            std_vec << kf_pos_weight_ * std_weight_position_ * width * noise_scale,
-                    kf_pos_weight_ * std_weight_position_ * height * noise_scale,
-                    kf_size_weight_ * std_weight_position_ * width * noise_scale,
-                    kf_size_weight_ * std_weight_position_ * height * noise_scale;
+            std_vec << kf_pos_weight_ * std_weight_position_ * width * linear_std_scale,
+                    kf_pos_weight_ * std_weight_position_ * height * linear_std_scale,
+                    kf_size_weight_ * std_weight_position_ * width * linear_std_scale,
+                    kf_size_weight_ * std_weight_position_ * height * linear_std_scale;
         }
 
         projected_mean = (update_mat_ * mean.transpose()).transpose();

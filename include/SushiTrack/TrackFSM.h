@@ -48,10 +48,16 @@ namespace SushiTrack
             /**
              * @brief Updates the kinematic state based on motion analysis.
              * 
+             * Performs multi-stage analysis of the state vector to classify motion. 
+             * Normalizes estimated velocity using the reference frame rate and 
+             * evaluates acceleration using the derivative of velocity over time. 
+             * Implements a hysteresis-based transition logic to stabilize 
+             * state assignments under noisy detection conditions.
+             * 
              * @param mean Current state mean vector containing position and velocity.
              * @param is_lost Flag indicating if the tracklet is in the Lost state.
              * @param tracklet_len Duration of the tracklet in frames.
-             * @param dt Time interval elapsed since the previous update.
+             * @param dt Time interval elapsed since the previous update in seconds.
              */
             void updateState(const KalmanTypes::StateMean& mean, bool is_lost,
                             size_t tracklet_len = 0, float dt = 0.0f);

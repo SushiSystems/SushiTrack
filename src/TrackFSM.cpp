@@ -28,13 +28,16 @@ namespace SushiTrack
     /**
      * @brief Updates the kinematic state based on estimated velocity and acceleration.
      * 
-     * Calculates instantaneous velocity and acceleration from the state mean and 
-     * transitions the FSM state using the configured thresholds.
+     * Analyzes the state vector to determine the object's movement category.
+     * Velocity is normalized to units-per-second using the reference frame rate,
+     * and acceleration is computed as the derivative of velocity over the 
+     * instantaneous time interval. Transitions use a hysteresis margin to 
+     * prevent state flickering under detection noise.
      * 
      * @param mean Current state mean vector containing position and velocity.
      * @param is_lost Flag indicating if the tracklet is in the Lost state.
      * @param tracklet_len Number of consecutive frames the tracklet has been active.
-     * @param dt Time interval elapsed since the previous update.
+     * @param dt Time interval elapsed since the previous update in seconds.
      */
     void TrackFSM::updateState(const KalmanTypes::StateMean& mean, bool is_lost,
                             size_t tracklet_len, float dt)
@@ -45,42 +48,67 @@ namespace SushiTrack
             return;
         }
 
-        const float effective_dt = config_.time_aware ? dt : (1.0f / static_cast<float>(std::max(1, config_.frame_rate)));
+        // 1. ZAMAN BİRİMLERİ (Normalizasyon Hatası Çözümü)
+        const float actual_dt = config_.time_aware ? dt : (1.0f / static_cast<float>(std::max(1, config_.frame_rate)));
+        const float safe_dt = std::max(actual_dt, 0.001f);
+        const float reference_fps = static_cast<float>(std::max(1, config_.frame_rate));
 
-        const float effective_fps = (effective_dt > 0.001f) 
-                                    ? (1.0f / effective_dt)
-                                    : static_cast<float>(std::max(1, config_.frame_rate));
-
-        const float vx_per_sec = mean(4) * effective_fps;
-        const float vy_per_sec = mean(5) * effective_fps;
+        // Kalman durumu frame bazlıdır, saniyeye çevirmek için referans FPS ile çarpılır.
+        const float vx_per_sec = mean(4) * reference_fps;
+        const float vy_per_sec = mean(5) * reference_fps;
         const float vel_residual_per_sec = std::sqrt(vx_per_sec * vx_per_sec + vy_per_sec * vy_per_sec);
 
+        // 2. GHOST ACCELERATION (Hayalet İvme) Çözümü
+        // Eğer nesne az önce kayıptıysa (Coasting) ve geri döndüyse, geçmiş hız hafızasını 
+        // yeni hıza eşitleyerek sahte bir ivme patlamasını engelliyoruz.
+        if (current_state_ == KinematicState::Coasting)
+        {
+            last_vx_per_sec_ = vx_per_sec;
+            last_vy_per_sec_ = vy_per_sec;
+            current_state_ = KinematicState::Cruising; // Nötr durumdan başlat
+            return; 
+        }
+
+        // 3. DOĞRU İVME HESABI
+        // Saniye cinsinden hız farkı, doğrudan geçen anlık zamana (actual_dt) bölünür.
         const float dvx = vx_per_sec - last_vx_per_sec_;
         const float dvy = vy_per_sec - last_vy_per_sec_;
-        const float accel_per_sec2 = std::sqrt(dvx * dvx + dvy * dvy) * effective_fps;
+        const float accel_per_sec2 = std::sqrt(dvx * dvx + dvy * dvy) / safe_dt;
+
+        // Sonraki frame için hızları kaydet
         last_vx_per_sec_ = vx_per_sec;
         last_vy_per_sec_ = vy_per_sec;
 
+        // Isınma (Warmup) süreci
         if (tracklet_len < kWarmupFrames)
         {
             current_state_ = KinematicState::Cruising;
             return;
         }
 
-        if (vel_residual_per_sec < config_.fsm_stationary_vel_thresh)
+        // 4. HYSTERESIS (Titreme Önleyici Ölü Bant) Mantığı
+        const float margin_down = 0.8f; // Eşiğin %20 altı
+        const float margin_up   = 1.2f; // Eşiğin %20 üstü
+
+        if (current_state_ == KinematicState::Stationary)
         {
-            current_state_ = KinematicState::Stationary;
+            if (vel_residual_per_sec > config_.fsm_stationary_vel_thresh * margin_up)
+                current_state_ = KinematicState::Cruising;
         }
-        else if (accel_per_sec2 > config_.fsm_maneuver_accel_thresh)
+        else if (current_state_ == KinematicState::Maneuvering)
         {
-            current_state_ = KinematicState::Maneuvering;
+            if (accel_per_sec2 < config_.fsm_maneuver_accel_thresh * margin_down)
+                current_state_ = KinematicState::Cruising;
         }
-        else
+        else // Mevcut durum: Cruising
         {
-            current_state_ = KinematicState::Cruising;
+            if (vel_residual_per_sec < config_.fsm_stationary_vel_thresh * margin_down)
+                current_state_ = KinematicState::Stationary;
+            else if (accel_per_sec2 > config_.fsm_maneuver_accel_thresh * margin_up)
+                current_state_ = KinematicState::Maneuvering;
         }
     }
-
+    
     /**
      * @brief Adjusts state predictor noise parameters based on the current 
      * kinematic state.

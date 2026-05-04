@@ -140,12 +140,6 @@ extern "C"
         float reid_recovery_thresh;  ///< Maximum allowed cost for visual recovery of lost tracks (effective when enable_reid=1).
         int   max_feature_history;   ///< Maximum number of visual appearance vectors stored per tracklet.
 
-        /**
-         * @brief Number of frames after lost transition during which the
-         * tracker still publishes the predicted bounding box.
-         */
-        int   output_lost_grace_frames;
-
     } SushiTrack_Params;
 
     /**
