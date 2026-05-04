@@ -63,11 +63,7 @@ extern "C"
         params->max_area_ratio     = 50.0f;
         params->motion_cost_weight = 0.15f;
 
-        params->std_weight_position = 0.05f;
-        params->std_weight_velocity = 0.00625f;
-        params->kf_pos_weight       = 2.0f;
-        params->kf_size_weight      = 2.0f;
-        params->kf_vel_weight       = 10.0f;
+
         params->enable_xyah         = 1;
         params->kalman_type         = 0;
         params->iou_plus_one        = 1;
@@ -96,6 +92,9 @@ extern "C"
         params->reid_low_iou_weight  = 0.2f;
         params->reid_recovery_thresh = 0.4f;
         params->max_feature_history  = 100;
+
+        params->primary_assoc_mode   = 1;
+        params->fuse_score           = 0;
     }
 
     /**
@@ -150,11 +149,7 @@ extern "C"
             config.max_area_ratio     = params->max_area_ratio;
             config.motion_cost_weight = params->motion_cost_weight;
 
-            config.std_weight_position = params->std_weight_position;
-            config.std_weight_velocity = params->std_weight_velocity;
-            config.kf_pos_weight       = params->kf_pos_weight;
-            config.kf_size_weight      = params->kf_size_weight;
-            config.kf_vel_weight       = params->kf_vel_weight;
+
 
             config.iou_match_thresh       = params->iou_match_thresh;
             config.unconfirmed_iou_thresh = params->unconfirmed_iou_thresh;
@@ -181,19 +176,18 @@ extern "C"
             config.reid_recovery_thresh = params->reid_recovery_thresh;
             config.max_feature_history  = params->max_feature_history;
 
+            config.primary_assoc_mode   = params->primary_assoc_mode;
+            config.fuse_score           = (params->fuse_score != 0);
+
             auto kf_factory = std::make_shared<SushiTrack::GenericKalmanFactory>(
-                config.kalman_type, config.std_weight_position, config.std_weight_velocity,
-                config.kf_pos_weight, config.kf_size_weight, config.kf_vel_weight,
-                config.enable_xyah);
+                config.kalman_type, config.enable_xyah);
 
             std::shared_ptr<SushiTrack::IGateValidator> active_gate_validator;
 
             if (config.enable_mahalanobis)
             {
                 auto gate_kf = SushiTrack::KalmanFilterRegistry::getInstance().create(
-                    config.kalman_type, config.std_weight_position, config.std_weight_velocity,
-                    config.kf_pos_weight, config.kf_size_weight, config.kf_vel_weight,
-                    config.enable_xyah);
+                    config.kalman_type, config.enable_xyah);
                 
                 if (gate_kf)
                 {
@@ -327,6 +321,21 @@ extern "C"
                  */
                 high_conf_metric = iou_calc;
                 low_conf_metric  = iou_calc;
+            }
+
+            /**
+             * @brief Score fusion is applied to the primary cost matrix only.
+             *
+             * Wrapping low-confidence, tentative, duplicate, and lost-recovery
+             * metrics would over-penalise pairs that are already low-score by
+             * construction (low-confidence pass) or operate on a different
+             * scale (cosine, Mahalanobis). The reference ByteTrack pipeline
+             * uses fuse_score on the first association only, and this matches
+             * that behaviour.
+             */
+            if (config.fuse_score)
+            {
+                high_conf_metric = std::make_shared<SushiTrack::FuseScoreDecorator>(high_conf_metric);
             }
 
             auto impl     = new SushiTrackHdlImpl();

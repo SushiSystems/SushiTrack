@@ -116,11 +116,7 @@ extern "C"
         float max_area_ratio;       ///< Maximum allowed area ratio for candidate pairs.
         float motion_cost_weight;   ///< Weighting factor for motion similarity in fused metrics (effective when enable_mahalanobis=1).
 
-        float std_weight_position;  ///< Process noise multiplier for position components.
-        float std_weight_velocity;  ///< Process noise multiplier for velocity components.
-        float kf_pos_weight;        ///< Multiplier for position state uncertainty.
-        float kf_size_weight;       ///< Multiplier for dimension state uncertainty.
-        float kf_vel_weight;        ///< Multiplier for velocity state uncertainty.
+
         int   enable_xyah;          ///< Flag for centroid-based coordinate representation.
         int   kalman_type;          ///< Type of Kalman Filter (0: Linear, 1: NSA).
         int   iou_plus_one;         ///< Flag for alternate intersection area calculation.
@@ -139,6 +135,28 @@ extern "C"
         float reid_low_iou_weight;   ///< IoU fallback weight in low-confidence ReIDFirst pass.
         float reid_recovery_thresh;  ///< Maximum allowed cost for visual recovery of lost tracks (effective when enable_reid=1).
         int   max_feature_history;   ///< Maximum number of visual appearance vectors stored per tracklet.
+
+        /**
+         * @brief Primary association mode selector.
+         *
+         * 0 = Age-cascade (legacy). Tracks are bucketed by frames-since-last-seen
+         *     and each bucket is solved with an independent LAPJV.
+         * 1 = Global LAPJV (default). Single cost matrix and single LAPJV solve
+         *     over the union of all candidate tracks; identical to the
+         *     reference ByteTrack pipeline. Recommended for clean / high-
+         *     confidence detections where the global optimum is preferable.
+         */
+        int   primary_assoc_mode;
+
+        /**
+         * @brief Score fusion flag for the primary association cost matrix.
+         *
+         * When non-zero, the high-confidence cost matrix is rescaled with the
+         * detection confidence (cost' = 1 - (1 - cost) * score), giving
+         * high-confidence pairs lower association cost. Matches the reference
+         * ByteTrack fuse_score behaviour. Off by default.
+         */
+        int   fuse_score;
 
     } SushiTrack_Params;
 

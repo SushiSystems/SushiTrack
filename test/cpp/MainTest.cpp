@@ -18,6 +18,7 @@
 #include "OCSORTAdapter.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -29,6 +30,14 @@ namespace fs = std::filesystem;
 
 static std::string resolveConfig()
 {
+    // Allow the user to point at any config file (e.g. data/config.bytetrack_identical.json)
+    // without recompiling. Falls back to the default search path if the variable is unset.
+    if (const char* env_path = std::getenv("SUSHITRACK_CONFIG"))
+    {
+        if (env_path[0] != '\0' && fs::exists(env_path))
+            return std::string(env_path);
+    }
+
     for (const auto& p : {"data/config.json", "test/data/config.json"})
         if (fs::exists(p)) return p;
     return "";

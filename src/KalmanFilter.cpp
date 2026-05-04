@@ -29,28 +29,16 @@ namespace SushiTrack
     using StateHCov  = Eigen::Matrix<float, 4, 4, Eigen::RowMajor>;
 
     /**
-     * @brief Initializes the Kalman filter with noise parameters.
-     * 
-     * @param std_weight_position Standard deviation weight for position state.
-     * @param std_weight_velocity Standard deviation weight for velocity state.
-     * @param kf_pos_weight Scaling weight for position uncertainty.
-     * @param kf_size_weight Scaling weight for size uncertainty.
-     * @param kf_vel_weight Scaling weight for velocity uncertainty.
+     * @brief Initializes the Kalman filter with the configured coordinate system.
+     *
+     * Noise constants are fixed to the reference ByteTrack tuning (see
+     * KalmanFilter::kStdWeightPosition / kStdWeightVelocity / kInitPositionMult
+     * / kInitVelocityMult).
+     *
      * @param enable_xyah Flag for using [center_x, center_y, aspect_ratio, height] format.
      */
-    KalmanFilter::KalmanFilter(float std_weight_position,
-                                float std_weight_velocity,
-                                float kf_pos_weight,
-                                float kf_size_weight,
-                                float kf_vel_weight,
-                                bool  enable_xyah)
-        : std_weight_position_(std_weight_position),
-        std_weight_velocity_(std_weight_velocity),
-        kf_pos_weight_(kf_pos_weight),
-        kf_size_weight_(kf_size_weight),
-        kf_vel_weight_(kf_vel_weight),
-        enable_xyah_(enable_xyah)
-
+    KalmanFilter::KalmanFilter(bool enable_xyah)
+        : enable_xyah_(enable_xyah)
     {
         motion_mat_.setIdentity();
         update_mat_.setIdentity();
@@ -69,31 +57,34 @@ namespace SushiTrack
         mean.block<1, 4>(0, 0) = measurement.block<1, 4>(0, 0);
         mean.block<1, 4>(0, 4) = Eigen::RowVector4f::Zero();
 
+        constexpr float k_pos_init = kInitPositionMult * kStdWeightPosition;
+        constexpr float k_vel_init = kInitVelocityMult * kStdWeightVelocity;
+
         StateMean std_vec;
         if (enable_xyah_)
         {
             float height = std::max(1e-2f, measurement[3]);
-            std_vec(0) = kf_pos_weight_ * std_weight_position_ * height;
-            std_vec(1) = kf_pos_weight_ * std_weight_position_ * height;
+            std_vec(0) = k_pos_init * height;
+            std_vec(1) = k_pos_init * height;
             std_vec(2) = 1e-2f;
-            std_vec(3) = kf_pos_weight_ * std_weight_position_ * height;
-            std_vec(4) = kf_vel_weight_ * std_weight_velocity_ * height;
-            std_vec(5) = kf_vel_weight_ * std_weight_velocity_ * height;
+            std_vec(3) = k_pos_init * height;
+            std_vec(4) = k_vel_init * height;
+            std_vec(5) = k_vel_init * height;
             std_vec(6) = 1e-5f;
-            std_vec(7) = kf_vel_weight_ * std_weight_velocity_ * height;
+            std_vec(7) = k_vel_init * height;
         }
         else
         {
             float width  = std::max(1e-2f, measurement[2]);
             float height = std::max(1e-2f, measurement[3]);
-            std_vec(0) = kf_pos_weight_  * std_weight_position_ * width;
-            std_vec(1) = kf_pos_weight_  * std_weight_position_ * height;
-            std_vec(2) = kf_size_weight_ * std_weight_position_ * width;
-            std_vec(3) = kf_size_weight_ * std_weight_position_ * height;
-            std_vec(4) = kf_vel_weight_  * std_weight_velocity_ * width;
-            std_vec(5) = kf_vel_weight_  * std_weight_velocity_ * height;
-            std_vec(6) = kf_vel_weight_  * std_weight_velocity_ * width;
-            std_vec(7) = kf_vel_weight_  * std_weight_velocity_ * height;
+            std_vec(0) = k_pos_init * width;
+            std_vec(1) = k_pos_init * height;
+            std_vec(2) = k_pos_init * width;
+            std_vec(3) = k_pos_init * height;
+            std_vec(4) = k_vel_init * width;
+            std_vec(5) = k_vel_init * height;
+            std_vec(6) = k_vel_init * width;
+            std_vec(7) = k_vel_init * height;
         }
 
         covariance = std_vec.array().square().matrix().asDiagonal();
@@ -108,12 +99,19 @@ namespace SushiTrack
      * variance, which is too aggressive once dt deviates from one and inflates
      * uncertainty enough to cause wrong re-associations on multi-frame recoveries.
      *
-     * The position and size baseline noise is multiplied by kf_pos_weight and
-     * kf_size_weight respectively so that the per-step process noise stays
-     * proportional to the measurement noise in project(). This restores the
-     * predict-to-measure noise ratio that the underlying ByteTrack tuning assumes
-     * and prevents the Kalman gain from collapsing toward zero when kf_pos_weight
-     * is greater than one.
+     * Process noise is held at the bytetrack reference scale: a single std_pos
+     * baseline for the position/size components and a single std_vel baseline
+     * for the velocity components, both proportional to the dominant box
+     * dimension. The kf_pos_weight / kf_vel_weight multipliers are intentionally
+     * NOT applied here. They expand the *initial* covariance in initiate() to
+     * match the bytetrack reference (2x position, 10x velocity), but applying
+     * them again per step inflates the steady-state process and measurement
+     * noise relative to bytetrack and shifts the Kalman gain toward measurement-
+     * only updates. That destroys the velocity estimate between frames and
+     * shows up as elevated IDSW and reduced AssA on clean sequences.
+     *
+     * Per-state dynamic_*_mult multipliers (set transiently by the FSM) still
+     * apply because they encode short-term motion regime changes.
      *
      * @param mean Reference to state mean for prediction.
      * @param covariance Reference to state covariance for prediction.
@@ -131,27 +129,27 @@ namespace SushiTrack
         if (enable_xyah_)
         {
             float height = std::max(1e-2f, mean(3));
-            std_vec(0) = dynamic_pos_mult_  * kf_pos_weight_  * std_weight_position_ * height * dt;
-            std_vec(1) = dynamic_pos_mult_  * kf_pos_weight_  * std_weight_position_ * height * dt;
+            std_vec(0) = dynamic_pos_mult_  * kStdWeightPosition * height * dt;
+            std_vec(1) = dynamic_pos_mult_  * kStdWeightPosition * height * dt;
             std_vec(2) = 1e-2f * dt;
-            std_vec(3) = dynamic_size_mult_ * kf_pos_weight_  * std_weight_position_ * height * dt;
-            std_vec(4) = dynamic_vel_mult_  * kf_vel_weight_  * std_weight_velocity_ * height * dt;
-            std_vec(5) = dynamic_vel_mult_  * kf_vel_weight_  * std_weight_velocity_ * height * dt;
+            std_vec(3) = dynamic_size_mult_ * kStdWeightPosition * height * dt;
+            std_vec(4) = dynamic_vel_mult_  * kStdWeightVelocity * height * dt;
+            std_vec(5) = dynamic_vel_mult_  * kStdWeightVelocity * height * dt;
             std_vec(6) = 1e-5f * dt;
-            std_vec(7) = dynamic_vel_mult_  * kf_vel_weight_  * std_weight_velocity_ * height * dt;
+            std_vec(7) = dynamic_vel_mult_  * kStdWeightVelocity * height * dt;
         }
         else
         {
             float width  = std::max(1e-2f, mean(2));
             float height = std::max(1e-2f, mean(3));
-            std_vec(0) = dynamic_pos_mult_  * kf_pos_weight_  * std_weight_position_ * width  * dt;
-            std_vec(1) = dynamic_pos_mult_  * kf_pos_weight_  * std_weight_position_ * height * dt;
-            std_vec(2) = dynamic_size_mult_ * kf_size_weight_ * std_weight_position_ * width  * dt;
-            std_vec(3) = dynamic_size_mult_ * kf_size_weight_ * std_weight_position_ * height * dt;
-            std_vec(4) = dynamic_vel_mult_  * kf_vel_weight_  * std_weight_velocity_ * width  * dt;
-            std_vec(5) = dynamic_vel_mult_  * kf_vel_weight_  * std_weight_velocity_ * height * dt;
-            std_vec(6) = dynamic_vel_mult_  * kf_vel_weight_  * std_weight_velocity_ * width  * dt;
-            std_vec(7) = dynamic_vel_mult_  * kf_vel_weight_  * std_weight_velocity_ * height * dt;
+            std_vec(0) = dynamic_pos_mult_  * kStdWeightPosition * width  * dt;
+            std_vec(1) = dynamic_pos_mult_  * kStdWeightPosition * height * dt;
+            std_vec(2) = dynamic_size_mult_ * kStdWeightPosition * width  * dt;
+            std_vec(3) = dynamic_size_mult_ * kStdWeightPosition * height * dt;
+            std_vec(4) = dynamic_vel_mult_  * kStdWeightVelocity * width  * dt;
+            std_vec(5) = dynamic_vel_mult_  * kStdWeightVelocity * height * dt;
+            std_vec(6) = dynamic_vel_mult_  * kStdWeightVelocity * width  * dt;
+            std_vec(7) = dynamic_vel_mult_  * kStdWeightVelocity * height * dt;
         }
 
         StateMean tmp = std_vec.array().square();
@@ -355,7 +353,15 @@ namespace SushiTrack
 
     /**
      * @brief Projects the state distribution into the measurement space.
-     * 
+     *
+     * Measurement noise is held at the bytetrack reference scale: a single
+     * std_pos baseline proportional to the dominant box dimension. The
+     * kf_pos_weight / kf_size_weight multipliers are intentionally NOT
+     * applied here for the same reason they are not applied in predict():
+     * they only adjust the initial covariance in initiate(), and reusing
+     * them at every project step changes the steady-state innovation gain
+     * relative to the bytetrack reference.
+     *
      * @param projected_mean Output projected mean vector.
      * @param projected_cov Output projected covariance matrix.
      * @param mean Current state mean vector.
@@ -373,17 +379,17 @@ namespace SushiTrack
         DetectBox std_vec;
         if (enable_xyah_)
         {
-            std_vec << kf_pos_weight_ * std_weight_position_ * height,
-                    kf_pos_weight_ * std_weight_position_ * height,
+            std_vec << kStdWeightPosition * height,
+                    kStdWeightPosition * height,
                     1e-1f,
-                    kf_pos_weight_ * std_weight_position_ * height;
+                    kStdWeightPosition * height;
         }
         else
         {
-            std_vec << kf_pos_weight_ * std_weight_position_ * width,
-                    kf_pos_weight_ * std_weight_position_ * height,
-                    kf_size_weight_ * std_weight_position_ * width,
-                    kf_size_weight_ * std_weight_position_ * height;
+            std_vec << kStdWeightPosition * width,
+                    kStdWeightPosition * height,
+                    kStdWeightPosition * width,
+                    kStdWeightPosition * height;
         }
 
         projected_mean = (update_mat_ * mean.transpose()).transpose();
@@ -419,27 +425,27 @@ namespace SushiTrack
         if (enable_xyah_)
         {
             float height = std::max(1e-2f, measurement[3]);
-            std_vec(0) = kf_pos_weight_ * std_weight_position_ * height * linear_std_scale;
-            std_vec(1) = kf_pos_weight_ * std_weight_position_ * height * linear_std_scale;
+            std_vec(0) = kInitPositionMult * kStdWeightPosition * height * linear_std_scale;
+            std_vec(1) = kInitPositionMult * kStdWeightPosition * height * linear_std_scale;
             std_vec(2) = 1e-2f;
-            std_vec(3) = kf_pos_weight_ * std_weight_position_ * height * linear_std_scale;
-            std_vec(4) = kf_vel_weight_ * std_weight_velocity_ * height;
-            std_vec(5) = kf_vel_weight_ * std_weight_velocity_ * height;
+            std_vec(3) = kInitPositionMult * kStdWeightPosition * height * linear_std_scale;
+            std_vec(4) = kInitVelocityMult * kStdWeightVelocity * height;
+            std_vec(5) = kInitVelocityMult * kStdWeightVelocity * height;
             std_vec(6) = 1e-5f;
-            std_vec(7) = kf_vel_weight_ * std_weight_velocity_ * height;
+            std_vec(7) = kInitVelocityMult * kStdWeightVelocity * height;
         }
         else
         {
             float width  = std::max(1e-2f, measurement[2]);
             float height = std::max(1e-2f, measurement[3]);
-            std_vec(0) = kf_pos_weight_  * std_weight_position_ * width * linear_std_scale;
-            std_vec(1) = kf_pos_weight_  * std_weight_position_ * height * linear_std_scale;
-            std_vec(2) = kf_size_weight_ * std_weight_position_ * width * linear_std_scale;
-            std_vec(3) = kf_size_weight_ * std_weight_position_ * height * linear_std_scale;
-            std_vec(4) = kf_vel_weight_  * std_weight_velocity_ * width;
-            std_vec(5) = kf_vel_weight_  * std_weight_velocity_ * height;
-            std_vec(6) = kf_vel_weight_  * std_weight_velocity_ * width;
-            std_vec(7) = kf_vel_weight_  * std_weight_velocity_ * height;
+            std_vec(0) = kInitPositionMult * kStdWeightPosition * width * linear_std_scale;
+            std_vec(1) = kInitPositionMult * kStdWeightPosition * height * linear_std_scale;
+            std_vec(2) = kInitPositionMult * kStdWeightPosition * width * linear_std_scale;
+            std_vec(3) = kInitPositionMult * kStdWeightPosition * height * linear_std_scale;
+            std_vec(4) = kInitVelocityMult * kStdWeightVelocity * width;
+            std_vec(5) = kInitVelocityMult * kStdWeightVelocity * height;
+            std_vec(6) = kInitVelocityMult * kStdWeightVelocity * width;
+            std_vec(7) = kInitVelocityMult * kStdWeightVelocity * height;
         }
 
         covariance = std_vec.array().square().matrix().asDiagonal();
@@ -448,8 +454,12 @@ namespace SushiTrack
     /**
      * @brief Projects the state distribution into the measurement space with NSA scaling.
      *
-     * The measurement noise standard deviations are scaled by (1 - score) so that
-     * low-confidence observations contribute less to the Kalman update.
+     * The measurement noise standard deviations are scaled by sqrt(1 - score)
+     * so that low-confidence observations contribute less to the Kalman update.
+     * The kf_pos_weight / kf_size_weight multipliers are intentionally NOT
+     * applied here — see the base KalmanFilter::project rationale: those
+     * multipliers only expand the initial covariance in initiate(), and reusing
+     * them at every project step shifts the steady-state innovation gain.
      *
      * @param projected_mean Output projected mean vector.
      * @param projected_cov Output projected covariance matrix.
@@ -471,17 +481,17 @@ namespace SushiTrack
         DetectBox std_vec;
         if (enable_xyah_)
         {
-            std_vec << kf_pos_weight_ * std_weight_position_ * height * linear_std_scale,
-                    kf_pos_weight_ * std_weight_position_ * height * linear_std_scale,
+            std_vec << kStdWeightPosition * height * linear_std_scale,
+                    kStdWeightPosition * height * linear_std_scale,
                     1e-1f,
-                    kf_pos_weight_ * std_weight_position_ * height * linear_std_scale;
+                    kStdWeightPosition * height * linear_std_scale;
         }
         else
         {
-            std_vec << kf_pos_weight_ * std_weight_position_ * width * linear_std_scale,
-                    kf_pos_weight_ * std_weight_position_ * height * linear_std_scale,
-                    kf_size_weight_ * std_weight_position_ * width * linear_std_scale,
-                    kf_size_weight_ * std_weight_position_ * height * linear_std_scale;
+            std_vec << kStdWeightPosition * width * linear_std_scale,
+                    kStdWeightPosition * height * linear_std_scale,
+                    kStdWeightPosition * width * linear_std_scale,
+                    kStdWeightPosition * height * linear_std_scale;
         }
 
         projected_mean = (update_mat_ * mean.transpose()).transpose();
@@ -502,12 +512,8 @@ namespace SushiTrack
      * @param kf_vel_weight Multiplier applied to velocity-related uncertainty.
      * @param enable_xyah Flag selecting the xyah coordinate parameterization.
      */
-    GenericKalmanFactory::GenericKalmanFactory(int kalman_type, float std_weight_pos, float std_weight_vel,
-                                               float kf_pos_weight, float kf_size_weight, float kf_vel_weight,
-                                               bool enable_xyah)
-        : kalman_type_(kalman_type), std_weight_pos_(std_weight_pos), std_weight_vel_(std_weight_vel),
-          kf_pos_weight_(kf_pos_weight), kf_size_weight_(kf_size_weight), kf_vel_weight_(kf_vel_weight),
-          enable_xyah_(enable_xyah) {}
+    GenericKalmanFactory::GenericKalmanFactory(int kalman_type, bool enable_xyah)
+        : kalman_type_(kalman_type), enable_xyah_(enable_xyah) {}
 
     /**
      * @brief Instantiates a state predictor through the registry.
@@ -520,7 +526,7 @@ namespace SushiTrack
     std::unique_ptr<IStatePredictor> GenericKalmanFactory::create() const
     {
         return KalmanFilterRegistry::getInstance().create(
-            kalman_type_, std_weight_pos_, std_weight_vel_, kf_pos_weight_, kf_size_weight_, kf_vel_weight_, enable_xyah_);
+            kalman_type_, enable_xyah_);
     }
 
 } // namespace SushiTrack

@@ -194,12 +194,6 @@ namespace TestInfrastructure
                 p.max_area_ratio     = gf("max_area_ratio",     p.max_area_ratio);
                 p.motion_cost_weight = gf("motion_cost_weight", p.motion_cost_weight);
 
-                p.std_weight_position = gf("std_weight_position", p.std_weight_position);
-                p.std_weight_velocity = gf("std_weight_velocity", p.std_weight_velocity);
-                p.kf_pos_weight       = gf("kf_pos_weight",       p.kf_pos_weight);
-                p.kf_size_weight      = gf("kf_size_weight",      p.kf_size_weight);
-                p.kf_vel_weight       = gf("kf_vel_weight",       p.kf_vel_weight);
-
                 p.iou_match_thresh       = gf("iou_match_thresh",       p.iou_match_thresh);
                 p.unconfirmed_iou_thresh = gf("unconfirmed_iou_thresh", p.unconfirmed_iou_thresh);
                 p.duplicate_iou_thresh   = gf("duplicate_iou_thresh",   p.duplicate_iou_thresh);
@@ -213,8 +207,10 @@ namespace TestInfrastructure
                 p.reid_recovery_thresh = gf("reid_recovery_thresh", p.reid_recovery_thresh);
                 p.max_feature_history  = gi("max_feature_history",  p.max_feature_history);
 
+                p.primary_assoc_mode   = gi("primary_assoc_mode",   p.primary_assoc_mode);
+                p.fuse_score           = gi("fuse_score",           p.fuse_score);
+
                 // Note: The following fields are experimental and not exposed in the C API:
-                // - primary_assoc_mode (internal C++ only)
                 // - enable_ocm, ocm_weight, ocm_delta_t (experimental features)
                 // - enable_oos (experimental smoothing)
                 // These can be accessed via C++ API (TrackerConfig) if needed.

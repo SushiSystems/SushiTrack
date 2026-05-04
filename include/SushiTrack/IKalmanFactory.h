@@ -42,20 +42,7 @@ namespace SushiTrack
     class GenericKalmanFactory : public IKalmanFactory
     {
         public:
-            /**
-             * @brief Initializes the factory with dynamic type and baseline noise parameters.
-             * 
-             * @param kalman_type Identifier for the Kalman filter type.
-             * @param std_weight_pos Baseline uncertainty for position.
-             * @param std_weight_vel Baseline uncertainty for velocity.
-             * @param kf_pos_weight Scaling factor for position uncertainty.
-             * @param kf_size_weight Scaling factor for size uncertainty.
-             * @param kf_vel_weight Scaling factor for velocity uncertainty.
-             * @param enable_xyah Coordinate system selection flag.
-             */
-            GenericKalmanFactory(int kalman_type, float std_weight_pos = 0.05f, float std_weight_vel = 0.00625f,
-                                 float kf_pos_weight = 2.0f, float kf_size_weight = 2.0f, float kf_vel_weight = 10.0f,
-                                 bool enable_xyah = false);
+            GenericKalmanFactory(int kalman_type, bool enable_xyah = false);
 
             /**
              * @brief Generates a new state predictor instance from the registry.
@@ -66,7 +53,6 @@ namespace SushiTrack
 
         private:
             int kalman_type_;
-            float std_weight_pos_, std_weight_vel_, kf_pos_weight_, kf_size_weight_, kf_vel_weight_;
             bool enable_xyah_;
     };
 

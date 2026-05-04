@@ -279,7 +279,20 @@ namespace SushiTrack
 
     /**
      * @brief Performs association between tracks and high-confidence detections.
-     * 
+     *
+     * Two strategies are supported, selected by config_.primary_assoc_mode:
+     *   0 = Age-cascade (legacy). Tracks are bucketed by frames-since-last-seen
+     *       and each bucket is solved as an independent LAPJV. This favours the
+     *       freshest tracks in contested matches and tends to suppress ID
+     *       switches in heavy occlusion regimes at the cost of denying the
+     *       global optimum to high-confidence clean detections.
+     *   1 = Global LAPJV (ByteTrack-identical). A single cost matrix is built
+     *       over the union of all candidate tracks and all high-confidence
+     *       detections and solved with one LAPJV call. This matches the
+     *       reference BYTETracker pipeline (3rdparty/bytetrack/BYTETracker.cpp
+     *       lines 82-118) and preserves the global optimum, which improves
+     *       DetA on clean / high-confidence sequences.
+     *
      * @param tracklet_pool Collection of candidate tracklets for matching.
      * @param det_high Collection of high-confidence observations.
      * @param activated_tracklets Output list for successfully updated tracks.
@@ -294,6 +307,79 @@ namespace SushiTrack
                                             std::vector<TrackletPtr>& track_remaining,
                                             std::vector<TrackletPtr>& det_high_remaining)
     {
+        if (config_.primary_assoc_mode == 1)
+        {
+            // ----- Global LAPJV (ByteTrack-identical) -----
+            // Single cost matrix and single solve over the entire candidate set.
+            // Mirrors byte_track::BYTETracker::update step 2 exactly so that, with
+            // matching cost calculator and thresholds, the assignment is bit-for-bit
+            // identical to the reference implementation.
+
+            if (tracklet_pool.empty())
+            {
+                det_high_remaining = det_high;
+                return;
+            }
+
+            if (det_high.empty())
+            {
+                for (auto& t : tracklet_pool)
+                {
+                    if (t->getTrackState() == TrackState::Tracked)
+                        track_remaining.push_back(t);
+                }
+                det_high_remaining.clear();
+                return;
+            }
+
+            std::vector<std::vector<int>> matches;
+            std::vector<int> u_track, u_det;
+
+            high_conf_metric_->calculate(tracklet_pool, det_high, main_cost_matrix_);
+
+            solver_->solve(main_cost_matrix_,
+                        (int)tracklet_pool.size(),
+                        (int)det_high.size(),
+                        config_.match_thresh,
+                        matches, u_track, u_det);
+
+            for (auto& m : matches)
+            {
+                auto& track = tracklet_pool[m[0]];
+                auto& det   = det_high[m[1]];
+
+                if (track->getTrackState() == TrackState::Tracked)
+                {
+                    track->update(*det, frame_id_);
+                    activated_tracklets.push_back(track);
+                }
+                else
+                {
+                    track->reActivate(*det, frame_id_);
+                    refind_tracklets.push_back(track);
+                    SUSHITRACK_LOG_DEBUG("[Tracker] Track %llu recovered from Lost state (Global LAPJV).",
+                        (unsigned long long)track->getTrackId());
+                }
+            }
+
+            for (int idx : u_track)
+            {
+                if (tracklet_pool[idx]->getTrackState() == TrackState::Tracked)
+                {
+                    track_remaining.push_back(tracklet_pool[idx]);
+                }
+            }
+
+            det_high_remaining.clear();
+            det_high_remaining.reserve(u_det.size());
+            for (int idx : u_det)
+            {
+                det_high_remaining.push_back(det_high[idx]);
+            }
+            return;
+        }
+
+        // ----- Age-cascade (legacy mode 0) -----
         det_high_remaining = det_high;
 
         std::map<size_t, std::vector<TrackletPtr>> tracks_by_age;
@@ -847,7 +933,17 @@ namespace SushiTrack
 
     /**
      * @brief Eliminates redundant tracklets based on spatial overlap thresholds.
-     * 
+     *
+     * Two tracklets that occupy nearly identical regions are treated as
+     * duplicates; the longer-lived one is retained. Track lifetime is the
+     * span between the current observation frame and the track's start
+     * frame, mirroring the reference ByteTrack policy
+     * (BYTETracker.cpp:300-310). The previous "freshness" rule
+     * (frame_id - getFrameId()) is incorrect for this purpose: a Tracked
+     * track always has freshness 0 and would automatically win against any
+     * just-recovered Lost track, which churns identities on crowded scenes
+     * where a long-tracked target temporarily overlaps a young one.
+     *
      * @param a First collection of candidate tracklets.
      * @param b Second collection of candidate tracklets.
      * @param a_res Output collection from the first set after duplication removal.
@@ -867,10 +963,12 @@ namespace SushiTrack
             {
                 if (iou_cost_matrix_(i, j) < config_.duplicate_iou_thresh)
                 {
-                    int ta = (int)(frame_id_ - a[i]->getFrameId());
-                    int tb = (int)(frame_id_ - b[j]->getFrameId());
-                    if (ta > tb) a_dup[i] = true;
-                    else b_dup[j] = true;
+                    // Lifetime: how many frames the track has existed for.
+                    // Longer-lived track wins; the younger one is dropped.
+                    const int ta = (int)(a[i]->getFrameId() - a[i]->getStartFrameId());
+                    const int tb = (int)(b[j]->getFrameId() - b[j]->getStartFrameId());
+                    if (ta > tb) b_dup[j] = true;
+                    else         a_dup[i] = true;
                 }
             }
         }

@@ -21,7 +21,7 @@ namespace SushiTrack
     /**
      * @brief Signature for Kalman filter instantiation functions.
      */
-    using KalmanCreator = std::function<std::unique_ptr<IKalmanFilter>(float, float, float, float, float, bool)>;
+    using KalmanCreator = std::function<std::unique_ptr<IKalmanFilter>(bool)>;
 
     /**
      * @brief Singleton registry for managing and instantiating Kalman filters.
@@ -67,14 +67,12 @@ namespace SushiTrack
              * @param enable_xyah Flag for coordinate system selection.
              * @return Unique pointer to the newly instantiated Kalman filter, or nullptr if type is not registered.
              */
-            std::unique_ptr<IKalmanFilter> create(int type, float std_weight_pos, float std_weight_vel, 
-                                                  float kf_pos_weight, float kf_size_weight, float kf_vel_weight, 
-                                                  bool enable_xyah) const
+            std::unique_ptr<IKalmanFilter> create(int type, bool enable_xyah) const
             {
                 auto it = creators_.find(type);
                 if (it != creators_.end())
                 {
-                    return it->second(std_weight_pos, std_weight_vel, kf_pos_weight, kf_size_weight, kf_vel_weight, enable_xyah);
+                    return it->second(enable_xyah);
                 }
                 SUSHITRACK_LOG_ERROR(("[KalmanFilterRegistry] Unregistered Kalman type requested: " + std::to_string(type)).c_str());
                 return nullptr;
@@ -101,8 +99,8 @@ namespace SushiTrack
         explicit KalmanFilterRegistrar(int type)
         {
             KalmanFilterRegistry::getInstance().registerCreator(type, 
-                [](float p1, float p2, float p3, float p4, float p5, bool enable_xyah) {
-                    return std::make_unique<T>(p1, p2, p3, p4, p5, enable_xyah);
+                [](bool enable_xyah) {
+                    return std::make_unique<T>(enable_xyah);
                 });
         }
     };

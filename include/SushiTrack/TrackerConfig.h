@@ -73,14 +73,7 @@ namespace SushiTrack
         int   tentative_slow_hits_offset  = 1;     ///< Additional hits required for slow-moving tracks.
         int   tentative_vslow_hits_offset = 2;     ///< Additional hits required for very low confidence tracks.
 
-        // --- Kalman Filter Weights ---
-        float std_weight_position = 0.05f;    ///< Baseline uncertainty multiplier for position components.
-        float std_weight_velocity = 0.00625f; ///< Baseline uncertainty multiplier for velocity components.
 
-        // --- Kalman Sensitivity Multipliers ---
-        float kf_pos_weight  = 2.0f;  ///< Multiplier for position state uncertainty.
-        float kf_size_weight = 2.0f;  ///< Multiplier for dimension state uncertainty.
-        float kf_vel_weight  = 10.0f; ///< Multiplier for velocity state uncertainty.
 
         /**
          * @brief Coordinate and distance settings.
@@ -117,6 +110,17 @@ namespace SushiTrack
          * greedy strategy and matches the BYTE reference implementation.
          */
         int   primary_assoc_mode = 1;
+
+        /**
+         * @brief Score fusion for the primary association cost matrix.
+         *
+         * When enabled, the high-confidence cost matrix is rescaled by the
+         * detection confidence score so that high-confidence pairs receive
+         * proportionally lower cost (cost' = 1 - (1 - cost) * score). Mirrors
+         * the reference ByteTrack fuse_score behaviour. Off by default to
+         * preserve bit-for-bit compatibility with prior runs.
+         */
+        bool  fuse_score = false;
 
     };
     

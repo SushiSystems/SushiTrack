@@ -28,21 +28,25 @@ namespace SushiTrack
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
             /**
-             * @brief Initializes a Kalman Filter with specified noise parameters.
+             * @brief Baseline noise constants matching the reference ByteTrack tuning.
              *
-             * @param std_weight_position Baseline uncertainty for position.
-             * @param std_weight_velocity Baseline uncertainty for velocity.
-             * @param kf_pos_weight Scaling factor for position uncertainty.
-             * @param kf_size_weight Scaling factor for size uncertainty.
-             * @param kf_vel_weight Scaling factor for velocity uncertainty.
+             * These values replace the previous configurable hyperparameters
+             * (std_weight_position / std_weight_velocity / kf_*_weight). They
+             * are calibrated against the ByteTrack reference implementation
+             * and exposing them as user knobs offered no measurable benefit
+             * across the MOT17 / MOT20 benchmarks.
+             */
+            static constexpr float kStdWeightPosition = 1.0f / 20.0f;
+            static constexpr float kStdWeightVelocity = 1.0f / 160.0f;
+            static constexpr float kInitPositionMult  = 2.0f;
+            static constexpr float kInitVelocityMult  = 10.0f;
+
+            /**
+             * @brief Initializes a Kalman Filter with the configured coordinate system.
+             *
              * @param enable_xyah Flag for coordinate system selection.
              */
-            KalmanFilter(float std_weight_position = 0.05f,
-                        float std_weight_velocity = 0.00625f,
-                        float kf_pos_weight = 2.0f,
-                        float kf_size_weight = 2.0f,
-                        float kf_vel_weight = 10.0f,
-                        bool  enable_xyah = false);
+            explicit KalmanFilter(bool enable_xyah = false);
 
             ~KalmanFilter() override = default;
 
@@ -134,12 +138,6 @@ namespace SushiTrack
             void setNoiseMultipliers(float pos_mult, float size_mult, float vel_mult) override;
 
         protected:
-            float std_weight_position_;
-            float std_weight_velocity_;
-            float kf_pos_weight_;
-            float kf_size_weight_;
-            float kf_vel_weight_;
-
             float dynamic_pos_mult_  = 1.0f;
             float dynamic_size_mult_ = 1.0f;
             float dynamic_vel_mult_  = 1.0f;

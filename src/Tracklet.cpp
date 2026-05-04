@@ -197,19 +197,36 @@ namespace SushiTrack
      * 
      * @param dt Time interval for prediction.
      */
-    void Tracklet::predict(float dt) 
+    void Tracklet::predict(float dt)
     {
         std::lock_guard<std::mutex> lock(state_mutex_);
 
         last_dt_ = dt;
 
-        if (state_ != TrackState::Tracked) 
+        if (state_ != TrackState::Tracked)
         {
-            mean_[6] = 0.f;
-            mean_[7] = 0.f;
-
-            mean_[4] *= 0.95f; 
-            mean_[5] *= 0.95f;
+            // Match the reference ByteTrack STrack::predict policy: when a
+            // track is not actively being observed, freeze the size-velocity
+            // components only. Position velocity is left intact so that a
+            // walking target keeps propagating through brief occlusions and
+            // gets re-acquired close to its true position when a detection
+            // reappears. The previous policy zeroed aspect/height velocity
+            // AND damped (x, y) velocity by 5% per frame, which made Lost
+            // tracks stall and produced wrong-position re-associations on
+            // clean sequences (visible as elevated IDSW on MOT17-04-SDP).
+            if (enable_xyah_)
+            {
+                // state = [x, y, a, h, vx, vy, va, vh]
+                // freeze height velocity, leave (vx, vy, va) intact.
+                mean_[7] = 0.f;
+            }
+            else
+            {
+                // state = [x, y, w, h, vx, vy, vw, vh]
+                // freeze size velocities (vw, vh), leave (vx, vy) intact.
+                mean_[6] = 0.f;
+                mean_[7] = 0.f;
+            }
         }
 
         if (fsm_ && kf_) 

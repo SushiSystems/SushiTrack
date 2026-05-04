@@ -585,6 +585,60 @@ namespace SushiTrack
         return motion_d;
     }
 
+    /**
+     * @brief Applies score-weighted rescaling to an inner cost matrix.
+     *
+     * Delegates the geometric cost computation to the wrapped calculator and
+     * then rescales each populated cell using the corresponding detection
+     * score. Cells flagged as invalid by the inner calculator (sentinel
+     * values >= 1e3) are left untouched so the assignment solver keeps
+     * rejecting them.
+     *
+     * The fusion formula is identical to the reference ByteTrack
+     * implementation: cost' = 1 - (1 - cost) * score, which rewards
+     * high-confidence detections without affecting low-confidence pairs more
+     * than the inner calculator already did.
+     *
+     * @param a Collection of source tracklets.
+     * @param b Collection of target tracklets (observations).
+     * @param out_matrix Output cost matrix populated by the inner calculator and rescaled in-place.
+     */
+    void FuseScoreDecorator::calculate(const std::vector<TrackletPtr>& __restrict a,
+                                       const std::vector<TrackletPtr>& __restrict b,
+                                       CostMatrix& __restrict out_matrix)
+    {
+        inner_->calculate(a, b, out_matrix);
+        if (a.empty() || b.empty()) return;
+
+        constexpr float kSentinel = 1e3f;
+
+        for (size_t j = 0; j < b.size(); ++j)
+        {
+            const float score = std::clamp(b[j]->getScore(), 0.0f, 1.0f);
+            for (size_t i = 0; i < a.size(); ++i)
+            {
+                float c = out_matrix(i, j);
+                if (c >= kSentinel) continue;
+                out_matrix(i, j) = 1.0f - (1.0f - c) * score;
+            }
+        }
+    }
+
+    /**
+     * @brief Single-pair score-weighted cost.
+     *
+     * @param a Source tracklet.
+     * @param b Candidate tracklet.
+     * @return float Score-fused association cost.
+     */
+    float FuseScoreDecorator::calculate_single(const TrackletPtr& a, const TrackletPtr& b) const
+    {
+        float c = inner_->calculate_single(a, b);
+        if (c >= 1e3f) return c;
+        const float score = std::clamp(b->getScore(), 0.0f, 1.0f);
+        return 1.0f - (1.0f - c) * score;
+    }
+
     GatedIoUCostCalculator::GatedIoUCostCalculator(float gating_thresh,
                                                 std::shared_ptr<IGateValidator> gate_validator,
                                                 std::shared_ptr<ICostCalculator> iou_calc,

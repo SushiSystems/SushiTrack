@@ -249,9 +249,54 @@ namespace SushiTrack
     };
 
     /**
+     * @brief Score-fusion decorator for any IoU-based cost calculator.
+     *
+     * Wraps an inner ICostCalculator and rescales the produced cost matrix so
+     * that detections with a higher confidence score receive proportionally
+     * lower association cost. Mirrors the fuse_score behaviour from the
+     * reference ByteTrack pipeline:
+     *
+     *     fused_cost(i, j) = 1 - (1 - inner_cost(i, j)) * detection_score(j)
+     *
+     * Sentinel cells (>= 1e3) produced by the inner calculator for invalid
+     * pairs (gated out, area-ratio violation, etc.) are preserved as-is so
+     * that the assignment solver continues to reject them.
+     *
+     * This decorator is intentionally only applied to the primary
+     * high-confidence association stage; low-confidence detections already
+     * have low scores and would be unfairly penalised twice.
+     */
+    class FuseScoreDecorator : public ICostCalculator
+    {
+        public:
+            /**
+             * @brief Wraps an inner cost calculator.
+             *
+             * @param inner Cost calculator whose output matrix will be rescaled.
+             */
+            explicit FuseScoreDecorator(std::shared_ptr<ICostCalculator> inner)
+                : inner_(std::move(inner)) {}
+
+            /**
+             * @brief Computes inner costs and applies score fusion in-place.
+             *
+             * @param a Collection of source tracklets.
+             * @param b Collection of target tracklets (observations).
+             * @param out_matrix Output cost matrix to be populated.
+             */
+            void calculate(const std::vector<TrackletPtr>& __restrict a,
+                        const std::vector<TrackletPtr>& __restrict b,
+                        CostMatrix& __restrict out_matrix) override;
+            float calculate_single(const TrackletPtr& a, const TrackletPtr& b) const override;
+
+        private:
+            std::shared_ptr<ICostCalculator> inner_;
+    };
+
+    /**
      * @brief Spatial overlap calculator with motion-based gating.
-     * 
-     * Calculates IoU costs and applies penalties based on Mahalanobis distance 
+     *
+     * Calculates IoU costs and applies penalties based on Mahalanobis distance
      * validation gates.
      */
     class GatedIoUCostCalculator : public ICostCalculator
