@@ -1,6 +1,6 @@
 {
     "sushitrack": {
-        "time_aware": 1,
+        "time_aware": 0,
         "enable_xyah": 0,
         "enable_diou": 1,
         "iou_plus_one": 1,
@@ -11,17 +11,17 @@
         "track_buffer": 30,
         "track_thresh": 0.2,
         "high_thresh": 0.5,
-        "match_thresh": 0.8,
+        "match_thresh": 0.7,
         "iou_match_thresh": 0.5,
         "unconfirmed_iou_thresh": 0.7,
         "duplicate_iou_thresh": 0.15,
-        "enable_tentative": 0,
+        "enable_tentative": 1,
         "tentative_match_thresh": 0.5,
-        "tentative_confirm_hits": 3,
-        "tentative_max_age": 2,
+        "tentative_confirm_hits": 2,
+        "tentative_max_age": 6,
         "enable_fsm": 0,
-        "fsm_stationary_vel_thresh": 45.0,
-        "fsm_maneuver_accel_thresh": 270.0,
+        "fsm_stationary_vel_thresh": 40.0,
+        "fsm_maneuver_accel_thresh": 200.0,
         "enable_reid": 0,
         "feature_momentum": 0.9,
         "reid_high_thresh": 0.3,
@@ -41,13 +41,13 @@
         "track_buffer": 30,
         "track_thresh": 0.2,
         "high_thresh": 0.5,
-        "match_thresh": 0.8
+        "match_thresh": 0.7
     },
     "ocsort": {
         "det_thresh": 0.2,
         "max_age": 30,
         "min_hits": 3,
-        "iou_threshold": 0.2,
+        "iou_threshold": 0.3,
         "delta_t": 3,
         "inertia": 0.2,
         "use_byte": 1

@@ -83,12 +83,12 @@ namespace TestInfrastructure
                 if (dets.empty())
                 {
                     // Update with empty matrix if necessary, but ocsort might handle empty input
-                    Eigen::MatrixXf empty_dets(0, 5);
+                    Eigen::MatrixXf empty_dets(0, 6);
                     tracker_->update(empty_dets);
                     return {};
                 }
 
-                Eigen::MatrixXf eigen_dets(dets.size(), 5);
+                Eigen::MatrixXf eigen_dets(dets.size(), 6);
                 for (size_t i = 0; i < dets.size(); ++i)
                 {
                     eigen_dets(i, 0) = dets[i].x;
@@ -96,6 +96,7 @@ namespace TestInfrastructure
                     eigen_dets(i, 2) = dets[i].x + dets[i].w;
                     eigen_dets(i, 3) = dets[i].y + dets[i].h;
                     eigen_dets(i, 4) = dets[i].score;
+                    eigen_dets(i, 5) = static_cast<float>(dets[i].label);
                 }
 
                 auto tracks = tracker_->update(eigen_dets);

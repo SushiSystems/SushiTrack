@@ -7,7 +7,6 @@
 @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
 """
 
-import os
 import sys
 import argparse
 from pathlib import Path
@@ -56,7 +55,6 @@ def resolve_data_dir(args) -> Path:
     candidates = [
         Path(__file__).parent.parent.parent / "data",
         Path(__file__).parent.parent / "data",
-        Path(__file__).parent / ".." / ".." / "data",
     ]
     for c in candidates:
         if c.exists():
@@ -109,7 +107,7 @@ def _run_direct_mode(args):
         shutil.copy(gt_path,   tmp / seq_name / "gt"   / "gt.txt")
         shutil.copy(pred_path, tmp / seq_name / "pred" / f"{args.tracker}.txt")
 
-        runner  = TrackEvalRunner(data_root=str(tmp))
+        runner  = TrackEvalRunner(data_root=str(tmp), split=args.split)
         results = runner.evaluate(trackers=[args.tracker], scenarios=[seq_name])
         runner.print_results(results, compare=False)
 

@@ -323,7 +323,7 @@ class TrackEvalRunner:
 
             dataset   = trackeval.datasets.MotChallenge2DBox(dataset_config)
             metrics   = [
-                trackeval.metrics.HOTA({"THRESHOLD": hota_thresholds}),
+                trackeval.metrics.HOTA({"HOTA_THRESH": hota_thresholds}),
                 trackeval.metrics.CLEAR({"THRESHOLD": 0.5}),
                 trackeval.metrics.Identity({"THRESHOLD": 0.5}),
             ]
