@@ -64,6 +64,9 @@ namespace TestInfrastructure
                 rebuildTracker();
             }
 
+            /**
+             * @brief Destroys the SushiTrackAdapter instance and releases internal handles.
+             */
             ~SushiTrackAdapter() override
             {
                 if (hdl_) SushiTrack_Destroy(hdl_);
@@ -134,6 +137,9 @@ namespace TestInfrastructure
             SushiTrackHdl      hdl_  = nullptr;
             SushiTrackHdlImpl* impl_ = nullptr;
 
+            /**
+             * @brief Re-instantiates the tracker using the current parameter configuration.
+             */
             void rebuildTracker()
             {
                 if (hdl_) SushiTrack_Destroy(hdl_);
@@ -143,6 +149,12 @@ namespace TestInfrastructure
                 impl_ = reinterpret_cast<SushiTrackHdlImpl*>(hdl_);
             }
 
+            /**
+             * @brief Parses and applies configuration values from a JSON file.
+             * 
+             * @param path File system path to the JSON configuration.
+             * @param p Reference to the configuration parameters structure to be updated.
+             */
             void applyJson(const std::string& path, SushiTrack_Params& p)
             {
                 JsonDoc doc = parse_json(path);

@@ -23,7 +23,10 @@ namespace SushiTrack
     class IKalmanFactory
     {
         public:
-            virtual ~IKalmanFactory() = default;
+    /**
+     * @brief Virtual destructor for the interface.
+     */
+    virtual ~IKalmanFactory() = default;
 
             /**
              * @brief Creates and returns a new state predictor instance.
@@ -42,6 +45,12 @@ namespace SushiTrack
     class GenericKalmanFactory : public IKalmanFactory
     {
         public:
+            /**
+             * @brief Initializes the factory with Kalman type and coordinate parameters.
+             * 
+             * @param kalman_type Identifier for the Kalman filter type.
+             * @param enable_xyah Flag for coordinate system selection.
+             */
             GenericKalmanFactory(int kalman_type, bool enable_xyah = false);
 
             /**

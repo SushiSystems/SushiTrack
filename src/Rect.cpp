@@ -25,31 +25,66 @@ namespace SushiTrack
         tlwh({x, y, width, height})
     { }
 
+    /**
+     * @brief Destroys the Rect instance.
+     */
     template <typename T>
     Rect<T>::~Rect()
     { }
 
+    /**
+     * @brief Retrieves the top-left X coordinate.
+     * @return Constant reference to the X coordinate.
+     */
     template <typename T>
     const T& Rect<T>::x() const { return tlwh[0]; }
 
+    /**
+     * @brief Retrieves the top-left Y coordinate.
+     * @return Constant reference to the Y coordinate.
+     */
     template <typename T>
     const T& Rect<T>::y() const { return tlwh[1]; }
 
+    /**
+     * @brief Retrieves the width dimension.
+     * @return Constant reference to the width.
+     */
     template <typename T>
     const T& Rect<T>::width() const { return tlwh[2]; }
 
+    /**
+     * @brief Retrieves the height dimension.
+     * @return Constant reference to the height.
+     */
     template <typename T>
     const T& Rect<T>::height() const { return tlwh[3]; }
 
+    /**
+     * @brief Retrieves a mutable reference to the top-left X coordinate.
+     * @return Reference to the X coordinate.
+     */
     template <typename T>
     T& Rect<T>::x() { return tlwh[0]; }
 
+    /**
+     * @brief Retrieves a mutable reference to the top-left Y coordinate.
+     * @return Reference to the Y coordinate.
+     */
     template <typename T>
     T& Rect<T>::y() { return tlwh[1]; }
 
+    /**
+     * @brief Retrieves a mutable reference to the width dimension.
+     * @return Reference to the width.
+     */
     template <typename T>
     T& Rect<T>::width() { return tlwh[2]; }
 
+    /**
+     * @brief Retrieves a mutable reference to the height dimension.
+     * @return Reference to the height.
+     */
     template <typename T>
     T& Rect<T>::height() { return tlwh[3]; }
 

@@ -20,7 +20,10 @@ namespace SushiTrack
     class ITimingPolicy
     {
         public:
-            virtual ~ITimingPolicy() = default;
+    /**
+     * @brief Virtual destructor for the interface.
+     */
+    virtual ~ITimingPolicy() = default;
 
             /**
              * @brief Normalizes a raw time interval for use in state prediction.

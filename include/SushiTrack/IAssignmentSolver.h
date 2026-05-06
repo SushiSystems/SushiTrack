@@ -23,7 +23,10 @@ namespace SushiTrack
     class IAssignmentSolver
     {
         public:
-            virtual ~IAssignmentSolver() = default;
+    /**
+     * @brief Virtual destructor for the interface.
+     */
+    virtual ~IAssignmentSolver() = default;
 
             /**
              * @brief Computes optimal assignments from a cost matrix.

@@ -44,68 +44,133 @@ namespace SushiTrack
     {
         if (is_lost)
         {
+            // Capture the pre-Coasting motion regime so it can be restored on
+            // recovery and consumed by lost-buffer / gating policies that need
+            // to reason about the underlying motion category while the track is
+            // dark. Only sample if we are not already Coasting, otherwise we
+            // would clobber the captured state on every successive Lost frame.
+            if (current_state_ != KinematicState::Coasting)
+                pre_coast_state_ = current_state_;
             current_state_ = KinematicState::Coasting;
             return;
         }
 
-        // 1. ZAMAN BİRİMLERİ (Normalizasyon Hatası Çözümü)
+        // ----- Time normalisation -----
         const float actual_dt = config_.time_aware ? dt : (1.0f / static_cast<float>(std::max(1, config_.frame_rate)));
         const float safe_dt = std::max(actual_dt, 0.001f);
         const float reference_fps = static_cast<float>(std::max(1, config_.frame_rate));
 
-        // Kalman durumu frame bazlıdır, saniyeye çevirmek için referans FPS ile çarpılır.
+        // The Kalman state stores per-frame velocity; convert to per-second so
+        // thresholds keep their physical meaning regardless of frame rate.
         const float vx_per_sec = mean(4) * reference_fps;
         const float vy_per_sec = mean(5) * reference_fps;
         const float vel_residual_per_sec = std::sqrt(vx_per_sec * vx_per_sec + vy_per_sec * vy_per_sec);
 
-        // 2. GHOST ACCELERATION (Hayalet İvme) Çözümü
-        // Eğer nesne az önce kayıptıysa (Coasting) ve geri döndüyse, geçmiş hız hafızasını 
-        // yeni hıza eşitleyerek sahte bir ivme patlamasını engelliyoruz.
+        // ----- Cold-start ghost-acceleration fix -----
+        // Seed the velocity history on the very first call so the first
+        // dvx/dvy is zero. Without this, a track born with non-zero velocity
+        // would compute (full velocity - 0) / dt on its first acceleration
+        // sample and immediately jump into Maneuvering once warmup ends.
+        if (!has_velocity_history_)
+        {
+            last_vx_per_sec_ = vx_per_sec;
+            last_vy_per_sec_ = vy_per_sec;
+            has_velocity_history_ = true;
+        }
+
+        // ----- Coasting recovery -----
+        // When an observation arrives after a Lost period, snap the velocity
+        // history to the freshly observed velocity (otherwise the gap shows up
+        // as a giant acceleration spike) AND restore the kinematic regime that
+        // was active before the track went dark. A pedestrian who was
+        // Maneuvering before brief occlusion comes back as Maneuvering, not
+        // Cruising — preserving the noise / association policy that matched
+        // their underlying motion.
         if (current_state_ == KinematicState::Coasting)
         {
             last_vx_per_sec_ = vx_per_sec;
             last_vy_per_sec_ = vy_per_sec;
-            current_state_ = KinematicState::Cruising; // Nötr durumdan başlat
-            return; 
+            current_state_   = pre_coast_state_;
+            pending_state_   = pre_coast_state_;
+            pending_count_   = 0;
+            return;
         }
 
-        // 3. DOĞRU İVME HESABI
-        // Saniye cinsinden hız farkı, doğrudan geçen anlık zamana (actual_dt) bölünür.
+        // ----- Acceleration estimate -----
         const float dvx = vx_per_sec - last_vx_per_sec_;
         const float dvy = vy_per_sec - last_vy_per_sec_;
         const float accel_per_sec2 = std::sqrt(dvx * dvx + dvy * dvy) / safe_dt;
 
-        // Sonraki frame için hızları kaydet
         last_vx_per_sec_ = vx_per_sec;
         last_vy_per_sec_ = vy_per_sec;
 
-        // Isınma (Warmup) süreci
+        // ----- Warmup -----
         if (tracklet_len < kWarmupFrames)
         {
             current_state_ = KinematicState::Cruising;
+            pending_state_ = KinematicState::Cruising;
+            pending_count_ = 0;
             return;
         }
 
-        // 4. HYSTERESIS (Titreme Önleyici Ölü Bant) Mantığı
-        const float margin_down = 0.8f; // Eşiğin %20 altı
-        const float margin_up   = 1.2f; // Eşiğin %20 üstü
+        // ----- Threshold-based hysteresis (dead-band) -----
+        const float margin_down = 0.8f;
+        const float margin_up   = 1.2f;
 
-        if (current_state_ == KinematicState::Stationary)
+        // Single-frame classification suggested by the current sample. Allows
+        // direct Stationary <-> Maneuvering transitions (the previous state
+        // machine had to pass through Cruising for a frame, which delayed
+        // adaptation when a parked vehicle suddenly accelerated). Sustain
+        // rules keep the active state sticky inside the dead-band.
+        KinematicState observed;
+        if (accel_per_sec2 > config_.fsm_maneuver_accel_thresh * margin_up)
         {
-            if (vel_residual_per_sec > config_.fsm_stationary_vel_thresh * margin_up)
-                current_state_ = KinematicState::Cruising;
+            observed = KinematicState::Maneuvering;
         }
-        else if (current_state_ == KinematicState::Maneuvering)
+        else if (vel_residual_per_sec < config_.fsm_stationary_vel_thresh * margin_down)
         {
-            if (accel_per_sec2 < config_.fsm_maneuver_accel_thresh * margin_down)
-                current_state_ = KinematicState::Cruising;
+            observed = KinematicState::Stationary;
         }
-        else // Mevcut durum: Cruising
+        else if (current_state_ == KinematicState::Maneuvering &&
+                 accel_per_sec2 >= config_.fsm_maneuver_accel_thresh * margin_down)
         {
-            if (vel_residual_per_sec < config_.fsm_stationary_vel_thresh * margin_down)
-                current_state_ = KinematicState::Stationary;
-            else if (accel_per_sec2 > config_.fsm_maneuver_accel_thresh * margin_up)
-                current_state_ = KinematicState::Maneuvering;
+            observed = KinematicState::Maneuvering;
+        }
+        else if (current_state_ == KinematicState::Stationary &&
+                 vel_residual_per_sec <= config_.fsm_stationary_vel_thresh * margin_up)
+        {
+            observed = KinematicState::Stationary;
+        }
+        else
+        {
+            observed = KinematicState::Cruising;
+        }
+
+        // ----- Time-based stability -----
+        // A candidate transition must persist for kStableFrames consecutive
+        // frames before it is committed. Eliminates one-frame state flicker
+        // under detection jitter even when the threshold dead-band is crossed.
+        if (observed == current_state_)
+        {
+            pending_state_ = observed;
+            pending_count_ = 0;
+            return;
+        }
+
+        if (observed == pending_state_)
+        {
+            if (pending_count_ < 255) pending_count_++;
+        }
+        else
+        {
+            pending_state_ = observed;
+            pending_count_ = 1;
+        }
+
+        if (pending_count_ >= kStableFrames)
+        {
+            current_state_ = pending_state_;
+            pending_count_ = 0;
         }
     }
     

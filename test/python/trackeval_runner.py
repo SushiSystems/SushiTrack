@@ -20,10 +20,21 @@ if str(_TOOLS_DIR) not in sys.path:
 try:
     from logger import log_info, log_error, log_warning, log_success
 except ImportError:
-    def log_info(m):    print(f"[INFO] {m}")
-    def log_error(m):   print(f"[ERROR] {m}")
-    def log_warning(m): print(f"[WARNING] {m}")
-    def log_success(m): print(f"[SUCCESS] {m}")
+    def log_info(m):
+        """@brief Fallback logging for informational messages."""
+        print(f"[INFO] {m}")
+
+    def log_error(m):
+        """@brief Fallback logging for error messages."""
+        print(f"[ERROR] {m}")
+
+    def log_warning(m):
+        """@brief Fallback logging for warning messages."""
+        print(f"[WARNING] {m}")
+
+    def log_success(m):
+        """@brief Fallback logging for success messages."""
+        print(f"[SUCCESS] {m}")
 
 
 def _ensure_trackeval() -> bool:
@@ -46,6 +57,7 @@ def _make_seqinfo(seq_dir: Path, seq_name: str, frame_rate: int = 30) -> None:
     @param seq_dir Destination directory.
     @param seq_name Sequence identifier.
     @param frame_rate Processing frequency.
+    @return None.
     """
     seqinfo_path = seq_dir / "seqinfo.ini"
     if seqinfo_path.exists():
@@ -187,6 +199,7 @@ class TrackEvalRunner:
         @brief Displays evaluation results to console.
         @param results Results mapping.
         @param compare Flag for color comparison.
+        @return None.
         """
         from report_generator import print_trackeval_table
         print_trackeval_table(results, compare=compare)
@@ -196,6 +209,7 @@ class TrackEvalRunner:
         @brief Persists evaluation results to files.
         @param results Results mapping.
         @param out_dir Output directory path.
+        @return None.
         """
         from report_generator import export_trackeval_results
         export_trackeval_results(results, out_dir)

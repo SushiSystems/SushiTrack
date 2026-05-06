@@ -43,6 +43,9 @@ namespace SushiTrack
              */
             TrackFSM(const TrackerConfig& config);
             
+            /**
+             * @brief Destroys the TrackFSM instance.
+             */
             ~TrackFSM() = default;
 
             /**
@@ -72,18 +75,59 @@ namespace SushiTrack
 
             /**
              * @brief Retrieves the active kinematic state.
-             * 
+             *
              * @return Current KinematicState enum value.
              */
             KinematicState getCurrentState() const { return current_state_; }
 
+            /**
+             * @brief Retrieves the last observed motion regime.
+             *
+             * When the track is currently Coasting (i.e. between observations) this
+             * returns the kinematic state that was active immediately before the
+             * track went dark. For all other states the active state itself is
+             * returned. This is the canonical input for downstream policies that
+             * must reason about the *true* motion regime regardless of whether
+             * the track is presently being observed (e.g. lost-track buffer
+             * scaling, association-stage gating).
+             *
+             * @return KinematicState recorded just before the most recent
+             *         transition into Coasting, or the active state otherwise.
+             */
+            KinematicState getLastSeenState() const
+            {
+                return (current_state_ == KinematicState::Coasting)
+                    ? pre_coast_state_
+                    : current_state_;
+            }
+
         private:
-            TrackerConfig  config_;        
-            KinematicState current_state_; 
-            float last_vx_per_sec_ = 0.0f; 
-            float last_vy_per_sec_ = 0.0f; 
+            TrackerConfig  config_;
+            KinematicState current_state_;
+            float last_vx_per_sec_ = 0.0f;
+            float last_vy_per_sec_ = 0.0f;
+
+            // Lazy-init flag for the velocity history. The first updateState call
+            // seeds last_v* from the current velocity so the first dvx/dvy is zero
+            // (instead of equal to the full velocity, which would otherwise produce
+            // a spurious Maneuvering classification on born-with-velocity tracks).
+            bool has_velocity_history_ = false;
+
+            // Pre-Coasting motion regime, used to restore the active state when
+            // an observation is reacquired after a Lost period. Without this, every
+            // recovery would demote the track to Cruising regardless of what it
+            // was doing pre-occlusion, losing kinematic context exactly when
+            // adaptive behaviour matters most.
+            KinematicState pre_coast_state_ = KinematicState::Cruising;
+
+            // Time-based hysteresis: a candidate transition must be observed for
+            // kStableFrames consecutive frames before it is committed. Single-frame
+            // jitter cannot flip the state.
+            KinematicState pending_state_ = KinematicState::Stationary;
+            unsigned char  pending_count_ = 0;
 
             static constexpr size_t kWarmupFrames = 3;
+            static constexpr unsigned char kStableFrames = 2;
     };
 
 } // namespace SushiTrack

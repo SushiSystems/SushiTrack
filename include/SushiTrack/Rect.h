@@ -50,6 +50,9 @@ namespace SushiTrack
          */
         Rect(const T &x, const T &y, const T &width, const T &height);
 
+        /**
+         * @brief Destroys the Rect instance.
+         */
         ~Rect();
 
         const T &x() const;      ///< Returns Top-Left X coordinate.

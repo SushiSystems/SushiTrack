@@ -50,6 +50,7 @@ namespace SushiTrack
      * @param mean Output state mean vector.
      * @param covariance Output state covariance matrix.
      * @param measurement Input observation vector.
+     * @param score Detection confidence score.
      */
     void KalmanFilter::initiate(StateMean& mean, StateCov& covariance,
                                 const DetectBox& measurement, float /*score*/)
@@ -170,6 +171,7 @@ namespace SushiTrack
      * @param mean Reference to state mean for update.
      * @param covariance Reference to state covariance for update.
      * @param measurement Input observation vector.
+     * @param score Detection confidence score.
      */
     void KalmanFilter::update(StateMean& mean, StateCov& covariance,
                                 const DetectBox& measurement, float score)
@@ -243,16 +245,41 @@ namespace SushiTrack
 
     /**
      * @brief Computes Mahalanobis distance between a state and an observation.
-     * 
+     *
+     * When @p score is non-zero the projection is recomputed per-call so a
+     * confidence-aware filter (NSAKalmanFilter) can scale the measurement
+     * noise. When @p score is zero the cached LLT path is taken, which is
+     * bit-identical to the prior behaviour.
+     *
      * @param mean Current state mean.
      * @param covariance Current state covariance.
      * @param measurement Input observation vector.
+     * @param score Detection score (0.0 = legacy unscaled projection).
      * @return Computed squared Mahalanobis distance.
      */
     float KalmanFilter::mahalanobisDistance(const StateMean& mean,
                                             const StateCov& covariance,
-                                            const DetectBox& measurement) const
+                                            const DetectBox& measurement,
+                                            float score) const
     {
+        if (score > 0.0f)
+        {
+            StateHMean projected_mean;
+            StateHCov  projected_cov;
+            project(projected_mean, projected_cov, mean, covariance, score);
+
+            auto llt = projected_cov.llt();
+            if (llt.info() != Eigen::Success)
+            {
+                SUSHITRACK_LOG_WARN("[KalmanFilter] Score-aware gate conditioning failure. Regularizing covariance.");
+                projected_cov.diagonal().array() += 1e-6f;
+                llt = projected_cov.llt();
+            }
+            Eigen::Matrix<float, 1, 4> diff = measurement - projected_mean;
+            Eigen::Matrix<float, 1, 4> z = llt.solve(diff.transpose()).transpose();
+            return (diff * z.transpose())(0, 0);
+        }
+
         StateHMean projected_mean;
         const auto& llt = getCachedLLT(mean, covariance, projected_mean);
 
@@ -263,40 +290,74 @@ namespace SushiTrack
 
     /**
      * @brief Validates if a measurement lies within the statistical gate.
-     * 
+     *
      * @param mean Current state mean.
      * @param covariance Current state covariance.
      * @param measurement Input observation vector.
      * @param chi2_thresh Chi-squared threshold for gating.
+     * @param score Detection score for confidence-aware projection.
      * @return True if the measurement is within the gate.
      */
     bool KalmanFilter::isInGate(const StateMean& mean,
                                 const StateCov& covariance,
                                 const DetectBox& measurement,
-                                float chi2_thresh) const
+                                float chi2_thresh,
+                                float score) const
     {
-        return mahalanobisDistance(mean, covariance, measurement) <= chi2_thresh;
+        return mahalanobisDistance(mean, covariance, measurement, score) <= chi2_thresh;
     }
 
     /**
      * @brief Computes gating flags for a collection of measurements.
-     * 
+     *
+     * When a non-empty @p scores vector matching the measurement count is
+     * supplied, the projected covariance is recomputed for each measurement
+     * with that detection's score so confidence-adaptive filters take effect
+     * during gating. Otherwise the cached single-LLT fast path is used.
+     *
      * @param mean Current state mean.
      * @param covariance Current state covariance.
      * @param measurements Collection of input observation vectors.
      * @param chi2_thresh Chi-squared threshold for gating.
+     * @param scores Optional per-measurement detection scores.
      * @return Collection of boolean flags indicating gate membership.
      */
     std::vector<bool> KalmanFilter::getGateFlags(const KalmanTypes::StateMean& mean,
                                                 const KalmanTypes::StateCov& covariance,
                                                 const KalmanTypes::DetectBoxVector& measurements,
-                                                float chi2_thresh) const
+                                                float chi2_thresh,
+                                                const std::vector<float>& scores) const
     {
-        StateHMean projected_mean;
-        const auto& llt = getCachedLLT(mean, covariance, projected_mean);
-
         std::vector<bool> flags;
         flags.reserve(measurements.size());
+
+        const bool use_scores = (scores.size() == measurements.size());
+
+        if (use_scores)
+        {
+            // Per-measurement projection: required for NSAKalmanFilter so the
+            // score-scaled noise is actually applied during gating.
+            for (size_t i = 0; i < measurements.size(); ++i)
+            {
+                StateHMean projected_mean;
+                StateHCov  projected_cov;
+                project(projected_mean, projected_cov, mean, covariance, scores[i]);
+
+                auto llt = projected_cov.llt();
+                if (llt.info() != Eigen::Success)
+                {
+                    projected_cov.diagonal().array() += 1e-6f;
+                    llt = projected_cov.llt();
+                }
+                Eigen::Matrix<float, 1, 4> diff = measurements[i] - projected_mean;
+                Eigen::Matrix<float, 1, 4> z = llt.solve(diff.transpose()).transpose();
+                flags.push_back((diff * z.transpose())(0, 0) <= chi2_thresh);
+            }
+            return flags;
+        }
+
+        StateHMean projected_mean;
+        const auto& llt = getCachedLLT(mean, covariance, projected_mean);
 
         for (const auto& measurement : measurements)
         {
@@ -311,21 +372,49 @@ namespace SushiTrack
 
     /**
      * @brief Computes squared Mahalanobis distances for a collection of measurements.
-     * 
+     *
+     * Score-aware variant: see getGateFlags for the rationale on
+     * per-measurement projection.
+     *
      * @param mean Current state mean.
      * @param covariance Current state covariance.
      * @param measurements Collection of input observation vectors.
+     * @param scores Optional per-measurement detection scores.
      * @return Collection of squared Mahalanobis distances.
      */
     std::vector<float> KalmanFilter::getGateSqDistances(const KalmanTypes::StateMean& mean,
                                                        const KalmanTypes::StateCov& covariance,
-                                                       const KalmanTypes::DetectBoxVector& measurements) const
+                                                       const KalmanTypes::DetectBoxVector& measurements,
+                                                       const std::vector<float>& scores) const
     {
-        StateHMean projected_mean;
-        const auto& llt = getCachedLLT(mean, covariance, projected_mean);
-
         std::vector<float> dists;
         dists.reserve(measurements.size());
+
+        const bool use_scores = (scores.size() == measurements.size());
+
+        if (use_scores)
+        {
+            for (size_t i = 0; i < measurements.size(); ++i)
+            {
+                StateHMean projected_mean;
+                StateHCov  projected_cov;
+                project(projected_mean, projected_cov, mean, covariance, scores[i]);
+
+                auto llt = projected_cov.llt();
+                if (llt.info() != Eigen::Success)
+                {
+                    projected_cov.diagonal().array() += 1e-6f;
+                    llt = projected_cov.llt();
+                }
+                Eigen::Matrix<float, 1, 4> diff = measurements[i] - projected_mean;
+                Eigen::Matrix<float, 1, 4> z = llt.solve(diff.transpose()).transpose();
+                dists.push_back((diff * z.transpose())(0, 0));
+            }
+            return dists;
+        }
+
+        StateHMean projected_mean;
+        const auto& llt = getCachedLLT(mean, covariance, projected_mean);
 
         for (const auto& measurement : measurements)
         {
@@ -366,6 +455,7 @@ namespace SushiTrack
      * @param projected_cov Output projected covariance matrix.
      * @param mean Current state mean vector.
      * @param covariance Current state covariance matrix.
+     * @param score Detection confidence score.
      */
     void KalmanFilter::project(Eigen::Matrix<float, 1, 4, Eigen::RowMajor>& projected_mean,
                                 Eigen::Matrix<float, 4, 4, Eigen::RowMajor>&  projected_cov,

@@ -14,11 +14,14 @@
 namespace TestInfrastructure
 {
 
-	struct Scenario
-	{
-		std::string name;
-		std::string dataset;
-	};
+    /**
+     * @brief Data structure representing a benchmarking scenario.
+     */
+    struct Scenario
+    {
+        std::string name;    ///< Specific sequence name (e.g., "MOT17-02-DPM").
+        std::string dataset; ///< Parent dataset identifier (e.g., "MOT17").
+    };
 
 	// clang-format off
 	static const Scenario kScenarios[] =

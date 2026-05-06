@@ -23,7 +23,10 @@ namespace SushiTrack
     class IStatePredictor
     {
         public:
-            virtual ~IStatePredictor() = default;
+    /**
+     * @brief Virtual destructor for the interface.
+     */
+    virtual ~IStatePredictor() = default;
 
             /**
              * @brief Initializes the state mean and covariance from an initial observation.
@@ -31,6 +34,7 @@ namespace SushiTrack
              * @param mean Output state mean vector to be initialized.
              * @param covariance Output state covariance matrix to be initialized.
              * @param measurement Input initial observation vector.
+             * @param score Detection confidence score used for noise scaling.
              */
             virtual void initiate(KalmanTypes::StateMean& mean, KalmanTypes::StateCov& covariance,
                                 const KalmanTypes::DetectBox& measurement, float score = 0.0f) = 0;
@@ -50,6 +54,7 @@ namespace SushiTrack
              * @param mean State mean vector to be updated.
              * @param covariance State covariance matrix to be updated.
              * @param measurement Input observation vector for state refinement.
+             * @param score Detection confidence score used for noise scaling.
              */
             virtual void update(KalmanTypes::StateMean& mean, KalmanTypes::StateCov& covariance,
                                 const KalmanTypes::DetectBox& measurement, float score = 0.0f) = 0;

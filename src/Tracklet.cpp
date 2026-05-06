@@ -49,6 +49,7 @@ namespace SushiTrack
      * @param feat Visual feature vector.
      * @param alpha Exponential moving average weight for feature updates.
      * @param enable_xyah Coordinate system flag.
+     * @param max_feature_history Maximum number of features to store in history.
      */
     Tracklet::Tracklet(std::unique_ptr<IStatePredictor> kf,
                     const Rect<float>& rect,
@@ -255,11 +256,20 @@ namespace SushiTrack
     /**
      * @brief Updates the tracklet state with a matched observation.
      *
+     * The lifecycle flag transition (state_=Tracked, is_activated_=true,
+     * is_confirmed_=true) is gated by @p keep_state. The tentative pipeline
+     * passes keep_state=true so a freshly matched but not-yet-confirmed
+     * tentative does not leak as an activated track output for the duration
+     * of the hit-accumulation window. The flags are committed by
+     * Tracklet::confirm(...) once the dynamic hit threshold is met.
+     *
      * @param new_track Matched detection data.
      * @param frame_id Current frame identifier.
      * @param update_features Flag for updating visual features with the observation.
+     * @param keep_state When true, suppresses the lifecycle flag transition.
      */
-    void Tracklet::update(const Tracklet& new_track, size_t frame_id, bool update_features)
+    void Tracklet::update(const Tracklet& new_track, size_t frame_id,
+                          bool update_features, bool keep_state)
     {
         const KalmanTypes::DetectBox new_meas = new_track.getMeasurement();
 
@@ -276,15 +286,18 @@ namespace SushiTrack
             updateFeatures(new_track.getCurrFeat());
         }
 
-        state_ = TrackState::Tracked;
-        is_activated_ = true;
-        is_confirmed_ = true;
+        if (!keep_state)
+        {
+            state_ = TrackState::Tracked;
+            is_activated_ = true;
+            is_confirmed_ = true;
+        }
         frame_id_ = frame_id;
         hits_++;
         tracklet_len_ = frame_id - start_frame_id_ + 1;
         accumulated_lost_time_ = 0.0f;
 
-        if (fsm_) 
+        if (fsm_)
         {
             fsm_->updateState(mean_, false, tracklet_len_, last_dt_);
         }
@@ -292,6 +305,8 @@ namespace SushiTrack
 
     /**
      * @brief Retrieves a thread-safe copy of the current state mean.
+     * 
+     * @return State mean vector.
      */
     KalmanTypes::StateMean Tracklet::getMean() const 
     {
@@ -301,6 +316,8 @@ namespace SushiTrack
 
     /**
      * @brief Retrieves a thread-safe copy of the current state covariance.
+     * 
+     * @return State covariance matrix.
      */
     KalmanTypes::StateCov Tracklet::getCovariance() const 
     {

@@ -58,12 +58,16 @@ namespace SushiTrack
              * @param feat Visual feature vector.
              * @param alpha EMA weight for feature updates.
              * @param enable_xyah Coordinate system flag.
+             * @param max_feature_history Maximum number of visual appearance vectors stored per tracklet.
              */
             Tracklet(std::unique_ptr<IStatePredictor> kf,
                    const Rect<float>& rect, int label, float score,
                    std::vector<float> feat = {}, float alpha = 0.9f,
                    bool enable_xyah = false, int max_feature_history = 100);
 
+            /**
+             * @brief Destroys the Tracklet instance.
+             */
             ~Tracklet() = default;
 
             const Rect<float>& getRect()       const { return rect_; }
@@ -80,6 +84,17 @@ namespace SushiTrack
             int                getHits() const { return hits_; }
             TrackFSM*          getFSM() const { return fsm_.get(); }
             KinematicState     getKinematicState() const { return fsm_ ? fsm_->getCurrentState() : KinematicState::Cruising; }
+
+            /**
+             * @brief Retrieves the last observed motion regime.
+             *
+             * Resolves to the kinematic state recorded just before the track
+             * went Lost when the FSM is currently Coasting, or the active
+             * state otherwise. When no FSM is attached this falls back to
+             * Cruising so that downstream policies degrade to identity
+             * behaviour rather than a special-cased no-op.
+             */
+            KinematicState     getLastSeenState() const { return fsm_ ? fsm_->getLastSeenState() : KinematicState::Cruising; }
 
             const std::vector<float>& getSmoothFeat() const { return smooth_feat_; }
             const std::vector<float>& getCurrFeat()   const { return curr_feat_;   }
@@ -111,6 +126,13 @@ namespace SushiTrack
              */
             void confirm(size_t frame_id, size_t final_id);
 
+            /**
+             * @brief Recovers a lost tracklet using new observation data.
+             * 
+             * @param new_track Observed detection data wrapped in a tracklet container.
+             * @param frame_id Current frame identifier.
+             * @param new_track_id New tracking identifier (optional).
+             */
             void reActivate(const Tracklet& new_track, size_t frame_id, int new_track_id = -1);
 
             /** 
@@ -120,14 +142,23 @@ namespace SushiTrack
              */
             void predict(float dt = 1.0f);
 
-            /** 
-             * @brief Refines the motion state and bounding box using a new observation. 
-             * 
+            /**
+             * @brief Refines the motion state and bounding box using a new observation.
+             *
+             * When @p keep_state is true the lifecycle flags (state_, is_activated_,
+             * is_confirmed_) are left untouched. This is required by the tentative
+             * matching pipeline, which must accumulate hits across multiple frames
+             * before promoting a track to the confirmed/activated state. Defaulting
+             * the flag to false preserves the legacy call signature for the
+             * confirmed-track and lost-recovery paths.
+             *
              * @param new_track Matched detection data.
              * @param frame_id Current frame identifier.
              * @param update_features Flag for updating visual features.
+             * @param keep_state When true, suppresses the lifecycle flag transition.
              */
-            void update(const Tracklet& new_track, size_t frame_id, bool update_features = true);
+            void update(const Tracklet& new_track, size_t frame_id,
+                        bool update_features = true, bool keep_state = false);
 
             /**
              * @brief Transitions the track to the lost state.
@@ -148,8 +179,22 @@ namespace SushiTrack
              */
             void markAsRemoved();
 
+            /**
+             * @brief Sets the internal track identifier.
+             * @param id Unique tracking identifier.
+             */
             void setTrackId(size_t id) { track_id_ = id; }
+
+            /**
+             * @brief Assigns a kinematic state machine to the tracklet.
+             * @param fsm Unique pointer to the TrackFSM instance.
+             */
             void setFSM(std::unique_ptr<TrackFSM> fsm) { fsm_ = std::move(fsm); }
+
+            /**
+             * @brief Assigns a timing policy to the tracklet.
+             * @param policy Shared pointer to the ITimingPolicy instance.
+             */
             void setTimingPolicy(std::shared_ptr<ITimingPolicy> policy) { timing_policy_ = std::move(policy); }
 
             /**
@@ -178,8 +223,22 @@ namespace SushiTrack
                 return feature_history_;
             }
             
+            /**
+             * @brief Retrieves a thread-safe copy of the current state mean.
+             * @return State mean vector.
+             */
             KalmanTypes::StateMean getMean() const;
+
+            /**
+             * @brief Retrieves a thread-safe copy of the current state covariance.
+             * @return State covariance matrix.
+             */
             KalmanTypes::StateCov  getCovariance() const;
+
+            /**
+             * @brief Formats the current state as a measurement vector for the predictor.
+             * @return Measurement vector in the configured coordinate format.
+             */
             KalmanTypes::DetectBox getMeasurement() const;
 
             mutable uint64_t visit_id_ = 0;

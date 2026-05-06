@@ -25,6 +25,9 @@ namespace SushiTrack
     class CostMatrix
     {
         public:
+            /**
+             * @brief Initializes an empty cost matrix with zero dimensions.
+             */
             CostMatrix() : rows_(0), cols_(0) {}
 
             /**

@@ -44,6 +44,13 @@ namespace SushiTrack
             void calculate(const std::vector<TrackletPtr>& __restrict a,
                         const std::vector<TrackletPtr>& __restrict b,
                         CostMatrix& __restrict out_matrix) override;
+            /**
+             * @brief Computes the association cost for a single pair.
+             * 
+             * @param a Source tracklet for association.
+             * @param b Candidate tracklet for association.
+             * @return float Calculated association cost.
+             */
             float calculate_single(const TrackletPtr& a, const TrackletPtr& b) const override;
         private:
             float max_area_ratio_;
@@ -78,6 +85,13 @@ namespace SushiTrack
             void calculate(const std::vector<TrackletPtr>& __restrict a,
                         const std::vector<TrackletPtr>& __restrict b,
                         CostMatrix& __restrict out_matrix) override;
+            /**
+             * @brief Computes the association cost for a single pair.
+             * 
+             * @param a Source tracklet for association.
+             * @param b Candidate tracklet for association.
+             * @return float Calculated association cost.
+             */
             float calculate_single(const TrackletPtr& a, const TrackletPtr& b) const override;
         private:
             float max_area_ratio_;
@@ -105,6 +119,13 @@ namespace SushiTrack
             void calculate(const std::vector<TrackletPtr>& __restrict a,
                         const std::vector<TrackletPtr>& __restrict b,
                         CostMatrix& __restrict out_matrix) override;
+            /**
+             * @brief Computes the association cost for a single pair.
+             * 
+             * @param a Source tracklet for association.
+             * @param b Candidate tracklet for association.
+             * @return float Calculated association cost.
+             */
             float calculate_single(const TrackletPtr& a, const TrackletPtr& b) const override;
     };
 
@@ -122,6 +143,7 @@ namespace SushiTrack
              * 
              * @param reid_confidence_thresh Minimum similarity for direct association.
              * @param iou_weight Weighting factor for fallback overlap calculations.
+             * @param reid_direct_assignment_weight Scaling factor for high-confidence direct visual matches.
              * @param iou_calc Implementation for spatial overlap calculation.
              * @param cosine_calc Implementation for visual similarity calculation.
              */
@@ -147,6 +169,13 @@ namespace SushiTrack
             void calculate(const std::vector<TrackletPtr>& __restrict a,
                         const std::vector<TrackletPtr>& __restrict b,
                         CostMatrix& __restrict out_matrix) override;
+            /**
+             * @brief Computes the association cost for a single pair.
+             * 
+             * @param a Source tracklet for association.
+             * @param b Candidate tracklet for association.
+             * @return float Calculated association cost.
+             */
             float calculate_single(const TrackletPtr& a, const TrackletPtr& b) const override;
 
         private:
@@ -170,6 +199,8 @@ namespace SushiTrack
              * @brief Initializes the visual-only matcher.
              * 
              * @param reid_threshold Minimum visual similarity threshold.
+             * @param gating_thresh Statistical threshold for the Mahalanobis gate.
+             * @param gate_validator Implementation for motion-based gating.
              */
             PureReIDCostCalculator(float reid_threshold = 0.4f,
                                    float gating_thresh = 9.4877f,
@@ -188,6 +219,13 @@ namespace SushiTrack
             void calculate(const std::vector<TrackletPtr>& __restrict a,
                         const std::vector<TrackletPtr>& __restrict b,
                         CostMatrix& __restrict out_matrix) override;
+            /**
+             * @brief Computes the association cost for a single pair.
+             * 
+             * @param a Source tracklet for association.
+             * @param b Candidate tracklet for association.
+             * @return float Calculated association cost.
+             */
             float calculate_single(const TrackletPtr& a, const TrackletPtr& b) const override;
 
         private:
@@ -195,6 +233,7 @@ namespace SushiTrack
             float gating_thresh_;
             std::shared_ptr<IGateValidator> gate_validator_;
             KalmanTypes::DetectBoxVector meas_workspace_; ///< Pre-allocated buffer for measurement vectors to reduce heap churn.
+            std::vector<float>           score_workspace_; ///< Pre-allocated buffer for per-detection scores (NSA gating).
     };
 
     /**
@@ -234,6 +273,13 @@ namespace SushiTrack
             void calculate(const std::vector<TrackletPtr>& __restrict a,
                         const std::vector<TrackletPtr>& __restrict b,
                         CostMatrix& __restrict out_matrix) override;
+            /**
+             * @brief Computes the association cost for a single pair.
+             * 
+             * @param a Source tracklet for association.
+             * @param b Candidate tracklet for association.
+             * @return float Calculated association cost.
+             */
             float calculate_single(const TrackletPtr& a, const TrackletPtr& b) const override;
 
         private:
@@ -246,6 +292,7 @@ namespace SushiTrack
             float reid_direct_assignment_weight_;
 
             KalmanTypes::DetectBoxVector meas_workspace_; ///< Pre-allocated buffer for measurement vectors to reduce heap churn.
+            std::vector<float>           score_workspace_; ///< Pre-allocated buffer for per-detection scores (NSA gating).
     };
 
     /**
@@ -287,6 +334,13 @@ namespace SushiTrack
             void calculate(const std::vector<TrackletPtr>& __restrict a,
                         const std::vector<TrackletPtr>& __restrict b,
                         CostMatrix& __restrict out_matrix) override;
+            /**
+             * @brief Computes the association cost for a single pair.
+             * 
+             * @param a Source tracklet for association.
+             * @param b Candidate tracklet for association.
+             * @return float Calculated association cost.
+             */
             float calculate_single(const TrackletPtr& a, const TrackletPtr& b) const override;
 
         private:
@@ -325,6 +379,13 @@ namespace SushiTrack
             void calculate(const std::vector<TrackletPtr>& __restrict a,
                         const std::vector<TrackletPtr>& __restrict b,
                         CostMatrix& __restrict out_matrix) override;
+            /**
+             * @brief Computes the association cost for a single pair.
+             * 
+             * @param a Source tracklet for association.
+             * @param b Candidate tracklet for association.
+             * @return float Calculated association cost.
+             */
             float calculate_single(const TrackletPtr& a, const TrackletPtr& b) const override;
 
         private:
@@ -334,6 +395,7 @@ namespace SushiTrack
             std::shared_ptr<ICostCalculator> iou_calc_;
 
             KalmanTypes::DetectBoxVector meas_workspace_; ///< Pre-allocated buffer for measurement vectors to reduce heap churn.
+            std::vector<float>           score_workspace_; ///< Pre-allocated buffer for per-detection scores (NSA gating).
     };
 
 } // namespace SushiTrack

@@ -29,8 +29,13 @@ class Detection:
     score:  float = 1.0
 
 
+#: @brief Identifier for the pedestrian class in MOT Challenge datasets.
 PEDESTRIAN_CLASS         = 1
+
+#: @brief Set of class IDs considered distractors in MOT17.
 DISTRACTOR_CLASSES_MOT17 = {2, 7, 8, 12}
+
+#: @brief Set of class IDs considered distractors in MOT20.
 DISTRACTOR_CLASSES_MOT20 = {2, 6, 7, 8, 12}
 
 

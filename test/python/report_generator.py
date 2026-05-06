@@ -21,9 +21,15 @@ try:
     from logger import log_info, log_success, RED, GREEN, YELLOW, BLUE, RESET
 except ImportError:
     RED = GREEN = YELLOW = BLUE = RESET = ""
-    def log_info(m):    print(f"[INFO] {m}")
-    def log_success(m): print(f"[SUCCESS] {m}")
+    def log_info(m):
+        """@brief Fallback logging for informational messages."""
+        print(f"[INFO] {m}")
 
+    def log_success(m):
+        """@brief Fallback logging for success messages."""
+        print(f"[SUCCESS] {m}")
+
+#: @brief ANSI escape sequence for bold text.
 BOLD = "\033[1m"
 
 
@@ -84,6 +90,7 @@ def _colored(v: float, ref: Optional[float], reverse: bool = False) -> str:
     return s
 
 
+#: @brief Column definitions for the evaluation report table.
 _COLS = [
     ("Tracker",   14, False),
     ("Scenario",  24, False),
@@ -98,10 +105,13 @@ _COLS = [
     ("Lat(us)",   10, True),
 ]
 
+#: @brief Pre-computed header string for the console report.
 _HEADER = "".join(
     _ansi_ljust(h, w) if not rj else _ansi_rjust(h, w)
     for h, w, rj in _COLS
 )
+
+#: @brief separator string for table layout.
 _SEP = "-" * sum(w for _, w, _ in _COLS)
 
 
@@ -209,6 +219,7 @@ def _print_aggregate_block(label: str, tracker_names: list, results: dict,
     @param seqs List of sequences in block.
     @param compare Flag for color comparison.
     @param agg_override Optional override for aggregate metrics.
+    @return None.
     """
     print(_SEP)
     print(label)
@@ -234,6 +245,7 @@ def print_trackeval_table(results: dict, compare: bool = True) -> None:
     @brief Prints evaluation table to console.
     @param results Mapping of tracker to sequence metrics.
     @param compare Flag for color comparison.
+    @return None.
     """
     tracker_names = list(results.keys())
 
@@ -289,6 +301,7 @@ def export_trackeval_results(results: dict, out_dir: str) -> None:
     @brief Exports evaluation results to JSON and CSV formats.
     @param results Nested results mapping.
     @param out_dir Output directory path.
+    @return None.
     """
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)

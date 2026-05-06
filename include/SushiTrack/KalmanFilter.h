@@ -48,6 +48,9 @@ namespace SushiTrack
              */
             explicit KalmanFilter(bool enable_xyah = false);
 
+            /**
+             * @brief Virtual destructor for the interface.
+             */
             ~KalmanFilter() override = default;
 
             /**
@@ -56,6 +59,7 @@ namespace SushiTrack
              * @param mean Output state mean vector.
              * @param covariance Output state covariance matrix.
              * @param measurement Input initial observation vector.
+             * @param score Detection confidence score.
              */
             void initiate(KalmanTypes::StateMean& mean, KalmanTypes::StateCov& covariance,
                         const KalmanTypes::DetectBox& measurement, float score = 0.0f) override;
@@ -75,6 +79,7 @@ namespace SushiTrack
              * @param mean State mean vector to be updated.
              * @param covariance State covariance matrix to be updated.
              * @param measurement Input observation vector.
+             * @param score Detection confidence score.
              */
             void update(KalmanTypes::StateMean& mean, KalmanTypes::StateCov& covariance,
                         const KalmanTypes::DetectBox& measurement, float score = 0.0f) override;
@@ -85,10 +90,12 @@ namespace SushiTrack
              * @param mean Current state mean.
              * @param covariance Current state covariance.
              * @param measurement Input observation vector.
+             * @param score Optional detection score for confidence-aware projection.
              * @return Computed squared Mahalanobis distance.
              */
             float mahalanobisDistance(const KalmanTypes::StateMean& mean, const KalmanTypes::StateCov& covariance,
-                                     const KalmanTypes::DetectBox& measurement) const;
+                                     const KalmanTypes::DetectBox& measurement,
+                                     float score = 0.0f) const;
 
             /**
              * @brief Validates if an observation falls within a statistical gate.
@@ -97,36 +104,42 @@ namespace SushiTrack
              * @param covariance Current state covariance.
              * @param measurement Input observation vector.
              * @param chi2_thresh Chi-square threshold for gating.
+             * @param score Optional detection score for confidence-aware projection.
              * @return True if the observation is within the gate.
              */
             bool isInGate(const KalmanTypes::StateMean& mean, const KalmanTypes::StateCov& covariance,
-                        const KalmanTypes::DetectBox& measurement, float chi2_thresh) const override;
+                        const KalmanTypes::DetectBox& measurement, float chi2_thresh,
+                        float score = 0.0f) const override;
 
             /**
              * @brief Performs batch gate validation for multiple observations.
-             * 
+             *
              * @param mean Current state mean.
              * @param covariance Current state covariance.
              * @param measurements Collection of input observation vectors.
              * @param chi2_thresh Chi-square threshold for gating.
+             * @param scores Optional per-measurement confidence scores.
              * @return Collection of boolean flags indicating gate membership.
              */
             std::vector<bool> getGateFlags(const KalmanTypes::StateMean& mean,
                                          const KalmanTypes::StateCov& covariance,
                                          const KalmanTypes::DetectBoxVector& measurements,
-                                         float chi2_thresh) const override;
+                                         float chi2_thresh,
+                                         const std::vector<float>& scores = {}) const override;
 
             /**
              * @brief Performs batch Mahalanobis distance calculations.
-             * 
+             *
              * @param mean Current state mean.
              * @param covariance Current state covariance.
              * @param measurements Collection of input observation vectors.
+             * @param scores Optional per-measurement confidence scores.
              * @return Collection of computed squared Mahalanobis distances.
              */
             std::vector<float> getGateSqDistances(const KalmanTypes::StateMean& mean,
                                                  const KalmanTypes::StateCov& covariance,
-                                                 const KalmanTypes::DetectBoxVector& measurements) const override;
+                                                 const KalmanTypes::DetectBoxVector& measurements,
+                                                 const std::vector<float>& scores = {}) const override;
 
             /**
              * @brief Configures dynamic noise multipliers for the process model.

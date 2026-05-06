@@ -15,6 +15,7 @@
 #include "SushiTrack/Logger.h"
 
 #include <algorithm>
+#include <cmath>
 #include <map>
 #include <set>
 
@@ -594,6 +595,7 @@ namespace SushiTrack
      * @param tentative_next Output list for tracks remaining tentative.
      * @param removed_tentative_curr Output list for tentative tracks that aged out.
      * @param det_for_new_init Output list for detections qualifying for new track initiation.
+     * @param dt Time interval of the current frame.
      */
     void SushiTrackTracker::matchTentative(std::vector<TrackletPtr>& tentative_tracks,
                                         std::vector<TrackletPtr>& det_high_remaining,
@@ -627,7 +629,11 @@ namespace SushiTrack
             auto& t = tentative_tracks[m[0]];
             auto& d = det_high_remaining[m[1]];
 
-            t->update(*d, frame_id_);
+            // keep_state=true: do not flip is_activated_/is_confirmed_/state_
+            // until the dynamic hit threshold is met. Without this, a tentative
+            // track would leak as an activated output on the first match,
+            // bypassing the validation window entirely.
+            t->update(*d, frame_id_, /*update_features=*/true, /*keep_state=*/true);
 
             int required_hits = get_dynamic_hits(t->getScore());
 
@@ -671,7 +677,10 @@ namespace SushiTrack
             auto& t = tentative_remaining[m[0]];
             auto& d = det_low_remaining[m[1]];
 
-            t->update(*d, frame_id_, false);
+            // keep_state=true: same rationale as the high-confidence loop above
+            // — defer activation/confirmation to confirm() once required_hits
+            // is reached, so unvalidated tentatives never appear in the output.
+            t->update(*d, frame_id_, /*update_features=*/false, /*keep_state=*/true);
 
             int required_hits = get_dynamic_hits(t->getScore());
 
@@ -804,16 +813,42 @@ namespace SushiTrack
     {
         for (auto& s : lost_tracklets_)
         {
+            // State-aware buffer scaling. The kinematic regime captured just
+            // before the track went dark drives how long we are willing to
+            // wait for a recovery:
+            //   - Stationary tracks reliably reappear at the same spot, so a
+            //     longer buffer helps reclaim them before identity churn.
+            //   - Maneuvering tracks have noisy predictions; a modest extra
+            //     budget keeps them recoverable through brief occlusions.
+            //   - Cruising / no-FSM tracks use the configured buffer as-is.
+            // Defaults collapse to 1.0x when no FSM is attached so the policy
+            // is bit-identical to the prior behaviour with the FSM disabled.
+            float buffer_scale = 1.0f;
+            if (s->getFSM())
+            {
+                switch (s->getLastSeenState())
+                {
+                    case KinematicState::Stationary:  buffer_scale = 1.5f; break;
+                    case KinematicState::Maneuvering: buffer_scale = 1.2f; break;
+                    case KinematicState::Cruising:
+                    case KinematicState::Coasting:
+                    default:                           buffer_scale = 1.0f; break;
+                }
+            }
+
+            const int scaled_buffer = std::max(1,
+                static_cast<int>(std::round(static_cast<float>(config_.track_buffer) * buffer_scale)));
+
             const float accumulated = config_.time_aware
                 ? s->getAccumulatedLostTime()
                 : static_cast<float>(frame_id_ - s->getFrameId());
 
-            if (timing_policy_->isExpired(accumulated, config_.track_buffer))
+            if (timing_policy_->isExpired(accumulated, scaled_buffer))
             {
                 s->markAsRemoved();
                 removed_tracklets_curr.push_back(s);
-                SUSHITRACK_LOG_INFO("[Tracker] Track %llu expired after being lost for %.2f seconds.", 
-                    (unsigned long long)s->getTrackId(), accumulated);
+                SUSHITRACK_LOG_INFO("[Tracker] Track %llu expired after being lost for %.2f seconds (scaled buffer=%d).",
+                    (unsigned long long)s->getTrackId(), accumulated, scaled_buffer);
             }
         }
     }

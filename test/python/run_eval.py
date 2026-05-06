@@ -65,6 +65,7 @@ def resolve_data_dir(args) -> Path:
 def main():
     """
     @brief Execution entry point.
+    @return None.
     """
     args = parse_args()
 
@@ -93,6 +94,7 @@ def _run_direct_mode(args):
     """
     @brief Executes evaluation on specific ground-truth and prediction files.
     @param args Argparse namespace object.
+    @return None.
     """
     import tempfile, shutil
 

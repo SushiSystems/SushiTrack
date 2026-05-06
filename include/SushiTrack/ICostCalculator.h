@@ -28,7 +28,10 @@ namespace SushiTrack
         public:
             using TrackletPtr = std::shared_ptr<Tracklet>;
 
-            virtual ~ICostCalculator() = default;
+    /**
+     * @brief Virtual destructor for the interface.
+     */
+    virtual ~ICostCalculator() = default;
 
             /**
              * @brief Computes association costs for all possible tracklet pairs.

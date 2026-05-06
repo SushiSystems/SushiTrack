@@ -25,7 +25,10 @@ namespace SushiTrack
     class IKalmanFilter : public IStatePredictor, public IGateValidator
     {
         public:
-            virtual ~IKalmanFilter() = default;
+    /**
+     * @brief Virtual destructor for the interface.
+     */
+    virtual ~IKalmanFilter() = default;
     };
 
 } // namespace SushiTrack

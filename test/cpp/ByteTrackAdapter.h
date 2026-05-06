@@ -128,6 +128,9 @@ namespace TestInfrastructure
 
             std::unique_ptr<byte_track::BYTETracker> tracker_;
 
+            /**
+             * @brief Re-instantiates the tracker using the current parameter configuration.
+             */
             void rebuildTracker()
             {
                 tracker_ = std::make_unique<byte_track::BYTETracker>(

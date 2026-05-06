@@ -24,6 +24,9 @@ namespace TestInfrastructure
     class ITrackerAdapter
     {
         public:
+            /**
+             * @brief Destroys the ITrackerAdapter instance.
+             */
             virtual ~ITrackerAdapter() = default;
 
             /**
