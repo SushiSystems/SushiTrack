@@ -17,10 +17,13 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <exception>
 
 #ifdef _WIN32
 #   include <intrin.h>
 #endif
+
+#include <nlohmann/json.hpp>
 
 namespace TestInfrastructure
 {
@@ -166,8 +169,8 @@ namespace TestInfrastructure
         return result;
     }
 
-    using JsonSection = std::map<std::string, float>; 		///< Key-value pairs for a configuration block.
-    using JsonDoc     = std::map<std::string, JsonSection>; ///< Collection of configuration blocks.
+    using JsonSection = nlohmann::json;
+    using JsonDoc     = nlohmann::json;
 
     /**
      * @brief Minimalist JSON parser for configuration loading.
@@ -177,38 +180,27 @@ namespace TestInfrastructure
      */
     inline JsonDoc parse_json(const std::string& filepath)
     {
-        JsonDoc result;
-
+        JsonDoc result = nlohmann::json::object();
         std::ifstream file(filepath);
         if (!file.is_open()) return result;
-
-        std::ostringstream buf;
-        buf << file.rdbuf();
-        std::string content = buf.str();
-
-        auto first = content.find('{');
-        auto last  = content.rfind('}');
-        if (first == std::string::npos || last == std::string::npos)
-            return result;
-        content = content.substr(first + 1, last - first - 1);
-
-        static const std::regex section_re(R"re("([A-Za-z0-9_]+)"\s*:\s*\{([^}]*)\})re");
-        static const std::regex kv_re     (R"re("([A-Za-z0-9_]+)"\s*:\s*(-?[0-9]+(?:\.[0-9]*)?(?:[eE][+-]?[0-9]+)?))re");
-
-        auto sit = std::sregex_iterator(content.begin(), content.end(), section_re);
-        for (; sit != std::sregex_iterator(); ++sit)
+        
+        try 
         {
-            std::string section = (*sit)[1].str();
-            std::string body    = (*sit)[2].str();
-
-            JsonSection sec;
-            auto kit = std::sregex_iterator(body.begin(), body.end(), kv_re);
-            for (; kit != std::sregex_iterator(); ++kit)
-                sec[(*kit)[1].str()] = std::stof((*kit)[2].str());
-
-            result[section] = std::move(sec);
+            result = nlohmann::json::parse(file, nullptr, true, true);
+        } 
+        catch (const nlohmann::json::parse_error& e) 
+        {
+            std::cerr << "[ JSON ERROR ] Parse failed in " << filepath 
+                      << " at byte " << e.byte << ": " << e.what() << "\n";
+        } 
+        catch (const std::exception& e) 
+        {
+            std::cerr << "[ JSON ERROR ] Error parsing " << filepath << ": " << e.what() << "\n";
+        } 
+        catch (...) 
+        {
+            std::cerr << "[ JSON ERROR ] Unknown error parsing " << filepath << "\n";
         }
-
         return result;
     }
 
@@ -222,8 +214,10 @@ namespace TestInfrastructure
      */
     inline float json_get(const JsonSection& sec, const std::string& key, float def)
     {
-        auto it = sec.find(key);
-        return (it != sec.end()) ? it->second : def;
+        if (sec.is_object() && sec.contains(key) && sec[key].is_number())
+            return sec[key].get<float>();
+        return def;
     }
+
     
 } // namespace TestInfrastructure

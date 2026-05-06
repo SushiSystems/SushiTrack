@@ -47,7 +47,7 @@ namespace TestInfrastructure
                     auto it = doc.find("ocsort");
                     if (it != doc.end())
                     {
-                        const JsonSection& s = it->second;
+                        const JsonSection& s = it.value();
                         det_thresh_    = json_get(s, "det_thresh",    det_thresh_);
                         max_age_       = static_cast<int>(json_get(s, "max_age",       static_cast<float>(max_age_)));
                         min_hits_      = static_cast<int>(json_get(s, "min_hits",      static_cast<float>(min_hits_)));

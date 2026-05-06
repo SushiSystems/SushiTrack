@@ -157,75 +157,88 @@ namespace TestInfrastructure
              */
             void applyJson(const std::string& path, SushiTrack_Params& p)
             {
-                JsonDoc doc = parse_json(path);
-                auto it = doc.find("sushitrack");
-                if (it == doc.end())
+                nlohmann::json doc = parse_json(path);
+                if (!doc.contains("sushitrack"))
                 {
                     std::cout << "[ SushiTrackAdapter ] no \"sushitrack\" section in "
                             << path << " -- using defaults\n";
                     return;
                 }
 
-                const JsonSection& s = it->second;
-                auto gf = [&](const char* k, float d) { return json_get(s, k, d); };
-                auto gi = [&](const char* k, int   d) {
-                    return static_cast<int>(json_get(s, k, static_cast<float>(d)));
+                auto ds = doc["sushitrack"];
+                auto gf = [&](const nlohmann::json& sec, const char* k, float d) { return json_get(sec, k, d); };
+                auto gi = [&](const nlohmann::json& sec, const char* k, int   d) {
+                    return static_cast<int>(json_get(sec, k, static_cast<float>(d)));
                 };
 
-                p.track_thresh  = gf("track_thresh",  p.track_thresh);
-                p.high_thresh   = gf("high_thresh",   p.high_thresh);
-                p.match_thresh  = gf("match_thresh",  p.match_thresh);
+                if (ds.contains("basic"))
+                {
+                    auto basic = ds["basic"];
+                    p.time_aware         = gi(basic, "time_aware",         p.time_aware);
+                    p.frame_rate         = gi(basic, "frame_rate",         p.frame_rate);
+                    p.track_buffer       = gi(basic, "track_buffer",       p.track_buffer);
+                    p.track_thresh       = gf(basic, "track_thresh",       p.track_thresh);
+                    p.high_thresh        = gf(basic, "high_thresh",        p.high_thresh);
+                    p.match_thresh       = gf(basic, "match_thresh",       p.match_thresh);
+                    p.enable_tentative   = gi(basic, "enable_tentative",   p.enable_tentative);
+                    p.enable_fsm         = gi(basic, "enable_fsm",         p.enable_fsm);
+                    p.enable_reid        = gi(basic, "enable_reid",        p.enable_reid);
+                    p.enable_mahalanobis = gi(basic, "enable_mahalanobis", p.enable_mahalanobis);
+                }
 
-                p.frame_rate   = gi("frame_rate",   p.frame_rate);
-                p.track_buffer = gi("track_buffer", p.track_buffer);
-
-                p.time_aware         = gi("time_aware",         p.time_aware);
-                p.enable_reid        = gi("enable_reid",        p.enable_reid);
-                p.enable_fsm         = gi("enable_fsm",         p.enable_fsm);
-                p.enable_tentative   = gi("enable_tentative",   p.enable_tentative);
-                p.enable_mahalanobis = gi("enable_mahalanobis", p.enable_mahalanobis);
-                p.enable_diou        = gi("enable_diou",        p.enable_diou);
-                p.enable_xyah        = gi("enable_xyah",        p.enable_xyah);
-                p.kalman_type        = gi("kalman_type",        p.kalman_type);
-                p.iou_plus_one       = gi("iou_plus_one",       p.iou_plus_one);
-
-                p.fsm_stationary_vel_thresh = gf("fsm_stationary_vel_thresh", p.fsm_stationary_vel_thresh);
-                p.fsm_maneuver_accel_thresh = gf("fsm_maneuver_accel_thresh", p.fsm_maneuver_accel_thresh);
-
-                p.tentative_match_thresh = gf("tentative_match_thresh", p.tentative_match_thresh);
-                p.tentative_confirm_hits = gi("tentative_confirm_hits", p.tentative_confirm_hits);
-                p.tentative_max_age      = gi("tentative_max_age",      p.tentative_max_age);
-
-                p.tentative_fast_thresh       = gf("tentative_fast_thresh",       p.tentative_fast_thresh);
-                p.tentative_fast_hits         = gi("tentative_fast_hits",         p.tentative_fast_hits);
-                p.tentative_slow_thresh       = gf("tentative_slow_thresh",       p.tentative_slow_thresh);
-                p.tentative_slow_hits_offset  = gi("tentative_slow_hits_offset",  p.tentative_slow_hits_offset);
-                p.tentative_vslow_hits_offset = gi("tentative_vslow_hits_offset", p.tentative_vslow_hits_offset);
-
-                p.gating_thresh      = gf("gating_thresh",      p.gating_thresh);
-                p.max_area_ratio     = gf("max_area_ratio",     p.max_area_ratio);
-                p.motion_cost_weight = gf("motion_cost_weight", p.motion_cost_weight);
-
-                p.iou_match_thresh       = gf("iou_match_thresh",       p.iou_match_thresh);
-                p.unconfirmed_iou_thresh = gf("unconfirmed_iou_thresh", p.unconfirmed_iou_thresh);
-                p.duplicate_iou_thresh   = gf("duplicate_iou_thresh",   p.duplicate_iou_thresh);
-
-                p.feature_momentum     = gf("feature_momentum",     p.feature_momentum);
-                p.reid_direct_assignment_weight = gf("reid_direct_assignment_weight", p.reid_direct_assignment_weight);
-                p.reid_high_thresh     = gf("reid_high_thresh",     p.reid_high_thresh);
-                p.reid_high_iou_weight = gf("reid_high_iou_weight", p.reid_high_iou_weight);
-                p.reid_low_thresh      = gf("reid_low_thresh",      p.reid_low_thresh);
-                p.reid_low_iou_weight  = gf("reid_low_iou_weight",  p.reid_low_iou_weight);
-                p.reid_recovery_thresh = gf("reid_recovery_thresh", p.reid_recovery_thresh);
-                p.max_feature_history  = gi("max_feature_history",  p.max_feature_history);
-
-                p.primary_assoc_mode   = gi("primary_assoc_mode",   p.primary_assoc_mode);
-                p.fuse_score           = gi("fuse_score",           p.fuse_score);
-
-                // Note: The following fields are experimental and not exposed in the C API:
-                // - enable_ocm, ocm_weight, ocm_delta_t (experimental features)
-                // - enable_oos (experimental smoothing)
-                // These can be accessed via C++ API (TrackerConfig) if needed.
+                if (ds.contains("advanced"))
+                {
+                    auto adv = ds["advanced"];
+                    
+                    if (adv.contains("association")) {
+                        auto sec = adv["association"];
+                        p.primary_assoc_mode     = gi(sec, "primary_assoc_mode",     p.primary_assoc_mode);
+                        p.fuse_score             = gi(sec, "fuse_score",             p.fuse_score);
+                        p.iou_match_thresh       = gf(sec, "iou_match_thresh",       p.iou_match_thresh);
+                        p.unconfirmed_iou_thresh = gf(sec, "unconfirmed_iou_thresh", p.unconfirmed_iou_thresh);
+                        p.duplicate_iou_thresh   = gf(sec, "duplicate_iou_thresh",   p.duplicate_iou_thresh);
+                    }
+                    
+                    if (adv.contains("coordinate_system")) {
+                        auto sec = adv["coordinate_system"];
+                        p.enable_xyah  = gi(sec, "enable_xyah",  p.enable_xyah);
+                        p.enable_diou  = gi(sec, "enable_diou",  p.enable_diou);
+                        p.iou_plus_one = gi(sec, "iou_plus_one", p.iou_plus_one);
+                        p.kalman_type  = gi(sec, "kalman_type",  p.kalman_type);
+                    }
+                    
+                    if (adv.contains("reid_params")) {
+                        auto sec = adv["reid_params"];
+                        p.feature_momentum     = gf(sec, "feature_momentum",     p.feature_momentum);
+                        p.reid_high_thresh     = gf(sec, "reid_high_thresh",     p.reid_high_thresh);
+                        p.reid_high_iou_weight = gf(sec, "reid_high_iou_weight", p.reid_high_iou_weight);
+                        p.reid_low_thresh      = gf(sec, "reid_low_thresh",      p.reid_low_thresh);
+                        p.reid_low_iou_weight  = gf(sec, "reid_low_iou_weight",  p.reid_low_iou_weight);
+                        p.reid_recovery_thresh = gf(sec, "reid_recovery_thresh", p.reid_recovery_thresh);
+                        p.max_feature_history  = gi(sec, "max_feature_history",  p.max_feature_history);
+                    }
+                    
+                    if (adv.contains("fsm_params")) {
+                        auto sec = adv["fsm_params"];
+                        p.fsm_stationary_vel_thresh = gf(sec, "fsm_stationary_vel_thresh", p.fsm_stationary_vel_thresh);
+                        p.fsm_maneuver_accel_thresh = gf(sec, "fsm_maneuver_accel_thresh", p.fsm_maneuver_accel_thresh);
+                    }
+                    
+                    if (adv.contains("tentative_logic")) {
+                        auto sec = adv["tentative_logic"];
+                        p.tentative_match_thresh = gf(sec, "tentative_match_thresh", p.tentative_match_thresh);
+                        p.tentative_confirm_hits = gi(sec, "tentative_confirm_hits", p.tentative_confirm_hits);
+                        p.tentative_max_age      = gi(sec, "tentative_max_age",      p.tentative_max_age);
+                    }
+                    
+                    if (adv.contains("mahalanobis_gating")) {
+                        auto sec = adv["mahalanobis_gating"];
+                        p.proximity_thresh   = gf(sec, "proximity_thresh",   p.proximity_thresh);
+                        p.gating_thresh      = gf(sec, "gating_thresh",      p.gating_thresh);
+                        p.motion_cost_weight = gf(sec, "motion_cost_weight", p.motion_cost_weight);
+                        p.max_area_ratio     = gf(sec, "max_area_ratio",     p.max_area_ratio);
+                    }
+                }
 
                 std::cout << "[ SushiTrackAdapter ] config loaded from " << path << "\n";
             }

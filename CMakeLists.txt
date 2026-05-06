@@ -117,6 +117,7 @@ if(BUILD_MOT_TEST)
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/bytetrack/include
         ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/ocsort/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty
         ${EIGEN3_INCLUDE_DIR}
     )
 

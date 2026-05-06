@@ -85,78 +85,147 @@ extern "C"
     */
     typedef struct 
     {
-        int   enable_reid;      ///< Flag to enable visual appearance-based matching.
-        int   time_aware;       ///< Flag to enable real-time interval processing.
+        // ====================================================================
+        // BASIC PARAMETERS
+        // ====================================================================
 
-        int   enable_fsm;                 ///< Flag to enable the kinematic state machine.
-        float fsm_stationary_vel_thresh;  ///< Velocity threshold for stationary classification (units/s).
-        float fsm_maneuver_accel_thresh;  ///< Acceleration threshold for maneuver classification (units/s^2).
+        /** @brief Flag to enable real-time interval processing rather than frame-based intervals. */
+        int   time_aware;
 
-        int   enable_tentative;        ///< Flag to enable intermediate track validation state.
-        float tentative_match_thresh;  ///< Maximum cost limit for tentative track association.
-        int   tentative_confirm_hits;  ///< Required consecutive observations for track confirmation.
-        int   tentative_max_age;       ///< Maximum persistence for tentative tracks without observations.
+        /** @brief Target processing frequency (frames per second). */
+        int   frame_rate;
 
-        
-        float tentative_fast_thresh;       ///< Score threshold for instant track confirmation.
-        int   tentative_fast_hits;         ///< Hits required when score exceeds fast threshold.
-        float tentative_slow_thresh;       ///< Score threshold below which confirmation is delayed.
-        int   tentative_slow_hits_offset;  ///< Additional hits required for slow-moving tracks.
-        int   tentative_vslow_hits_offset; ///< Additional hits required for very low confidence tracks.
+        /** @brief Maximum number of frames to persist a track in the lost state before deletion. */
+        int   track_buffer;
 
-        int   frame_rate;              ///< Target processing frequency.
-        int   track_buffer;            ///< Maximum persistence for lost tracks in frame units.
+        /** @brief Score threshold for classifying detections into high and low confidence pools. */
+        float track_thresh;
 
-        float track_thresh;     ///< Score threshold for detection classification.
-        float high_thresh;      ///< Minimum score for initializing new tracks.
-        float match_thresh;     ///< Maximum cost limit for primary association.
-        
-        int   enable_mahalanobis;   ///< Flag to enable Mahalanobis distance gating.
-        float gating_thresh;        ///< Statistical distance threshold for gating.
-        float max_area_ratio;       ///< Maximum allowed area ratio for candidate pairs.
-        float motion_cost_weight;   ///< Weighting factor for motion similarity in fused metrics (effective when enable_mahalanobis=1).
+        /** @brief Minimum confidence score required to initialize a new tracklet. */
+        float high_thresh;
 
+        /** @brief Maximum cost limit allowed for the primary tracking association step. */
+        float match_thresh;
 
-        int   enable_xyah;          ///< Flag for centroid-based coordinate representation.
-        int   kalman_type;          ///< Type of Kalman Filter (0: Linear, 1: NSA).
-        int   iou_plus_one;         ///< Flag for alternate intersection area calculation.
-        int   enable_diou;          ///< Flag to enable Distance-IoU metric.
+        /** @brief Flag to enable the tentative, unconfirmed track lifecycle state. */
+        int   enable_tentative;
 
-        float feature_momentum;     ///< Exponential moving average weight for visual feature updates.
-        float reid_direct_assignment_weight; ///< Scaling factor for high-confidence direct visual matches.
+        /** @brief Flag to enable the Kinematic Finite State Machine for dynamic noise adjustment. */
+        int   enable_fsm;
 
-        float iou_match_thresh;       ///< Maximum cost limit for secondary association.
-        float unconfirmed_iou_thresh; ///< Maximum cost limit for unconfirmed track association.
-        float duplicate_iou_thresh;   ///< Threshold for identifying redundant tracks.
+        /** @brief Flag to enable ReID visual feature extraction and association. */
+        int   enable_reid;
 
-        float reid_high_thresh;      ///< Maximum allowed cost for direct association in high-confidence ReIDFirst pass (effective when enable_reid=1 and enable_mahalanobis=0).
-        float reid_high_iou_weight;  ///< IoU fallback weight in high-confidence ReIDFirst pass.
-        float reid_low_thresh;       ///< Maximum allowed cost for direct association in low-confidence ReIDFirst pass (effective when enable_reid=1 and enable_mahalanobis=0).
-        float reid_low_iou_weight;   ///< IoU fallback weight in low-confidence ReIDFirst pass.
-        float reid_recovery_thresh;  ///< Maximum allowed cost for visual recovery of lost tracks (effective when enable_reid=1).
-        int   max_feature_history;   ///< Maximum number of visual appearance vectors stored per tracklet.
+        /** @brief Flag to enable Mahalanobis distance gating to filter impossible associations. */
+        int   enable_mahalanobis;
 
-        /**
-         * @brief Primary association mode selector.
-         *
-         * 0 = Age-cascade (legacy). Tracks are bucketed by frames-since-last-seen
-         *     and each bucket is solved with an independent LAPJV.
-         * 1 = Global LAPJV (default). Single cost matrix and single LAPJV solve
-         *     over the union of all candidate tracks; identical to the
-         *     reference ByteTrack pipeline. Recommended for clean / high-
-         *     confidence detections where the global optimum is preferable.
-         */
+        // ====================================================================
+        // ADVANCED PARAMETERS
+        // ====================================================================
+
+        // --- Association ---
+
+        /** @brief Primary association mode (0: Age-cascade legacy, 1: Global LAPJV). */
         int   primary_assoc_mode;
 
-        /**
-         * @brief Score fusion flag for the primary association cost matrix.
-         *
-         * When non-zero, the high-confidence cost matrix is rescaled with the
-         * detection confidence (cost' = 1 - (1 - cost) * score), giving
-         * high-confidence pairs lower association cost. Matches the reference
-         * ByteTrack fuse_score behaviour. Off by default.
-         */
+        /** @brief Flag to enable confidence-based score fusion in the primary association matrix. */
         int   fuse_score;
+
+        /** @brief Maximum cost limit allowed for the secondary (IoU-based) association step. */
+        float iou_match_thresh;
+
+        /** @brief Maximum cost limit allowed for associating unconfirmed tracks. */
+        float unconfirmed_iou_thresh;
+
+        /** @brief IoU threshold to identify and remove redundant, duplicate tracks. */
+        float duplicate_iou_thresh;
+
+        // --- Coordinate System ---
+
+        /** @brief Flag to enable centroid-based (XYAH) coordinate representation instead of XYWH. */
+        int   enable_xyah;
+
+        /** @brief Flag to enable Distance-IoU (DIoU) metric for spatial penalization. */
+        int   enable_diou;
+
+        /** @brief Flag to add a +1 offset in bounding box dimension calculations (inclusive). */
+        int   iou_plus_one;
+
+        /** @brief Defines the type of Kalman Filter utilized (0: Linear, 1: Noise Scale Adaptive). */
+        int   kalman_type;
+
+        // --- ReID Params ---
+
+        /** @brief Exponential moving average weight for smoothing visual feature updates. */
+        float feature_momentum;
+
+        /** @brief Distance threshold for direct visual association in the high-confidence ReID pass. */
+        float reid_high_thresh;
+
+        /** @brief Fallback weight applied to the IoU cost during the high-confidence ReID pass. */
+        float reid_high_iou_weight;
+
+        /** @brief Distance threshold for direct visual association in the low-confidence ReID pass. */
+        float reid_low_thresh;
+
+        /** @brief Fallback weight applied to the IoU cost during the low-confidence ReID pass. */
+        float reid_low_iou_weight;
+
+        /** @brief Distance threshold allowed for recovering lost tracks strictly via visual features. */
+        float reid_recovery_thresh;
+
+        /** @brief Maximum capacity of visual appearance vectors stored in the gallery per tracklet. */
+        int   max_feature_history;
+
+        // --- FSM Params ---
+
+        /** @brief Velocity threshold to classify an object's kinematic state as stationary. */
+        float fsm_stationary_vel_thresh;
+
+        /** @brief Acceleration threshold to classify an object's kinematic state as maneuvering. */
+        float fsm_maneuver_accel_thresh;
+
+        // --- Tentative Logic ---
+
+        /** @brief Maximum cost limit allowed for tentative track associations. */
+        float tentative_match_thresh;
+
+        /** @brief Number of consecutive successful matches required to confirm a tentative track. */
+        int   tentative_confirm_hits;
+
+        /** @brief Maximum frames to persist a tentative track without any successful matches. */
+        int   tentative_max_age;
+
+        // --- Mahalanobis Gating ---
+
+        /** @brief Proximity threshold for initial broad spatial filtering before statistical gating. */
+        float proximity_thresh;
+
+        /** @brief Chi-squared statistical distance threshold utilized for Mahalanobis gating. */
+        float gating_thresh;
+
+        /** @brief Weighting factor applied to motion similarity within fused association costs. */
+        float motion_cost_weight;
+
+        /** @brief Maximum allowed area ratio disparity to filter impossible candidate pairs. */
+        float max_area_ratio;
+
+        // ====================================================================
+        // EXTENDED PARAMETERS
+        // ====================================================================
+
+        /** @brief Score threshold for instant tentative track confirmation. */
+        float tentative_fast_thresh;
+        /** @brief Hits required when score exceeds fast threshold. */
+        int   tentative_fast_hits;
+        /** @brief Score threshold below which confirmation is delayed. */
+        float tentative_slow_thresh;
+        /** @brief Additional hits required for slow-moving tentative tracks. */
+        int   tentative_slow_hits_offset;
+        /** @brief Additional hits required for very low confidence tentative tracks. */
+        int   tentative_vslow_hits_offset;
+        /** @brief Scaling factor for high-confidence direct visual matches. */
+        float reid_direct_assignment_weight;
 
     } SushiTrack_Params;
 

@@ -48,7 +48,7 @@ namespace TestInfrastructure
                     auto it = doc.find("bytetrack");
                     if (it != doc.end())
                     {
-                        const JsonSection& s = it->second;
+                        const JsonSection& s = it.value();
                         frame_rate_   = static_cast<int>(json_get(s, "frame_rate",   static_cast<float>(frame_rate_)));
                         track_buffer_ = static_cast<int>(json_get(s, "track_buffer", static_cast<float>(track_buffer_)));
                         track_thresh_ = json_get(s, "track_thresh", track_thresh_);

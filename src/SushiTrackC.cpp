@@ -52,9 +52,9 @@ extern "C"
         params->frame_rate   = 25;
         params->track_buffer = 30;
 
-        params->track_thresh = 0.5f;
+        params->track_thresh = 0.2f;
         params->high_thresh  = 0.5f;
-        params->match_thresh = 0.8f;
+        params->match_thresh = 0.7f;
 
         params->enable_tentative = 0;
 
@@ -64,7 +64,7 @@ extern "C"
         params->motion_cost_weight = 0.15f;
 
 
-        params->enable_xyah         = 1;
+        params->enable_xyah         = 0;
         params->kalman_type         = 0;
         params->iou_plus_one        = 1;
         params->enable_diou         = 1;
@@ -75,9 +75,9 @@ extern "C"
         params->unconfirmed_iou_thresh = 0.7f;
         params->duplicate_iou_thresh   = 0.15f;
 
-        params->tentative_match_thresh = 0.5f;
-        params->tentative_confirm_hits = 4;
-        params->tentative_max_age      = 12;
+        params->tentative_match_thresh = 0.3f;
+        params->tentative_confirm_hits = 3;
+        params->tentative_max_age      = 2;
 
 
         params->tentative_fast_thresh       = 0.85f;
@@ -94,7 +94,7 @@ extern "C"
         params->max_feature_history  = 100;
 
         params->primary_assoc_mode   = 1;
-        params->fuse_score           = 0;
+        params->fuse_score           = 1;
     }
 
     /**

@@ -45,7 +45,7 @@ venv/
 Thumbs.db
 
 # Project Specific
-/data/*/pred/
+data/*/pred/
 docs/html/
 
 # 3rd Party
