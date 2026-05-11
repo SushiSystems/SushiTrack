@@ -95,6 +95,12 @@ extern "C"
 
         params->primary_assoc_mode   = 1;
         params->fuse_score           = 1;
+
+        params->enable_interaction_context              = 0;
+        params->interaction_iou_thresh                  = 0.3f;
+        params->interaction_occluder_penalty            = 0.3f;
+        params->interaction_occluder_validity_frames    = 60;
+        params->interaction_occluder_validity_seconds   = 2.0f;
     }
 
     /**
@@ -178,6 +184,12 @@ extern "C"
 
             config.primary_assoc_mode   = params->primary_assoc_mode;
             config.fuse_score           = (params->fuse_score != 0);
+
+            config.enable_interaction_context              = (params->enable_interaction_context != 0);
+            config.interaction_iou_thresh                  = params->interaction_iou_thresh;
+            config.interaction_occluder_penalty            = params->interaction_occluder_penalty;
+            config.interaction_occluder_validity_frames    = params->interaction_occluder_validity_frames;
+            config.interaction_occluder_validity_seconds   = params->interaction_occluder_validity_seconds;
 
             auto kf_factory = std::make_shared<SushiTrack::GenericKalmanFactory>(
                 config.kalman_type, config.enable_xyah);
@@ -468,7 +480,7 @@ extern "C"
         }
         catch (const std::exception& e)
         {
-            SUSHITRACK_LOG_ERROR(e.what());
+            SUSHITRACK_LOG_ERROR("[SushiTrack] Update failed: %s", e.what());
             return 0;
         }
     }
@@ -476,12 +488,7 @@ extern "C"
     /**
      * @brief Configures a global callback function for system logging.
      *
-     * The callback is invoked from the calling thread whenever the library
-     * emits a log message. Pass NULL to unregister an existing callback.
-     * The store uses release semantics so that any subsequent log emission
-     * on any thread observes the updated pointer.
-     *
-     * @param callback Function pointer to the logging implementation, or NULL.
+     * @param callback Function pointer to the logging implementation.
      */
     void SushiTrack_SetLogCallback(SushiTrack_LogCallback callback)
     {

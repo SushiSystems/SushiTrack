@@ -39,6 +39,9 @@ env/
 venv/
 .env
 .pytest_cache/
+*.pth
+*.tar
+*.mp4
 
 # OS Files
 .DS_Store

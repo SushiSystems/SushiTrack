@@ -227,6 +227,47 @@ extern "C"
         /** @brief Scaling factor for high-confidence direct visual matches. */
         float reid_direct_assignment_weight;
 
+        // ====================================================================
+        // INTERACTION CONTEXT (GLOBAL OCCLUSION MODELLING)
+        // ====================================================================
+
+        /**
+         * @brief Master switch for the scene-level interaction context module.
+         *
+         * When non-zero, the tracker builds a per-frame interaction graph over
+         * the predicted bounding boxes of all confirmed and lost tracklets,
+         * captures an occluder identifier at the moment a track transitions
+         * to the lost state, and biases lost-recovery association against
+         * detections that geometrically coincide with that occluder while the
+         * snapshot remains valid. Has no effect unless enable_fsm is also
+         * non-zero.
+         */
+        int   enable_interaction_context;
+
+        /**
+         * @brief Minimum predicted-box intersection-over-union required to
+         *        register a pairwise interaction in the graph.
+         */
+        float interaction_iou_thresh;
+
+        /**
+         * @brief Additive cost penalty applied to recovery matches that
+         *        coincide with a still-valid occluder snapshot.
+         */
+        float interaction_occluder_penalty;
+
+        /**
+         * @brief Maximum frame-counted lifetime of an occluder snapshot when
+         *        operating in frame-based timing mode.
+         */
+        int   interaction_occluder_validity_frames;
+
+        /**
+         * @brief Maximum wall-clock lifetime of an occluder snapshot in
+         *        seconds when operating in real-time timing mode.
+         */
+        float interaction_occluder_validity_seconds;
+
     } SushiTrack_Params;
 
     /**
@@ -246,14 +287,14 @@ extern "C"
 
     /**
      * @brief Terminates a tracker instance and deallocates associated memory.
-     * 
+     *
      * @param hdl Handle to the tracker instance to be destroyed.
      */
     void SushiTrack_Destroy(SushiTrackHdl hdl);
 
     /**
      * @brief Processes a new set of detections and updates internal track states.
-     * 
+     *
      * @param hdl Handle to the tracker instance.
      * @param objects Array of input detection structures.
      * @param n_objects Number of elements in the objects array.
@@ -271,7 +312,7 @@ extern "C"
 
     /**
      * @brief Extended instantiation providing status code feedback.
-     * 
+     *
      * @param params Pointer to the configuration structure.
      * @param out_hdl Pointer to receive the initialized tracker handle.
      * @return Status code indicating success or specific failure reason.
@@ -280,7 +321,7 @@ extern "C"
 
     /**
      * @brief Configures a global callback function for system logging.
-     * 
+     *
      * @param callback Function pointer to the logging implementation.
      */
     void SushiTrack_SetLogCallback(SushiTrack_LogCallback callback);

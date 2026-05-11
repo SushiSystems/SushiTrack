@@ -10,7 +10,8 @@
             "enable_tentative": 1,
             "enable_fsm": 1,
             "enable_reid": 0,
-            "enable_mahalanobis": 0
+            "enable_mahalanobis": 0,
+            "enable_interaction_context": 1
         },
         "advanced": {
             "association": {
@@ -55,6 +56,12 @@
                 "gating_thresh": 9.4877,
                 "motion_cost_weight": 0.15,
                 "max_area_ratio": 50.0
+            },
+            "interaction_context": {
+                "interaction_iou_thresh": 0.6,
+                "interaction_occluder_penalty": 0.15,
+                "interaction_occluder_validity_frames": 30,
+                "interaction_occluder_validity_seconds": 1
             }
         }
     },

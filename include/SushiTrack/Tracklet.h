@@ -14,6 +14,7 @@
 #include "SushiTrack/Rect.h"
 #include "SushiTrack/KalmanTypes.h"
 #include "SushiTrack/TrackFSM.h"
+#include "SushiTrack/InteractionState.h"
 
 #include <cstdint>
 #include <cstddef>
@@ -199,10 +200,83 @@ namespace SushiTrack
 
             /**
              * @brief Retrieves the accumulated time spent in the lost state.
-             * 
+             *
              * @return Total lost time in seconds or frame count.
              */
             float getAccumulatedLostTime() const { return accumulated_lost_time_; }
+
+            /**
+             * @brief Records the identity of the tracklet that occluded this
+             *        track at the moment of transition into the Lost state.
+             *
+             * The snapshot is intended to be consumed by the lost-recovery
+             * association stage to bias matches against the still-active
+             * occluder. The frame and accumulated-time stamps record when the
+             * snapshot was taken so that the consumer can enforce a
+             * configurable validity window in either frame-counted or
+             * wall-clock mode.
+             *
+             * @param occluder_id Track identifier of the occluding tracklet.
+             * @param frame_id Frame in which the snapshot was taken.
+             * @param time_seconds Accumulated wall-clock time elapsed up to
+             *                     the snapshot moment, measured in seconds.
+             */
+            void setOccluderSnapshot(int occluder_id, size_t frame_id, float time_seconds)
+            {
+                occluder_id_              = occluder_id;
+                occluder_snapshot_frame_  = frame_id;
+                occluder_snapshot_time_   = time_seconds;
+                interaction_state_        = (occluder_id >= 0)
+                                            ? InteractionState::Occluded
+                                            : InteractionState::Free;
+            }
+
+            /**
+             * @brief Clears the stored occluder snapshot.
+             *
+             * Invoked once the snapshot has served its purpose or has been
+             * deemed expired by the consumer. Resets the interaction state to
+             * Free so that downstream policies stop biasing decisions on the
+             * basis of the stale record.
+             */
+            void clearOccluderSnapshot()
+            {
+                occluder_id_              = -1;
+                occluder_snapshot_frame_  = 0;
+                occluder_snapshot_time_   = 0.0f;
+                interaction_state_        = InteractionState::Free;
+            }
+
+            /**
+             * @brief Retrieves the stored occluder identifier.
+             *
+             * @return Track identifier of the occluder, or -1 when no
+             *         snapshot has been recorded.
+             */
+            int getOccluderId() const { return occluder_id_; }
+
+            /**
+             * @brief Retrieves the frame in which the occluder snapshot was
+             *        taken.
+             *
+             * @return Frame identifier of the snapshot.
+             */
+            size_t getOccluderSnapshotFrame() const { return occluder_snapshot_frame_; }
+
+            /**
+             * @brief Retrieves the accumulated wall-clock time recorded with
+             *        the occluder snapshot.
+             *
+             * @return Snapshot timestamp in seconds.
+             */
+            float getOccluderSnapshotTime() const { return occluder_snapshot_time_; }
+
+            /**
+             * @brief Retrieves the current scene-level interaction state.
+             *
+             * @return Active InteractionState value.
+             */
+            InteractionState getInteractionState() const { return interaction_state_; }
 
             /** 
              * @brief Updates visual features using exponential moving average. 
@@ -269,8 +343,20 @@ namespace SushiTrack
             size_t max_feature_history_;
             std::deque<std::vector<float>> feature_history_;
             float accumulated_lost_time_ = 0.0f;
-            
+
             float last_dt_ = 1.0f;
+
+            // ----- Interaction context snapshot -----
+            // Records the front-most occluder identifier captured at the
+            // moment this tracklet transitioned into the Lost state. The
+            // frame and time stamps allow the consumer to enforce a
+            // configurable validity window in either timing mode. Defaults
+            // collapse to an inert Free state so that policies degrade to
+            // identity behaviour when the interaction module is disabled.
+            int              occluder_id_              = -1;
+            size_t           occluder_snapshot_frame_  = 0;
+            float            occluder_snapshot_time_   = 0.0f;
+            InteractionState interaction_state_        = InteractionState::Free;
 
             float              alpha_;
             bool               enable_xyah_;

@@ -160,6 +160,69 @@ namespace SushiTrack
         int   tentative_vslow_hits_offset = 2;
         /** @brief Scaling factor for high-confidence direct visual matches. */
         float reid_direct_assignment_weight = 0.2f;
+
+        // ====================================================================
+        // INTERACTION CONTEXT (GLOBAL OCCLUSION MODELLING)
+        // ====================================================================
+
+        /**
+         * @brief Master switch for the scene-level interaction context module.
+         *
+         * When enabled, the tracker builds a per-frame interaction graph over
+         * the predicted bounding boxes of all confirmed and lost tracklets,
+         * snapshots an occluder identifier on a track at the moment it
+         * transitions into the Lost state, and biases lost-recovery
+         * association against detections that coincide with that occluder
+         * while the snapshot is still valid. Defaults to false so that the
+         * legacy behaviour is preserved bit-for-bit when the feature is not
+         * explicitly opted into.
+         */
+        bool  enable_interaction_context = false;
+
+        /**
+         * @brief Minimum predicted-box IoU required to register an interaction.
+         *
+         * Pairs of tracklets whose predicted bounding boxes overlap below this
+         * threshold are not considered to be interacting. Increasing the
+         * value reduces false-positive occluder snapshots in sparse scenes;
+         * lowering it captures grazing occlusions at the cost of more noise.
+         */
+        float interaction_iou_thresh = 0.3f;
+
+        /**
+         * @brief Additive cost penalty applied to recovery matches that
+         *        coincide with a still-valid occluder snapshot.
+         *
+         * The penalty is added to the lost-recovery association cost when the
+         * candidate detection overlaps with the occluder that was active at
+         * the moment the tracklet became Lost. Larger values more aggressively
+         * suppress premature re-association during the occlusion window.
+         */
+        float interaction_occluder_penalty = 0.3f;
+
+        /**
+         * @brief Maximum frame-counted lifetime of an occluder snapshot.
+         *
+         * Used when the tracker is operating in frame-based timing mode
+         * (time_aware = false). Once the number of frames elapsed since the
+         * snapshot exceeds this value, the snapshot is treated as expired and
+         * the occluder-aware penalty is no longer applied. Larger values keep
+         * the suppression active longer, which protects against late
+         * emergence of the original track at the cost of delaying legitimate
+         * re-acquisitions of unrelated detections.
+         */
+        int   interaction_occluder_validity_frames = 60;
+
+        /**
+         * @brief Maximum wall-clock lifetime of an occluder snapshot in seconds.
+         *
+         * Used when the tracker is operating in real-time mode
+         * (time_aware = true). The semantics mirror the frame-counted variant
+         * but are evaluated against the accumulated lost-time of the
+         * tracklet. Decouples the validity window from the frame rate so that
+         * downstream pipelines with variable cadence behave consistently.
+         */
+        float interaction_occluder_validity_seconds = 2.0f;
     };
     
 } // namespace SushiTrack

@@ -187,7 +187,17 @@ namespace SushiTrack
         hits_++;
         tracklet_len_ = frame_id - start_frame_id_ + 1;
         accumulated_lost_time_ = 0.0f;
-        if (fsm_) 
+
+        // Successful recovery invalidates any occluder snapshot taken at the
+        // moment this track went dark. Retaining the snapshot would bias
+        // subsequent matches on the basis of a relationship that has already
+        // been resolved by the recovery event itself.
+        occluder_id_             = -1;
+        occluder_snapshot_frame_ = 0;
+        occluder_snapshot_time_  = 0.0f;
+        interaction_state_       = InteractionState::Free;
+
+        if (fsm_)
         {
             fsm_->updateState(mean_, false, tracklet_len_, last_dt_);
         }
@@ -296,6 +306,17 @@ namespace SushiTrack
         hits_++;
         tracklet_len_ = frame_id - start_frame_id_ + 1;
         accumulated_lost_time_ = 0.0f;
+
+        // A confirmed observation supersedes any prior occluder snapshot. The
+        // snapshot is only meaningful while the track is in Lost; once it is
+        // back under direct observation the recorded relationship is stale.
+        if (!keep_state)
+        {
+            occluder_id_             = -1;
+            occluder_snapshot_frame_ = 0;
+            occluder_snapshot_time_  = 0.0f;
+            interaction_state_       = InteractionState::Free;
+        }
 
         if (fsm_)
         {

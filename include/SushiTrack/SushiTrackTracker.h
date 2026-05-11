@@ -14,6 +14,7 @@
 #include "SushiTrack/IAssignmentSolver.h"
 #include "SushiTrack/IKalmanFactory.h"
 #include "SushiTrack/ITimingPolicy.h"
+#include "SushiTrack/IInteractionGraph.h"
 #include "SushiTrack/TrackerConfig.h"
 #include "SushiTrack/Object.h"
 #include "SushiTrack/CostMatrix.h"
@@ -102,6 +103,8 @@ namespace SushiTrack
             std::vector<TrackletPtr> tentative_tracklets_; ///< Tracks awaiting confirmation.
             std::vector<TrackletPtr> tracked_tracklets_;   ///< Confirmed active tracks.
             std::vector<TrackletPtr> lost_tracklets_;      ///< Tracks recently lost.
+
+            std::unique_ptr<IInteractionGraph> interaction_graph_; ///< Scene-level interaction analyser (optional).
 
             size_t frame_id_;                   ///< Identifier for frame sequence.
             size_t track_id_count_;             ///< Counter for track identity.
@@ -254,10 +257,37 @@ namespace SushiTrack
 
             /**
              * @brief Creates a state predictor instance.
-             * 
+             *
              * @return Unique pointer to the state predictor.
              */
             std::unique_ptr<IStatePredictor> createKalmanFilter() const;
+
+            /**
+             * @brief Applies the occluder-aware cost penalty to a cost matrix.
+             *
+             * Iterates over the provided track collection and, for every Lost
+             * tracklet whose recorded occluder snapshot is still valid in the
+             * active timing mode, adds the configured penalty to all cells
+             * whose corresponding detection rectangle overlaps the snapshotted
+             * occluder geometry. Cells already at the sentinel cost (gate
+             * violations) are not modified so the assignment solver keeps
+             * rejecting them.
+             *
+             * Encapsulates the shared suppression policy used by both
+             * matchHighConfidence and matchLostRecovery so the two call sites
+             * cannot drift apart in their interpretation of snapshot
+             * validity or penalty application.
+             *
+             * @param tracks    Track rows of the cost matrix.
+             * @param dets      Detection columns of the cost matrix.
+             * @param matrix    Cost matrix to be modified in place.
+             * @param only_lost When true, only rows whose track is in the
+             *                  Lost state are considered.
+             */
+            void applyOccluderPenalty(const std::vector<TrackletPtr>& tracks,
+                                      const std::vector<TrackletPtr>& dets,
+                                      CostMatrix& matrix,
+                                      bool only_lost) const;
     };
 
 } // namespace SushiTrack

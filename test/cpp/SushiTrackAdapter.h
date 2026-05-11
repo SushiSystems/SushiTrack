@@ -184,6 +184,7 @@ namespace TestInfrastructure
                     p.enable_fsm         = gi(basic, "enable_fsm",         p.enable_fsm);
                     p.enable_reid        = gi(basic, "enable_reid",        p.enable_reid);
                     p.enable_mahalanobis = gi(basic, "enable_mahalanobis", p.enable_mahalanobis);
+                    p.enable_interaction_context = gi(basic, "enable_interaction_context", p.enable_interaction_context);
                 }
 
                 if (ds.contains("advanced"))
@@ -243,6 +244,14 @@ namespace TestInfrastructure
                         p.gating_thresh      = gf(sec, "gating_thresh",      p.gating_thresh);
                         p.motion_cost_weight = gf(sec, "motion_cost_weight", p.motion_cost_weight);
                         p.max_area_ratio     = gf(sec, "max_area_ratio",     p.max_area_ratio);
+                    }
+
+                    if (adv.contains("interaction_context")) {
+                        auto sec = adv["interaction_context"];
+                        p.interaction_iou_thresh                = gf(sec, "interaction_iou_thresh",                p.interaction_iou_thresh);
+                        p.interaction_occluder_penalty          = gf(sec, "interaction_occluder_penalty",          p.interaction_occluder_penalty);
+                        p.interaction_occluder_validity_frames  = gi(sec, "interaction_occluder_validity_frames",  p.interaction_occluder_validity_frames);
+                        p.interaction_occluder_validity_seconds = gf(sec, "interaction_occluder_validity_seconds", p.interaction_occluder_validity_seconds);
                     }
                 }
 
