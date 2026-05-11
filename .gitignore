@@ -50,6 +50,3 @@ Thumbs.db
 # Project Specific
 data/*/pred/
 docs/html/
-
-# 3rd Party
-3rdparty/eigen/*
