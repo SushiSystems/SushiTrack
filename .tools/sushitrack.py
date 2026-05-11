@@ -46,9 +46,9 @@ def get_data_root() -> Path:
     @return Path object.
     """
     root = get_project_root()
-    if (root / "data").exists():
-        return root / "data"
-    return root / "test" / "data"
+    if (root / "test" / "data").exists():
+        return root / "test" / "data"
+    return root / "data"
 
 
 def project_build(clean: bool, test: bool) -> bool:
@@ -193,13 +193,14 @@ def _run_binary(binary: str, gtest_filter: str) -> tuple[bool, dict]:
         return False, {}
 
 
-def project_test(scenario: str | None, compare: bool, eval_only: bool, export: str | None) -> bool:
+def project_test(scenario: str | None, compare: bool, eval_only: bool, export: str | None, trackeval: bool) -> bool:
     """
     @brief Orchestrates project testing and evaluation.
     @param scenario  Target sequence identifier.
     @param compare   Flag for comparative evaluation.
     @param eval_only Flag to skip binary execution.
     @param export    Optional export directory path.
+    @param trackeval Flag to use official TrackEval script directly.
     @return Execution status.
     """
     perf_data: dict = {t: {} for t in _KNOWN_TRACKERS}
@@ -215,8 +216,112 @@ def project_test(scenario: str | None, compare: bool, eval_only: bool, export: s
         if not success:
             return False
 
-    log_info("Running TrackEval evaluation...")
+    if trackeval:
+        log_info("Running TrackEval via official script...")
+        return run_trackeval_official(scenario, compare)
+
+    log_info("Running internal TrackEval evaluation...")
     return run_evaluation(scenario, compare, perf_data, export)
+
+def run_trackeval_official(scenario: str | None, compare: bool) -> bool:
+    import shutil
+    data_root = get_data_root()
+    trackeval_dir = get_project_root() / "3rdparty" / "TrackEval"
+    
+    if not trackeval_dir.exists():
+        log_error("TrackEval directory not found in project root.")
+        return False
+        
+    trackers = _KNOWN_TRACKERS if compare else ["sushitrack"]
+    
+    # 1. Prepare directory structure
+    for tracker in trackers:
+        for seq_dir in data_root.iterdir():
+            if not seq_dir.is_dir() or not (seq_dir / "gt" / "gt.txt").exists():
+                continue
+                
+            seq = seq_dir.name
+            if scenario and seq != scenario:
+                continue
+                
+            src_pred = seq_dir / "pred" / tracker / f"{seq}.txt"
+            if not src_pred.exists():
+                continue
+                
+            benchmark = "MOT20" if seq.upper().startswith("MOT20") else "MOT17"
+            dst_dir = trackeval_dir / "data" / "trackers" / "mot_challenge" / f"{benchmark}-train" / tracker / "data"
+            dst_dir.mkdir(parents=True, exist_ok=True)
+            
+            shutil.copy2(src_pred, dst_dir / f"{seq}.txt")
+            log_info(f"Copied {seq} for {tracker} to TrackEval hierarchy")
+            
+            # 2. Copy GT and seqinfo to TrackEval (only once per sequence)
+            gt_dst_dir = trackeval_dir / "data" / "gt" / "mot_challenge" / f"{benchmark}-train" / seq
+            if not (gt_dst_dir / "gt" / "gt.txt").exists():
+                (gt_dst_dir / "gt").mkdir(parents=True, exist_ok=True)
+                src_gt = seq_dir / "gt" / "gt.txt"
+                if src_gt.exists():
+                    shutil.copy2(src_gt, gt_dst_dir / "gt" / "gt.txt")
+                    
+                src_info = seq_dir / "seqinfo.ini"
+                if src_info.exists():
+                    shutil.copy2(src_info, gt_dst_dir / "seqinfo.ini")
+                
+                log_info(f"Copied GT/info for {seq} to TrackEval hierarchy")
+            
+    # 2. Run the official script for each benchmark (grouping trackers for comparison)
+    script_path = trackeval_dir / "scripts" / "run_mot_challenge.py"
+    if not script_path.exists():
+        log_error(f"Official TrackEval script not found at {script_path}")
+        return False
+        
+    success = True
+    for benchmark in ["MOT17", "MOT20"]:
+        # Identify which trackers actually have data for this benchmark
+        valid_trackers = []
+        all_seqs = set()
+        for tracker in trackers:
+            tracker_data_dir = trackeval_dir / "data" / "trackers" / "mot_challenge" / f"{benchmark}-train" / tracker / "data"
+            if tracker_data_dir.exists():
+                seqs = [f.stem for f in tracker_data_dir.iterdir() if f.is_file() and f.suffix == ".txt"]
+                if seqs:
+                    valid_trackers.append(tracker)
+                    all_seqs.update(seqs)
+        
+        if not valid_trackers:
+            continue
+
+        # Generate/Update seqmap for this benchmark based on found sequences
+        seqmap_dir = trackeval_dir / "data" / "gt" / "mot_challenge" / "seqmaps"
+        seqmap_dir.mkdir(parents=True, exist_ok=True)
+        seqmap_path = seqmap_dir / f"{benchmark}-train.txt"
+        with open(seqmap_path, "w") as f:
+            f.write("name\n")
+            for s in sorted(all_seqs):
+                f.write(f"{s}\n")
+        log_info(f"Generated seqmap: {seqmap_path.name} with {len(all_seqs)} sequences")
+
+        # Run official script with multiple trackers
+        cmd = [
+            sys.executable,
+            str(script_path),
+            "--BENCHMARK", benchmark,
+            "--TRACKERS_TO_EVAL"
+        ] + valid_trackers + [
+            "--SPLIT_TO_EVAL", "train"
+        ]
+        
+        log_info(f"Executing: {' '.join(cmd)}")
+        try:
+            # Note: We run with check=False because TrackEval might return non-zero if some classes fail
+            result = subprocess.run(cmd, cwd=str(trackeval_dir))
+            if result.returncode != 0:
+                success = False
+        except Exception as e:
+            log_error(f"Failed to run TrackEval script: {e}")
+            success = False
+                
+    return success
 
 
 def run_evaluation(
@@ -294,6 +399,7 @@ def main():
     proj.add_argument("--scenario",  type=str)
     proj.add_argument("--compare",   action="store_true")
     proj.add_argument("--eval-only", action="store_true")
+    proj.add_argument("--trackeval", action="store_true")
     proj.add_argument("--export",    type=str)
 
     dock = subparsers.add_parser("docker")
@@ -308,7 +414,7 @@ def main():
         elif args.action == "clean":
             success = project_clean()
         elif args.action == "test":
-            success = project_test(args.scenario, args.compare, args.eval_only, args.export)
+            success = project_test(args.scenario, args.compare, args.eval_only, args.export, args.trackeval)
 
         if not success:
             sys.exit(1)

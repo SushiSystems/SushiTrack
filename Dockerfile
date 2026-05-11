@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /workspace/sushitrack
 
 COPY environment.yml .
-RUN pip3 install --no-cache-dir motmetrics numpy pandas scipy pytest trackeval
+RUN pip3 install --no-cache-dir numpy pandas scipy pytest
 
 COPY . /workspace/sushitrack/
 

@@ -9,8 +9,6 @@ dependencies:
   - ninja
   - pip
   - pip:
-      - motmetrics
-      - trackeval
       - numpy
       - pandas
       - scipy

@@ -38,7 +38,7 @@ static std::string resolveConfig()
             return std::string(env_path);
     }
 
-    for (const auto& p : {"data/config.json", "test/data/config.json"})
+    for (const auto& p : {"test/config.json", "test/data/config.json", "data/config.json"})
         if (fs::exists(p)) return p;
     return "";
 }
@@ -82,9 +82,9 @@ TEST_P(TrackerTest, MOT)
 {
     const Scenario& sc = GetParam().scenario;
 
-    std::string data_root = "data";
+    std::string data_root = "test/data";
     if (!fs::exists(fs::path(data_root) / sc.name / "det" / "det.txt"))
-        data_root = "test/data";
+        data_root = "data";
 
     if (!fs::exists(fs::path(data_root) / sc.name / "det" / "det.txt"))
     {

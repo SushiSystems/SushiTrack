@@ -216,6 +216,7 @@ namespace TestInfrastructure
                         p.reid_low_iou_weight  = gf(sec, "reid_low_iou_weight",  p.reid_low_iou_weight);
                         p.reid_recovery_thresh = gf(sec, "reid_recovery_thresh", p.reid_recovery_thresh);
                         p.max_feature_history  = gi(sec, "max_feature_history",  p.max_feature_history);
+                        p.reid_direct_assignment_weight = gf(sec, "reid_direct_assignment_weight", p.reid_direct_assignment_weight);
                     }
                     
                     if (adv.contains("fsm_params")) {
@@ -229,6 +230,11 @@ namespace TestInfrastructure
                         p.tentative_match_thresh = gf(sec, "tentative_match_thresh", p.tentative_match_thresh);
                         p.tentative_confirm_hits = gi(sec, "tentative_confirm_hits", p.tentative_confirm_hits);
                         p.tentative_max_age      = gi(sec, "tentative_max_age",      p.tentative_max_age);
+                        p.tentative_fast_thresh       = gf(sec, "tentative_fast_thresh",       p.tentative_fast_thresh);
+                        p.tentative_fast_hits         = gi(sec, "tentative_fast_hits",         p.tentative_fast_hits);
+                        p.tentative_slow_thresh       = gf(sec, "tentative_slow_thresh",       p.tentative_slow_thresh);
+                        p.tentative_slow_hits_offset  = gi(sec, "tentative_slow_hits_offset",  p.tentative_slow_hits_offset);
+                        p.tentative_vslow_hits_offset = gi(sec, "tentative_vslow_hits_offset", p.tentative_vslow_hits_offset);
                     }
                     
                     if (adv.contains("mahalanobis_gating")) {

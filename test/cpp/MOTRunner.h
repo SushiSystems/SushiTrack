@@ -100,9 +100,10 @@ namespace TestInfrastructure
             return RunResult{};
 
         fs::path pred_dir = out_dir.empty() ? base / "pred" : fs::path(out_dir);
-        fs::create_directories(pred_dir);
+        fs::path tracker_pred_dir = pred_dir / adapter.name();
+        fs::create_directories(tracker_pred_dir);
 
-        fs::path pred_path = pred_dir / (adapter.name() + ".txt");
+        fs::path pred_path = tracker_pred_dir / (scenario + ".txt");
 
         std::ofstream out(pred_path);
         if (!out.is_open())

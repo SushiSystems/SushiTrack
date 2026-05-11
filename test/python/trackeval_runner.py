@@ -17,6 +17,10 @@ _TOOLS_DIR = Path(__file__).parent.parent.parent / ".tools"
 if str(_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(_TOOLS_DIR))
 
+_3RDPARTY_TRACKEVAL = Path(__file__).parent.parent.parent / "3rdparty" / "TrackEval"
+if _3RDPARTY_TRACKEVAL.exists() and str(_3RDPARTY_TRACKEVAL) not in sys.path:
+    sys.path.insert(0, str(_3RDPARTY_TRACKEVAL))
+
 try:
     from logger import log_info, log_error, log_warning, log_success
 except ImportError:
@@ -267,12 +271,11 @@ class TrackEvalRunner:
                 return {}
 
             log_info(f"Loading predictions for '{tracker_name}'...")
-            pred_filename  = f"{tracker_name}.txt"
             submitted_seqs = []
             for seq in valid_seqs:
-                src_pred = self.data_root / seq / "pred" / pred_filename
+                src_pred = self.data_root / seq / "pred" / tracker_name / f"{seq}.txt"
                 if not src_pred.exists():
-                    log_warning(f"  [MISS] {seq:<32} pred/{pred_filename} not found")
+                    log_warning(f"  [MISS] {seq:<32} pred/{tracker_name}/{seq}.txt not found")
                     continue
                 dst_dir = trackers_folder / tracker_name / self.split
                 dst_dir.mkdir(parents=True, exist_ok=True)
