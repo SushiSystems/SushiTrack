@@ -4,6 +4,8 @@ bin/
 lib/
 out/
 
+test/data/*/pred/
+
 # CMake generated files
 CMakeCache.txt
 CMakeFiles/
@@ -41,7 +43,10 @@ venv/
 .pytest_cache/
 *.pth
 *.tar
+
+# Videos
 *.mp4
+*.webm
 
 # OS Files
 .DS_Store

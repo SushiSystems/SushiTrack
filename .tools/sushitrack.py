@@ -14,7 +14,7 @@ import argparse
 import platform
 from pathlib import Path
 
-from logger import log_info, log_warning, log_error, log_success
+from loguru import logger
 
 _TOOLS_DIR    = Path(__file__).parent
 _PROJECT_ROOT = _TOOLS_DIR.parent
@@ -62,14 +62,20 @@ def project_build(clean: bool, test: bool) -> bool:
     args   = []
     if clean: args.append("--clean")
     if test:  args.append("--test")
+    # For build scripts, they probably need to know if --addsanitizer is used. 
+    # But currently they don't accept it. We can pass it if we modify the bat/sh scripts later.
+    # Actually, the task says: Update build.bat/build.sh to accept --addsanitizer.
+    # So we'll pass it from os.environ or add an arg. Let's just pass an env var for now or we will modify build scripts.
+    if os.environ.get("USE_ASAN") == "1":
+        args.append("--addsanitizer")
 
     mode = "test" if test else "normal"
-    log_info(f"Building project: {mode}, {'clean' if clean else 'skip clean'}")
+    logger.info(f"Building project: {mode}, {'clean' if clean else 'skip clean'}")
     try:
         subprocess.run([str(script)] + args, check=True, shell=(platform.system() == "Windows"))
         return True
     except subprocess.CalledProcessError as e:
-        log_error(f"Build failed with exit code {e.returncode}")
+        logger.error(f"Build failed with exit code {e.returncode}")
         return False
 
 
@@ -83,7 +89,7 @@ def project_clean() -> bool:
         subprocess.run([str(script)], check=True, shell=(platform.system() == "Windows"))
         return True
     except subprocess.CalledProcessError as e:
-        log_error(f"Clean failed with exit code {e.returncode}")
+        logger.error(f"Clean failed with exit code {e.returncode}")
         return False
 
 
@@ -135,19 +141,20 @@ def _get_test_binary() -> Path | None:
     return found[0] if found else None
 
 
-def _get_gtest_filter(scenario: str | None, compare: bool) -> str:
+def _get_gtest_filter(scenario: str | None, compare: bool, tracker: str = "sushitrack") -> str:
     """
     @brief Constructs GTest filter string.
     @param scenario Target sequence identifier.
     @param compare  Flag for comparative testing.
+    @param tracker  Target tracker identifier.
     @return Filter string.
     """
-    trackers = _KNOWN_TRACKERS if compare else ["sushitrack"]
+    trackers = _KNOWN_TRACKERS if compare else [tracker.lower()]
     sc       = scenario.replace('-', '_') if scenario else None
 
     parts = []
-    for tracker in trackers:
-        parts.append(f"*{sc}_{tracker}*" if sc else f"*_{tracker}*")
+    for t in trackers:
+        parts.append(f"*{sc}_{t}*" if sc else f"*_{t}*")
     return ":".join(parts)
 
 
@@ -165,7 +172,7 @@ def _run_binary(binary: str, gtest_filter: str) -> tuple[bool, dict]:
             text=True,
         )
         if result.returncode != 0:
-            log_error(f"Binary failed with exit code {result.returncode}")
+            logger.error(f"Binary failed with exit code {result.returncode}")
             print(result.stdout)
             print(result.stderr)
             return False, {}
@@ -189,11 +196,46 @@ def _run_binary(binary: str, gtest_filter: str) -> tuple[bool, dict]:
 
         return True, perf_data
     except Exception as e:
-        log_error(f"Binary execution failed: {e}")
+        logger.error(f"Binary execution failed: {e}")
         return False, {}
 
+def project_test_videos(args) -> bool:
+    script = _TOOLS_DIR / "project" / "test" / "demo.py"
+    cmd = [sys.executable, str(script)]
+    
+    cmd.extend(["--source", args.source])
+    cmd.extend(["--tracker", args.tracker])
+    cmd.extend(["--name", args.name])
+    cmd.extend(["--device", args.device])
+    cmd.extend(["--conf", str(args.conf)])
+    cmd.extend(["--nms", str(args.nms)])
+    cmd.extend(["--num_classes", str(args.num_classes)])
+    
+    if args.ckpt:
+        cmd.extend(["--ckpt", args.ckpt])
+    
+    if args.tsize is not None:
+        cmd.extend(["--tsize"] + [str(t) for t in args.tsize])
+        
+    if args.stress:
+        cmd.append("--stress")
+    if args.no_save:
+        cmd.append("--no_save")
+    if args.save_name:
+        cmd.extend(["--save_name", args.save_name])
+    if args.legacy:
+        cmd.append("--legacy")
+        
+    logger.info(f"Running video test pipeline: {' '.join(cmd)}")
+    try:
+        subprocess.run(cmd, check=True)
+        return True
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Video test failed with exit code {e.returncode}")
+        return False
 
-def project_test(scenario: str | None, compare: bool, eval_only: bool, export: str | None, trackeval: bool) -> bool:
+
+def project_test(scenario: str | None, compare: bool, eval_only: bool, export: str | None, trackeval: bool, tracker: str = "sushitrack") -> bool:
     """
     @brief Orchestrates project testing and evaluation.
     @param scenario  Target sequence identifier.
@@ -201,38 +243,39 @@ def project_test(scenario: str | None, compare: bool, eval_only: bool, export: s
     @param eval_only Flag to skip binary execution.
     @param export    Optional export directory path.
     @param trackeval Flag to use official TrackEval script directly.
+    @param tracker   Target tracker identifier.
     @return Execution status.
     """
-    perf_data: dict = {t: {} for t in _KNOWN_TRACKERS}
+    perf_data: dict = {t: {} for t in (_KNOWN_TRACKERS if compare else [tracker.lower()])}
 
     if not eval_only:
         binary = _get_test_binary()
         if not binary:
-            log_error("Test binary not found. Build with 'sushitrack project build --test' first.")
+            logger.error("Test binary not found. Build with 'sushitrack project build --test' first.")
             return False
 
-        log_info(f"Running tracking binary: {binary.name}")
-        success, perf_data = _run_binary(str(binary), _get_gtest_filter(scenario, compare))
+        logger.info(f"Running tracking binary: {binary.name}")
+        success, perf_data = _run_binary(str(binary), _get_gtest_filter(scenario, compare, tracker))
         if not success:
             return False
 
     if trackeval:
-        log_info("Running TrackEval via official script...")
-        return run_trackeval_official(scenario, compare)
+        logger.info("Running TrackEval via official script...")
+        return run_trackeval_official(scenario, compare, tracker)
 
-    log_info("Running internal TrackEval evaluation...")
-    return run_evaluation(scenario, compare, perf_data, export)
+    logger.info("Running internal TrackEval evaluation...")
+    return run_evaluation(scenario, compare, perf_data, export, tracker)
 
-def run_trackeval_official(scenario: str | None, compare: bool) -> bool:
+def run_trackeval_official(scenario: str | None, compare: bool, tracker: str = "sushitrack") -> bool:
     import shutil
     data_root = get_data_root()
     trackeval_dir = get_project_root() / "3rdparty" / "TrackEval"
     
     if not trackeval_dir.exists():
-        log_error("TrackEval directory not found in project root.")
+        logger.error("TrackEval directory not found in project root.")
         return False
         
-    trackers = _KNOWN_TRACKERS if compare else ["sushitrack"]
+    trackers = _KNOWN_TRACKERS if compare else [tracker.lower()]
     
     # 1. Prepare directory structure
     for tracker in trackers:
@@ -253,7 +296,7 @@ def run_trackeval_official(scenario: str | None, compare: bool) -> bool:
             dst_dir.mkdir(parents=True, exist_ok=True)
             
             shutil.copy2(src_pred, dst_dir / f"{seq}.txt")
-            log_info(f"Copied {seq} for {tracker} to TrackEval hierarchy")
+            logger.info(f"Copied {seq} for {tracker} to TrackEval hierarchy")
             
             # 2. Copy GT and seqinfo to TrackEval (only once per sequence)
             gt_dst_dir = trackeval_dir / "data" / "gt" / "mot_challenge" / f"{benchmark}-train" / seq
@@ -267,12 +310,12 @@ def run_trackeval_official(scenario: str | None, compare: bool) -> bool:
                 if src_info.exists():
                     shutil.copy2(src_info, gt_dst_dir / "seqinfo.ini")
                 
-                log_info(f"Copied GT/info for {seq} to TrackEval hierarchy")
+                logger.info(f"Copied GT/info for {seq} to TrackEval hierarchy")
             
     # 2. Run the official script for each benchmark (grouping trackers for comparison)
     script_path = trackeval_dir / "scripts" / "run_mot_challenge.py"
     if not script_path.exists():
-        log_error(f"Official TrackEval script not found at {script_path}")
+        logger.error(f"Official TrackEval script not found at {script_path}")
         return False
         
     success = True
@@ -299,7 +342,7 @@ def run_trackeval_official(scenario: str | None, compare: bool) -> bool:
             f.write("name\n")
             for s in sorted(all_seqs):
                 f.write(f"{s}\n")
-        log_info(f"Generated seqmap: {seqmap_path.name} with {len(all_seqs)} sequences")
+        logger.info(f"Generated seqmap: {seqmap_path.name} with {len(all_seqs)} sequences")
 
         # Run official script with multiple trackers
         cmd = [
@@ -311,14 +354,14 @@ def run_trackeval_official(scenario: str | None, compare: bool) -> bool:
             "--SPLIT_TO_EVAL", "train"
         ]
         
-        log_info(f"Executing: {' '.join(cmd)}")
+        logger.info(f"Executing: {' '.join(cmd)}")
         try:
             # Note: We run with check=False because TrackEval might return non-zero if some classes fail
             result = subprocess.run(cmd, cwd=str(trackeval_dir))
             if result.returncode != 0:
                 success = False
         except Exception as e:
-            log_error(f"Failed to run TrackEval script: {e}")
+            logger.error(f"Failed to run TrackEval script: {e}")
             success = False
                 
     return success
@@ -329,6 +372,7 @@ def run_evaluation(
     compare:    bool,
     perf_data:  dict,
     export_dir: str | None = None,
+    tracker:    str = "sushitrack",
 ) -> bool:
     """
     @brief Orchestrates TrackEval-based metric calculation.
@@ -339,16 +383,16 @@ def run_evaluation(
     @return Execution status.
     """
     if not _EVAL_AVAILABLE:
-        log_error("Evaluator not available. Install TrackEval:\n"
+        logger.error("Evaluator not available. Install TrackEval:\n"
                   "  pip install git+https://github.com/JonathonLuiten/TrackEval.git")
         return False
 
     data_root = get_data_root()
     if not data_root.exists():
-        log_error(f"Data directory not found: {data_root}")
+        logger.error(f"Data directory not found: {data_root}")
         return False
 
-    trackers  = _KNOWN_TRACKERS if compare else ["sushitrack"]
+    trackers  = _KNOWN_TRACKERS if compare else [tracker.lower()]
     scenarios = [scenario] if scenario else None
 
     try:
@@ -364,7 +408,7 @@ def run_evaluation(
         )
 
         if not results:
-            log_error("No evaluation results produced. Check that pred/*.txt files exist.")
+            logger.error("No evaluation results produced. Check that pred/*.txt files exist.")
             return False
 
         print_trackeval_table(results, compare=compare)
@@ -375,13 +419,13 @@ def run_evaluation(
         return True
     except ImportError as e:
         if "trackeval" in str(e):
-            log_error("TrackEval library not found.\n"
+            logger.error("TrackEval library not found.\n"
                       "  Install: pip install git+https://github.com/JonathonLuiten/TrackEval.git")
         else:
-            log_error(f"Evaluation failed: {e}")
+            logger.error(f"Evaluation failed: {e}")
         return False
     except Exception as e:
-        log_error(f"Evaluation failed: {e}")
+        logger.error(f"Evaluation failed: {e}")
         return False
 
 
@@ -394,6 +438,7 @@ def main():
 
     proj = subparsers.add_parser("project")
     proj.add_argument("action",      choices=["build", "test", "clean"])
+    proj.add_argument("test_type",   nargs="?", choices=["labels", "videos"], default="labels")
     proj.add_argument("--clean",     action="store_true")
     proj.add_argument("--test",      action="store_true")
     proj.add_argument("--scenario",  type=str)
@@ -401,6 +446,22 @@ def main():
     proj.add_argument("--eval-only", action="store_true")
     proj.add_argument("--trackeval", action="store_true")
     proj.add_argument("--export",    type=str)
+    
+    # New arguments for testing (videos & yolox)
+    proj.add_argument("--addsanitizer", action="store_true")
+    proj.add_argument("--stress", action="store_true")
+    proj.add_argument("--source", type=str)
+    proj.add_argument("--tracker", type=str, default="SushiTrack")
+    proj.add_argument("-n", "--name", type=str, default="yolox-s", help="YOLOX model architecture name")
+    proj.add_argument("-c", "--ckpt", default=None, type=str, help="Path to YOLOX checkpoint weights")
+    proj.add_argument("--device", default="gpu", type=str, help="Device to run inference (cpu or gpu)")
+    proj.add_argument("--conf", default=0.1, type=float, help="Detection confidence threshold")
+    proj.add_argument("--nms", default=0.45, type=float, help="NMS threshold")
+    proj.add_argument("--tsize", default=None, nargs="+", type=int, help="Test image size (height, width) or single square value")
+    proj.add_argument("--num_classes", default=80, type=int, help="Number of classes in the model")
+    proj.add_argument("--legacy", action="store_true", help="Use legacy normalization (BGR2RGB, 0-1 scale, Mean/Std)")
+    proj.add_argument("--no_save", action="store_true", help="Do not save the output video")
+    proj.add_argument("--save_name", default=None, help="Explicit filename for saving output")
 
     dock = subparsers.add_parser("docker")
     dock.add_argument("action", choices=["build", "run"])
@@ -409,12 +470,34 @@ def main():
 
     if args.command == "project":
         success = False
+        if args.addsanitizer:
+            os.environ["USE_ASAN"] = "1"
+            
         if args.action == "build":
             success = project_build(args.clean, args.test)
         elif args.action == "clean":
             success = project_clean()
         elif args.action == "test":
-            success = project_test(args.scenario, args.compare, args.eval_only, args.export, args.trackeval)
+            if args.test_type == "labels":
+                if args.addsanitizer:
+                    # If ASAN is requested, we should probably rebuild the project first.
+                    logger.info("ASAN requested. Ensuring project is built with ASAN...")
+                    project_build(clean=False, test=True)
+                
+                # Normalize tracker name for registry (C++ is case sensitive)
+                tracker_map = {t.lower(): t for t in ["ByteTrack", "SushiTrack", "OCSORT"]}
+                normalized_tracker = tracker_map.get(args.tracker.lower(), args.tracker)
+                args.tracker = normalized_tracker
+
+                success = project_test(args.scenario, args.compare, args.eval_only, args.export, args.trackeval, args.tracker)
+            elif args.test_type == "videos":
+                if not args.source:
+                    logger.error("--source is required for video testing")
+                else:
+                    # Normalize tracker name for video test registry as well
+                    tracker_map = {t.lower(): t for t in ["ByteTrack", "SushiTrack", "OCSORT"]}
+                    args.tracker = tracker_map.get(args.tracker.lower(), args.tracker)
+                    success = project_test_videos(args)
 
         if not success:
             sys.exit(1)

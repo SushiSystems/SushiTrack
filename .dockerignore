@@ -27,4 +27,4 @@ Dockerfile
 .dockerignore
 
 # Data
-data/*/pred/
+test/data/*/pred/

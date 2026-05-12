@@ -11,6 +11,7 @@ TEST=0
 for arg in "$@"; do
     if [ "$arg" == "--clean" ]; then CLEAN=1; fi
     if [ "$arg" == "--test" ]; then TEST=1; fi
+    if [ "$arg" == "--addsanitizer" ]; then USE_ASAN="1"; fi
 done
 
 TARGET_ARG=""
@@ -18,10 +19,14 @@ EXTRA_ARGS=""
 
 if [ $TEST -eq 1 ]; then
     EXTRA_ARGS="-DBUILD_MOT_TEST=ON"
-    TARGET_ARG="--target mot_test"
+    TARGET_ARG="--target mot_test --target tracker_bridge"
 else
     EXTRA_ARGS="-DBUILD_MOT_TEST=OFF"
     TARGET_ARG="--target sushitrack"
+fi
+
+if [ "$USE_ASAN" == "1" ]; then
+    EXTRA_ARGS="$EXTRA_ARGS -DUSE_ASAN=ON"
 fi
 
 if [ $CLEAN -eq 1 ]; then

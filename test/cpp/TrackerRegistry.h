@@ -1,0 +1,168 @@
+/**
+ * @file      TrackerRegistry.h
+ * @brief     Dynamic registry and C-API bridge for tracker adapters.
+ * @author    Mustafa Garip (mustafagarip@sushisystems.io)
+ * @date      12.05.2026
+ * @version   v1.0.0
+ * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
+ */
+
+#pragma once
+
+#include "ITrackerAdapter.h"
+#include <string>
+#include <unordered_map>
+#include <functional>
+#include <iostream>
+#include <algorithm>
+#include <cctype>
+
+
+using namespace TestInfrastructure;
+
+/**
+ * @brief Singleton registry for dynamically registering and instantiating tracking algorithms.
+ * 
+ * Provides a factory pattern implementation to decouple tracker instantiation from 
+ * the core pipeline logic. New algorithms can register themselves at startup.
+ */
+class TrackerRegistry
+{
+public:
+    using CreatorFunc = std::function<ITrackerAdapter*()>;
+
+    /**
+     * @brief Retrieves the singleton instance of the registry.
+     * 
+     * @return Reference to the TrackerRegistry instance.
+     */
+    static TrackerRegistry& getInstance()
+    {
+        static TrackerRegistry instance;
+        return instance;
+    }
+
+    /**
+     * @brief Registers a tracking algorithm constructor.
+     * 
+     * @param name    Identifier string for the tracking algorithm.
+     * @param creator Factory function returning an ITrackerAdapter pointer.
+     */
+    void registerTracker(const std::string& name, CreatorFunc creator)
+    {
+        std::string normalized = name;
+        std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                       [](unsigned char c){ return std::tolower(c); });
+        registry_[normalized] = creator;
+    }
+
+    /**
+     * @brief Instantiates a registered tracking algorithm by name.
+     * 
+     * @param name Identifier string for the requested tracking algorithm.
+     * @return Pointer to the allocated ITrackerAdapter, or nullptr if not found.
+     */
+    ITrackerAdapter* create(const std::string& name)
+    {
+        std::string normalized = name;
+        std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                       [](unsigned char c){ return std::tolower(c); });
+        
+        auto it = registry_.find(normalized);
+        if (it != registry_.end())
+        {
+            return it->second();
+        }
+        std::cerr << "Tracker " << name << " not found in registry!" << std::endl;
+        return nullptr;
+    }
+
+private:
+    /**
+     * @brief Private constructor to enforce the Singleton pattern.
+     */
+    TrackerRegistry() = default;
+
+    std::unordered_map<std::string, CreatorFunc> registry_; ///< Mapping of identifiers to factory functions.
+};
+
+/**
+ * @def REGISTER_TRACKER(NAME, TYPE)
+ * @brief Macro to automatically register a tracker implementation at translation unit load time.
+ */
+#define CONCAT_IMPL(x, y) x##y
+#define CONCAT(x, y) CONCAT_IMPL(x, y)
+
+#define REGISTER_TRACKER(NAME, TYPE)                                                    \
+    static const bool CONCAT(_registered_, __LINE__) = []()                             \
+    {                                                                                   \
+        TrackerRegistry::getInstance().registerTracker(NAME, []() -> ITrackerAdapter*   \
+        {                                                                               \
+            return new TYPE();                                                          \
+        });                                                                             \
+        return true;                                                                    \
+    }();
+
+
+// C-API for ctypes interoperability
+#ifdef _WIN32
+#define EXPORT_API __declspec(dllexport)
+#else
+#define EXPORT_API __attribute__((visibility("default")))
+#endif
+
+extern "C" 
+{
+    /**
+     * @brief Minimalist C-structure representing a 2D bounding box detection.
+     */
+    struct CDetection
+    {
+        float x;     ///< Horizontal coordinate.
+        float y;     ///< Vertical coordinate.
+        float w;     ///< Dimension width.
+        float h;     ///< Dimension height.
+        float score; ///< Detection confidence.
+        int label;   ///< Classification label.
+    };
+
+    /**
+     * @brief Minimalist C-structure representing a tracking output result.
+     */
+    struct CTrackResult
+    {
+        int track_id; ///< Track identity identifier.
+        float x;      ///< Horizontal coordinate.
+        float y;      ///< Vertical coordinate.
+        float w;      ///< Dimension width.
+        float h;      ///< Dimension height.
+        float score;  ///< Track confidence.
+    };
+
+    /**
+     * @brief Instantiates a tracking algorithm via the C-API.
+     * 
+     * @param name Null-terminated string identifying the algorithm.
+     * @return Opaque pointer to the ITrackerAdapter instance.
+     */
+    EXPORT_API ITrackerAdapter* create_tracker(const char* name);
+
+    /**
+     * @brief Destroys an ITrackerAdapter instance via the C-API.
+     * 
+     * @param tracker Opaque pointer to the ITrackerAdapter instance.
+     */
+    EXPORT_API void delete_tracker(ITrackerAdapter* tracker);
+
+    /**
+     * @brief Executes a single update iteration of the tracking algorithm via the C-API.
+     * 
+     * @param tracker        Opaque pointer to the ITrackerAdapter instance.
+     * @param detections     Pointer to an array of CDetection inputs.
+     * @param num_detections Number of items in the detections array.
+     * @param results        Pointer to an allocated array for storing CTrackResult outputs.
+     * @param num_results    Pointer to an integer receiving the number of populated results.
+     * @param max_results    Capacity of the results array.
+     */
+    EXPORT_API void tracker_process_c(ITrackerAdapter* tracker, const CDetection* detections, int num_detections, CTrackResult* results, int* num_results, int max_results);
+}

@@ -21,25 +21,7 @@ _3RDPARTY_TRACKEVAL = Path(__file__).parent.parent.parent / "3rdparty" / "TrackE
 if _3RDPARTY_TRACKEVAL.exists() and str(_3RDPARTY_TRACKEVAL) not in sys.path:
     sys.path.insert(0, str(_3RDPARTY_TRACKEVAL))
 
-try:
-    from logger import log_info, log_error, log_warning, log_success
-except ImportError:
-    def log_info(m):
-        """@brief Fallback logging for informational messages."""
-        print(f"[INFO] {m}")
-
-    def log_error(m):
-        """@brief Fallback logging for error messages."""
-        print(f"[ERROR] {m}")
-
-    def log_warning(m):
-        """@brief Fallback logging for warning messages."""
-        print(f"[WARNING] {m}")
-
-    def log_success(m):
-        """@brief Fallback logging for success messages."""
-        print(f"[SUCCESS] {m}")
-
+from loguru import logger
 
 def _ensure_trackeval() -> bool:
     """
@@ -50,7 +32,7 @@ def _ensure_trackeval() -> bool:
         import trackeval  # noqa
         return True
     except ImportError:
-        log_error("TrackEval not found.\n"
+        logger.error("TrackEval not found.\n"
                   "  Install: pip install git+https://github.com/JonathonLuiten/TrackEval.git")
         return False
 
@@ -166,7 +148,7 @@ class TrackEvalRunner:
         if scenarios is None:
             scenarios = self._discover_scenarios()
         if not scenarios:
-            log_warning(f"No scenarios found in {self.data_root}")
+            logger.warning(f"No scenarios found in {self.data_root}")
             return {}
 
         groups: dict = {}
@@ -252,12 +234,12 @@ class TrackEvalRunner:
             gt_folder       = tmp / "gt"
             trackers_folder = tmp / "trackers"
 
-            log_info("Loading ground truth...")
+            logger.info("Loading ground truth...")
             valid_seqs = []
             for seq in scenarios:
                 src_gt = self.data_root / seq / "gt" / "gt.txt"
                 if not src_gt.exists():
-                    log_warning(f"  [MISS] {seq:<32} gt.txt not found")
+                    logger.warning(f"  [MISS] {seq:<32} gt.txt not found")
                     continue
                 seq_root = gt_folder / seq
                 (seq_root / "gt").mkdir(parents=True, exist_ok=True)
@@ -266,16 +248,16 @@ class TrackEvalRunner:
                 (seq_root / "img1").mkdir(exist_ok=True)
                 valid_seqs.append(seq)
                 print(f"  [ OK ] {seq:<32} gt loaded")
-            log_info(f"  -> {len(valid_seqs)} sequences with GT")
+            logger.info(f"  -> {len(valid_seqs)} sequences with GT")
             if not valid_seqs:
                 return {}
 
-            log_info(f"Loading predictions for '{tracker_name}'...")
+            logger.info(f"Loading predictions for '{tracker_name}'...")
             submitted_seqs = []
             for seq in valid_seqs:
                 src_pred = self.data_root / seq / "pred" / tracker_name / f"{seq}.txt"
                 if not src_pred.exists():
-                    log_warning(f"  [MISS] {seq:<32} pred/{tracker_name}/{seq}.txt not found")
+                    logger.warning(f"  [MISS] {seq:<32} pred/{tracker_name}/{seq}.txt not found")
                     continue
                 dst_dir = trackers_folder / tracker_name / self.split
                 dst_dir.mkdir(parents=True, exist_ok=True)
@@ -285,13 +267,13 @@ class TrackEvalRunner:
                 if sdup: msg += f"  ! {sdup} duplicates removed"
                 print(msg)
                 submitted_seqs.append(seq)
-            log_info(f"  -> {len(submitted_seqs)} sequences submitted")
+            logger.info(f"  -> {len(submitted_seqs)} sequences submitted")
             if not submitted_seqs:
-                log_warning(f"No pred files for '{tracker_name}' -- skipping.")
+                logger.warning(f"No pred files for '{tracker_name}' -- skipping.")
                 return {}
 
             benchmark = _detect_benchmark(submitted_seqs[0])
-            log_info(f"Benchmark inferred: {benchmark}")
+            logger.info(f"Benchmark inferred: {benchmark}")
             seqmap_dir = tmp / "seqmaps"
             seqmap_dir.mkdir(parents=True, exist_ok=True)
             with open(seqmap_dir / f"{benchmark}-{self.split}.txt", "w") as f:
@@ -299,7 +281,7 @@ class TrackEvalRunner:
                 for seq in submitted_seqs:
                     f.write(f"{seq}\n")
 
-            log_info("Running TrackEval engine...")
+            logger.info("Running TrackEval engine...")
             dataset_config = {
                 "GT_FOLDER":            str(gt_folder),
                 "TRACKERS_FOLDER":      str(trackers_folder),
@@ -347,7 +329,7 @@ class TrackEvalRunner:
             evaluator = trackeval.Evaluator(evaluator_config)
             raw, _msg = evaluator.evaluate([dataset], metrics)
 
-            log_info("Processing results...")
+            logger.info("Processing results...")
             return self._extract_results(raw, tracker_name, submitted_seqs)
 
         finally:

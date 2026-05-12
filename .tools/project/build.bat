@@ -16,6 +16,7 @@ set EXTRA_ARGS=
 if "%~1"=="" goto end_parse
 if "%~1"=="--clean" set CLEAN=1
 if "%~1"=="--test"  set TEST=1
+if "%~1"=="--addsanitizer" set USE_ASAN=1
 shift
 goto parse_args
 :end_parse
@@ -23,10 +24,14 @@ goto parse_args
 set TARGET_ARG=
 if %TEST%==1 (
     set EXTRA_ARGS=-DBUILD_MOT_TEST=ON
-    set TARGET_ARG=--target mot_test
+    set TARGET_ARG=--target mot_test --target tracker_bridge
 ) else (
     set EXTRA_ARGS=-DBUILD_MOT_TEST=OFF
     set TARGET_ARG=--target sushitrack
+)
+
+if "%USE_ASAN%"=="1" (
+    set EXTRA_ARGS=%EXTRA_ARGS% -DUSE_ASAN=ON
 )
 
 if %CLEAN%==1 (

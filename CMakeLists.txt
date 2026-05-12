@@ -2,12 +2,24 @@ cmake_minimum_required(VERSION 3.14)
 project(sushitrack)
 
 # ============================================================
-# Build Type
+# Build Type & Options
 # ============================================================
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
+option(USE_ASAN "Enable AddressSanitizer" OFF)
+if(USE_ASAN)
+    if(MSVC)
+        add_compile_options(/fsanitize=address)
+        add_link_options(/fsanitize=address)
+    else()
+        add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+        add_link_options(-fsanitize=address)
+    endif()
+endif()
+
 
 # ============================================================
 # C++ Standard
@@ -127,6 +139,24 @@ if(BUILD_MOT_TEST)
         bytetrack         # bytetrack static lib
         libocsort         # ocsort shared lib
         GTest::GTest
+    )
+
+    # Tracker Bridge for Python ctypes
+    add_library(tracker_bridge SHARED
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/cpp/TrackerRegistry.cpp
+    )
+    target_include_directories(tracker_bridge PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/bytetrack/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/ocsort/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty
+        ${EIGEN3_INCLUDE_DIR}
+    )
+    target_link_libraries(tracker_bridge PRIVATE
+        ${PROJECT_NAME}
+        bytetrack
+        libocsort
     )
 
     # CTest integration

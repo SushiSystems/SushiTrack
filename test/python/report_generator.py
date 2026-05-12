@@ -17,17 +17,8 @@ _TOOLS_DIR = Path(__file__).parent.parent.parent / ".tools"
 if str(_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(_TOOLS_DIR))
 
-try:
-    from logger import log_info, log_success, RED, GREEN, YELLOW, BLUE, RESET
-except ImportError:
-    RED = GREEN = YELLOW = BLUE = RESET = ""
-    def log_info(m):
-        """@brief Fallback logging for informational messages."""
-        print(f"[INFO] {m}")
-
-    def log_success(m):
-        """@brief Fallback logging for success messages."""
-        print(f"[SUCCESS] {m}")
+from loguru import logger
+RED, GREEN, YELLOW, BLUE, RESET = "\033[91m", "\033[92m", "\033[93m", "\033[94m", "\033[0m"
 
 #: @brief ANSI escape sequence for bold text.
 BOLD = "\033[1m"
@@ -309,7 +300,7 @@ def export_trackeval_results(results: dict, out_dir: str) -> None:
     json_path = out / "mot_results.json"
     with open(json_path, "w") as f:
         json.dump(results, f, indent=2)
-    log_success(f"JSON export: {json_path}")
+    logger.success(f"JSON export: {json_path}")
 
     csv_path = out / "mot_results.csv"
     fields = [
@@ -327,4 +318,4 @@ def export_trackeval_results(results: dict, out_dir: str) -> None:
                 row = {"tracker": tracker, "scenario": seq}
                 row.update(m)
                 writer.writerow(row)
-    log_success(f"CSV export: {csv_path}")
+    logger.success(f"CSV export: {csv_path}")
