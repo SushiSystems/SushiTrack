@@ -1,5 +1,6 @@
-$base_dir = "D:/.projects/sushitrack"
-$test_data = "$base_dir/test/data"
+$script_dir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$base_dir = Resolve-Path "$script_dir/../.."
+$test_data = "$base_dir/tests/regression/evaluator/data"
 $te_data = "$base_dir/3rdparty/TrackEval/data"
 
 Write-Host "Constructing TrackEval data structure..."

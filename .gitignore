@@ -4,7 +4,7 @@ bin/
 lib/
 out/
 
-test/data/*/pred/
+tests/regression/evaluator/data/*/pred/
 
 # CMake generated files
 CMakeCache.txt

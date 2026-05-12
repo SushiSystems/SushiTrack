@@ -1,0 +1,427 @@
+/**
+ * @file      test_tracklet.cpp
+ * @brief     Unit tests for Tracklet lifecycle, state transitions, ReID, and Tentative logic.
+ * @author    Mustafa Garip (mustafagarip@sushisystems.io)
+ * @date      12.05.2026
+ * @version   v1.0.0
+ * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
+ *
+ * Coverage
+ * --------
+ * Lifecycle
+ *   - New state on construction.
+ *   - activate() transitions to Tracked; isActivated=true only on frame 1.
+ *   - activateTentative() produces Tentative state, is_activated=false.
+ *   - confirm() promotes Tentative to Tracked and assigns final track id.
+ *   - markAsLost() transitions to Lost, resets is_activated.
+ *   - markAsRemoved() transitions to Removed.
+ *   - reActivate() recovers Lost track back to Tracked.
+ *
+ * Prediction
+ *   - predict() increments accumulated_lost_time for Lost/Tentative tracks.
+ *   - predict() does not modify accumulated_lost_time for Tracked tracks.
+ *
+ * ReID
+ *   - updateFeatures() normalises the feature vector (unit length).
+ *   - getMaxFeatureSimilarity() returns 1.0 for identical feature.
+ *   - getMaxFeatureSimilarity() returns < 1.0 for orthogonal feature.
+ *   - Feature history is capped at max_feature_history.
+ *
+ * Occluder snapshot
+ *   - setOccluderSnapshot() sets interaction state to Occluded.
+ *   - clearOccluderSnapshot() resets interaction state to Free.
+ *   - reActivate() clears the occluder snapshot automatically.
+ *
+ * Tentative fast-path
+ *   - update() with keep_state=true does not change TrackState.
+ *   - update() with keep_state=false promotes to Tracked.
+ */
+
+#include <gtest/gtest.h>
+
+#include "SushiTrack/Tracklet.h"
+#include "SushiTrack/KalmanFilter.h"
+#include "SushiTrack/KalmanTypes.h"
+#include "SushiTrack/TrackerConfig.h"
+#include "SushiTrack/InteractionState.h"
+
+#include <memory>
+#include <vector>
+#include <cmath>
+
+using namespace SushiTrack;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** @brief Creates a real KalmanFilter-backed IStatePredictor. */
+static std::unique_ptr<IStatePredictor> makeKF()
+{
+    return std::make_unique<KalmanFilter>();
+}
+
+/**
+ * @brief Constructs a Tracklet at (x, y, w, h) with given label and score.
+ *
+ * @param x      Top-left x.
+ * @param y      Top-left y.
+ * @param w      Width.
+ * @param h      Height.
+ * @param label  Class label.
+ * @param score  Detection confidence.
+ */
+static std::unique_ptr<Tracklet> makeTracklet(
+    float x = 100.f, float y = 200.f,
+    float w = 50.f,  float h = 80.f,
+    int label = 1,   float score = 0.9f)
+{
+    return std::make_unique<Tracklet>(
+        makeKF(),
+        Rect<float>(x, y, w, h),
+        label, score
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Construction
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief A newly constructed Tracklet has state New, is not activated, and
+ *        is not confirmed.
+ */
+TEST(TrackletTest, ConstructionStateIsNew)
+{
+    auto t = makeTracklet();
+    EXPECT_EQ(t->getTrackState(), TrackState::New);
+    EXPECT_FALSE(t->isActivated());
+    EXPECT_FALSE(t->isConfirmed());
+}
+
+// ---------------------------------------------------------------------------
+// activate()
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief activate() at frame_id=1 sets Tracked, isActivated=true, isConfirmed=true.
+ */
+TEST(TrackletTest, ActivateOnFrameOne)
+{
+    auto t = makeTracklet();
+    t->activate(makeKF(), /*frame_id=*/1, /*track_id=*/42);
+
+    EXPECT_EQ(t->getTrackState(), TrackState::Tracked);
+    EXPECT_TRUE(t->isActivated());
+    EXPECT_TRUE(t->isConfirmed());
+    EXPECT_EQ(t->getTrackId(), static_cast<size_t>(42));
+    EXPECT_EQ(t->getFrameId(), static_cast<size_t>(1));
+}
+
+/**
+ * @brief activate() at frame_id=5 sets Tracked but isActivated=false
+ *        (implicit one-frame validation for non-first-frame tracks).
+ */
+TEST(TrackletTest, ActivateOnLaterFrameIsNotActivated)
+{
+    auto t = makeTracklet();
+    t->activate(makeKF(), /*frame_id=*/5, /*track_id=*/7);
+
+    EXPECT_EQ(t->getTrackState(), TrackState::Tracked);
+    EXPECT_FALSE(t->isActivated());
+}
+
+// ---------------------------------------------------------------------------
+// activateTentative()
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief activateTentative() sets state to Tentative with isActivated=false
+ *        and isConfirmed=false.
+ */
+TEST(TrackletTest, ActivateTentativeState)
+{
+    auto t = makeTracklet();
+    t->activateTentative(makeKF(), /*frame_id=*/3, /*initial_id=*/0);
+
+    EXPECT_EQ(t->getTrackState(), TrackState::Tentative);
+    EXPECT_FALSE(t->isActivated());
+    EXPECT_FALSE(t->isConfirmed());
+}
+
+// ---------------------------------------------------------------------------
+// confirm()
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief confirm() promotes a Tentative track to Tracked with isActivated=true
+ *        and assigns the final track id.
+ */
+TEST(TrackletTest, ConfirmPromotesTentative)
+{
+    auto t = makeTracklet();
+    t->activateTentative(makeKF(), 3, 0);
+    t->confirm(/*frame_id=*/5, /*final_id=*/99);
+
+    EXPECT_EQ(t->getTrackState(), TrackState::Tracked);
+    EXPECT_TRUE(t->isActivated());
+    EXPECT_TRUE(t->isConfirmed());
+    EXPECT_EQ(t->getTrackId(), static_cast<size_t>(99));
+}
+
+// ---------------------------------------------------------------------------
+// markAsLost()
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief markAsLost() transitions the track to Lost and clears isActivated.
+ */
+TEST(TrackletTest, MarkAsLostSetsLostState)
+{
+    auto t = makeTracklet();
+    t->activate(makeKF(), 1, 10);
+    ASSERT_TRUE(t->isActivated());
+
+    t->markAsLost(0.04f);
+
+    EXPECT_EQ(t->getTrackState(), TrackState::Lost);
+    EXPECT_FALSE(t->isActivated());
+}
+
+/**
+ * @brief markAsLost() initialises accumulated_lost_time with the dt argument.
+ */
+TEST(TrackletTest, MarkAsLostInitialisesAccumulatedTime)
+{
+    auto t = makeTracklet();
+    t->activate(makeKF(), 1, 1);
+    t->markAsLost(0.04f);
+
+    EXPECT_FLOAT_EQ(t->getAccumulatedLostTime(), 0.04f);
+}
+
+// ---------------------------------------------------------------------------
+// markAsRemoved()
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief markAsRemoved() transitions the track to Removed.
+ */
+TEST(TrackletTest, MarkAsRemovedSetsRemovedState)
+{
+    auto t = makeTracklet();
+    t->activate(makeKF(), 1, 1);
+    t->markAsRemoved();
+
+    EXPECT_EQ(t->getTrackState(), TrackState::Removed);
+    EXPECT_FALSE(t->isActivated());
+}
+
+// ---------------------------------------------------------------------------
+// reActivate()
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief reActivate() recovers a Lost track back to Tracked with
+ *        isActivated=true and resets accumulated_lost_time to 0.
+ */
+TEST(TrackletTest, ReActivateRestoresTrackedState)
+{
+    auto t = makeTracklet();
+    t->activate(makeKF(), 1, 10);
+    t->markAsLost(0.04f);
+    ASSERT_EQ(t->getTrackState(), TrackState::Lost);
+
+    auto obs = makeTracklet(105.f, 205.f);
+    t->reActivate(*obs, /*frame_id=*/8);
+
+    EXPECT_EQ(t->getTrackState(), TrackState::Tracked);
+    EXPECT_TRUE(t->isActivated());
+    EXPECT_TRUE(t->isConfirmed());
+    EXPECT_FLOAT_EQ(t->getAccumulatedLostTime(), 0.f);
+}
+
+// ---------------------------------------------------------------------------
+// predict() — accumulated_lost_time
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief predict() increments accumulated_lost_time for a Lost track.
+ */
+TEST(TrackletTest, PredictIncrementsLostTimeForLostTrack)
+{
+    auto t = makeTracklet();
+    t->activate(makeKF(), 1, 1);
+    t->markAsLost(0.0f);
+
+    const float dt = 0.04f;
+    t->predict(dt);
+
+    EXPECT_NEAR(t->getAccumulatedLostTime(), dt, 1e-5f);
+}
+
+/**
+ * @brief predict() does not change accumulated_lost_time for a Tracked track.
+ */
+TEST(TrackletTest, PredictDoesNotIncrementLostTimeForTrackedTrack)
+{
+    auto t = makeTracklet();
+    t->activate(makeKF(), 1, 1);
+    ASSERT_EQ(t->getAccumulatedLostTime(), 0.f);
+
+    t->predict(0.04f);
+
+    EXPECT_FLOAT_EQ(t->getAccumulatedLostTime(), 0.f);
+}
+
+// ---------------------------------------------------------------------------
+// update() keep_state flag
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief update() with keep_state=true does not change the TrackState.
+ */
+TEST(TrackletTest, UpdateKeepStatePreservesTrackState)
+{
+    auto t = makeTracklet();
+    t->activateTentative(makeKF(), 3, 0);
+    ASSERT_EQ(t->getTrackState(), TrackState::Tentative);
+
+    auto obs = makeTracklet(102.f, 202.f);
+    t->update(*obs, /*frame_id=*/4, /*update_features=*/false, /*keep_state=*/true);
+
+    EXPECT_EQ(t->getTrackState(), TrackState::Tentative);
+    EXPECT_FALSE(t->isActivated());
+}
+
+/**
+ * @brief update() with keep_state=false promotes the track to Tracked.
+ */
+TEST(TrackletTest, UpdateNoKeepStatePromotesToTracked)
+{
+    auto t = makeTracklet();
+    t->activate(makeKF(), 3, 5);
+
+    auto obs = makeTracklet(102.f, 202.f);
+    t->update(*obs, /*frame_id=*/4, /*update_features=*/false, /*keep_state=*/false);
+
+    EXPECT_EQ(t->getTrackState(), TrackState::Tracked);
+    EXPECT_TRUE(t->isActivated());
+}
+
+// ---------------------------------------------------------------------------
+// ReID — feature normalisation and similarity
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief updateFeatures() L2-normalises the stored feature vector.
+ */
+TEST(TrackletTest, UpdateFeaturesNormalisesVector)
+{
+    auto t = makeTracklet();
+    std::vector<float> feat = {3.f, 4.f};  // L2 norm = 5
+    t->updateFeatures(feat);
+
+    const auto& sf = t->getSmoothFeat();
+    ASSERT_EQ(sf.size(), static_cast<size_t>(2));
+    float norm = std::sqrt(sf[0]*sf[0] + sf[1]*sf[1]);
+    EXPECT_NEAR(norm, 1.f, 1e-5f);
+}
+
+/**
+ * @brief getMaxFeatureSimilarity() returns ~1.0 for the same feature that was
+ *        stored, and <0.5 for an orthogonal feature.
+ */
+TEST(TrackletTest, FeatureSimilarityIdenticalVsOrthogonal)
+{
+    auto t = makeTracklet();
+    std::vector<float> feat_a = {1.f, 0.f, 0.f};
+    t->updateFeatures(feat_a);
+
+    // Normalise manually to compare
+    std::vector<float> same = {1.f, 0.f, 0.f};
+    float norm = std::sqrt(same[0]*same[0] + same[1]*same[1] + same[2]*same[2]);
+    for (auto& v : same) v /= norm;
+
+    EXPECT_NEAR(t->getMaxFeatureSimilarity(same), 1.f, 1e-4f);
+
+    std::vector<float> ortho = {0.f, 1.f, 0.f};
+    float dot = t->getMaxFeatureSimilarity(ortho);
+    EXPECT_LT(dot, 0.1f);
+}
+
+/**
+ * @brief Feature history is capped at max_feature_history; the oldest entry
+ *        is evicted when the buffer is full.
+ */
+TEST(TrackletTest, FeatureHistoryCapIsRespected)
+{
+    const int max_hist = 5;
+    auto t = std::make_unique<Tracklet>(
+        makeKF(),
+        Rect<float>(0.f, 0.f, 50.f, 80.f),
+        /*label=*/1, /*score=*/0.9f,
+        /*feat=*/std::vector<float>{},
+        /*alpha=*/0.9f,
+        /*enable_xyah=*/false,
+        /*max_feature_history=*/max_hist
+    );
+
+    for (int i = 0; i < max_hist + 3; ++i)
+    {
+        std::vector<float> f = {static_cast<float>(i), 0.f, 0.f};
+        t->updateFeatures(f);
+    }
+
+    EXPECT_LE(static_cast<int>(t->getFeatureHistory().size()), max_hist);
+}
+
+// ---------------------------------------------------------------------------
+// Occluder snapshot
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief setOccluderSnapshot() sets interaction state to Occluded.
+ */
+TEST(TrackletTest, SetOccluderSnapshotMarksOccluded)
+{
+    auto t = makeTracklet();
+    t->activate(makeKF(), 1, 1);
+    t->setOccluderSnapshot(42, 5, 0.2f);
+
+    EXPECT_EQ(t->getInteractionState(), InteractionState::Occluded);
+    EXPECT_EQ(t->getOccluderId(), 42);
+}
+
+/**
+ * @brief clearOccluderSnapshot() resets interaction state to Free and
+ *        occluder id to -1.
+ */
+TEST(TrackletTest, ClearOccluderSnapshotResetsToFree)
+{
+    auto t = makeTracklet();
+    t->activate(makeKF(), 1, 1);
+    t->setOccluderSnapshot(42, 5, 0.2f);
+    t->clearOccluderSnapshot();
+
+    EXPECT_EQ(t->getInteractionState(), InteractionState::Free);
+    EXPECT_EQ(t->getOccluderId(), -1);
+}
+
+/**
+ * @brief reActivate() clears any occluder snapshot automatically.
+ */
+TEST(TrackletTest, ReActivateClearsOccluderSnapshot)
+{
+    auto t = makeTracklet();
+    t->activate(makeKF(), 1, 1);
+    t->markAsLost(0.04f);
+    t->setOccluderSnapshot(42, 2, 0.08f);
+    ASSERT_EQ(t->getInteractionState(), InteractionState::Occluded);
+
+    auto obs = makeTracklet(105.f, 205.f);
+    t->reActivate(*obs, 5);
+
+    EXPECT_EQ(t->getInteractionState(), InteractionState::Free);
+    EXPECT_EQ(t->getOccluderId(), -1);
+}

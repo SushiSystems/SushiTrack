@@ -136,6 +136,17 @@ namespace SushiTrack
         {
             observed = KinematicState::Maneuvering;
         }
+        else if (pending_state_ == KinematicState::Maneuvering &&
+                 vel_residual_per_sec > config_.fsm_stationary_vel_thresh * margin_up)
+        {
+            // Pending-sustain: a Maneuvering candidate was triggered by a large
+            // velocity step. On subsequent frames the instantaneous acceleration
+            // may drop to zero because the new velocity is now constant, but the
+            // object is still clearly moving fast. Keep the Maneuvering
+            // observation alive so the stability counter can reach kStableFrames
+            // without being reset by a spurious Cruising classification.
+            observed = KinematicState::Maneuvering;
+        }
         else if (current_state_ == KinematicState::Stationary &&
                  vel_residual_per_sec <= config_.fsm_stationary_vel_thresh * margin_up)
         {

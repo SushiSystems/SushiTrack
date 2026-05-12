@@ -5,14 +5,14 @@ cd "$PROJECT_ROOT"
 
 echo "[INFO] Cleaning project build artifacts..."
 
-if [ -d "build" ]; then
-    echo "[INFO] Removing build/"
-    rm -rf build
+if [ -f "$PROJECT_ROOT/.tools/paths.env" ]; then
+    export $(grep -v '^#' "$PROJECT_ROOT/.tools/paths.env" | xargs)
 fi
+BUILD_DIR=${DIR_BUILD:-build}
 
-if [ -d "test/build" ]; then
-    echo "[INFO] Removing test/build/"
-    rm -rf test/build
+if [ -d "$BUILD_DIR" ]; then
+    echo "[INFO] Removing $BUILD_DIR/"
+    rm -rf "$BUILD_DIR"
 fi
 
 echo "[SUCCESS] Clean completed."

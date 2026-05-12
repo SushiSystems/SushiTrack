@@ -127,8 +127,19 @@ namespace SushiTrack
         /** @brief Number of consecutive successful matches required to confirm a tentative track. */
         int   tentative_confirm_hits = 3;
 
-        /** @brief Maximum frames to persist a tentative track without any successful matches. */
-        int   tentative_max_age = 2;
+        /**
+         * @brief Maximum time a tentative track may go without a match before it is removed,
+         *        expressed in seconds.
+         *
+         * Interpreted identically in both timing modes:
+         *   - time_aware = true:  compared directly against the accumulated lost-time of the
+         *     tentative track, which predict() increments by the real dt on each frame.
+         *   - time_aware = false: multiplied by frame_rate to obtain the equivalent frame
+         *     count, then compared against frames elapsed since the last successful match.
+         *
+         * Default 0.08 s equals 2 frames at 25 fps, preserving the prior integer default.
+         */
+        float tentative_max_age_seconds = 0.08f;
 
         // --- Mahalanobis Gating ---
 
@@ -148,16 +159,52 @@ namespace SushiTrack
         // EXTENDED PARAMETERS
         // ====================================================================
 
-        /** @brief Score threshold for instant tentative track confirmation. */
+        /**
+         * @brief Score threshold for single-hit tentative confirmation.
+         *
+         * When the matched detection's score is at or above this value,
+         * tentative_fast_hits (default 1) is used as the required hit count.
+         * A single high-confidence match is sufficient to confirm the track.
+         */
         float tentative_fast_thresh       = 0.85f;
-        /** @brief Hits required when score exceeds fast threshold. */
+
+        /** @brief Required hit count when the matched score exceeds tentative_fast_thresh. */
         int   tentative_fast_hits         = 1;
-        /** @brief Score threshold below which confirmation is delayed. */
+
+        /**
+         * @brief Score threshold below which an extra confirmation hit is required.
+         *
+         * When the matched score is below this value but above the floor
+         * (score < tentative_slow_thresh), tentative_slow_hits_offset additional
+         * hits are added to tentative_confirm_hits. Below the floor,
+         * tentative_vslow_hits_offset is added instead.
+         */
         float tentative_slow_thresh       = 0.40f;
-        /** @brief Additional hits required for slow-moving tentative tracks. */
+
+        /** @brief Extra hits added to tentative_confirm_hits for scores in [tentative_slow_thresh, high_thresh). */
         int   tentative_slow_hits_offset  = 1;
-        /** @brief Additional hits required for very low confidence tentative tracks. */
+
+        /** @brief Extra hits added to tentative_confirm_hits for scores below tentative_slow_thresh. */
         int   tentative_vslow_hits_offset = 2;
+
+        /**
+         * @note Score-history independence of the confirmation threshold.
+         *
+         * The required hit count is evaluated against the score of the most
+         * recently matched detection (t->getScore()), not the score at birth.
+         * This means the threshold that applies at confirm time is determined
+         * by the last observation, regardless of what earlier matches scored.
+         *
+         * Consequence: a track that accumulated hits against low-confidence
+         * detections and then matches a high-confidence detection on a later
+         * frame will be confirmed immediately if hits_ >= tentative_fast_hits,
+         * because the new score drives the required-hits lookup. This is
+         * intentional: the final high-confidence observation is treated as
+         * the authoritative signal that the track is real. If the desired
+         * behaviour is to gate confirmation on the score at birth, the
+         * threshold lookup should be moved to activateTentative() and the
+         * result stored as a per-track field.
+         */
         /** @brief Scaling factor for high-confidence direct visual matches. */
         float reid_direct_assignment_weight = 0.2f;
 
@@ -193,34 +240,35 @@ namespace SushiTrack
          * @brief Additive cost penalty applied to recovery matches that
          *        coincide with a still-valid occluder snapshot.
          *
-         * The penalty is added to the lost-recovery association cost when the
-         * candidate detection overlaps with the occluder that was active at
-         * the moment the tracklet became Lost. Larger values more aggressively
-         * suppress premature re-association during the occlusion window.
+         * Added to the association cost when a candidate detection overlaps
+         * the occluder that was active at the moment the tracklet became Lost.
+         * Higher values suppress premature re-association more aggressively
+         * during the occlusion window.
          */
         float interaction_occluder_penalty = 0.3f;
 
         /**
-         * @brief Maximum frame-counted lifetime of an occluder snapshot.
+         * @brief Base lifetime of an occluder snapshot, in seconds.
          *
-         * Used when the tracker is operating in frame-based timing mode
-         * (time_aware = false). Once the number of frames elapsed since the
-         * snapshot exceeds this value, the snapshot is treated as expired and
-         * the occluder-aware penalty is no longer applied. Larger values keep
-         * the suppression active longer, which protects against late
-         * emergence of the original track at the cost of delaying legitimate
-         * re-acquisitions of unrelated detections.
-         */
-        int   interaction_occluder_validity_frames = 60;
-
-        /**
-         * @brief Maximum wall-clock lifetime of an occluder snapshot in seconds.
+         * Controls how long the occluder-aware penalty stays active after a
+         * track transitions to Lost. The value is interpreted the same way in
+         * both timing modes:
          *
-         * Used when the tracker is operating in real-time mode
-         * (time_aware = true). The semantics mirror the frame-counted variant
-         * but are evaluated against the accumulated lost-time of the
-         * tracklet. Decouples the validity window from the frame rate so that
-         * downstream pipelines with variable cadence behave consistently.
+         *   - time_aware = true:  compared directly against the tracklet's
+         *     accumulated lost-time in seconds.
+         *   - time_aware = false: multiplied by frame_rate to obtain the
+         *     equivalent frame count, then compared against frames elapsed
+         *     since the snapshot.
+         *
+         * The effective window is further scaled per call by validityScale(),
+         * which adjusts it based on the occluder's kinematic state: stationary
+         * occluders extend the window because their position is reliable;
+         * maneuvering occluders contract it because they may have left the
+         * scene. This scaling is applied consistently in both the penalty and
+         * the cleanup path, so the snapshot is always cleared at the same
+         * frame the penalty would stop firing.
+         *
+         * Default 2.0 s corresponds to 50 frames at 25 fps.
          */
         float interaction_occluder_validity_seconds = 2.0f;
     };

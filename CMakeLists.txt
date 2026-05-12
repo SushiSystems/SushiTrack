@@ -9,6 +9,13 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
+# ------------------------------------------------------------
+# Output Directories (Unified for Windows DLL/EXE resolution)
+# ------------------------------------------------------------
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+
 option(USE_ASAN "Enable AddressSanitizer" OFF)
 if(USE_ASAN)
     if(MSVC)
@@ -112,57 +119,24 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/ocsort
                  ${CMAKE_CURRENT_BINARY_DIR}/ocsort)
 
 
+
 # ============================================================
-# MOT Test Executable
-# BUILD_MOT_TEST=ON to enable (default: OFF)
+# Test Targets
+#
+# Unit tests (fast, no external data):
+#   cmake -DBUILD_UNIT_TEST=ON ..
+#   cmake --build . --target unit_test
+#
+# Regression tests (MOT label-based benchmark + video inference bridge):
+#   cmake -DBUILD_REGRESSION_TEST=ON ..
+#   cmake --build . --target regression_test
+#
+# Build both:
+#   cmake -DBUILD_UNIT_TEST=ON -DBUILD_REGRESSION_TEST=ON ..
+#
+# Legacy alias (deprecated, maps to BUILD_REGRESSION_TEST):
+#   cmake -DBUILD_MOT_TEST=ON ..
 # ============================================================
-option(BUILD_MOT_TEST "Build the unified MOT benchmark test executable" OFF)
+option(BUILD_MOT_TEST "Deprecated alias for BUILD_REGRESSION_TEST" OFF)
 
-if(BUILD_MOT_TEST)
-    find_package(GTest REQUIRED)
-
-    add_executable(mot_test
-        ${CMAKE_CURRENT_SOURCE_DIR}/test/cpp/MainTest.cpp
-    )
-
-    target_include_directories(mot_test PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/test/cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/bytetrack/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/ocsort/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty
-        ${EIGEN3_INCLUDE_DIR}
-    )
-
-    target_link_libraries(mot_test PRIVATE
-        ${PROJECT_NAME}   # sushitrack shared lib
-        bytetrack         # bytetrack static lib
-        libocsort         # ocsort shared lib
-        GTest::GTest
-    )
-
-    # Tracker Bridge for Python ctypes
-    add_library(tracker_bridge SHARED
-        ${CMAKE_CURRENT_SOURCE_DIR}/test/cpp/TrackerRegistry.cpp
-    )
-    target_include_directories(tracker_bridge PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/test/cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/bytetrack/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/ocsort/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty
-        ${EIGEN3_INCLUDE_DIR}
-    )
-    target_link_libraries(tracker_bridge PRIVATE
-        ${PROJECT_NAME}
-        bytetrack
-        libocsort
-    )
-
-    # CTest integration
-    enable_testing()
-    include(GoogleTest)
-    gtest_discover_tests(mot_test
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    )
-endif()
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tests)

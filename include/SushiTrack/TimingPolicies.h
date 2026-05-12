@@ -105,7 +105,7 @@ namespace SushiTrack
             bool isExpired(float accumulated_seconds, int buffer_frames) const override
             {
                 const float timeout_seconds = static_cast<float>(buffer_frames) / fps_f_;
-                return accumulated_seconds > timeout_seconds;
+                return accumulated_seconds > (timeout_seconds + 1e-4f);
             }
 
         private:

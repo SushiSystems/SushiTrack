@@ -69,7 +69,8 @@ namespace SushiTrack
                                     const std::vector<TrackletPtr>& __restrict b,
                                     CostMatrix& __restrict out_matrix)
     {
-        out_matrix.resize(a.size(), b.size(), 1e4f);
+        out_matrix.resize(a.size(), b.size(), 1.0f);
+        
         if (a.empty() || b.empty()) return;
 
         const float offset = iou_plus_one_ ? 1.0f : 0.0f;

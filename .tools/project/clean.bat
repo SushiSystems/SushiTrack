@@ -6,14 +6,13 @@ cd /d "%PROJECT_ROOT%"
 
 echo [INFO] Cleaning project build artifacts...
 
-if exist "build" (
-    echo [INFO] Removing build/
-    rd /s /q "build"
-)
+:: Parse paths.env
+for /f "usebackq eol=# delims== tokens=1,2" %%A in ("%PROJECT_ROOT%\.tools\paths.env") do set "%%A=%%B"
+if not defined DIR_BUILD set "DIR_BUILD=build"
 
-if exist "test\build" (
-    echo [INFO] Removing test/build/
-    rd /s /q "test\build"
+if exist "%DIR_BUILD%" (
+    echo [INFO] Removing %DIR_BUILD%/
+    rd /s /q "%DIR_BUILD%"
 )
 
 echo [SUCCESS] Clean completed.

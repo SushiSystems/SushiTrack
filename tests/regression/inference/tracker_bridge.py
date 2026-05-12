@@ -40,6 +40,9 @@ class TrackerBridge:
         
         # Look in standard cmake output directories
         search_paths = [
+            os.path.join(build_dir, "bin", lib_name),
+            os.path.join(build_dir, "bin", "Release", lib_name),
+            os.path.join(build_dir, "bin", "Debug", lib_name),
             os.path.join(build_dir, lib_name),
             os.path.join(build_dir, "Release", lib_name),
             os.path.join(build_dir, "Debug", lib_name),

@@ -193,8 +193,14 @@ extern "C"
         /** @brief Number of consecutive successful matches required to confirm a tentative track. */
         int   tentative_confirm_hits;
 
-        /** @brief Maximum frames to persist a tentative track without any successful matches. */
-        int   tentative_max_age;
+        /**
+         * @brief Maximum time a tentative track may go without a match, in seconds.
+         *
+         * Works identically in both timing modes. In frame-based mode the value is
+         * compared against accumulated_lost_time_, which predict() increments by
+         * 1/frame_rate per frame. Default 0.08 s equals 2 frames at 25 fps.
+         */
+        float tentative_max_age_seconds;
 
         // --- Mahalanobis Gating ---
 
@@ -257,14 +263,13 @@ extern "C"
         float interaction_occluder_penalty;
 
         /**
-         * @brief Maximum frame-counted lifetime of an occluder snapshot when
-         *        operating in frame-based timing mode.
-         */
-        int   interaction_occluder_validity_frames;
-
-        /**
-         * @brief Maximum wall-clock lifetime of an occluder snapshot in
-         *        seconds when operating in real-time timing mode.
+         * @brief Base lifetime of an occluder snapshot, in seconds.
+         *
+         * Interpreted the same way in both timing modes. In frame-based mode
+         * the value is multiplied by frame_rate to obtain the equivalent frame
+         * count. The effective window is further scaled by the occluder's
+         * kinematic state at evaluation time. Default 2.0 s equals 50 frames
+         * at 25 fps.
          */
         float interaction_occluder_validity_seconds;
 

@@ -1,6 +1,5 @@
 # Build artifacts
 build/
-test/build/
 bin/
 obj/
 
@@ -27,4 +26,4 @@ Dockerfile
 .dockerignore
 
 # Data
-test/data/*/pred/
+tests/regression/evaluator/data/*/pred/

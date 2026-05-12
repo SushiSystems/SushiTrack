@@ -223,6 +223,8 @@ sushitrack project test --scenario MOT17-04-DPM --compare
 # Re-evaluate previously generated predictions
 sushitrack project test --eval-only
 
+sushitrack project test inference -n yolox-x -c 3rdparty/weight/mot17x.pth.tar --source 3rdparty/video/MOT17-04.mp4 --num-classes 1 --legacy
+
 # Export results
 sushitrack project test --compare --export ./results
 ```

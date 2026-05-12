@@ -13,11 +13,18 @@ from pathlib import Path
 from typing import Optional
 import sys
 
-_TOOLS_DIR = Path(__file__).parent.parent.parent / ".tools"
+_PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+_TOOLS_DIR = _PROJECT_ROOT / ".tools"
+
 if str(_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(_TOOLS_DIR))
 
-_3RDPARTY_TRACKEVAL = Path(__file__).parent.parent.parent / "3rdparty" / "TrackEval"
+try:
+    from paths_manager import DIR_3RDPARTY
+    _3RDPARTY_TRACKEVAL = DIR_3RDPARTY / "TrackEval"
+except ImportError:
+    _3RDPARTY_TRACKEVAL = _PROJECT_ROOT / "3rdparty" / "TrackEval"
+
 if _3RDPARTY_TRACKEVAL.exists() and str(_3RDPARTY_TRACKEVAL) not in sys.path:
     sys.path.insert(0, str(_3RDPARTY_TRACKEVAL))
 

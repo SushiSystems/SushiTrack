@@ -12,9 +12,11 @@ import argparse
 from pathlib import Path
 
 _THIS_DIR = Path(__file__).parent
-sys.path.insert(0, str(_THIS_DIR))
+_PROJECT_ROOT = _THIS_DIR.parent.parent.parent.parent
+_TOOLS_DIR = _PROJECT_ROOT / ".tools"
 
-_TOOLS_DIR = _THIS_DIR.parent.parent / ".tools"
+if str(_THIS_DIR) not in sys.path:
+    sys.path.insert(0, str(_THIS_DIR))
 if str(_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(_TOOLS_DIR))
 
@@ -52,14 +54,19 @@ def resolve_data_dir(args) -> Path:
     """
     if args.data_dir:
         return Path(args.data_dir)
-    candidates = [
-        Path(__file__).parent.parent.parent / "data",
-        Path(__file__).parent.parent / "data",
-    ]
+
+    try:
+        from paths_manager import DIR_EVALUATOR, DIR_DATA
+        candidates = [DIR_EVALUATOR / "data", DIR_DATA]
+    except ImportError:
+        candidates = [
+            _PROJECT_ROOT / "tests" / "regression" / "evaluator" / "data",
+            _PROJECT_ROOT / "data",
+        ]
     for c in candidates:
         if c.exists():
             return c.resolve()
-    return Path(__file__).parent.parent.parent / "data"
+    return candidates[0] if candidates else Path(_PROJECT_ROOT / "data")
 
 
 def main():

@@ -5,12 +5,17 @@ BLUE='\033[94m'
 GREEN='\033[92m'
 RESET='\033[0m'
 
-# Get project root (two levels up from .tools/project)
-TOOLS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-ROOT_DIR="$TOOLS_DIR/../.."
-TEST_DATA_DIR="$ROOT_DIR/test/data"
+# Get project root (three levels up from .tools/misc)
+TOOLS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+ROOT_DIR="$( cd "$TOOLS_DIR/.." && pwd )"
 
-echo -e "${BLUE}[INFO]${RESET} Cleaning prediction directories in test/data..."
+if [ -f "$TOOLS_DIR/paths.env" ]; then
+    export $(grep -v '^#' "$TOOLS_DIR/paths.env" | xargs)
+fi
+
+TEST_DATA_DIR="$ROOT_DIR/${DIR_EVALUATOR:-tests/regression/evaluator}/data"
+
+echo -e "${BLUE}[INFO]${RESET} Cleaning prediction directories in $TEST_DATA_DIR..."
 
 FOUND=0
 if [ -d "$TEST_DATA_DIR" ]; then

@@ -75,9 +75,9 @@ extern "C"
         params->unconfirmed_iou_thresh = 0.7f;
         params->duplicate_iou_thresh   = 0.15f;
 
-        params->tentative_match_thresh = 0.3f;
-        params->tentative_confirm_hits = 3;
-        params->tentative_max_age      = 2;
+        params->tentative_match_thresh   = 0.3f;
+        params->tentative_confirm_hits   = 3;
+        params->tentative_max_age_seconds = 0.08f;
 
 
         params->tentative_fast_thresh       = 0.85f;
@@ -99,7 +99,6 @@ extern "C"
         params->enable_interaction_context              = 0;
         params->interaction_iou_thresh                  = 0.3f;
         params->interaction_occluder_penalty            = 0.3f;
-        params->interaction_occluder_validity_frames    = 60;
         params->interaction_occluder_validity_seconds   = 2.0f;
     }
 
@@ -159,9 +158,9 @@ extern "C"
 
             config.iou_match_thresh       = params->iou_match_thresh;
             config.unconfirmed_iou_thresh = params->unconfirmed_iou_thresh;
-            config.tentative_match_thresh = params->tentative_match_thresh;
-            config.tentative_confirm_hits = params->tentative_confirm_hits;
-            config.tentative_max_age      = params->tentative_max_age;
+            config.tentative_match_thresh    = params->tentative_match_thresh;
+            config.tentative_confirm_hits    = params->tentative_confirm_hits;
+            config.tentative_max_age_seconds = params->tentative_max_age_seconds;
             config.tentative_fast_thresh       = params->tentative_fast_thresh;
             config.tentative_fast_hits         = params->tentative_fast_hits;
             config.tentative_slow_thresh       = params->tentative_slow_thresh;
@@ -188,7 +187,6 @@ extern "C"
             config.enable_interaction_context              = (params->enable_interaction_context != 0);
             config.interaction_iou_thresh                  = params->interaction_iou_thresh;
             config.interaction_occluder_penalty            = params->interaction_occluder_penalty;
-            config.interaction_occluder_validity_frames    = params->interaction_occluder_validity_frames;
             config.interaction_occluder_validity_seconds   = params->interaction_occluder_validity_seconds;
 
             auto kf_factory = std::make_shared<SushiTrack::GenericKalmanFactory>(
@@ -408,7 +406,8 @@ extern "C"
                          int                             max_tracks,
                          float                           dt)
     {
-        if (!hdl || !objects || !out_tracks) return 0;
+        if (!hdl || !out_tracks) return 0;
+        if (n_objects > 0 && !objects) return 0;
         if (n_objects < 0 || max_tracks < 0) return 0;
         auto* impl = static_cast<SushiTrackHdlImpl*>(hdl);
 

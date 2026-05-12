@@ -1,17 +1,17 @@
 {
     "sushitrack": {
         "basic": {
-            "time_aware": 0,
+            "time_aware": 1,
             "frame_rate": 25,
             "track_buffer": 30,
             "track_thresh": 0.2,
             "high_thresh": 0.5,
             "match_thresh": 0.7,
-            "enable_tentative": 0,
-            "enable_fsm": 0,
+            "enable_tentative": 1,
+            "enable_fsm": 1,
             "enable_reid": 0,
             "enable_mahalanobis": 0,
-            "enable_interaction_context": 0
+            "enable_interaction_context": 1
         },
         "advanced": {
             "association": {
@@ -23,7 +23,7 @@
             },
             "coordinate_system": {
                 "enable_xyah": 1,
-                "enable_diou": 0,
+                "enable_diou": 1,
                 "iou_plus_one": 1,
                 "kalman_type": 0
             },
@@ -44,7 +44,7 @@
             "tentative_logic": {
                 "tentative_match_thresh": 0.5,
                 "tentative_confirm_hits": 3,
-                "tentative_max_age": 2,
+                "tentative_max_age_seconds": 0.08,
                 "tentative_fast_thresh": 0.7,
                 "tentative_fast_hits": 1,
                 "tentative_slow_thresh": 0.3,
@@ -60,8 +60,7 @@
             "interaction_context": {
                 "interaction_iou_thresh": 0.6,
                 "interaction_occluder_penalty": 0.15,
-                "interaction_occluder_validity_frames": 30,
-                "interaction_occluder_validity_seconds": 1
+                "interaction_occluder_validity_seconds": 1.2
             }
         }
     },

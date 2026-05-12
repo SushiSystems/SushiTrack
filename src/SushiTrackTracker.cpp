@@ -82,20 +82,21 @@ namespace SushiTrack
     namespace
     {
         /**
-         * @brief Returns the validity-window multiplier for a given occluder
+         * @brief Returns the validity-window multiplier for an occluder's
          *        kinematic state.
          *
-         * The occluder's motion regime dictates how long the snapshot can
-         * be trusted to describe the geometric relationship between the
-         * occludee and the visual obstacle. A Stationary occluder remains
-         * exactly where it was at snapshot time, so the validity window
-         * extends; a Maneuvering occluder may have left the scene entirely,
-         * so the window contracts. Cruising and Coasting are treated as
-         * neutral and mildly contracted respectively to reflect the
-         * decreasing confidence in the occluder's pose.
+         * A stationary occluder stays where it was at snapshot time, so the
+         * validity window can be extended. A maneuvering occluder may have
+         * moved out of frame, so the window contracts. Cruising is neutral;
+         * coasting is slightly contracted to reflect reduced positional
+         * confidence.
+         *
+         * Applied identically in applyOccluderPenalty() and cleanupLost()
+         * so the penalty and the snapshot expiry share the same effective
+         * window.
          *
          * @param s Occluder kinematic state.
-         * @return Validity multiplier in the half-open range (0, +inf).
+         * @return Multiplier applied to interaction_occluder_validity_seconds.
          */
         inline float validityScale(KinematicState s)
         {
@@ -113,15 +114,14 @@ namespace SushiTrack
          * @brief Returns the penalty multiplier driven by the occludee's
          *        kinematic state.
          *
-         * Stationary occludees almost always reappear in the same spot once
-         * the occluder steps aside, so the suppression of competing matches
-         * should be strong. Maneuvering occludees may emerge with a
-         * significant displacement, so suppression must be lighter to
-         * avoid rejecting the true reacquisition. Cruising and Coasting
-         * are treated as neutral and slightly reduced respectively.
+         * A stationary occludee will reappear at roughly the same position,
+         * so stronger suppression reduces identity churn. A maneuvering
+         * occludee may emerge well away from the occluder, so lighter
+         * suppression avoids rejecting a legitimate reacquisition. Cruising
+         * is neutral; coasting is slightly reduced.
          *
          * @param s Occludee kinematic state.
-         * @return Penalty multiplier in the closed range [0, +inf).
+         * @return Penalty multiplier applied to interaction_occluder_penalty.
          */
         inline float occludeeStateScale(KinematicState s)
         {
@@ -136,23 +136,21 @@ namespace SushiTrack
         }
 
         /**
-         * @brief Returns the penalty multiplier driven by the alignment
-         *        between occluder and occludee velocity vectors.
+         * @brief Returns the penalty multiplier driven by velocity alignment
+         *        between the occludee and the occluder.
          *
-         * Aligned motion (the two tracks share heading) indicates a
-         * persistent occlusion regime in which the occluder will continue
-         * to hide the occludee for several frames; the suppression should
-         * be strong. Anti-aligned motion indicates a crossing event in
-         * which the occluder is sweeping past, so the occludee is about to
-         * reappear and suppression should be lifted. Orthogonal motion
-         * sits in between. The dot product of unit-norm velocity vectors
-         * maps cleanly onto a multiplier centred at one, with a tight
-         * tunable amplitude that keeps the multiplier strictly positive.
+         * When both tracks share the same heading the occlusion is likely to
+         * persist, so the multiplier is increased. When they are heading in
+         * opposite directions the occluder is sweeping past and the occludee
+         * is about to reappear, so the multiplier is reduced. The cosine of
+         * the angle between the two unit velocity vectors is mapped to
+         * [0.6, 1.4] via 1 + 0.4 * cos(θ). When either velocity is below
+         * the noise floor the function returns 1.0 (identity).
          *
-         * @param vax X-component of the occludee velocity.
-         * @param vay Y-component of the occludee velocity.
-         * @param vbx X-component of the occluder velocity.
-         * @param vby Y-component of the occluder velocity.
+         * @param vax X-component of the occludee velocity (px/s).
+         * @param vay Y-component of the occludee velocity (px/s).
+         * @param vbx X-component of the occluder velocity (px/s).
+         * @param vby Y-component of the occluder velocity (px/s).
          * @return Alignment multiplier in the closed range [0.6, 1.4].
          */
         inline float velocityAlignmentScale(float vax, float vay,
@@ -175,29 +173,27 @@ namespace SushiTrack
     /**
      * @brief Applies the occluder-aware cost penalty to a cost matrix.
      *
-     * The validity-window helper is closed over the tracker configuration and
-     * the active timing policy so that the same predicate yields a
-     * frame-counted comparison in frame mode and a wall-clock comparison in
-     * real-time mode. The window is further scaled by the occluder's
-     * kinematic state so that stationary occluders extend the suppression
-     * horizon while maneuvering occluders contract it.
+     * For each row with a valid occluder snapshot, every detection column
+     * whose bounding box overlaps the snapshotted occluder geometry above
+     * the configured DIoU threshold receives an additive penalty.
      *
-     * For each surviving row, every detection column whose rectangle
-     * overlaps the snapshotted occluder geometry above the configured
-     * activation threshold receives an additive penalty. The penalty
-     * magnitude is modulated by two multipliers: the occludee's kinematic
-     * state, and the alignment between the occludee's and the occluder's
-     * velocity vectors. The combined modulation is bounded by construction
-     * and reduces to identity when no kinematic information is available.
+     * Snapshot validity is evaluated using interaction_occluder_validity_seconds
+     * scaled by validityScale() for the occluder's kinematic state. In
+     * frame-based mode the seconds value is converted to frames via frame_rate.
+     * This matches the expiry logic in cleanupLost() exactly, so the penalty
+     * stops firing on the same frame the snapshot is cleared.
      *
-     * Cells already at the sentinel cost are left untouched so the
-     * assignment solver keeps rejecting them.
+     * The penalty magnitude is further modulated by the occludee's kinematic
+     * state (occludeeStateScale) and the heading alignment between occludee
+     * and occluder (velocityAlignmentScale). Both multipliers are bounded and
+     * reduce to identity when kinematic information is unavailable.
+     *
+     * Cells already at the sentinel cost are left untouched.
      *
      * @param tracks    Track rows of the cost matrix.
      * @param dets      Detection columns of the cost matrix.
      * @param matrix    Cost matrix to be modified in place.
-     * @param only_lost When true, only rows whose track is in the Lost state
-     *                  are considered.
+     * @param only_lost When true, only rows in the Lost state are considered.
      */
     void SushiTrackTracker::applyOccluderPenalty(const std::vector<TrackletPtr>& tracks,
                                                 const std::vector<TrackletPtr>& dets,
@@ -233,8 +229,11 @@ namespace SushiTrack
             const size_t snap_frame = t->getOccluderSnapshotFrame();
             if (frame_id_ < snap_frame) return false;
             const size_t elapsed_frames = frame_id_ - snap_frame;
+            // Convert the seconds-based validity window to frames and apply
+            // the kinematic scale, matching the cleanupLost expiry path exactly.
             const float scaled_frames =
-                static_cast<float>(std::max(0, config_.interaction_occluder_validity_frames))
+                config_.interaction_occluder_validity_seconds
+                * static_cast<float>(std::max(1, config_.frame_rate))
                 * scale;
             return elapsed_frames <= static_cast<size_t>(std::lround(scaled_frames));
         };
@@ -892,15 +891,25 @@ namespace SushiTrack
 
     /**
      * @brief Processes association and lifecycle for unconfirmed tentative tracks.
-     * 
-     * @param tentative_tracks Predicted tentative tracklets for the current frame.
-     * @param det_high_remaining Unclaimed high-confidence detections.
-     * @param det_low_remaining Unclaimed low-confidence detections.
-     * @param activated_tracklets Output list for tracks promoted to confirmed state.
-     * @param tentative_next Output list for tracks remaining tentative.
-     * @param removed_tentative_curr Output list for tentative tracks that aged out.
-     * @param det_for_new_init Output list for detections qualifying for new track initiation.
-     * @param dt Time interval of the current frame.
+     *
+     * Each tentative track is matched first against high-confidence detections,
+     * then, if still unmatched, against low-confidence detections. A successful
+     * match increments hits_ and calls confirm() if the required hit count is
+     * reached. Unmatched tracks are aged out when their accumulated lost-time
+     * exceeds tentative_max_age_seconds.
+     *
+     * @param tentative_tracks        Predicted tentative tracklets for this frame.
+     * @param det_high_remaining      Unclaimed high-confidence detections.
+     * @param det_low_remaining       Unclaimed low-confidence detections.
+     * @param activated_tracklets     Output: tracks promoted to confirmed state.
+     * @param tentative_next          Output: tracks that remain tentative.
+     * @param removed_tentative_curr  Output: tracks that aged out this frame.
+     * @param det_for_new_init        Output: detections eligible for new track init.
+     * @param dt                      Time interval of the current frame in seconds.
+     *                                Used to compute the age of unmatched tentatives
+     *                                at the end of this call: accumulated_lost_time_
+     *                                has already been incremented by predict(dt), and
+     *                                the current unmatched frame adds one more dt.
      */
     void SushiTrackTracker::matchTentative(std::vector<TrackletPtr>& tentative_tracks,
                                         std::vector<TrackletPtr>& det_high_remaining,
@@ -1000,29 +1009,29 @@ namespace SushiTrack
             }
         }
 
-        (void)dt;
-
         for (int idx : u_tent_low)
         {
             auto& t = tentative_remaining[idx];
 
-            // Use frames-since-last-observation as the authoritative age measure.
-            // accumulated_lost_time_ is unreliable here because Tracklet::update()
-            // resets it to 0 and sets state=Tracked, which prevents predict() from
-            // re-accumulating it — causing tentative tracks to never expire in
-            // time_aware mode. Converting frame count to seconds via fps keeps both
-            // policies symmetric: they both expire at the same frame boundary.
-            const float frames_since_obs = static_cast<float>(frame_id_ - t->getFrameId());
-            const float accumulated = config_.time_aware
-                ? frames_since_obs / static_cast<float>(std::max(1, config_.frame_rate))
-                : frames_since_obs;
+            // Age is measured using accumulated_lost_time_, which predict() increments
+            // by the real dt on every frame where state == Tentative. update() resets it
+            // to zero on every successful match, so it always reflects the time elapsed
+            // since the last observation. In frame-based mode dt = 1/fps per frame, so
+            // accumulated_lost_time_ counts seconds just as in time-aware mode — the
+            // single tentative_max_age_seconds threshold therefore works identically in
+            // both modes without any frame-rate conversion at the call site.
+            // The current unmatched frame's dt is added here because predict() has already
+            // run before matchTentative is called, but the miss on this frame hasn't yet
+            // been reflected in accumulated_lost_time_ (update() would have zeroed it on
+            // a match; no match occurred, so we account for this frame manually).
+            const float accumulated = t->getAccumulatedLostTime() + dt;
 
-            if (timing_policy_->isExpired(accumulated, config_.tentative_max_age))
+            if (accumulated > config_.tentative_max_age_seconds)
             {
                 t->markAsRemoved();
                 removed_tentative_curr.push_back(t);
-                SUSHITRACK_LOG_DEBUG("[Tracker] Tentative track %llu aged out after %.0f frames without observation.",
-                    (unsigned long long)t->getTrackId(), frames_since_obs);
+                SUSHITRACK_LOG_DEBUG("[Tracker] Tentative track %llu aged out (lost_time=%.3fs, limit=%.3fs).",
+                    (unsigned long long)t->getTrackId(), accumulated, config_.tentative_max_age_seconds);
             }
             else
             {
@@ -1110,9 +1119,28 @@ namespace SushiTrack
     }
 
     /**
-     * @brief Identifies and removes lost tracks that have exceeded their maximum age.
-     * 
-     * @param removed_tracklets_curr Output collection for the removed tracklets.
+     * @brief Removes lost tracks that have exceeded their maximum age and
+     *        clears stale occluder snapshots.
+     *
+     * Two independent actions are taken per lost track:
+     *
+     *   1. Snapshot expiry. The occluder snapshot is cleared when either the
+     *      snapshotted occluder is no longer present in the scene or the
+     *      elapsed time since the snapshot exceeds the configured validity
+     *      window. The window is derived from interaction_occluder_validity_seconds
+     *      scaled by validityScale() for the occluder's kinematic state. In
+     *      frame-based mode the seconds value is converted to frames via
+     *      frame_rate. This mirrors the check in applyOccluderPenalty()
+     *      precisely, so the snapshot is cleared on the same frame the penalty
+     *      would stop firing and InteractionState stays consistent.
+     *
+     *   2. Track expiry. The configured track_buffer is scaled by the
+     *      occludee's last-seen kinematic state (stationary tracks get a
+     *      longer buffer, maneuvering tracks a modest extension). When the
+     *      accumulated lost time exceeds the scaled buffer the track is marked
+     *      Removed.
+     *
+     * @param removed_tracklets_curr Output collection for expired tracklets.
      */
     void SushiTrackTracker::cleanupLost(std::vector<TrackletPtr>& removed_tracklets_curr)
     {
@@ -1120,27 +1148,43 @@ namespace SushiTrack
         {
             // Drop the occluder snapshot once it has outlived its validity
             // window or the snapshotted occluder has itself left the scene.
-            // This keeps the InteractionState of long-lost tracks consistent
-            // with what the recovery policy will actually act on and avoids
-            // misleading downstream consumers that inspect the snapshot for
-            // diagnostic purposes.
+            // The window is scaled by the occluder's kinematic state using the
+            // same validityScale() call used in applyOccluderPenalty(), so the
+            // snapshot is cleared at exactly the frame the penalty would stop
+            // firing. Without this alignment the InteractionState could read
+            // Free while the penalty was still being applied, or vice versa.
             if (s->getOccluderId() >= 0)
             {
+                const size_t occ_id = static_cast<size_t>(s->getOccluderId());
                 const bool occluder_present = interaction_graph_ &&
-                    interaction_graph_->contains(static_cast<size_t>(s->getOccluderId()));
+                    interaction_graph_->contains(occ_id);
+
+                // Resolve the kinematic scale from the live graph if available;
+                // fall back to 1.0 (neutral) when the occluder has already left
+                // the scene so the snapshot can still expire on schedule rather
+                // than being cleared immediately by the presence check alone.
+                const float scale = (interaction_graph_ && occluder_present)
+                    ? validityScale(interaction_graph_->getKinematicState(occ_id))
+                    : 1.0f;
+
                 bool expired = false;
                 if (config_.time_aware)
                 {
                     const float elapsed = s->getAccumulatedLostTime() - s->getOccluderSnapshotTime();
-                    expired = elapsed > config_.interaction_occluder_validity_seconds;
+                    expired = elapsed > config_.interaction_occluder_validity_seconds * scale;
                 }
                 else
                 {
                     const size_t snap_frame = s->getOccluderSnapshotFrame();
                     const size_t elapsed_frames = (frame_id_ >= snap_frame)
                         ? (frame_id_ - snap_frame) : 0;
-                    expired = elapsed_frames > static_cast<size_t>(
-                        std::max(0, config_.interaction_occluder_validity_frames));
+                    // Convert the seconds-based window to frames and apply the
+                    // kinematic scale, mirroring the applyOccluderPenalty path.
+                    const float scaled_frames =
+                        config_.interaction_occluder_validity_seconds
+                        * static_cast<float>(std::max(1, config_.frame_rate))
+                        * scale;
+                    expired = elapsed_frames > static_cast<size_t>(std::lround(scaled_frames));
                 }
                 if (expired || !occluder_present)
                 {
