@@ -110,6 +110,7 @@ namespace SushiTrack
         start_frame_id_ = frame_id;
         tracklet_len_ = 1;
         hits_ = 1;
+        accumulated_lost_time_ = 0.0f;
     }
 
     /**
@@ -133,8 +134,9 @@ namespace SushiTrack
         start_frame_id_ = frame_id;
         tracklet_len_ = 1;
         hits_ = 1;
+        accumulated_lost_time_ = 0.0f;
     }
-
+    
     /**
      * @brief Promotes a tentative tracklet to a confirmed tracked state.
      * 

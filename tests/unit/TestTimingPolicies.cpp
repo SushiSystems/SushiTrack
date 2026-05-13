@@ -167,3 +167,51 @@ TEST(WallClockTimingPolicyTest, ZeroFpsClampedToOneHz)
     EXPECT_FALSE(p.isExpired(4.9f, 5));
     EXPECT_TRUE(p.isExpired(5.1f, 5));
 }
+
+// ===========================================================================
+// Tier 3 edge cases
+// ===========================================================================
+
+/**
+ * @brief toKfDt() with a negative raw_dt does not return a positive value
+ *        (negative intervals should not produce positive frame counts).
+ */
+TEST(WallClockTimingPolicyTest, NegativeDtProducesNonPositiveKfDt)
+{
+    WallClockTimingPolicy p(25);
+    float result = p.toKfDt(-1.0f);
+    EXPECT_LE(result, 0.f);
+}
+
+/**
+ * @brief toKfDt() with a dt that would produce exactly MAX_KF_DT_STEPS is
+ *        capped to that value.
+ */
+TEST(WallClockTimingPolicyTest, ExactCapBoundaryReturnsCap)
+{
+    WallClockTimingPolicy p(25);
+    float dt_at_cap = MAX_KF_DT_STEPS / 25.f;
+    EXPECT_FLOAT_EQ(p.toKfDt(dt_at_cap), MAX_KF_DT_STEPS);
+}
+
+/**
+ * @brief isExpired() with a very small positive epsilon above the boundary
+ *        returns true (boundary is open on the upper end).
+ */
+TEST(WallClockTimingPolicyTest, SmallEpsilonAboveBoundaryExpires)
+{
+    WallClockTimingPolicy p(25);
+    const float timeout    = static_cast<float>(30) / 25.0f;
+    const float just_above = timeout + 1e-3f;
+    EXPECT_TRUE(p.isExpired(just_above, 30));
+}
+
+/**
+ * @brief FrameTimingPolicy::isExpired() with frame_count = 0 and buffer_frames = 0
+ *        returns false (0 is not strictly greater than 0).
+ */
+TEST(FrameTimingPolicyTest, ZeroFrameCountAndZeroBufferNotExpired)
+{
+    FrameTimingPolicy p;
+    EXPECT_FALSE(p.isExpired(0.f, 0));
+}

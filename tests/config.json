@@ -44,7 +44,7 @@
             "tentative_logic": {
                 "tentative_match_thresh": 0.5,
                 "tentative_confirm_hits": 3,
-                "tentative_max_age_seconds": 0.08,
+                "tentative_max_age_seconds": 0.09,
                 "tentative_fast_thresh": 0.7,
                 "tentative_fast_hits": 1,
                 "tentative_slow_thresh": 0.3,

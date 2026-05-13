@@ -297,3 +297,75 @@ TEST(LAPJVSolverTest, RepeatedCallsProduceConsistentResults)
     EXPECT_EQ(first, second);
     EXPECT_EQ(first, 3u);
 }
+
+// ===========================================================================
+// Tier 3 edge cases
+// ===========================================================================
+
+/**
+ * @brief A matrix where every cell equals the sentinel value (1e4f) produces
+ *        no matches; all rows and columns are reported as unmatched.
+ */
+TEST(LAPJVSolverTest, AllSentinelMatrixProducesNoMatches)
+{
+    LAPJVSolver solver;
+    CostMatrix cost;
+    cost.resize(3, 3, 1e4f);
+
+    std::vector<std::vector<int>> matches;
+    std::vector<int> a_unm, b_unm;
+    solver.solve(cost, 3, 3, 0.9f, matches, a_unm, b_unm);
+
+    EXPECT_TRUE(matches.empty());
+    EXPECT_EQ(a_unm.size(), 3u);
+    EXPECT_EQ(b_unm.size(), 3u);
+}
+
+/**
+ * @brief A 1×N matrix where all costs exceed the threshold produces no matches
+ *        and reports the single row and all N columns as unmatched.
+ */
+TEST(LAPJVSolverTest, OneRowAllAboveThresholdNoMatch)
+{
+    LAPJVSolver solver;
+    CostMatrix cost;
+    cost.resize(1, 4, 0.9f);
+
+    std::vector<std::vector<int>> matches;
+    std::vector<int> a_unm, b_unm;
+    solver.solve(cost, 1, 4, 0.5f, matches, a_unm, b_unm);
+
+    EXPECT_TRUE(matches.empty());
+    EXPECT_EQ(a_unm.size(), 1u);
+    EXPECT_EQ(b_unm.size(), 4u);
+}
+
+/**
+ * @brief A 3×3 permutation matrix (each row's minimum is in a different column)
+ *        produces three correct cross-diagonal matches.
+ */
+TEST(LAPJVSolverTest, PermutationMatrixMatchesOptimally)
+{
+    LAPJVSolver solver;
+    CostMatrix cost;
+    cost.resize(3, 3, 1.0f);
+    cost(0, 2) = 0.0f;
+    cost(1, 0) = 0.0f;
+    cost(2, 1) = 0.0f;
+
+    std::vector<std::vector<int>> matches;
+    std::vector<int> a_unm, b_unm;
+    solver.solve(cost, 3, 3, 0.5f, matches, a_unm, b_unm);
+
+    EXPECT_EQ(matches.size(), 3u);
+    EXPECT_TRUE(a_unm.empty());
+    EXPECT_TRUE(b_unm.empty());
+
+    std::vector<int> row_to_col(3, -1);
+    for (const auto& p : matches)
+        row_to_col[p[0]] = p[1];
+
+    EXPECT_EQ(row_to_col[0], 2);
+    EXPECT_EQ(row_to_col[1], 0);
+    EXPECT_EQ(row_to_col[2], 1);
+}

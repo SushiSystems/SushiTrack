@@ -79,6 +79,13 @@ namespace SushiTrack
          */
         Xywh<T> getXywh() const;
 
+        /**
+         * @brief Retrieves dimensions in TLWH [x, y, w, h] format.
+         * 
+         * @return Vector containing top-left coordinates and dimensions.
+         */
+        Tlwh<T> getTlwh() const;
+
     };
 
     /**

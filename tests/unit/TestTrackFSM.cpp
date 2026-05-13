@@ -25,6 +25,9 @@
 #include "SushiTrack/TrackerConfig.h"
 #include "SushiTrack/KalmanTypes.h"
 #include "SushiTrack/IStatePredictor.h"
+#include "SushiTrack/Tracklet.h"
+#include "SushiTrack/KalmanFilter.h"
+#include "SushiTrack/Rect.h"
 
 using namespace SushiTrack;
 
@@ -397,4 +400,128 @@ TEST(TrackFSMTest, ApplyToPredictorNullIsSafe)
 {
     TrackFSM fsm(makeConfig());
     EXPECT_NO_THROW(fsm.applyToPredictor(nullptr, 0.04f));
+}
+
+/**
+ * @brief When no FSM is attached to a Tracklet, getKinematicState() returns
+ *        KinematicState::Cruising (the identity/fallback value) so that
+ *        downstream policies degrade gracefully.
+ */
+TEST(TrackFSMTest, FsmDisabledTrackletReturnsCruisingFallback)
+{
+    auto t = std::make_unique<Tracklet>(
+        std::make_unique<KalmanFilter>(),
+        Rect<float>(100.f, 200.f, 50.f, 80.f),
+        /*label=*/1, /*score=*/0.9f
+    );
+    ASSERT_EQ(t->getFSM(), nullptr);
+    EXPECT_EQ(t->getKinematicState(), KinematicState::Cruising);
+}
+
+/**
+ * @brief After transitioning to Maneuvering, driving the FSM with zero
+ *        velocity for kStableFrames + 1 frames transitions back to Stationary.
+ */
+TEST(TrackFSMTest, ManeuveringToStationaryRecovery)
+{
+    TrackFSM fsm(makeConfig());
+    KalmanTypes::StateMean slow = velMean(0.f);
+    KalmanTypes::StateMean fast = velMean(20.f);
+
+    driveWarmup(fsm, slow);
+    fsm.updateState(fast, false, 4, 0.04f);
+    fsm.updateState(fast, false, 5, 0.04f);
+    ASSERT_EQ(fsm.getCurrentState(), KinematicState::Maneuvering);
+
+    fsm.updateState(slow, false, 6, 0.04f);
+    fsm.updateState(slow, false, 7, 0.04f);
+    fsm.updateState(slow, false, 8, 0.04f);
+    EXPECT_EQ(fsm.getCurrentState(), KinematicState::Stationary);
+}
+
+// ---------------------------------------------------------------------------
+// Additional coverage requests
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Verifies that the kinematic state remains unchanged when the FSM is disabled.
+ *
+ * Ensures that even with extreme velocity components that would normally
+ * trigger a transition to Maneuvering, the state persists as the initial
+ * Stationary when enable_fsm is configured to false.
+ */
+TEST(TrackFSMTest, DisabledFsmDoesNotChangeState)
+{
+    TrackerConfig config;
+    config.enable_fsm = false;
+    TrackFSM fsm(config);
+
+    // Extreme velocity to normally trigger maneuvering
+    KalmanTypes::StateMean mean = KalmanTypes::StateMean::Zero();
+    mean(4) = 5000.0f;
+    mean(5) = 5000.0f;
+
+    fsm.updateState(mean, false, 10, 1.0f);
+
+    EXPECT_EQ(fsm.getCurrentState(), KinematicState::Stationary);
+}
+
+/**
+ * @brief Validates recovery from Maneuvering back to Stationary state.
+ *
+ * Simulates a high-acceleration event followed by a period of zero velocity.
+ * Verifies that the FSM correctly identifies the stabilization and transitions
+ * back to the Stationary state after the required stability window.
+ */
+TEST(TrackFSMTest, RecoversFromManeuveringToStationary) 
+{
+    TrackerConfig config; 
+    config.enable_fsm = true;
+    TrackFSM fsm(config);
+    
+    KalmanTypes::StateMean mean = KalmanTypes::StateMean::Zero();
+    
+    // Warmup: Hız geçmişini sıfır ile doldur
+    fsm.updateState(mean, false, 1, 1.0f);
+    fsm.updateState(mean, false, 2, 1.0f);
+    fsm.updateState(mean, false, 3, 1.0f);
+    fsm.updateState(mean, false, 4, 1.0f); 
+    
+    mean(4) = 1000.0f; // Yüksek Hız İvmelenmesi
+    
+    fsm.updateState(mean, false, 5, 1.0f); 
+    fsm.updateState(mean, false, 6, 1.0f); 
+    fsm.updateState(mean, false, 7, 1.0f); 
+    
+    ASSERT_EQ(fsm.getCurrentState(), KinematicState::Maneuvering);
+
+    mean(4) = 0.0f; // Durma (Stationary'e geçiş)
+    for(int i = 0; i < 15; ++i)
+        fsm.updateState(mean, false, 8 + i, 1.0f);
+    
+    EXPECT_EQ(fsm.getCurrentState(), KinematicState::Stationary);
+}
+
+/**
+ * @brief Confirms that Stationary state applies the expected noise multipliers.
+ *
+ * Verifies that when the FSM is in the Stationary state, the noise multipliers
+ * applied to the state predictor match the configured reduction factors for
+ * position, size, and velocity components.
+ */
+TEST(TrackFSMTest, ApplyToPredictorStationaryExactValuesVerify)
+{
+    TrackerConfig config = makeConfig();
+    TrackFSM fsm(config);
+
+    // Ensure state is Stationary (default on init)
+    ASSERT_EQ(fsm.getCurrentState(), KinematicState::Stationary);
+
+    MockPredictor mock;
+    fsm.applyToPredictor(&mock, 1.0f);
+
+    // Verify reduction multipliers for Stationary state (0.8, 0.6, 0.5)
+    EXPECT_FLOAT_EQ(mock.pos_mult,  0.8f);
+    EXPECT_FLOAT_EQ(mock.size_mult, 0.6f);
+    EXPECT_FLOAT_EQ(mock.vel_mult,  0.5f);
 }

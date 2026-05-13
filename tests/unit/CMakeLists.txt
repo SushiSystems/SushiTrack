@@ -28,6 +28,9 @@ add_executable(unit_test
     TestInteractionGraph.cpp
     TestTrackerTentative.cpp
     TestTrackerBuffers.cpp
+    TestLogger.cpp
+    TestSushiTrackC.cpp
+    TestSushiTrackTracker.cpp
     UnitTest.cpp
 )
 

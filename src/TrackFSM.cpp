@@ -42,6 +42,8 @@ namespace SushiTrack
     void TrackFSM::updateState(const KalmanTypes::StateMean& mean, bool is_lost,
                             size_t tracklet_len, float dt)
     {
+        if (!config_.enable_fsm) return;
+
         if (is_lost)
         {
             // Capture the pre-Coasting motion regime so it can be restored on

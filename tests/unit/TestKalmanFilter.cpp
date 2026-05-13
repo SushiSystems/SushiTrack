@@ -20,6 +20,10 @@
  * - setNoiseMultipliers(): predict covariance growth is proportional to multipliers.
  * - NSAKalmanFilter initiate() sets a valid non-zero covariance.
  * - XYAH coordinate mode: initiate mean matches [cx, cy, aspect, height].
+ * - predict(): multi-step integration for dt > 1.
+ * - XYAH mode: numerical stability during predict-update cycles.
+ * - NSAKalmanFilter update(): score=0 does not result in negative covariance.
+ * - update(): covariance remains symmetric.
  */
 
 #include <gtest/gtest.h>
@@ -491,4 +495,86 @@ TEST(NSAKalmanFilterXYAHTest, XYAHModeSupport)
     for (int i = 0; i < 8; ++i) {
         EXPECT_GT(cov(i, i), 0.f);
     }
+}
+
+/**
+ * @brief Verifies multi-step prediction logic when the time step (dt) is greater than one.
+ *        The position components are expected to shift linearly based on constant velocity.
+ */
+TEST(KalmanFilterTest, PredictWithDtGreaterThanOne)
+{
+    KalmanFilter           kf(false); // standard xywh
+    KalmanTypes::StateMean mean;
+    KalmanTypes::StateCov  cov;
+    KalmanTypes::DetectBox initial_box;
+    initial_box << 100.0f, 100.0f, 50.0f, 200.0f;
+
+    kf.initiate(mean, cov, initial_box, 1.0f);
+    mean(4) = 10.0f; // vx
+    mean(5) = 5.0f;  // vy
+
+    float dt = 2.5f; // Multi-step
+    kf.predict(mean, cov, dt);
+
+    EXPECT_FLOAT_EQ(mean(0), 100.0f + 10.0f * dt); // x = x + vx * dt
+    EXPECT_FLOAT_EQ(mean(1), 100.0f + 5.0f * dt);  // y = y + vy * dt
+}
+
+/**
+ * @brief Evaluates numerical stability in XYAH coordinate format during a 
+ *        predict-update cycle with constant measurements.
+ */
+TEST(KalmanFilterTest, XyahPredictUpdateStability)
+{
+    KalmanFilter           kf(true); // enable_xyah = true
+    KalmanTypes::StateMean mean;
+    KalmanTypes::StateCov  cov;
+    KalmanTypes::DetectBox box;
+    box << 50.0f, 50.0f, 0.5f, 100.0f; // x, y, a, h
+
+    kf.initiate(mean, cov, box, 1.0f);
+    kf.predict(mean, cov, 1.0f);
+    kf.update(mean, cov, box, 1.0f); // Update with same box
+
+    EXPECT_NEAR(mean(2), 0.5f, 1e-4); // Check aspect ratio remains stable
+}
+
+/**
+ * @brief Validates that NSAKalmanFilter does not produce negative covariance 
+ *        diagonal entries when updated with a detection score of zero.
+ */
+TEST_F(NSAKalmanFilterTest, ScoreZeroDoesNotProduceNegativeCovariance) 
+{
+    NSAKalmanFilter        nsa_kf(false);
+    KalmanTypes::StateMean mean;
+    KalmanTypes::StateCov  cov;
+    KalmanTypes::DetectBox box;
+    box << 10.0f, 10.0f, 20.0f, 20.0f;
+
+    nsa_kf.initiate(mean, cov, box, 1.0f);
+    nsa_kf.predict(mean, cov, 1.0f);
+
+    nsa_kf.update(mean, cov, box, 0.0f); 
+
+    for(int i = 0; i < 8; ++i)
+        EXPECT_GE(cov(i, i), 0.0f);
+}
+
+/**
+ * @brief Ensures the covariance matrix remains symmetric after a predict-update cycle.
+ */
+TEST(KalmanFilterTest, CovarianceRemainsSymmetricAfterUpdate)
+{
+    KalmanFilter           kf(false);
+    KalmanTypes::StateMean mean;
+    KalmanTypes::StateCov  cov;
+    KalmanTypes::DetectBox box;
+    box << 30.0f, 30.0f, 15.0f, 40.0f;
+
+    kf.initiate(mean, cov, box, 1.0f);
+    kf.predict(mean, cov, 1.0f);
+    kf.update(mean, cov, box, 0.9f);
+
+    // Check symmetry: A == A^T
+    EXPECT_TRUE(cov.isApprox(cov.transpose(), 1e-5f));
 }

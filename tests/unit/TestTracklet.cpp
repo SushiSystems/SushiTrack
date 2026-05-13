@@ -425,3 +425,140 @@ TEST(TrackletTest, ReActivateClearsOccluderSnapshot)
     EXPECT_EQ(t->getInteractionState(), InteractionState::Free);
     EXPECT_EQ(t->getOccluderId(), -1);
 }
+
+// ===========================================================================
+// Tier 3 edge cases
+// ===========================================================================
+
+/**
+ * @brief predict() increments accumulated_lost_time for a Tentative track.
+ */
+TEST(TrackletTest, PredictIncrementsLostTimeForTentativeTrack)
+{
+    auto t = makeTracklet();
+    t->activateTentative(makeKF(), 1, 0);
+    ASSERT_EQ(t->getTrackState(), TrackState::Tentative);
+
+    const float dt = 0.04f;
+    t->predict(dt);
+
+    EXPECT_NEAR(t->getAccumulatedLostTime(), dt, 1e-5f);
+}
+
+/**
+ * @brief activateTentative() initialises accumulated_lost_time to zero.
+ */
+TEST(TrackletTest, ActivateTentativeInitialisesLostTimeToZero)
+{
+    auto t = makeTracklet();
+    t->activateTentative(makeKF(), 3, 0);
+    EXPECT_FLOAT_EQ(t->getAccumulatedLostTime(), 0.f);
+}
+
+/**
+ * @brief markAsLost() called with dt=0 initialises accumulated_lost_time
+ *        to zero rather than a garbage value.
+ */
+TEST(TrackletTest, MarkAsLostWithZeroDtInitialisesToZero)
+{
+    auto t = makeTracklet();
+    t->activate(makeKF(), 1, 1);
+    t->markAsLost(0.0f);
+    EXPECT_FLOAT_EQ(t->getAccumulatedLostTime(), 0.f);
+}
+
+/**
+ * @brief reActivate() preserves the original track_id assigned at activation.
+ */
+TEST(TrackletTest, ReActivatePreservesTrackId)
+{
+    auto t = makeTracklet();
+    t->activate(makeKF(), 1, 77);
+    ASSERT_EQ(t->getTrackId(), static_cast<size_t>(77));
+
+    t->markAsLost(0.04f);
+    auto obs = makeTracklet(105.f, 205.f);
+    t->reActivate(*obs, 5);
+
+    EXPECT_EQ(t->getTrackId(), static_cast<size_t>(77));
+}
+
+/**
+ * @brief hits_ increments on each matched update call.
+ */
+TEST(TrackletTest, HitsIncrementOnConsecutiveUpdates)
+{
+    auto t = makeTracklet();
+    t->activate(makeKF(), 1, 1);
+    ASSERT_EQ(t->getHits(), 1);
+
+    auto obs = makeTracklet(102.f, 202.f);
+    t->update(*obs, 2, false, false);
+    EXPECT_EQ(t->getHits(), 2);
+
+    auto obs2 = makeTracklet(104.f, 204.f);
+    t->update(*obs2, 3, false, false);
+    EXPECT_EQ(t->getHits(), 3);
+}
+
+// ---------------------------------------------------------------------------
+// Lost-time and State Transitions
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Verifies that prediction increments the accumulated lost time for tracks 
+ *        in the Tentative state.
+ *
+ * Ensures that the temporal tracking of missing observations correctly accumulates
+ * for non-activated tracks during prediction cycles.
+ */
+TEST(TrackletTest, PredictIncrementsLostTimeForTentative)
+{
+    auto t = makeTracklet();
+    t->activateTentative(makeKF(), 1, 0);
+    ASSERT_EQ(t->getTrackState(), TrackState::Tentative);
+
+    const float dt = 1.0f;
+    t->predict(dt);
+
+    EXPECT_EQ(t->getTrackState(), TrackState::Tentative);
+    EXPECT_NEAR(t->getAccumulatedLostTime(), dt, 1e-5f);
+}
+
+/**
+ * @brief Confirms that the accumulated lost time is reset to zero upon 
+ * initial activation.
+ *
+ * Validates that transitioning from a tentative or newly created state to
+ * an active tracking state clears any prior temporal accumulation of lost cycles.
+ */
+TEST(TrackletTest, ActivateTentativeSetsLostTimeZero) 
+{
+    auto t = makeTracklet();
+
+    t->activateTentative(makeKF(), /*frame_id=*/1, /*initial_id=*/0);
+    
+    EXPECT_EQ(t->getTrackState(), TrackState::Tentative);
+    
+    EXPECT_FLOAT_EQ(t->getAccumulatedLostTime(), 0.0f);
+}
+
+/**
+ * @brief Verifies that marking a track as lost with a zero time interval 
+ *        correctly initializes the accumulated lost time.
+ *
+ * Ensures that boundary conditions for the time interval are handled correctly
+ * during state transitions into the Lost state.
+ */
+TEST(TrackletTest, MarkAsLostWithZeroDtInitialisesToZeroOverride)
+{
+    auto t = makeTracklet();
+    t->activate(makeKF(), 1, 100);
+
+    // Transition to lost with zero dt
+    t->markAsLost(0.0f);
+
+    EXPECT_EQ(t->getTrackState(), TrackState::Lost);
+    EXPECT_FLOAT_EQ(t->getAccumulatedLostTime(), 0.0f);
+}
+

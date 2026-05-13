@@ -197,3 +197,58 @@ TEST(CostMatrixTest, ConstDataPointerMatchesAccessor)
     const CostMatrix& cm = m;
     EXPECT_FLOAT_EQ(cm.data()[0], 5.f);
 }
+
+// ===========================================================================
+// Tier 3 edge cases
+// ===========================================================================
+
+/**
+ * @brief resize() to 0×0 produces an empty matrix; data() may be null.
+ */
+TEST(CostMatrixTest, ResizeToZeroProducesEmptyMatrix)
+{
+    CostMatrix m;
+    m.resize(3, 3);
+    m.resize(0, 0);
+    EXPECT_EQ(m.rows(), 0u);
+    EXPECT_EQ(m.cols(), 0u);
+    EXPECT_TRUE(m.empty());
+}
+
+/**
+ * @brief A 1×N matrix stores and retrieves all N cells correctly.
+ */
+TEST(CostMatrixTest, SingleRowMatrixAccessAllCells)
+{
+    CostMatrix m;
+    m.resize(1, 5, 0.0f);
+    for (std::size_t c = 0; c < 5; ++c)
+        m(0, c) = static_cast<float>(c);
+    for (std::size_t c = 0; c < 5; ++c)
+        EXPECT_FLOAT_EQ(m(0, c), static_cast<float>(c));
+}
+
+/**
+ * @brief An N×1 matrix stores and retrieves all N cells correctly.
+ */
+TEST(CostMatrixTest, SingleColumnMatrixAccessAllCells)
+{
+    CostMatrix m;
+    m.resize(5, 1, 0.0f);
+    for (std::size_t r = 0; r < 5; ++r)
+        m(r, 0) = static_cast<float>(r) * 2.f;
+    for (std::size_t r = 0; r < 5; ++r)
+        EXPECT_FLOAT_EQ(m(r, 0), static_cast<float>(r) * 2.f);
+}
+
+/**
+ * @brief data() pointer row-major indexing is consistent with operator() for
+ *        a non-square matrix.
+ */
+TEST(CostMatrixTest, DataPointerRowMajorNonSquare)
+{
+    CostMatrix m;
+    m.resize(3, 5, 0.0f);
+    m(1, 3) = 7.7f;
+    EXPECT_FLOAT_EQ(m.data()[1 * 5 + 3], 7.7f);
+}

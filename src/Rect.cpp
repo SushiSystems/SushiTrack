@@ -121,6 +121,17 @@ namespace SushiTrack
     }
 
     /**
+     * @brief Retrieves the rectangle dimensions in [top-left x, top-left y, width, height] format.
+     * 
+     * @return Vector containing TLWH coordinates.
+     */
+    template <typename T>
+    Tlwh<T> Rect<T>::getTlwh() const
+    {
+        return tlwh;
+    }
+
+    /**
      * @brief Creates a Rect instance from TLBR coordinates.
      * 
      * @param tlbr Vector containing [top, left, bottom, right].

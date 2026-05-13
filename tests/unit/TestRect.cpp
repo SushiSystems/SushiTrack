@@ -183,3 +183,120 @@ TEST(RectTest, IntSpecialisationCompiles)
     EXPECT_EQ(r.width(),  100);
     EXPECT_EQ(r.height(), 200);
 }
+
+// ===========================================================================
+// Tier 3 edge cases
+// ===========================================================================
+
+/**
+ * @brief A zero-width, zero-height Rect stores dimensions as zero without
+ *        crashing and getTlbr() returns coincident corners.
+ */
+TEST(RectTest, ZeroSizeRectHasCoincidentCorners)
+{
+    Rect<float> r(5.f, 10.f, 0.f, 0.f);
+    auto tlbr = r.getTlbr();
+    EXPECT_FLOAT_EQ(tlbr[0], 5.f);
+    EXPECT_FLOAT_EQ(tlbr[1], 10.f);
+    EXPECT_FLOAT_EQ(tlbr[2], 5.f);
+    EXPECT_FLOAT_EQ(tlbr[3], 10.f);
+}
+
+/**
+ * @brief Negative top-left coordinates are stored and converted correctly;
+ *        getXywh() returns the correct centroid for boxes with negative origin.
+ */
+TEST(RectTest, NegativeOriginCentroidIsCorrect)
+{
+    Rect<float> r(-20.f, -40.f, 40.f, 80.f);
+    auto xywh = r.getXywh();
+    EXPECT_FLOAT_EQ(xywh[0], 0.f);   // cx = -20 + 20
+    EXPECT_FLOAT_EQ(xywh[1], 0.f);   // cy = -40 + 40
+}
+
+/**
+ * @brief generate_rect_by_tlbr() with a square box produces equal width and height.
+ */
+TEST(RectTest, SquareBoxFromTlbrHasEqualDimensions)
+{
+    Tlbr<float> in;
+    in << 0.f, 0.f, 50.f, 50.f;
+    Rect<float> r = generate_rect_by_tlbr(in);
+    EXPECT_FLOAT_EQ(r.width(), r.height());
+}
+
+/**
+ * @brief generate_rect_by_xywh() with a very large box does not overflow
+ *        and getTlbr() round-trips correctly.
+ */
+TEST(RectTest, LargeBoxRoundTripIsExact)
+{
+    Xywh<float> in;
+    in << 1000.f, 2000.f, 400.f, 800.f;
+    Rect<float> r = generate_rect_by_xywh(in);
+    auto out = r.getXywh();
+    EXPECT_NEAR(out[0], 1000.f, 1e-3f);
+    EXPECT_NEAR(out[1], 2000.f, 1e-3f);
+    EXPECT_FLOAT_EQ(out[2], 400.f);
+    EXPECT_FLOAT_EQ(out[3], 800.f);
+}
+
+/**
+ * @brief Verifies that a rectangle with zero dimensions (width/height) is handled correctly.
+ * 
+ * Validates that the top-left and bottom-right corners coincide when dimensions are zero.
+ */
+TEST(RectTest, HandlesZeroSize) 
+{
+    Rect<float> rect(10.0f, 15.0f, 0.0f, 0.0f);
+    auto tlbr = rect.getTlbr();
+    EXPECT_FLOAT_EQ(tlbr[0], 10.0f); // Top/X1
+    EXPECT_FLOAT_EQ(tlbr[1], 15.0f); // Left/Y1
+    EXPECT_FLOAT_EQ(tlbr[2], 10.0f); // Bottom/X2 (Top + Height)
+    EXPECT_FLOAT_EQ(tlbr[3], 15.0f); // Right/Y2 (Left + Width)
+}
+
+/**
+ * @brief Ensures that negative coordinates are preserved in the internal representation.
+ * 
+ * Confirms that the top-left coordinates match the input even when they are negative.
+ */
+TEST(RectTest, AllowsNegativeCoordinates) 
+{
+    Rect<float> rect(-20.5f, -10.0f, 50.0f, 40.0f);
+    auto tlwh = rect.getTlwh();
+    EXPECT_FLOAT_EQ(tlwh[0], -20.5f);
+    EXPECT_FLOAT_EQ(tlwh[1], -10.0f);
+}
+
+/**
+ * @brief Validates behavior when TLBR input has reversed corners (e.g., top > bottom).
+ * 
+ * Verifies that the factory function produces a rectangle with negative dimensions 
+ * when the input corners are provided in reverse order.
+ */
+TEST(RectTest, GenerateByTlbrReversesCorners) 
+{
+    Tlbr<float> tlbr;
+    tlbr << 50.0f, 60.0f, 10.0f, 20.0f; // Top > Bottom, Left > Right
+    Rect<float> rect = generate_rect_by_tlbr(tlbr);
+    auto tlwh = rect.getTlwh();
+    
+    // width = x2 - x1 = 10 - 50 = -40
+    EXPECT_FLOAT_EQ(tlwh[2], -40.0f); 
+    // height = y2 - y1 = 20 - 60 = -40
+    EXPECT_FLOAT_EQ(tlwh[3], -40.0f); 
+}
+
+/**
+ * @brief Tests aspect ratio calculation based on XYWH representation.
+ * 
+ * Ensures that the aspect ratio (width/height) derived from the centroid format 
+ * matches the expected value for a standard resolution box.
+ */
+TEST(RectTest, XywhAspectRatioCalculation) {
+    Rect<float> rect(0.0f, 0.0f, 1920.0f, 1080.0f);
+    auto xywh = rect.getXywh(); // {cx, cy, w, h}
+    float aspect_ratio = xywh[2] / xywh[3];
+    EXPECT_FLOAT_EQ(aspect_ratio, 1920.0f / 1080.0f);
+}

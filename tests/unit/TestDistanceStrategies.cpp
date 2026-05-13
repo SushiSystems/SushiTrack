@@ -1,6 +1,6 @@
 /**
  * @file      TestDistanceStrategies.cpp
- * @brief     Unit tests for IoU, DIoU, Cosine, FuseScoreDecorator cost calculators.
+ * @brief     Unit tests for IoU, DIoU, Cosine, FuseScoreDecorator, GatedIoU, Fused, ReIDFirst, and PureReID cost calculators.
  * @author    Mustafa Garip (mustafagarip@sushisystems.io)
  * @date      12.05.2026
  * @version   v1.0.0
@@ -44,6 +44,7 @@
 #include <memory>
 #include <vector>
 #include <cmath>
+#include "SushiTrack/IGateValidator.h"
 
 using namespace SushiTrack;
 
@@ -343,4 +344,443 @@ TEST(FuseScoreDecoratorTest, SingleMatchesBatch)
     dec.calculate(av, bv, m);
 
     EXPECT_NEAR(m(0, 0), dec.calculate_single(a, b), 1e-5f);
+}
+
+// ===========================================================================
+// GatedIoUCostCalculator
+// ===========================================================================
+
+/**
+ * @brief NullGateValidator passes every cell; identical boxes yield IoU cost ≈ 0.
+ */
+TEST(GatedIoUCostCalculatorTest, NullGatePassesAllCellsFillsIoUCost)
+{
+    auto iou  = std::make_shared<IoUCostCalculator>();
+    GatedIoUCostCalculator calc(9.4877f, NullGateValidator::getInstance(), iou);
+
+    auto a = makeT(100.f, 100.f, 50.f, 80.f);
+    auto b = makeT(100.f, 100.f, 50.f, 80.f);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_NEAR(m(0, 0), 0.f, 1e-4f);
+}
+
+/**
+ * @brief NullGateValidator passes every cell; non-overlapping boxes yield cost = 1.
+ */
+TEST(GatedIoUCostCalculatorTest, NullGateNonOverlappingProducesCostOne)
+{
+    auto iou = std::make_shared<IoUCostCalculator>();
+    GatedIoUCostCalculator calc(9.4877f, NullGateValidator::getInstance(), iou);
+
+    auto a = makeT(  0.f, 0.f, 50.f, 50.f);
+    auto b = makeT(200.f, 0.f, 50.f, 50.f);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_FLOAT_EQ(m(0, 0), 1.f);
+}
+
+/**
+ * @brief A detection placed 5000 px from the activated tracklet fails the
+ *        Mahalanobis gate and produces a sentinel value.
+ */
+TEST(GatedIoUCostCalculatorTest, FailedGateProducesSentinel)
+{
+    auto iou = std::make_shared<IoUCostCalculator>();
+    GatedIoUCostCalculator calc(9.4877f, std::make_shared<KalmanFilter>(), iou);
+
+    auto a = makeT(100.f, 100.f, 50.f, 80.f);
+    a->activate(std::make_unique<KalmanFilter>(), 1, 1);
+    a->predict();
+
+    auto b = makeT(5100.f, 100.f, 50.f, 80.f);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_GE(m(0, 0), 1e3f);
+}
+
+/**
+ * @brief An empty detection collection produces an empty cost matrix.
+ */
+TEST(GatedIoUCostCalculatorTest, EmptyCollectionProducesEmptyMatrix)
+{
+    auto iou = std::make_shared<IoUCostCalculator>();
+    GatedIoUCostCalculator calc(9.4877f, NullGateValidator::getInstance(), iou);
+
+    auto a = makeT(0.f, 0.f, 50.f, 50.f);
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv;
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_TRUE(m.empty());
+}
+
+/**
+ * @brief calculate_single returns the same value as the corresponding batch cell.
+ */
+TEST(GatedIoUCostCalculatorTest, SingleMatchesBatch)
+{
+    auto iou = std::make_shared<IoUCostCalculator>();
+    GatedIoUCostCalculator calc(9.4877f, NullGateValidator::getInstance(), iou);
+
+    auto a = makeT(  0.f, 0.f, 100.f, 100.f);
+    auto b = makeT( 30.f, 0.f, 100.f, 100.f);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_NEAR(m(0, 0), calc.calculate_single(a, b), 1e-5f);
+}
+
+// ===========================================================================
+// FusedCostCalculator
+// ===========================================================================
+
+/**
+ * @brief NullGate + identical features → cosine_dist = 0 < reid_thresh → direct
+ *        assignment path → cost near 0.
+ */
+TEST(FusedCostCalculatorTest, NullGateIdenticalFeaturesDirectAssignment)
+{
+    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto cosine = std::make_shared<CosineCostCalculator>();
+    FusedCostCalculator calc(0.5f, 0.3f, 9.4877f,
+                             NullGateValidator::getInstance(),
+                             iou, cosine, /*reid_direct_assignment_weight=*/0.5f);
+
+    auto a = makeFeatT(100.f, 100.f, 4, 0);
+    auto b = makeFeatT(100.f, 100.f, 4, 0);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_NEAR(m(0, 0), 0.f, 1e-4f);
+}
+
+/**
+ * @brief A detection 5000 px from an activated tracklet fails the real KF gate
+ *        and receives a sentinel value.
+ */
+TEST(FusedCostCalculatorTest, NullGateSentinelPreservedWhenGateFails)
+{
+    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto cosine = std::make_shared<CosineCostCalculator>();
+    FusedCostCalculator calc(0.5f, 0.3f, 9.4877f,
+                             std::make_shared<KalmanFilter>(),
+                             iou, cosine);
+
+    auto a = makeT(100.f, 100.f, 50.f, 80.f);
+    a->activate(std::make_unique<KalmanFilter>(), 1, 1);
+    a->predict();
+
+    auto b = makeT(5100.f, 100.f, 50.f, 80.f);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_GE(m(0, 0), 1e3f);
+}
+
+/**
+ * @brief An empty detection collection produces an empty cost matrix.
+ */
+TEST(FusedCostCalculatorTest, EmptyCollectionProducesEmptyMatrix)
+{
+    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto cosine = std::make_shared<CosineCostCalculator>();
+    FusedCostCalculator calc(0.5f, 0.3f, 9.4877f,
+                             NullGateValidator::getInstance(),
+                             iou, cosine);
+
+    auto a = makeFeatT(0.f, 0.f, 4, 0);
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv;
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_TRUE(m.empty());
+}
+
+/**
+ * @brief calculate_single returns the same value as the corresponding batch cell.
+ */
+TEST(FusedCostCalculatorTest, SingleMatchesBatch)
+{
+    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto cosine = std::make_shared<CosineCostCalculator>();
+    FusedCostCalculator calc(0.5f, 0.3f, 9.4877f,
+                             NullGateValidator::getInstance(),
+                             iou, cosine, 0.5f);
+
+    auto a = makeFeatT(  0.f, 0.f, 4, 1);
+    auto b = makeFeatT( 30.f, 0.f, 4, 1);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_NEAR(m(0, 0), calc.calculate_single(a, b), 1e-5f);
+}
+
+// ===========================================================================
+// ReIDFirstCostCalculator
+// ===========================================================================
+
+/**
+ * @brief Both tracklets carry identical features; reid_dist = 0 < thresh → direct
+ *        assignment path → cost = 0 * reid_direct_assignment_weight = 0.
+ */
+TEST(ReIDFirstCostCalculatorTest, DirectAssignmentWhenBothHaveFeaturesAndCloseReID)
+{
+    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto cosine = std::make_shared<CosineCostCalculator>();
+    ReIDFirstCostCalculator calc(0.3f, 0.3f, 0.2f, iou, cosine);
+
+    auto a = makeFeatT(100.f, 100.f, 4, 0);
+    auto b = makeFeatT(100.f, 100.f, 4, 0);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_NEAR(m(0, 0), 0.f, 1e-4f);
+}
+
+/**
+ * @brief Neither tracklet has a feature vector; the blended path runs with
+ *        reid_dist = 1 and IoU cost, producing a cost in [0, 1].
+ */
+TEST(ReIDFirstCostCalculatorTest, BlendedPathWhenNoFeatures)
+{
+    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto cosine = std::make_shared<CosineCostCalculator>();
+    ReIDFirstCostCalculator calc(0.3f, 0.3f, 0.2f, iou, cosine);
+
+    auto a = makeT(100.f, 100.f, 50.f, 80.f);
+    auto b = makeT(100.f, 100.f, 50.f, 80.f);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_GE(m(0, 0), 0.f);
+    EXPECT_LE(m(0, 0), 1.f);
+}
+
+/**
+ * @brief Tracklet A has a feature but B does not; the blended path applies
+ *        with reid_dist = 1 (missing feature penalty), giving cost ≥ 0.
+ */
+TEST(ReIDFirstCostCalculatorTest, MissingFeatureOnBProducesFallback)
+{
+    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto cosine = std::make_shared<CosineCostCalculator>();
+    ReIDFirstCostCalculator calc(0.3f, 0.3f, 0.2f, iou, cosine);
+
+    auto a = makeFeatT(100.f, 100.f, 4, 0);
+    auto b = makeT(100.f, 100.f, 50.f, 80.f);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_GE(m(0, 0), 0.f);
+}
+
+/**
+ * @brief An empty detection collection produces an empty cost matrix.
+ */
+TEST(ReIDFirstCostCalculatorTest, EmptyCollectionProducesEmptyMatrix)
+{
+    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto cosine = std::make_shared<CosineCostCalculator>();
+    ReIDFirstCostCalculator calc(0.3f, 0.3f, 0.2f, iou, cosine);
+
+    auto a = makeFeatT(0.f, 0.f, 4, 0);
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv;
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_TRUE(m.empty());
+}
+
+/**
+ * @brief calculate_single returns the same value as the corresponding batch cell.
+ */
+TEST(ReIDFirstCostCalculatorTest, SingleMatchesBatch)
+{
+    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto cosine = std::make_shared<CosineCostCalculator>();
+    ReIDFirstCostCalculator calc(0.3f, 0.3f, 0.2f, iou, cosine);
+
+    auto a = makeFeatT(  0.f, 0.f, 4, 2);
+    auto b = makeFeatT( 30.f, 0.f, 4, 2);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_NEAR(m(0, 0), calc.calculate_single(a, b), 1e-5f);
+}
+
+// ===========================================================================
+// PureReIDCostCalculator
+// ===========================================================================
+
+/**
+ * @brief NullGate + identical features → reid_dist = 0 < thresh = 0.4 → cost near 0.
+ */
+TEST(PureReIDCostCalculatorTest, NullGateIdenticalFeaturesPassesThreshold)
+{
+    PureReIDCostCalculator calc(0.4f, 9.4877f, NullGateValidator::getInstance());
+
+    auto a = makeFeatT(100.f, 100.f, 4, 0);
+    auto b = makeFeatT(100.f, 100.f, 4, 0);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_NEAR(m(0, 0), 0.f, 1e-4f);
+}
+
+/**
+ * @brief NullGate + orthogonal features → reid_dist = 1 ≥ thresh = 0.4 → sentinel.
+ */
+TEST(PureReIDCostCalculatorTest, NullGateOrthogonalFeaturesExceedsThreshold)
+{
+    PureReIDCostCalculator calc(0.4f, 9.4877f, NullGateValidator::getInstance());
+
+    auto a = makeFeatT(100.f, 100.f, 4, 0);
+    auto b = makeFeatT(100.f, 100.f, 4, 1);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_GE(m(0, 0), 1e3f);
+}
+
+/**
+ * @brief A detection 5000 px from an activated tracklet fails the Mahalanobis
+ *        gate and receives a sentinel value regardless of feature similarity.
+ */
+TEST(PureReIDCostCalculatorTest, FailedGateProducesSentinel)
+{
+    PureReIDCostCalculator calc(0.4f, 9.4877f, std::make_shared<KalmanFilter>());
+
+    auto a = makeFeatT(100.f, 100.f, 4, 0);
+    a->activate(std::make_unique<KalmanFilter>(), 1, 1);
+    a->predict();
+
+    auto b = makeFeatT(5100.f, 100.f, 4, 0);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_GE(m(0, 0), 1e3f);
+}
+
+/**
+ * @brief An empty detection collection produces an empty cost matrix.
+ */
+TEST(PureReIDCostCalculatorTest, EmptyCollectionProducesEmptyMatrix)
+{
+    PureReIDCostCalculator calc(0.4f, 9.4877f, NullGateValidator::getInstance());
+
+    auto a = makeFeatT(0.f, 0.f, 4, 0);
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv;
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_TRUE(m.empty());
+}
+
+/**
+ * @brief calculate_single returns the same value as the corresponding batch cell
+ *        for a pair that passes the threshold.
+ */
+TEST(PureReIDCostCalculatorTest, SingleMatchesBatch)
+{
+    PureReIDCostCalculator calc(0.4f, 9.4877f, NullGateValidator::getInstance());
+
+    auto a = makeFeatT(  0.f, 0.f, 4, 3);
+    auto b = makeFeatT( 30.f, 0.f, 4, 3);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_NEAR(m(0, 0), calc.calculate_single(a, b), 1e-5f);
+}
+
+/**
+ * @brief FuseScoreDecorator with detection score = 0 always produces cost = 1:
+ *        fused = 1 - (1 - inner_cost) * 0 = 1, regardless of the inner cost.
+ */
+TEST(FuseScoreDecoratorTest, ScoreZeroProducesCostOne)
+{
+    auto inner = std::make_shared<IoUCostCalculator>();
+    FuseScoreDecorator dec(inner);
+
+    auto a = makeT(0.f, 0.f, 50.f, 80.f, 0.9f);
+    auto b = makeT(0.f, 0.f, 50.f, 80.f, 0.0f);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    dec.calculate(av, bv, m);
+
+    EXPECT_NEAR(m(0, 0), 1.f, 1e-5f);
+}
+
+/**
+ * @brief DIoU cost for a misaligned contained box is strictly GREATER
+ * than the corresponding plain IoU cost because the center-distance 
+ * penalty reduces the DIoU score, thus increasing the cost.
+ */
+TEST(DIoUCostCalculatorTest, ContainedMisalignedBoxCostGreaterThanIoUCost)
+{
+    IoUCostCalculator  iou_calc;
+    DIoUCostCalculator diou_calc;
+
+    auto outer = makeT(0.f, 0.f, 100.f, 100.f);
+    auto inner = makeT(10.f, 10.f, 50.f, 50.f);
+
+    std::vector<std::shared_ptr<Tracklet>> av{outer}, bv{inner};
+    CostMatrix iou_m, diou_m;
+
+    iou_calc.calculate(av, bv, iou_m);
+    diou_calc.calculate(av, bv, diou_m);
+
+    EXPECT_GT(diou_m(0, 0), iou_m(0, 0))
+        << "DIoU cost should be higher than IoU cost due to center distance penalty";
+}
+
+/**
+ * @brief CosineCostCalculator returns cost = 1 when tracklet B carries no
+ *        feature vector (missing feature on the detection side).
+ */
+TEST(CosineCostCalculatorTest, MissingFeatureOnBProducesCostOne)
+{
+    CosineCostCalculator calc;
+    auto a = makeFeatT(0.f, 0.f, 3, 0);
+    auto b = makeT(0.f, 0.f, 50.f, 80.f);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_FLOAT_EQ(m(0, 0), 1.f);
 }
