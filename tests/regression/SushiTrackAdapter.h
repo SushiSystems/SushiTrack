@@ -203,7 +203,7 @@ namespace TestInfrastructure
                     if (adv.contains("coordinate_system")) {
                         auto sec = adv["coordinate_system"];
                         p.enable_xyah  = gi(sec, "enable_xyah",  p.enable_xyah);
-                        p.enable_diou  = gi(sec, "enable_diou",  p.enable_diou);
+                        p.iou_type     = gi(sec, "iou_type",     p.iou_type);
                         p.iou_plus_one = gi(sec, "iou_plus_one", p.iou_plus_one);
                         p.kalman_type  = gi(sec, "kalman_type",  p.kalman_type);
                     }

@@ -370,7 +370,7 @@ def project_test_inference(args: argparse.Namespace) -> bool:
         "--device",      args.device,
         "--conf",        str(args.conf),
         "--nms",         str(args.nms),
-        "--num_classes", str(args.num_classes),
+        "--num-classes", str(args.num_classes),
     ]
 
     if args.ckpt:
@@ -385,6 +385,10 @@ def project_test_inference(args: argparse.Namespace) -> bool:
         cmd += ["--save_name", args.save_name]
     if args.legacy:
         cmd.append("--legacy")
+    if args.mot_label:
+        cmd.append("--mot-label")
+    if args.no_screen:
+        cmd.append("--no-screen")
 
     logger.info(f"Starting YOLOX inference pipeline — tracker: {tracker_display}")
     logger.info(f"Source: {args.source}")
@@ -419,6 +423,11 @@ def _run_trackeval_official(scenario: str | None, compare: bool, tracker: str) -
         return False
 
     trackers = _KNOWN_TRACKERS if compare else [tracker]
+
+    # Clear old data to prevent stale results and seqmaps
+    trackeval_data_dir = trackeval_dir / "data"
+    if trackeval_data_dir.exists():
+        shutil.rmtree(trackeval_data_dir, ignore_errors=True)
 
     for tr in trackers:
         for seq_dir in data_root.iterdir():
@@ -471,6 +480,8 @@ def _run_trackeval_official(scenario: str | None, compare: bool, tracker: str) -
         cmd = [sys.executable, str(script_path),
                "--BENCHMARK", benchmark,
                "--TRACKERS_TO_EVAL"] + valid_trackers + ["--SPLIT_TO_EVAL", "train"]
+        if scenario:
+            cmd += ["--SEQ_INFO", scenario]
         try:
             r = subprocess.run(cmd, cwd=str(trackeval_dir))
             if r.returncode != 0:
@@ -596,11 +607,13 @@ def _build_parser() -> argparse.ArgumentParser:
     p_test.add_argument("--conf",        type=float, default=0.1,       help="Detection confidence threshold")
     p_test.add_argument("--nms",         type=float, default=0.45,      help="NMS threshold")
     p_test.add_argument("--tsize",       type=int, nargs="+", default=None, help="Inference resolution [H W] or [S]")
-    p_test.add_argument("--num_classes", type=int, default=80,          help="YOLOX class count")
+    p_test.add_argument("--num-classes", type=int, default=80,          help="YOLOX class count")
     p_test.add_argument("--legacy",      action="store_true",           help="Legacy YOLOX normalisation")
     p_test.add_argument("--stress",      action="store_true",           help="Headless maximum throughput mode")
     p_test.add_argument("--no_save",     action="store_true",           help="Do not save output video")
     p_test.add_argument("--save_name",   type=str, default=None,        help="Output video filename")
+    p_test.add_argument("--mot-label",   action="store_true",           help="Write detections to output/det.txt (inference)")
+    p_test.add_argument("--no-screen",   action="store_true",           help="Disable UI display (inference)")
 
     # project clean
     proj_sub.add_parser("clean", help="Remove build artefacts")

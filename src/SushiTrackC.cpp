@@ -67,7 +67,7 @@ extern "C"
         params->enable_xyah         = 0;
         params->kalman_type         = 0;
         params->iou_plus_one        = 1;
-        params->enable_diou         = 1;
+        params->iou_type            = 1;
         params->feature_momentum    = 0.9f;
         params->reid_direct_assignment_weight = 0.2f;
 
@@ -170,7 +170,7 @@ extern "C"
             config.enable_xyah            = (params->enable_xyah  != 0);
             config.kalman_type            = params->kalman_type;
             config.iou_plus_one           = (params->iou_plus_one != 0);
-            config.enable_diou            = (params->enable_diou  != 0);
+            config.iou_type               = params->iou_type;
             config.feature_momentum       = params->feature_momentum;
             config.reid_direct_assignment_weight = params->reid_direct_assignment_weight;
 
@@ -219,9 +219,19 @@ extern "C"
             auto solver = std::make_unique<SushiTrack::LAPJVSolver>();
 
             std::shared_ptr<SushiTrack::ICostCalculator> iou_calc;
-            if (config.enable_diou)
+            if (config.iou_type == 1)
             {
                 iou_calc = std::make_shared<SushiTrack::DIoUCostCalculator>(
+                    config.max_area_ratio, config.iou_plus_one);
+            }
+            else if (config.iou_type == 2)
+            {
+                iou_calc = std::make_shared<SushiTrack::GIoUCostCalculator>(
+                    config.max_area_ratio, config.iou_plus_one);
+            }
+            else if (config.iou_type == 3)
+            {
+                iou_calc = std::make_shared<SushiTrack::SIoUCostCalculator>(
                     config.max_area_ratio, config.iou_plus_one);
             }
             else
@@ -325,7 +335,7 @@ extern "C"
                  * @brief Plain IoU or DIoU path.
                  *
                  * The primary and secondary stages use the configured IoU variant
-                 * (DIoU when enable_diou is set, plain IoU otherwise). Tentative
+                 * (DIoU, GIoU, SIoU when iou_type is set, plain IoU otherwise). Tentative
                  * and duplicate metrics remain on plain IoU regardless of the
                  * configuration to preserve the threshold semantics.
                  */

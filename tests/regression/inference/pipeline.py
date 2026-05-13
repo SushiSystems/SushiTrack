@@ -176,7 +176,7 @@ class VideoPipeline:
     process video streams frame by frame, rendering the results aesthetically.
     """
     
-    def __init__(self, video_path: str, detector: IDetector, stress_mode: bool = False, save_path: str = None):
+    def __init__(self, video_path: str, detector: IDetector, stress_mode: bool = False, save_path: str = None, mot_label: bool = False):
         """
         @brief Initializes the VideoPipeline orchestrator.
         
@@ -184,10 +184,17 @@ class VideoPipeline:
         @param detector    Injected implementation of IDetector.
         @param stress_mode Flag to disable visual rendering for maximum throughput.
         @param save_path   Optional path to save the output video.
+        @param mot_label   Flag to write detections in MOT format to output/det.txt.
         """
         self.video_path = video_path
         self.stress_mode = stress_mode
         self.detector = detector
+        self.mot_label = mot_label
+        self.det_file = None
+        
+        if self.mot_label:
+            os.makedirs("output", exist_ok=True)
+            self.det_file = open(os.path.join("output", "det.txt"), "w")
         
         # Handle string digit for camera index
         src = int(video_path) if video_path.isdigit() else video_path
@@ -198,6 +205,7 @@ class VideoPipeline:
         self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         self.fps = self.cap.get(cv2.CAP_PROP_FPS)
+        self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
         
         self.save_path = save_path
         self.vid_writer = None
@@ -223,10 +231,21 @@ class VideoPipeline:
                 break
                 
             frame_id += 1
+            if frame_id % 20 == 0:
+                if self.total_frames > 0:
+                    logger.info(f"Processing frame {frame_id}/{self.total_frames} ({frame_id/self.total_frames*100:.1f}%)")
+                else:
+                    logger.info(f"Processing frame {frame_id}")
+
             start_time = time.time()
             
             # 1. Detection
             detections, ratio = self.detector.inference(frame)
+            
+            if self.mot_label and self.det_file is not None:
+                for det in detections:
+                    x, y, w, h, score, label = det
+                    self.det_file.write(f"{frame_id},-1,{x:.2f},{y:.2f},{w:.2f},{h:.2f},{score:.4f},-1,-1,-1\n")
             
             # 2. Tracking
             tracks = tracker.update(detections)
@@ -248,6 +267,8 @@ class VideoPipeline:
         self.cap.release()
         if self.vid_writer:
             self.vid_writer.release()
+        if self.mot_label and self.det_file:
+            self.det_file.close()
         if not self.stress_mode:
             cv2.destroyAllWindows()
             

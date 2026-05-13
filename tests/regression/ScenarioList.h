@@ -32,6 +32,7 @@ namespace TestInfrastructure
 		{ "MOT17-04-DPM",   "MOT17" },
 		{ "MOT17-04-FRCNN", "MOT17" },
 		{ "MOT17-04-SDP",   "MOT17" },
+		{ "MOT17-04-YOLOX", "MOT17" },
 		{ "MOT17-05-DPM",   "MOT17" },
 		{ "MOT17-05-FRCNN", "MOT17" },
 		{ "MOT17-05-SDP",   "MOT17" },

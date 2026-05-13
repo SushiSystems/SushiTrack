@@ -79,8 +79,8 @@ namespace SushiTrack
         /** @brief Flag to enable centroid-based (XYAH) coordinate representation instead of XYWH. */
         bool  enable_xyah = false;
 
-        /** @brief Flag to enable Distance-IoU (DIoU) metric for spatial penalization. */
-        bool  enable_diou = true;
+        /** @brief Defines the type of IoU metric used for spatial penalization (0: IoU, 1: DIoU, 2: GIoU, 3: SIoU). */
+        int   iou_type = 1;
 
         /** @brief Flag to add a +1 offset in bounding box dimension calculations (inclusive). */
         bool  iou_plus_one = true;

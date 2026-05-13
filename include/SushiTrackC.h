@@ -145,8 +145,8 @@ extern "C"
         /** @brief Flag to enable centroid-based (XYAH) coordinate representation instead of XYWH. */
         int   enable_xyah;
 
-        /** @brief Flag to enable Distance-IoU (DIoU) metric for spatial penalization. */
-        int   enable_diou;
+        /** @brief Defines the type of IoU metric used for spatial penalization (0: IoU, 1: DIoU, 2: GIoU, 3: SIoU). */
+        int   iou_type;
 
         /** @brief Flag to add a +1 offset in bounding box dimension calculations (inclusive). */
         int   iou_plus_one;

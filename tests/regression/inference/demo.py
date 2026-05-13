@@ -58,8 +58,10 @@ def make_parser() -> argparse.ArgumentParser:
     parser.add_argument("--conf", default=0.1, type=float, help="Detection confidence threshold")
     parser.add_argument("--nms", default=0.45, type=float, help="NMS threshold")
     parser.add_argument("--tsize", default=[640], nargs="+", type=int, help="Test image size (height, width) or single square value")
-    parser.add_argument("--num_classes", default=80, type=int, help="Number of classes in the model")
+    parser.add_argument("--num-classes", default=80, type=int, help="Number of classes in the model")
     parser.add_argument("--legacy", action="store_true", help="Use legacy normalization (BGR2RGB, 0-1 scale, Mean/Std)")
+    parser.add_argument("--mot-label", action="store_true", help="Write detections to output/det.txt in MOT format")
+    parser.add_argument("--no-screen", action="store_true", help="Disable UI display for maximum speed")
     
     return parser
 
@@ -101,7 +103,8 @@ def main():
 
         # 2. Determine Save Path
         save_path = None
-        if not args.no_save and not args.stress:
+        is_stress = args.stress or args.no_screen
+        if not args.no_save and not is_stress:
             if args.save_name is None:
                 input_name = Path(args.source).stem
                 timestamp = time.strftime("%Y%m%d_%H%M%S")
@@ -115,7 +118,7 @@ def main():
         logger.info(f"[Demo] {args.tracker} Tracker loaded successfully.")
 
         # 4. Initialize Pipeline
-        pipeline = VideoPipeline(video_path=args.source, detector=detector, stress_mode=args.stress, save_path=save_path)
+        pipeline = VideoPipeline(video_path=args.source, detector=detector, stress_mode=is_stress, save_path=save_path, mot_label=args.mot_label)
         logger.info("[Demo] Pipeline orchestrator initialized.")
 
         # Run Pipeline

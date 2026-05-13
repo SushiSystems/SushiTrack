@@ -223,7 +223,7 @@ sushitrack project test --scenario MOT17-04-DPM --compare
 # Re-evaluate previously generated predictions
 sushitrack project test --eval-only
 
-sushitrack project test inference -n yolox-x -c 3rdparty/weight/mot17x.pth.tar --source 3rdparty/video/MOT17-04.mp4 --num_classes 1 --legacy
+sushitrack project test inference -n yolox-x -c 3rdparty/weight/mot17x.pth.tar --source 3rdparty/video/MOT17-04.mp4 --num-classes 1 --legacy
 
 # Export results
 sushitrack project test --compare --export ./results
@@ -374,7 +374,7 @@ Tracker parameters can be overridden at runtime through `data/config.json`. The 
     "enable_fsm": 0,
     "enable_tentative": 0,
     "enable_mahalanobis": 0,
-    "enable_diou": 1,
+    "iou_type": 1,
     "enable_xyah": 0,
     "iou_plus_one": 1,
     "time_aware": 0,
@@ -439,7 +439,7 @@ Tracker parameters can be overridden at runtime through `data/config.json`. The 
 |---|---|---|
 | `enable_mahalanobis` | 0 | Apply Mahalanobis distance gating before building cost matrices |
 | `gating_thresh` | 10.0 | Chi-squared threshold for Mahalanobis gate |
-| `enable_diou` | 1 | Use DIoU (penalizes center distance) instead of standard IoU |
+| `iou_type` | 1 | IoU variant to use (0: IoU, 1: DIoU, 2: GIoU, 3: SIoU) |
 | `iou_plus_one` | 1 | Use `1 - iou` as the cost value; set to 0 for `1 / (1 + iou)` |
 | `max_area_ratio` | 50.0 | Candidate pairs with area ratio above this are suppressed |
 | `motion_cost_weight` | 0.05 | Weight of motion penalty in fused cost calculations |

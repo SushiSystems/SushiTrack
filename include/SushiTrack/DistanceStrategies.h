@@ -101,6 +101,92 @@ namespace SushiTrack
     };
 
     /**
+     * @brief Generalized Intersection over Union (GIoU) cost calculator.
+     * 
+     * Calculates costs based on the IoU and the ratio of empty space 
+     * in the smallest enclosing bounding box.
+     */
+    class GIoUCostCalculator : public ICostCalculator
+    {
+        public:
+            /**
+             * @brief Initializes the GIoU calculator.
+             * 
+             * @param max_area_ratio Maximum allowed ratio between box areas.
+             * @param iou_plus_one Controls the inversion formula for cost calculation.
+             */
+            GIoUCostCalculator(float max_area_ratio = 4.0f, bool iou_plus_one = false)
+                : max_area_ratio_(max_area_ratio), iou_plus_one_(iou_plus_one) {}
+
+            /**
+             * @brief Populates the cost matrix using GIoU metrics.
+             * 
+             * @param a Collection of source tracklets.
+             * @param b Collection of target tracklets (observations).
+             * @param out_matrix Output cost matrix to be populated.
+             */
+            void calculate(const std::vector<TrackletPtr>& __restrict a,
+                        const std::vector<TrackletPtr>& __restrict b,
+                        CostMatrix& __restrict out_matrix) override;
+            /**
+             * @brief Computes the association cost for a single pair.
+             * 
+             * @param a Source tracklet for association.
+             * @param b Candidate tracklet for association.
+             * @return float Calculated association cost.
+             */
+            float calculate_single(const TrackletPtr& a, const TrackletPtr& b) const override;
+        private:
+            float max_area_ratio_;
+            bool  iou_plus_one_;
+            std::vector<float> row_areas_;
+            std::vector<float> col_areas_;
+    };
+
+    /**
+     * @brief SCYLLA-IoU (SIoU) cost calculator.
+     * 
+     * Calculates association costs by incorporating angle, distance, and shape 
+     * penalties into the standard IoU formulation.
+     */
+    class SIoUCostCalculator : public ICostCalculator
+    {
+        public:
+            /**
+             * @brief Initializes the SIoU calculator.
+             * 
+             * @param max_area_ratio Maximum allowed ratio between box areas.
+             * @param iou_plus_one Controls the inversion formula for cost calculation.
+             */
+            SIoUCostCalculator(float max_area_ratio = 4.0f, bool iou_plus_one = false)
+                : max_area_ratio_(max_area_ratio), iou_plus_one_(iou_plus_one) {}
+
+            /**
+             * @brief Populates the cost matrix using SIoU metrics.
+             * 
+             * @param a Collection of source tracklets.
+             * @param b Collection of target tracklets (observations).
+             * @param out_matrix Output cost matrix to be populated.
+             */
+            void calculate(const std::vector<TrackletPtr>& __restrict a,
+                        const std::vector<TrackletPtr>& __restrict b,
+                        CostMatrix& __restrict out_matrix) override;
+            /**
+             * @brief Computes the association cost for a single pair.
+             * 
+             * @param a Source tracklet for association.
+             * @param b Candidate tracklet for association.
+             * @return float Calculated association cost.
+             */
+            float calculate_single(const TrackletPtr& a, const TrackletPtr& b) const override;
+        private:
+            float max_area_ratio_;
+            bool  iou_plus_one_;
+            std::vector<float> row_areas_;
+            std::vector<float> col_areas_;
+    };
+
+    /**
      * @brief Visual similarity cost calculator using cosine distance.
      * 
      * Calculates costs based on the angular distance between high-dimensional 

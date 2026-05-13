@@ -1,7 +1,7 @@
 {
     "sushitrack": {
         "basic": {
-            "time_aware": 1,
+            "time_aware": 0,
             "frame_rate": 25,
             "track_buffer": 30,
             "track_thresh": 0.2,
@@ -11,7 +11,7 @@
             "enable_fsm": 1,
             "enable_reid": 0,
             "enable_mahalanobis": 0,
-            "enable_interaction_context": 1
+            "enable_interaction_context": 0
         },
         "advanced": {
             "association": {
@@ -22,9 +22,9 @@
                 "duplicate_iou_thresh": 0.15
             },
             "coordinate_system": {
-                "enable_xyah": 1,
-                "enable_diou": 1,
-                "iou_plus_one": 1,
+                "enable_xyah": 0,
+                "iou_type": 0,
+                "iou_plus_one": 0,
                 "kalman_type": 0
             },
             "reid_params": {
@@ -44,10 +44,10 @@
             "tentative_logic": {
                 "tentative_match_thresh": 0.5,
                 "tentative_confirm_hits": 3,
-                "tentative_max_age_seconds": 0.09,
+                "tentative_max_age_seconds": 0.08,
                 "tentative_fast_thresh": 0.7,
                 "tentative_fast_hits": 1,
-                "tentative_slow_thresh": 0.3,
+                "tentative_slow_thresh": 0.2,
                 "tentative_slow_hits_offset": 2,
                 "tentative_vslow_hits_offset": 4
             },

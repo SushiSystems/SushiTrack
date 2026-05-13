@@ -784,3 +784,95 @@ TEST(CosineCostCalculatorTest, MissingFeatureOnBProducesCostOne)
 
     EXPECT_FLOAT_EQ(m(0, 0), 1.f);
 }
+
+// ===========================================================================
+// GIoUCostCalculator
+// ===========================================================================
+
+/** @brief Identical boxes — cost ≈ 0. */
+TEST(GIoUCostCalculatorTest, IdenticalBoxesCostIsZero)
+{
+    GIoUCostCalculator calc;
+    auto a = makeT(50.f, 50.f, 80.f, 80.f);
+    auto b = makeT(50.f, 50.f, 80.f, 80.f);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_NEAR(m(0, 0), 0.f, 1e-4f);
+}
+
+/** @brief Separated boxes (no overlap) give a cost > 0. */
+TEST(GIoUCostCalculatorTest, SeparatedBoxesCostPositive)
+{
+    GIoUCostCalculator calc;
+    auto a = makeT(  0.f, 0.f, 50.f, 50.f);
+    auto b = makeT(300.f, 0.f, 50.f, 50.f);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_GT(m(0, 0), 0.f);
+}
+
+/** @brief calculate_single agrees with batch for a partial overlap pair. */
+TEST(GIoUCostCalculatorTest, SingleMatchesBatch)
+{
+    GIoUCostCalculator calc;
+    auto a = makeT(0.f, 0.f, 100.f, 100.f);
+    auto b = makeT(40.f, 40.f, 100.f, 100.f);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_NEAR(m(0, 0), calc.calculate_single(a, b), 1e-5f);
+}
+
+// ===========================================================================
+// SIoUCostCalculator
+// ===========================================================================
+
+/** @brief Identical boxes — cost ≈ 0. */
+TEST(SIoUCostCalculatorTest, IdenticalBoxesCostIsZero)
+{
+    SIoUCostCalculator calc;
+    auto a = makeT(50.f, 50.f, 80.f, 80.f);
+    auto b = makeT(50.f, 50.f, 80.f, 80.f);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_NEAR(m(0, 0), 0.f, 1e-4f);
+}
+
+/** @brief Separated boxes (no overlap) give a cost > 0. */
+TEST(SIoUCostCalculatorTest, SeparatedBoxesCostPositive)
+{
+    SIoUCostCalculator calc;
+    auto a = makeT(  0.f, 0.f, 50.f, 50.f);
+    auto b = makeT(300.f, 0.f, 50.f, 50.f);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_GT(m(0, 0), 0.f);
+}
+
+/** @brief calculate_single agrees with batch for a partial overlap pair. */
+TEST(SIoUCostCalculatorTest, SingleMatchesBatch)
+{
+    SIoUCostCalculator calc;
+    auto a = makeT(0.f, 0.f, 100.f, 100.f);
+    auto b = makeT(40.f, 40.f, 100.f, 100.f);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_NEAR(m(0, 0), calc.calculate_single(a, b), 1e-5f);
+}
