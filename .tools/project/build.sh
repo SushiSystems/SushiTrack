@@ -12,7 +12,6 @@ BUILD_DIR=${DIR_BUILD:-build}
 CLEAN=0
 BUILD_UNIT=0
 BUILD_REGRESSION=0
-USE_ASAN=0
 
 for arg in "$@"; do
     case "$arg" in
@@ -20,7 +19,6 @@ for arg in "$@"; do
         --unit)         BUILD_UNIT=1 ;;
         --regression)   BUILD_REGRESSION=1 ;;
         --test)         BUILD_UNIT=1; BUILD_REGRESSION=1 ;;
-        --addsanitizer) USE_ASAN=1 ;;
     esac
 done
 
@@ -31,7 +29,6 @@ CMAKE_ARGS="-DBUILD_UNIT_TEST=OFF -DBUILD_REGRESSION_TEST=OFF -DBUILD_MOT_TEST=O
 
 [ $BUILD_UNIT      -eq 1 ] && CMAKE_ARGS="$CMAKE_ARGS -DBUILD_UNIT_TEST=ON"
 [ $BUILD_REGRESSION -eq 1 ] && CMAKE_ARGS="$CMAKE_ARGS -DBUILD_REGRESSION_TEST=ON"
-[ $USE_ASAN        -eq 1 ] && CMAKE_ARGS="$CMAKE_ARGS -DUSE_ASAN=ON"
 
 # ----------------------------------------------------------------
 # Compose build targets

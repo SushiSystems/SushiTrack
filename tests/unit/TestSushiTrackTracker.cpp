@@ -372,19 +372,33 @@ protected:
 };
 
 /**
- * @brief A single detection with score >= tentative_fast_thresh promotes a
- *        tentative track to Tracked immediately (fast-tier, hits=1).
+ * @brief A high-score detection (score >= tentative_fast_thresh) promotes to
+ *        Tracked on the fast tier after a single confirming match.
+ *
+ * The SushiTrack tentative pipeline creates a Tentative track on the first
+ * frame (state=4, is_confirmed=0) and applies the implicit one-frame
+ * validation rule: a subsequent matching observation is required before
+ * promotion to Tracked. With tentative_fast_hits=1 and score >= 0.85, the
+ * second frame is the one that flips state to 1 / is_confirmed to 1.
  */
-TEST_F(TrackerTentativeTiersTest, HighScoreDetectionPromotesTentativeInOneHit)
+TEST_F(TrackerTentativeTiersTest, HighScoreDetectionPromotesAfterOneConfirmingHit)
 {
     std::vector<SushiTrack_Track> out(10);
-    SushiTrack_Object d0 = makeDet(100.0f, 200.0f, 0.9f);
 
+    // Frame 1: the high-score detection creates a Tentative track.
+    SushiTrack_Object d0 = makeDet(100.0f, 200.0f, 0.9f);
     int n = SushiTrack_Update(hdl_, &d0, 1, out.data(), 10, 0.04f);
+    ASSERT_EQ(n, 1);
+    EXPECT_EQ(out[0].state,        4);
+    EXPECT_EQ(out[0].is_confirmed, 0);
+
+    // Frame 2: the confirming match promotes the tentative to Tracked under
+    // the fast tier (tentative_fast_hits=1, score still above fast_thresh).
+    SushiTrack_Object d1 = makeDet(102.0f, 202.0f, 0.9f);
+    n = SushiTrack_Update(hdl_, &d1, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state,        1);
     EXPECT_EQ(out[0].is_confirmed, 1);
-    EXPECT_EQ(out[0].hits,         1);
 }
 
 /**

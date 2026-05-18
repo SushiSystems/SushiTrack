@@ -5,6 +5,7 @@ lib/
 out/
 
 tests/regression/evaluator/data/*/pred/
+tests/regression/evaluator/data/*/img1/
 
 # CMake generated files
 CMakeCache.txt
@@ -53,5 +54,4 @@ venv/
 Thumbs.db
 
 # Project Specific
-data/*/pred/
 docs/html/

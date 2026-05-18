@@ -16,16 +16,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
-option(USE_ASAN "Enable AddressSanitizer" OFF)
-if(USE_ASAN)
-    if(MSVC)
-        add_compile_options(/fsanitize=address)
-        add_link_options(/fsanitize=address)
-    else()
-        add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
-        add_link_options(-fsanitize=address)
-    endif()
-endif()
 
 
 # ============================================================
@@ -108,6 +98,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${EIGEN3_INCLUDE_DIR}
 )
+
 
 # ============================================================
 # External Trackers (3rdparty)

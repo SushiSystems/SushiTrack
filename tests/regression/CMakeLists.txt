@@ -46,6 +46,7 @@ set_target_properties(regression_test PROPERTIES
     CXX_STANDARD_REQUIRED ON
 )
 
+
 # ---------------------------------------------------------------------------
 # tracker_bridge — C-API shared library for Python ctypes video inference.
 #
@@ -70,6 +71,7 @@ target_link_libraries(tracker_bridge PRIVATE
     bytetrack
     libocsort
 )
+
 
 # ---------------------------------------------------------------------------
 # CTest integration

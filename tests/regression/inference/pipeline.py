@@ -10,6 +10,7 @@
 import os
 import sys
 import time
+import re
 import cv2
 import numpy as np
 from abc import ABC, abstractmethod
@@ -180,7 +181,7 @@ class VideoPipeline:
         """
         @brief Initializes the VideoPipeline orchestrator.
         
-        @param video_path  Path to the source video file or camera device ID.
+        @param video_path  Path to the source video file or camera device ID, or image sequence directory.
         @param detector    Injected implementation of IDetector.
         @param stress_mode Flag to disable visual rendering for maximum throughput.
         @param save_path   Optional path to save the output video.
@@ -196,16 +197,73 @@ class VideoPipeline:
             os.makedirs("output", exist_ok=True)
             self.det_file = open(os.path.join("output", "det.txt"), "w")
         
-        # Handle string digit for camera index
-        src = int(video_path) if video_path.isdigit() else video_path
-        self.cap = cv2.VideoCapture(src)
-        if not self.cap.isOpened():
-            raise FileNotFoundError(f"Cannot open video source: {video_path}")
+        self.is_image_seq = False
+        self.image_files = []
+        self.cap = None
+
+        if isinstance(video_path, str) and os.path.isdir(video_path):
+            self.is_image_seq = True
+            # Parse seqinfo.ini if available
+            seq_info_path = os.path.join(video_path, "seqinfo.ini")
+            im_dir = "img1"
+            im_ext = ".jpg"
+            self.fps = 30.0
             
-        self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        self.fps = self.cap.get(cv2.CAP_PROP_FPS)
-        self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            if os.path.exists(seq_info_path):
+                import configparser
+                try:
+                    config = configparser.ConfigParser()
+                    config.read(seq_info_path)
+                    if "Sequence" in config:
+                        seq_sec = config["Sequence"]
+                        im_dir = seq_sec.get("imDir", "img1")
+                        im_ext = seq_sec.get("imExt", ".jpg")
+                        self.fps = float(seq_sec.get("frameRate", "30"))
+                except Exception as e:
+                    logger.warning(f"Failed to parse seqinfo.ini: {e}. Using defaults.")
+            
+            img_folder = os.path.join(video_path, im_dir)
+            if not os.path.isdir(img_folder):
+                # Fallback to base directory
+                img_folder = video_path
+                
+            # List files
+            valid_exts = (im_ext.lower(), im_ext.upper())
+            files = [
+                os.path.join(img_folder, f)
+                for f in os.listdir(img_folder)
+                if f.lower().endswith(valid_exts)
+            ]
+            
+            # Natural sort based on numbers in the filename
+            def atoi(text):
+                return int(text) if text.isdigit() else text
+            def natural_keys(text):
+                return [atoi(c) for c in re.split(r'(\d+)', text)]
+                
+            self.image_files = sorted(files, key=natural_keys)
+            self.total_frames = len(self.image_files)
+            if self.total_frames == 0:
+                raise FileNotFoundError(f"No images found in {img_folder} matching extension {im_ext}")
+                
+            # Read first image to get width and height
+            first_frame = cv2.imread(self.image_files[0])
+            if first_frame is None:
+                raise ValueError(f"Cannot read first image in sequence: {self.image_files[0]}")
+            self.height, self.width = first_frame.shape[:2]
+        else:
+            # Handle string digit for camera index
+            src = int(video_path) if video_path.isdigit() else video_path
+            self.cap = cv2.VideoCapture(src)
+            if not self.cap.isOpened():
+                raise FileNotFoundError(f"Cannot open video source: {video_path}")
+                
+            self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            self.fps = self.cap.get(cv2.CAP_PROP_FPS)
+            if self.fps <= 0:
+                self.fps = 30.0
+            self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
         
         self.save_path = save_path
         self.vid_writer = None
@@ -226,7 +284,16 @@ class VideoPipeline:
         logger.info(f"Starting pipeline on {self.video_path} at {self.fps} FPS")
 
         while True:
-            ret, frame = self.cap.read()
+            if self.is_image_seq:
+                if frame_id >= self.total_frames:
+                    ret, frame = False, None
+                else:
+                    img_path = self.image_files[frame_id]
+                    frame = cv2.imread(img_path)
+                    ret = frame is not None
+            else:
+                ret, frame = self.cap.read()
+
             if not ret:
                 break
                 
@@ -264,7 +331,8 @@ class VideoPipeline:
                 if ch == 27 or ch == ord('q') or cv2.getWindowProperty("SushiTrack Video Test", cv2.WND_PROP_VISIBLE) < 1:
                     break
                     
-        self.cap.release()
+        if self.cap is not None:
+            self.cap.release()
         if self.vid_writer:
             self.vid_writer.release()
         if self.mot_label and self.det_file:

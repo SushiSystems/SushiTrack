@@ -57,13 +57,8 @@ namespace SushiTrack
 
             /**
              * @brief Instantiates a Kalman filter based on its registered type.
-             * 
+             *
              * @param type Identifier for the desired Kalman filter type.
-             * @param std_weight_pos Baseline uncertainty for position.
-             * @param std_weight_vel Baseline uncertainty for velocity.
-             * @param kf_pos_weight Scaling factor for position uncertainty.
-             * @param kf_size_weight Scaling factor for size uncertainty.
-             * @param kf_vel_weight Scaling factor for velocity uncertainty.
              * @param enable_xyah Flag for coordinate system selection.
              * @return Unique pointer to the newly instantiated Kalman filter, or nullptr if type is not registered.
              */

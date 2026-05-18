@@ -159,6 +159,8 @@ def _dataset_prefix(seq: str) -> str:
         return "MOT20"
     if u.startswith("MOT17"):
         return "MOT17"
+    if u.startswith("DANCETRACK"):
+        return "DanceTrack"
     return ""
 
 
@@ -248,6 +250,7 @@ def print_trackeval_table(results: dict, compare: bool = True) -> None:
 
     mot17_seqs = [s for s in all_seqs if _dataset_prefix(s) == "MOT17"]
     mot20_seqs = [s for s in all_seqs if _dataset_prefix(s) == "MOT20"]
+    dancetrack_seqs = [s for s in all_seqs if _dataset_prefix(s) == "DanceTrack"]
 
     print()
     print(BOLD + _HEADER + RESET)
@@ -274,6 +277,8 @@ def print_trackeval_table(results: dict, compare: bool = True) -> None:
         _print_aggregate_block("MOT17", tracker_names, results, mot17_seqs, compare)
     if mot20_seqs:
         _print_aggregate_block("MOT20", tracker_names, results, mot20_seqs, compare)
+    if dancetrack_seqs:
+        _print_aggregate_block("DanceTrack", tracker_names, results, dancetrack_seqs, compare)
 
     has_overall = any("OVERALL" in results[t] for t in tracker_names)
     overall_override = (

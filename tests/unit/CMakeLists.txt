@@ -31,11 +31,16 @@ add_executable(unit_test
     TestLogger.cpp
     TestSushiTrackC.cpp
     TestSushiTrackTracker.cpp
+    TestCAPIErrors.cpp
+    TestIntegration.cpp
+    TestBoundaryConditions.cpp
+    TestConfiguration.cpp
     UnitTest.cpp
 )
 
 target_include_directories(unit_test PRIVATE
     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/3rdparty
     ${CMAKE_SOURCE_DIR}/3rdparty/eigen
 )
 

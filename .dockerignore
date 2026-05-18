@@ -27,3 +27,4 @@ Dockerfile
 
 # Data
 tests/regression/evaluator/data/*/pred/
+tests/regression/evaluator/data/*/img1/

@@ -13,7 +13,6 @@ Build
   sushitrack project build --unit        -- build library + unit_test
   sushitrack project build --regression  -- build library + regression_test + tracker_bridge
   sushitrack project build --clean       -- wipe build dir first
-  sushitrack project build --addsanitizer
 
 Test
   sushitrack project test                -- run all: unit → label (regression) in sequence
@@ -92,14 +91,13 @@ def get_data_root() -> Path:
 # Build
 # ===========================================================================
 
-def project_build(clean: bool, unit: bool, regression: bool, asan: bool) -> bool:
+def project_build(clean: bool, unit: bool, regression: bool) -> bool:
     """
     @brief Invokes the platform build script with the requested options.
 
     @param clean      Wipe the build directory before configuring.
     @param unit       Build the unit_test target.
     @param regression Build the regression_test + tracker_bridge targets.
-    @param asan       Enable AddressSanitizer.
     @return True on success.
     """
     script = _TOOLS_DIR / "project" / ("build.bat" if _IS_WINDOWS else "build.sh")
@@ -107,7 +105,6 @@ def project_build(clean: bool, unit: bool, regression: bool, asan: bool) -> bool
     if clean:      args.append("--clean")
     if unit:       args.append("--unit")
     if regression: args.append("--regression")
-    if asan:       args.append("--addsanitizer")
 
     mode_parts = []
     if unit:       mode_parts.append("unit")
@@ -227,21 +224,61 @@ def project_test_unit(gtest_filter: str | None, verbose: bool) -> bool:
 # label (regression) test
 # ===========================================================================
 
-def _build_regression_filter(scenario: str | None, compare: bool, tracker: str) -> str:
+def _get_filtered_scenarios(scenario: str | None, private: bool, public: bool) -> list[str]:
+    """
+    @brief Returns a list of scenario names filtered by scenario name, private, or public flags.
+    """
+    data_root = get_data_root()
+    if not data_root.exists():
+        return []
+
+    all_seqs = sorted(
+        d.name for d in data_root.iterdir()
+        if d.is_dir() and (d / "gt" / "gt.txt").exists()
+    )
+
+    if scenario:
+        if scenario in all_seqs:
+            filtered = [scenario]
+        else:
+            filtered = [s for s in all_seqs if scenario.lower() in s.lower()]
+    else:
+        filtered = all_seqs
+
+    result = []
+    for seq in filtered:
+        is_mot = seq.upper().startswith("MOT")
+        if is_mot:
+            is_yolox = seq.upper().endswith("YOLOX")
+            if private and not is_yolox:
+                continue
+            if public and is_yolox:
+                continue
+        result.append(seq)
+
+    return result
+
+
+def _build_regression_filter(scenarios: list[str], compare: bool, tracker: str) -> str:
     """
     @brief Constructs a GTest filter for the regression_test suite.
 
-    @param scenario  Sequence name (e.g. "MOT17-02-DPM") or None for all.
+    @param scenarios List of sequence names to run.
     @param compare   Run all three trackers side-by-side.
     @param tracker   Single tracker name (lowercase).
     @return GTest --gtest_filter string.
     """
     trackers = _KNOWN_TRACKERS if compare else [tracker.lower()]
-    sc = scenario.replace('-', '_') if scenario else None
 
     parts = []
     for t in trackers:
-        parts.append(f"*{sc}_{t}*" if sc else f"*_{t}*")
+        for seq in scenarios:
+            sc = seq.replace('-', '_')
+            parts.append(f"*{sc}_{t}*")
+
+    if not parts:
+        return "-*"
+
     return ":".join(parts)
 
 
@@ -292,6 +329,8 @@ def project_test_label(
     export:     str | None,
     trackeval:  bool,
     tracker:    str,
+    private:    bool = False,
+    public:     bool = False,
 ) -> bool:
     """
     @brief Runs label-based (det.txt) regression inference and TrackEval metrics.
@@ -302,8 +341,15 @@ def project_test_label(
     @param export     Directory to write CSV/JSON exports to.
     @param trackeval  Use the official TrackEval script instead of the internal runner.
     @param tracker    Target tracker (lowercase key).
+    @param private    Run only sequences ending in YOLOX (MOT only).
+    @param public     Run all sequences except those ending in YOLOX (MOT only).
     @return True on success.
     """
+    scenarios = _get_filtered_scenarios(scenario, private, public)
+    if not scenarios:
+        logger.warning("No sequences matched the specified filter criteria.")
+        return True
+
     perf_data: dict = {t: {} for t in (_KNOWN_TRACKERS if compare else [tracker])}
 
     if not eval_only:
@@ -315,7 +361,7 @@ def project_test_label(
             )
             return False
 
-        gtest_filter = _build_regression_filter(scenario, compare, tracker)
+        gtest_filter = _build_regression_filter(scenarios, compare, tracker)
         logger.info(f"Running regression inference: {binary.name}")
         ok, perf_data = _run_regression_binary(binary, gtest_filter)
         if not ok:
@@ -323,10 +369,10 @@ def project_test_label(
 
     if trackeval:
         logger.info("Running TrackEval via official script ...")
-        return _run_trackeval_official(scenario, compare, tracker)
+        return _run_trackeval_official(scenarios, compare, tracker)
 
     logger.info("Running internal TrackEval evaluation ...")
-    return _run_evaluation_internal(scenario, compare, perf_data, export, tracker)
+    return _run_evaluation_internal(scenarios, compare, perf_data, export, tracker)
 
 
 # ===========================================================================
@@ -404,12 +450,12 @@ def project_test_inference(args: argparse.Namespace) -> bool:
 # TrackEval wrappers (unchanged logic, moved here for clarity)
 # ===========================================================================
 
-def _run_trackeval_official(scenario: str | None, compare: bool, tracker: str) -> bool:
+def _run_trackeval_official(scenarios: list[str], compare: bool, tracker: str) -> bool:
     """
     @brief Copies pred/GT files into the TrackEval directory tree and runs the
            official run_mot_challenge.py script.
 
-    @param scenario  Sequence filter.
+    @param scenarios List of sequences to run.
     @param compare   Evaluate all trackers.
     @param tracker   Single tracker key.
     @return True on success.
@@ -434,7 +480,7 @@ def _run_trackeval_official(scenario: str | None, compare: bool, tracker: str) -
             if not seq_dir.is_dir() or not (seq_dir / "gt" / "gt.txt").exists():
                 continue
             seq = seq_dir.name
-            if scenario and seq != scenario:
+            if seq not in scenarios:
                 continue
             src_pred = seq_dir / "pred" / tr / f"{seq}.txt"
             if not src_pred.exists():
@@ -480,8 +526,8 @@ def _run_trackeval_official(scenario: str | None, compare: bool, tracker: str) -
         cmd = [sys.executable, str(script_path),
                "--BENCHMARK", benchmark,
                "--TRACKERS_TO_EVAL"] + valid_trackers + ["--SPLIT_TO_EVAL", "train"]
-        if scenario:
-            cmd += ["--SEQ_INFO", scenario]
+        if len(scenarios) == 1:
+            cmd += ["--SEQ_INFO", scenarios[0]]
         try:
             r = subprocess.run(cmd, cwd=str(trackeval_dir))
             if r.returncode != 0:
@@ -494,7 +540,7 @@ def _run_trackeval_official(scenario: str | None, compare: bool, tracker: str) -
 
 
 def _run_evaluation_internal(
-    scenario:   str | None,
+    scenarios:  list[str],
     compare:    bool,
     perf_data:  dict,
     export_dir: str | None,
@@ -503,7 +549,7 @@ def _run_evaluation_internal(
     """
     @brief Runs the internal Python TrackEval wrapper.
 
-    @param scenario   Sequence filter.
+    @param scenarios  List of sequences to evaluate.
     @param compare    Evaluate all trackers.
     @param perf_data  FPS data from the regression binary run.
     @param export_dir Optional export directory.
@@ -523,7 +569,6 @@ def _run_evaluation_internal(
         return False
 
     trackers  = _KNOWN_TRACKERS if compare else [tracker]
-    scenarios = [scenario] if scenario else None
 
     try:
         runner  = TrackEvalRunner(data_root=str(data_root))
@@ -571,7 +616,6 @@ def _build_parser() -> argparse.ArgumentParser:
     p_build.add_argument("--unit",         action="store_true", help="Include unit_test target")
     p_build.add_argument("--regression",   action="store_true", help="Include regression_test + tracker_bridge")
     p_build.add_argument("--test",         action="store_true", help="Alias for --regression (deprecated)")
-    p_build.add_argument("--addsanitizer", action="store_true", help="Enable AddressSanitizer")
 
     # project test
     p_test = proj_sub.add_parser("test", help="Run tests")
@@ -596,7 +640,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p_test.add_argument("--eval-only",  action="store_true",     help="Skip binary; re-run TrackEval only (label mode)")
     p_test.add_argument("--trackeval",  action="store_true",     help="Use official TrackEval script (label mode)")
     p_test.add_argument("--export",     type=str,  default=None, help="Export results directory (label mode)")
-    p_test.add_argument("--addsanitizer", action="store_true",   help="Rebuild with ASAN before running (label mode)")
+    p_test.add_argument("--private",    action="store_true",     help="Run only sequences ending in YOLOX (MOT only)")
+    p_test.add_argument("--public",     action="store_true",     help="Run all sequences except those ending in YOLOX (MOT only)")
 
     # YOLOX / video options (inference mode)
     p_test.add_argument("--source",      type=str,               help="Video path or camera index (inference)")
@@ -649,13 +694,16 @@ def main():
                 clean      = args.clean,
                 unit       = unit,
                 regression = regression,
-                asan       = args.addsanitizer,
             )
 
         elif args.action == "clean":
             success = project_clean()
 
         elif args.action == "test":
+            if args.private and args.public:
+                logger.error("Cannot specify both --private and --public simultaneously.")
+                sys.exit(1)
+
             test_type = args.test_type or "all"
 
             if test_type == "all":
@@ -685,6 +733,8 @@ def main():
                         export    = args.export,
                         trackeval = args.trackeval,
                         tracker   = tracker_key,
+                        private   = args.private,
+                        public    = args.public,
                     )
 
             elif test_type == "unit":
@@ -694,10 +744,6 @@ def main():
                 )
 
             elif test_type == "label":
-                if args.addsanitizer:
-                    logger.info("ASAN requested — rebuilding with sanitizer ...")
-                    project_build(clean=False, unit=False, regression=True, asan=True)
-
                 tracker_key = args.tracker.lower()
                 if tracker_key not in _TRACKER_MAP:
                     logger.error(
@@ -713,6 +759,8 @@ def main():
                     export    = args.export,
                     trackeval = args.trackeval,
                     tracker   = tracker_key,
+                    private   = args.private,
+                    public    = args.public,
                 )
 
             elif test_type == "inference":

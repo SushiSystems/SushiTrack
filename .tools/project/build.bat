@@ -14,7 +14,6 @@ set BUILD_DIR=%DIR_BUILD%
 set CLEAN=0
 set BUILD_UNIT=0
 set BUILD_REGRESSION=0
-set USE_ASAN=0
 
 :parse_args
 if "%~1"=="" goto end_parse
@@ -22,7 +21,6 @@ if /i "%~1"=="--clean"         set CLEAN=1
 if /i "%~1"=="--unit"          set BUILD_UNIT=1
 if /i "%~1"=="--regression"    set BUILD_REGRESSION=1
 if /i "%~1"=="--test"          (set BUILD_UNIT=1 & set BUILD_REGRESSION=1)
-if /i "%~1"=="--addsanitizer"  set USE_ASAN=1
 shift
 goto parse_args
 :end_parse
@@ -34,7 +32,6 @@ set CMAKE_ARGS=-DBUILD_UNIT_TEST=OFF -DBUILD_REGRESSION_TEST=OFF -DBUILD_MOT_TES
 
 if %BUILD_UNIT%==1       set CMAKE_ARGS=%CMAKE_ARGS% -DBUILD_UNIT_TEST=ON
 if %BUILD_REGRESSION%==1 set CMAKE_ARGS=%CMAKE_ARGS% -DBUILD_REGRESSION_TEST=ON
-if %USE_ASAN%==1         set CMAKE_ARGS=%CMAKE_ARGS% -DUSE_ASAN=ON
 
 :: ----------------------------------------------------------------
 :: Compose build targets
