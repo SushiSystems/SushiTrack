@@ -143,6 +143,7 @@ sushitrack/
 ├── CMakeLists.txt                # Top-level build; defines library + 3rdparty subdirs + tests
 ├── Dockerfile                    # CUDA 12.1 base, system deps, Python wheels, alias setup
 ├── environment.yml               # Conda env: python 3.11, cmake, gtest, ninja, pip wheels
+├── sushitrack.json                # Runtime config loaded by the library (see Tracker config files)
 ├── README.md
 │
 ├── include/
@@ -194,6 +195,8 @@ sushitrack/
 │
 ├── tests/
 │   ├── CMakeLists.txt            # Options BUILD_UNIT_TEST / BUILD_REGRESSION_TEST / BUILD_INTEGRATION_TEST
+│   ├── bytetrack.json            # ByteTrack regression config
+│   ├── ocsort.json               # OCSORT regression config
 │   ├── unit/                     # GTest deterministic unit tests
 │   │   ├── CMakeLists.txt
 │   │   ├── UnitTest.cpp          # GTest main
@@ -582,7 +585,6 @@ The regression harness reads from `tests/regression/evaluator/data/`:
 
 ```
 tests/regression/evaluator/data/
-├── config.json                       # optional override file
 ├── MOT17-02-DPM/
 │   ├── det/det.txt                   # MOT-format detections
 │   ├── gt/gt.txt                     # MOT-format ground truth
@@ -604,30 +606,46 @@ MOT CSV format:
 
 Prediction files are written to `<sequence>/pred/<tracker>/<sequence>.txt` after each regression run. `cli/misc/clean_preds.sh` wipes every `pred/` subdirectory.
 
-### Tracker config file
+### Tracker config files
 
-Override compiled defaults at runtime through a JSON file. Resolution order: `$SUSHITRACK_CONFIG` env var → `tests/config.json` → `tests/regression/evaluator/data/config.json` → `data/config.json`. Any missing key falls back to the compiled default.
+Each tracker owns a dedicated JSON file:
+
+| File | Tracker | Loaded by |
+|---|---|---|
+| `sushitrack.json` (repository root) | SushiTrack | the **library itself** |
+| `tests/bytetrack.json` | ByteTrack | regression harness |
+| `tests/ocsort.json` | OCSORT | regression harness |
+
+`sushitrack.json` is bound to the library, not the test harness: the C API parses it directly (`src/ConfigLoader.cpp`), so a compiled `sushitrack.dll`/`.so` is retuned by editing the file with **no recompilation**. Resolution order: the `$SUSHITRACK_CONFIG` environment variable, then an upward search for `sushitrack.json` from the working directory (so a binary launched from `build/bin` still finds the file at the project root). Any missing key falls back to the compiled default from `SushiTrack_GetDefaultParams`.
+
+The schema is layered `basic` / `advanced`. The outer `"sushitrack"` wrapper is optional — a file whose root is already the `basic`/`advanced` object is also accepted:
 
 ```json
 {
   "sushitrack": {
-    "track_thresh": 0.2, "high_thresh": 0.5, "match_thresh": 0.7,
-    "frame_rate": 25, "track_buffer": 30,
-    "enable_reid": 0, "enable_fsm": 0, "enable_tentative": 0,
-    "enable_mahalanobis": 0, "enable_interaction_context": 0,
-    "iou_type": 1, "enable_xyah": 0, "iou_plus_one": 1,
-    "time_aware": 0, "kalman_type": 0,
-    "primary_assoc_mode": 1, "fuse_score": 1,
-    "fsm_stationary_vel_thresh": 40.0, "fsm_maneuver_accel_thresh": 250.0,
-    "reid_high_thresh": 0.3, "reid_high_iou_weight": 0.3,
-    "reid_low_thresh": 0.5,  "reid_low_iou_weight": 0.2,
-    "reid_recovery_thresh": 0.4
-  },
-  "bytetrack": { "track_thresh": 0.5, "high_thresh": 0.6, "match_thresh": 0.8,
-                 "frame_rate": 30, "track_buffer": 30 },
-  "ocsort":    { "...": "..." }
+    "basic": {
+      "track_thresh": 0.2, "high_thresh": 0.5, "match_thresh": 0.7,
+      "frame_rate": 25, "track_buffer": 30,
+      "enable_tentative": 1, "enable_fsm": 1, "enable_reid": 0,
+      "enable_mahalanobis": 0, "enable_interaction_context": 0
+    },
+    "advanced": {
+      "association":  { "primary_assoc_mode": 1, "fuse_score": 1, "iou_match_thresh": 0.5 },
+      "coordinate_system": { "iou_type": 1, "enable_xyah": 0, "iou_plus_one": 1, "kalman_type": 0 },
+      "fsm_params":   { "fsm_stationary_vel_thresh": 40.0, "fsm_maneuver_accel_thresh": 250.0 },
+      "interaction_context": { "interaction_iou_thresh": 0.6, "interaction_occluder_penalty": 0.15 }
+    }
+  }
 }
 ```
+
+C API entry points (`include/SushiTrackC.h`):
+
+- `SushiTrack_LoadParamsFromJson(path, &params)` — overlay a file onto a seeded `SushiTrack_Params` (`path = NULL` uses the resolution order above). A missing file is non-fatal.
+- `SushiTrack_CreateFromConfig(path)` — seed defaults, overlay the file, and create in one call.
+- `SushiTrack_Create(NULL)` — shorthand for `SushiTrack_CreateFromConfig(NULL)`. Passing an explicit `SushiTrack_Params*` bypasses file loading entirely (programmatic control).
+
+The Python binding mirrors this: `SushiTrack(config="auto")` resolves `sushitrack.json` through the library, `config="<path>"` loads an explicit file, and keyword overrides still win over the file.
 
 ---
 
@@ -770,14 +788,14 @@ Parameterised GTest binary that iterates over `Scenario × tracker_factory`. For
 3. Writes predictions to `<sequence>/pred/<tracker>/<sequence>.txt`.
 4. Emits a `[ PERF <tracker> ] <sequence>: <us/frame> us/frame` line read back by `sushitrack.py`.
 
-Config resolution: `$SUSHITRACK_CONFIG` → `tests/config.json` → `tests/regression/evaluator/data/config.json` → `data/config.json`.
+Config resolution: SushiTrack loads `sushitrack.json` through the library (`$SUSHITRACK_CONFIG`, then an upward search); ByteTrack and OCSORT read `tests/bytetrack.json` and `tests/ocsort.json`.
 
 Direct invocation:
 
 ```bash
 ./build/bin/Release/regression_test
 ./build/bin/Release/regression_test --gtest_filter="*MOT17_04_DPM_sushitrack*"
-SUSHITRACK_CONFIG=tests/config.json ./build/bin/Release/regression_test
+SUSHITRACK_CONFIG=./sushitrack.json ./build/bin/Release/regression_test
 ```
 
 ### Integration tests (`integration_test`)

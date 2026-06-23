@@ -1,0 +1,9 @@
+{
+    "bytetrack": {
+        "frame_rate": 25,
+        "track_buffer": 30,
+        "track_thresh": 0.2,
+        "high_thresh": 0.5,
+        "match_thresh": 0.7
+    }
+}

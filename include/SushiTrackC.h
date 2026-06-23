@@ -325,6 +325,37 @@ extern "C"
     SushiTrack_Status SushiTrack_CreateEx(const SushiTrack_Params* params, SushiTrackHdl* out_hdl);
 
     /**
+     * @brief Overlays a JSON configuration file onto a parameters structure.
+     *
+     * The caller seeds @p params first (typically via SushiTrack_GetDefaultParams)
+     * and this overlays any keys present in the file, leaving the rest untouched.
+     * A missing file is not an error and returns SUSHITRACK_SUCCESS; a malformed
+     * file returns SUSHITRACK_RUNTIME_ERROR with @p params unchanged.
+     *
+     * @param path   Explicit file path, or NULL to use the resolution order:
+     *               the SUSHITRACK_CONFIG environment variable, then an upward
+     *               search for sushitrack.json from the working directory.
+     * @param params Parameters structure updated in place.
+     * @return Status code indicating success or a specific failure reason.
+     */
+    SushiTrack_Status SushiTrack_LoadParamsFromJson(const char* path, SushiTrack_Params* params);
+
+    /**
+     * @brief Instantiates a tracker directly from a JSON configuration file.
+     *
+     * Equivalent to seeding compiled defaults, overlaying the resolved file via
+     * SushiTrack_LoadParamsFromJson, and calling SushiTrack_Create. A deployed
+     * build can therefore be retuned by editing sushitrack.json with no
+     * recompilation. When no file is found the tracker is built on compiled
+     * defaults.
+     *
+     * @param path Explicit file path, or NULL to use the standard resolution
+     *             order (see SushiTrack_LoadParamsFromJson).
+     * @return Handle to the initialized tracker instance, or NULL on failure.
+     */
+    SushiTrackHdl SushiTrack_CreateFromConfig(const char* path);
+
+    /**
      * @brief Configures a global callback function for system logging.
      *
      * @param callback Function pointer to the logging implementation.

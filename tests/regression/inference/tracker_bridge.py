@@ -47,9 +47,11 @@ class TrackerBridge:
         if tracker_name.strip().lower() == "sushitrack":
             self._mode = "binding"
             from sushitrack import SushiTrack
-            # Compiled defaults, frame-based timing (dt is ignored internally when
-            # time_aware=0). Override here if a tuned inference config is needed.
-            self._ds = SushiTrack()
+            # Driven by the runtime sushitrack.json (resolved by the library:
+            # SUSHITRACK_CONFIG env var, then an upward search), so the inference
+            # path honours the same config as the regression binary. Falls back
+            # to compiled defaults when no file is found.
+            self._ds = SushiTrack(config="auto")
             return
 
         self._mode = "shim"

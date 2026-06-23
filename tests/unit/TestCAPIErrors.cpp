@@ -153,13 +153,20 @@ TEST(CAPIInvalidArgumentStandaloneTest, GetDefaultParamsNullPointerDoesNotCrash)
 }
 
 /**
- * @brief SushiTrack_Create with a null params pointer must return a null handle
- *        rather than constructing a tracker from undefined memory.
+ * @brief SushiTrack_Create with a null params pointer auto-loads the runtime
+ *        config (SushiTrack_CreateFromConfig) and returns a valid handle.
+ *
+ * A null params pointer is no longer a misuse: it is the documented opt-in to
+ * the library-owned config path (defaults overlaid with sushitrack.json when one
+ * is resolvable, otherwise compiled defaults). The strict null-rejection
+ * contract lives on CreateEx (see CreateExNullParamsPropagatesStatusViaOutHandle).
  */
-TEST(CAPIInvalidArgumentStandaloneTest, CreateWithNullParamsReturnsNullHandle)
+TEST(CAPIInvalidArgumentStandaloneTest, CreateWithNullParamsAutoLoadsConfig)
 {
     SushiTrackHdl hdl = SushiTrack_Create(nullptr);
-    EXPECT_EQ(hdl, nullptr);
+    EXPECT_NE(hdl, nullptr);
+    if (hdl != nullptr)
+        SushiTrack_Destroy(hdl);
 }
 
 /**

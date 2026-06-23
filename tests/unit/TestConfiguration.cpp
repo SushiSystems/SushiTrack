@@ -1,6 +1,6 @@
 /**
  * @file      TestConfiguration.cpp
- * @brief     Tests for configuration loading from tests/config.json into SushiTrack_Params.
+ * @brief     Tests for configuration loading from sushitrack.json into SushiTrack_Params.
  * @author    Mustafa Garip (mustafagarip@sushisystems.io)
  * @date      18.05.2026
  * @version   v1.0.0
@@ -10,18 +10,19 @@
  * -----
  * Closes the configuration-system gap flagged in UNIT_TEST_VALIDATION_REPORT.md
  * Section 2.3.1 and the verified-report's Omission #2:
- *   - The real config file is at tests/config.json, NOT data/config.json.
+ *   - The canonical config file is sushitrack.json at the repository root.
  *   - The advanced.interaction_context.* fields, advanced.tentative_logic
  *     fast_/slow_/vslow_ tiers, and reid_direct_assignment_weight have no
  *     existing tests.
  *
  * Approach
  * --------
- * The SushiTrack public C API does not own JSON parsing — the regression
- * harness loads config.json through TestInfra::parse_json (nlohmann/json
- * vendored under 3rdparty). This test file mirrors that approach using the
- * already-vendored nlohmann/json single-header include, exercises a
- * round-trip from JSON to SushiTrack_Params, and validates:
+ * The SushiTrack public C API now owns JSON parsing through
+ * SushiTrack_LoadParamsFromJson (src/ConfigLoader.cpp). This file keeps an
+ * independent reference parser (applyConfigToParams below, built on the
+ * vendored nlohmann/json single-header) as an oracle, exercises a round-trip
+ * from JSON to SushiTrack_Params, asserts the library loader agrees with the
+ * oracle (ConfigLoaderLibraryApiTest), and validates:
  *   1. Every documented field is loaded with the right type.
  *   2. Defaults are honoured when sections are missing.
  *   3. Out-of-range values are at minimum tolerated (the loader should not
@@ -30,7 +31,7 @@
  * Coverage
  * --------
  * ConfigLoaderBaselineTest
- *   - tests/config.json parses successfully (preconditional smoke test).
+ *   - sushitrack.json parses successfully (preconditional smoke test).
  *   - The "sushitrack" root section is an object.
  *   - The basic section contains every documented switch field.
  *
@@ -72,12 +73,12 @@ namespace
 using Json = nlohmann::json;
 
 /**
- * @brief Resolves the path to tests/config.json relative to the source tree.
+ * @brief Resolves the path to sushitrack.json relative to the source tree.
  *
  * GoogleTest's working directory is set to ${CMAKE_SOURCE_DIR} via the
  * gtest_discover_tests WORKING_DIRECTORY argument (see tests/unit/CMakeLists.txt
  * and tests/regression/CMakeLists.txt for precedent), so the relative path
- * "tests/config.json" is the canonical location. We also honour
+ * "sushitrack.json" is the canonical location. We also honour
  * SUSHITRACK_CONFIG as an environment override to align with the regression
  * runner's documented pattern.
  *
@@ -88,7 +89,7 @@ std::string configPath()
     const char* env = std::getenv("SUSHITRACK_CONFIG");
     if (env != nullptr && env[0] != '\0')
         return std::string(env);
-    return std::string("tests/config.json");
+    return std::string("sushitrack.json");
 }
 
 /**
@@ -207,7 +208,7 @@ void applyConfigToParams(const Json& doc, SushiTrack_Params& params)
 }
 
 /**
- * @brief Reads tests/config.json into an nlohmann::json document.
+ * @brief Reads sushitrack.json into an nlohmann::json document.
  *
  * Returns an empty object on failure (mirrors TestInfra::parse_json
  * semantics in the regression harness).
@@ -235,7 +236,7 @@ Json loadConfigJson()
 // ============================================================================
 
 /**
- * @brief tests/config.json must parse and contain the expected root object.
+ * @brief sushitrack.json must parse and contain the expected root object.
  */
 TEST(ConfigLoaderBaselineTest, ConfigFileParsesAndContainsRootObject)
 {
@@ -515,4 +516,65 @@ TEST(ConfigLoaderTrackerSmokeTest, LoadedParamsSurviveSingleDetectionUpdate)
     EXPECT_GE(n, 0);
 
     SushiTrack_Destroy(hdl);
+}
+
+// ============================================================================
+// ConfigLoaderLibraryApiTest
+// ============================================================================
+
+/**
+ * @brief The library-owned loader (SushiTrack_LoadParamsFromJson) must produce
+ *        the same Params as the in-test reference parser for the shipped file.
+ *
+ * This is the parity guard for the production code path: sushitrack.json is now
+ * parsed inside the library, not by the harness, so the two must agree field by
+ * field. The reference parser above stays as an independent oracle.
+ */
+TEST(ConfigLoaderLibraryApiTest, LibraryLoaderMatchesReferenceParser)
+{
+    Json doc = loadConfigJson();
+    ASSERT_FALSE(doc.empty());
+
+    SushiTrack_Params reference{};
+    SushiTrack_GetDefaultParams(&reference);
+    applyConfigToParams(doc, reference);
+
+    SushiTrack_Params loaded{};
+    SushiTrack_GetDefaultParams(&loaded);
+    ASSERT_EQ(SushiTrack_LoadParamsFromJson(configPath().c_str(), &loaded),
+              SUSHITRACK_SUCCESS);
+
+    EXPECT_EQ      (loaded.enable_fsm,                 reference.enable_fsm);
+    EXPECT_EQ      (loaded.enable_interaction_context, reference.enable_interaction_context);
+    EXPECT_EQ      (loaded.frame_rate,                 reference.frame_rate);
+    EXPECT_EQ      (loaded.primary_assoc_mode,         reference.primary_assoc_mode);
+    EXPECT_FLOAT_EQ(loaded.match_thresh,               reference.match_thresh);
+    EXPECT_FLOAT_EQ(loaded.interaction_occluder_penalty,
+                    reference.interaction_occluder_penalty);
+    EXPECT_FLOAT_EQ(loaded.fsm_maneuver_accel_thresh,  reference.fsm_maneuver_accel_thresh);
+}
+
+/**
+ * @brief A NULL params pointer must be rejected without dereferencing.
+ */
+TEST(ConfigLoaderLibraryApiTest, NullParamsAreRejected)
+{
+    EXPECT_EQ(SushiTrack_LoadParamsFromJson(configPath().c_str(), nullptr),
+              SUSHITRACK_INVALID_ARGUMENT);
+}
+
+/**
+ * @brief A missing file is non-fatal: params are left at defaults and SUCCESS
+ *        is returned, so configuration stays optional.
+ */
+TEST(ConfigLoaderLibraryApiTest, MissingFileLeavesDefaultsAndSucceeds)
+{
+    SushiTrack_Params before{};
+    SushiTrack_GetDefaultParams(&before);
+    SushiTrack_Params after = before;
+
+    EXPECT_EQ(SushiTrack_LoadParamsFromJson("this/path/does/not/exist.json", &after),
+              SUSHITRACK_SUCCESS);
+    EXPECT_EQ(after.frame_rate,  before.frame_rate);
+    EXPECT_EQ(after.enable_fsm,  before.enable_fsm);
 }

@@ -43,26 +43,38 @@ namespace fs = std::filesystem;
 // ---------------------------------------------------------------------------
 
 /**
- * @brief Resolves the tracker configuration file path.
+ * @brief Resolves a configuration file by walking up from the working directory.
  *
- * Checks the SUSHITRACK_CONFIG environment variable first, then falls back to
- * standard search locations relative to the working directory.
+ * Each tracker now owns a dedicated file (sushitrack.json at the repository root,
+ * bytetrack.json and ocsort.json under tests/). A binary launched from build/bin
+ * still finds them by ascending through parent directories.
  *
- * @return Absolute or relative path to a valid config.json, or empty string.
+ * @param rel Path relative to the directory that contains the file.
+ * @return Absolute path to the file, or an empty string when not found.
  */
-static std::string resolveConfig()
+static std::string resolveConfigUp(const std::string& rel)
 {
-    if (const char* env_path = std::getenv("SUSHITRACK_CONFIG"))
-        if (env_path[0] != '\0' && fs::exists(env_path))
-            return std::string(env_path);
+    std::error_code ec;
+    fs::path dir = fs::current_path(ec);
+    for (int depth = 0; depth < 8 && !dir.empty(); ++depth)
+    {
+        fs::path candidate = dir / rel;
+        if (fs::exists(candidate, ec)) return candidate.string();
 
-    for (const auto& p : {"tests/config.json", "tests/regression/evaluator/data/config.json", "data/config.json"})
-        if (fs::exists(p)) return p;
-
+        if (!dir.has_parent_path()) break;
+        fs::path parent = dir.parent_path();
+        if (parent == dir) break;
+        dir = parent;
+    }
     return "";
 }
 
-static const std::string kConfigPath = resolveConfig();
+// SushiTrack resolves its own sushitrack.json inside the library (SUSHITRACK_CONFIG
+// env var, then an upward search), so its factory passes an empty path and lets
+// the loader decide. The reference trackers are configured here from their own
+// files under tests/.
+static const std::string kByteTrackConfig = resolveConfigUp("tests/bytetrack.json");
+static const std::string kOCSortConfig    = resolveConfigUp("tests/ocsort.json");
 
 // ---------------------------------------------------------------------------
 // Adapter factories
@@ -81,9 +93,9 @@ struct NamedFactory
 
 static const NamedFactory kFactories[] =
 {
-    { "sushitrack", []() { return std::make_unique<SushiTrackAdapter>(kConfigPath); } },
-    { "bytetrack", []() { return std::make_unique<ByteTrackAdapter>(kConfigPath); } },
-    { "ocsort",    []() { return std::make_unique<OCSORTAdapter>(kConfigPath);    } },
+    { "sushitrack", []() { return std::make_unique<SushiTrackAdapter>("");               } },
+    { "bytetrack", []() { return std::make_unique<ByteTrackAdapter>(kByteTrackConfig); } },
+    { "ocsort",    []() { return std::make_unique<OCSORTAdapter>(kOCSortConfig);        } },
 };
 
 // ---------------------------------------------------------------------------
@@ -193,10 +205,11 @@ int main(int argc, char** argv)
 {
     printHardwareInfo();
 
-    if (!kConfigPath.empty())
-        std::cout << "[ CONFIG ] Using " << kConfigPath << "\n\n";
-    else
-        std::cout << "[ CONFIG ] No config.json found -- using tracker defaults\n\n";
+    std::cout << "[ CONFIG ] SushiTrack: resolved by the library (SUSHITRACK_CONFIG / sushitrack.json)\n";
+    std::cout << "[ CONFIG ] ByteTrack: "
+              << (kByteTrackConfig.empty() ? "defaults" : kByteTrackConfig) << "\n";
+    std::cout << "[ CONFIG ] OCSORT   : "
+              << (kOCSortConfig.empty() ? "defaults" : kOCSortConfig) << "\n\n";
 
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

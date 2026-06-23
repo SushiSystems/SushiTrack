@@ -263,6 +263,9 @@ def _bind(lib: C.CDLL) -> C.CDLL:
     lib.SushiTrack_CreateEx.argtypes = [POINTER(SushiTrackParams), POINTER(c_void_p)]
     lib.SushiTrack_CreateEx.restype = c_int
 
+    lib.SushiTrack_LoadParamsFromJson.argtypes = [c_char_p, POINTER(SushiTrackParams)]
+    lib.SushiTrack_LoadParamsFromJson.restype = c_int
+
     lib.SushiTrack_Update.argtypes = [
         c_void_p, POINTER(SushiTrackObject), c_int,
         POINTER(SushiTrackTrack), c_int, c_float,
@@ -290,16 +293,31 @@ class SushiTrack:
 
     :param lib_path: Explicit path to the shared library (else auto-discovered).
     :param max_tracks: Capacity of the reusable output buffer.
+    :param config: Optional JSON configuration. ``None`` (default) uses the
+        compiled defaults only; ``"auto"`` lets the library resolve
+        ``sushitrack.json`` through its own search order (``SUSHITRACK_CONFIG``
+        env var, then an upward search); any other string is treated as an
+        explicit file path. Values are layered defaults → file → keyword
+        overrides, so explicit ``param_overrides`` always win.
     :param param_overrides: Any ``SushiTrack_Params`` field, e.g.
         ``enable_fsm=1``, ``iou_type=1``, ``time_aware=1``. Unspecified fields
-        keep the compiled defaults from ``SushiTrack_GetDefaultParams``.
+        keep whatever the defaults/config established.
     """
 
-    def __init__(self, lib_path: Optional[str] = None, max_tracks: int = 256, **param_overrides):
+    def __init__(self, lib_path: Optional[str] = None, max_tracks: int = 256,
+                 config: Optional[str] = None, **param_overrides):
         self._lib = _bind(C.CDLL(find_library(lib_path)))
 
         params = SushiTrackParams()
         self._lib.SushiTrack_GetDefaultParams(C.byref(params))
+
+        if config is not None:
+            json_path = None if config == "auto" else config.encode("utf-8")
+            status = self._lib.SushiTrack_LoadParamsFromJson(json_path, C.byref(params))
+            if status != Status.SUCCESS:
+                raise SushiTrackError(
+                    f"SushiTrack_LoadParamsFromJson failed: {Status(status).name}")
+
         for key, value in param_overrides.items():
             if not hasattr(params, key):
                 raise AttributeError(f"Unknown SushiTrack_Params field: {key!r}")

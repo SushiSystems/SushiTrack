@@ -84,6 +84,7 @@ add_library(${PROJECT_NAME} SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Tracklet.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SushiTrackTracker.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SushiTrackC.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ConfigLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DistanceStrategies.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/AssignmentSolvers.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/LAPJV.cpp
@@ -97,6 +98,12 @@ add_library(${PROJECT_NAME} SHARED
 target_include_directories(${PROJECT_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${EIGEN3_INCLUDE_DIR}
+)
+
+# nlohmann/json is a private implementation detail of the JSON config loader;
+# it must not leak onto the public include interface.
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty
 )
 
 

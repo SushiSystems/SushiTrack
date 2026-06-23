@@ -7,16 +7,16 @@
             "track_thresh": 0.2,
             "high_thresh": 0.5,
             "match_thresh": 0.7,
-            "enable_tentative": 1,
             "enable_fsm": 1,
             "enable_reid": 0,
+            "enable_tentative": 1,
             "enable_mahalanobis": 0,
             "enable_interaction_context": 0
         },
         "advanced": {
             "association": {
-                "primary_assoc_mode": 1,
                 "fuse_score": 1,
+                "primary_assoc_mode": 1,
                 "iou_match_thresh": 0.5,
                 "unconfirmed_iou_thresh": 0.7,
                 "duplicate_iou_thresh": 0.15
@@ -63,21 +63,5 @@
                 "interaction_occluder_validity_seconds": 1.2
             }
         }
-    },
-    "bytetrack": {
-        "frame_rate": 25,
-        "track_buffer": 30,
-        "track_thresh": 0.2,
-        "high_thresh": 0.5,
-        "match_thresh": 0.7
-    },
-    "ocsort": {
-        "det_thresh": 0.2,
-        "max_age": 30,
-        "min_hits": 3,
-        "iou_threshold": 0.3,
-        "delta_t": 3,
-        "inertia": 0.2,
-        "use_byte": 1
     }
 }

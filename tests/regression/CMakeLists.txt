@@ -12,7 +12,7 @@
 #   ./regression_test
 #
 # Run with a custom config:
-#   SUSHITRACK_CONFIG=tests/config.json ./regression_test
+#   SUSHITRACK_CONFIG=./sushitrack.json ./regression_test
 #
 # Run a single tracker:
 #   ./regression_test --gtest_filter="MOT/RegressionTest.*sushitrack*"

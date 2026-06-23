@@ -106,11 +106,20 @@ extern "C"
     /**
      * @brief Instantiates a tracker based on provided configuration.
      *
-     * @param params Pointer to the configuration structure.
+     * When @p params is NULL the tracker is built from the runtime configuration
+     * file instead: compiled defaults are seeded and then overlaid with
+     * sushitrack.json resolved through the standard order (see
+     * SushiTrack_CreateFromConfig). Pass an explicit structure to bypass file
+     * loading entirely and configure the tracker programmatically.
+     *
+     * @param params Pointer to the configuration structure, or NULL to load
+     *               from sushitrack.json.
      * @return Handle to the initialized tracker instance, or NULL on failure.
      */
     SushiTrackHdl SushiTrack_Create(const SushiTrack_Params* params)
     {
+        if (!params) return SushiTrack_CreateFromConfig(nullptr);
+
         SushiTrackHdl     hdl    = nullptr;
         SushiTrack_Status status = SushiTrack_CreateEx(params, &hdl);
 
