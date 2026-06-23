@@ -4,4 +4,4 @@ setlocal
 set "PROJECT_ROOT=%~dp0..\.."
 cd /d "%PROJECT_ROOT%"
 
-python .tools\sushitrack.py project run %*
+python cli\sushitrack.py project run %*

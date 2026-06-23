@@ -19,6 +19,7 @@
 
 option(BUILD_UNIT_TEST       "Build deterministic GTest unit tests"          OFF)
 option(BUILD_REGRESSION_TEST "Build MOT label-based regression test runner"  OFF)
+option(BUILD_INTEGRATION_TEST "Build integration tests"                      OFF)
 
 # ---------------------------------------------------------------------------
 # Legacy alias: BUILD_MOT_TEST still works, maps to BUILD_REGRESSION_TEST.
@@ -40,4 +41,9 @@ endif()
 if(BUILD_REGRESSION_TEST)
     message(STATUS "[tests] regression_test target enabled")
     add_subdirectory(regression)
+endif()
+
+if(BUILD_INTEGRATION_TEST)
+    message(STATUS "[tests] integration_test target enabled")
+    add_subdirectory(integration)
 endif()

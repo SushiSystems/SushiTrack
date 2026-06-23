@@ -14,7 +14,7 @@ from typing import Optional
 import sys
 
 _PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
-_TOOLS_DIR = _PROJECT_ROOT / ".tools"
+_TOOLS_DIR = _PROJECT_ROOT / "cli"
 
 if str(_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(_TOOLS_DIR))

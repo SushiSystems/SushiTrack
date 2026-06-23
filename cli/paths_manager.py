@@ -5,7 +5,7 @@ class PathManager:
     def __init__(self, project_root: Path):
         self.project_root = project_root
         self.paths = {}
-        env_file = project_root / ".tools" / "paths.env"
+        env_file = project_root / "cli" / "paths.env"
         if env_file.exists():
             with open(env_file, "r") as f:
                 for line in f:
@@ -19,7 +19,7 @@ class PathManager:
 
 _manager = PathManager(Path(__file__).parent.parent)
 
-DIR_TOOLS = _manager.get("DIR_TOOLS", ".tools")
+DIR_TOOLS = _manager.get("DIR_TOOLS", "cli")
 DIR_BUILD = _manager.get("DIR_BUILD", "build")
 DIR_DATA = _manager.get("DIR_DATA", "data")
 DIR_3RDPARTY = _manager.get("DIR_3RDPARTY", "3rdparty")

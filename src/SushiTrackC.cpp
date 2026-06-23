@@ -60,6 +60,7 @@ extern "C"
 
         params->enable_mahalanobis = 0;
         params->gating_thresh      = 9.4877f;
+        params->proximity_thresh   = 0.7f;
         params->max_area_ratio     = 50.0f;
         params->motion_cost_weight = 0.15f;
 
@@ -151,6 +152,7 @@ extern "C"
 
             config.enable_mahalanobis = (params->enable_mahalanobis != 0);
             config.gating_thresh      = params->gating_thresh;
+            config.proximity_thresh   = params->proximity_thresh;
             config.max_area_ratio     = params->max_area_ratio;
             config.motion_cost_weight = params->motion_cost_weight;
 
@@ -266,7 +268,8 @@ extern "C"
                     config.gating_thresh,
                     active_gate_validator,
                     iou_calc,
-                    config.motion_cost_weight);
+                    config.motion_cost_weight,
+                    config.proximity_thresh);
 
                 if (config.enable_reid)
                 {
@@ -284,12 +287,14 @@ extern "C"
                         config.reid_high_iou_weight,
                         config.reid_high_thresh, config.gating_thresh,
                         active_gate_validator,
-                        gated_iou, cosine_calc, config.reid_direct_assignment_weight);
+                        gated_iou, cosine_calc, config.reid_direct_assignment_weight,
+                        config.proximity_thresh);
                     low_conf_metric      = std::make_shared<SushiTrack::FusedCostCalculator>(
                         config.reid_low_iou_weight,
                         config.reid_low_thresh, config.gating_thresh,
                         active_gate_validator,
-                        gated_iou, cosine_calc, config.reid_direct_assignment_weight);
+                        gated_iou, cosine_calc, config.reid_direct_assignment_weight,
+                        config.proximity_thresh);
                     lost_recovery_metric = std::make_shared<SushiTrack::PureReIDCostCalculator>(
                         config.reid_recovery_thresh, config.gating_thresh, active_gate_validator);
                 }

@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-_TOOLS_DIR = Path(__file__).parent.parent.parent / ".tools"
+_TOOLS_DIR = Path(__file__).parent.parent.parent / "cli"
 if str(_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(_TOOLS_DIR))
 

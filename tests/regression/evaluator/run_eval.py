@@ -13,7 +13,7 @@ from pathlib import Path
 
 _THIS_DIR = Path(__file__).parent
 _PROJECT_ROOT = _THIS_DIR.parent.parent.parent.parent
-_TOOLS_DIR = _PROJECT_ROOT / ".tools"
+_TOOLS_DIR = _PROJECT_ROOT / "cli"
 
 if str(_THIS_DIR) not in sys.path:
     sys.path.insert(0, str(_THIS_DIR))

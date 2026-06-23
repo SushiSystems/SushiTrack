@@ -57,6 +57,12 @@ extern "C"
             d.h = detections[i].h;
             d.score = detections[i].score;
             d.label = detections[i].label;
+            
+            if (detections[i].feat != nullptr && detections[i].feat_dim > 0)
+            {
+                d.feature.assign(detections[i].feat, detections[i].feat + detections[i].feat_dim);
+            }
+            
             dets.push_back(d);
         }
 

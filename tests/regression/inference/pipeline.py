@@ -17,12 +17,75 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Tuple
 from loguru import logger
 
+_YOLOX_AVAILABLE = True
+_YOLOX_IMPORT_ERROR = None
+
 try:
     import torch
     from yolox.exp import get_exp
     from yolox.utils import postprocess
+except ImportError as e:
+    _YOLOX_AVAILABLE = False
+    _YOLOX_IMPORT_ERROR = e
+
+_ONNXRUNTIME_AVAILABLE = True
+try:
+    import onnxruntime as ort
 except ImportError:
-    pass  # We will handle missing YOLOX gracefully if not instantiated
+    _ONNXRUNTIME_AVAILABLE = False
+
+class IFeatureExtractor(ABC):
+    """
+    @brief Abstract interface for appearance feature extraction (ReID).
+    """
+    @abstractmethod
+    def extract(self, img_crops: List[np.ndarray]) -> np.ndarray:
+        """
+        @brief Extracts appearance features for a batch of image crops.
+        
+        @param img_crops List of image crops (NumPy arrays, BGR format).
+        @return A 2D NumPy array of shape (N, feature_dim) containing L2-normalized embeddings.
+        """
+        pass
+
+class OSNetExtractor(IFeatureExtractor):
+    """
+    @brief Concrete implementation of IFeatureExtractor using OSNet via ONNX Runtime.
+    """
+    def __init__(self, model_path: str, device: str = "gpu", input_size: Tuple[int, int] = (256, 128)):
+        if not _ONNXRUNTIME_AVAILABLE:
+            raise ImportError("onnxruntime is not installed. Please install it to use OSNetExtractor.")
+        
+        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if device == 'gpu' else ['CPUExecutionProvider']
+        self.session = ort.InferenceSession(model_path, providers=providers)
+        self.input_name = self.session.get_inputs()[0].name
+        self.input_size = input_size # (Height, Width)
+        self.mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+        self.std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+
+    def extract(self, img_crops: List[np.ndarray]) -> np.ndarray:
+        if not img_crops:
+            return np.zeros((0, 512), dtype=np.float32) # Default 512 for OSNet
+            
+        batch = []
+        for crop in img_crops:
+            if crop.size == 0: # Handle empty crops gracefully
+                crop = np.zeros((self.input_size[0], self.input_size[1], 3), dtype=np.uint8)
+            img = cv2.resize(crop, (self.input_size[1], self.input_size[0]))
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img = img.astype(np.float32) / 255.0
+            img = (img - self.mean) / self.std
+            img = np.transpose(img, (2, 0, 1)) # HWC to CHW
+            batch.append(img)
+            
+        batch_tensor = np.stack(batch, axis=0)
+        features = self.session.run(None, {self.input_name: batch_tensor})[0]
+        
+        # L2 Normalize for Cosine Distance
+        norms = np.linalg.norm(features, axis=1, keepdims=True)
+        features = features / np.clip(norms, 1e-12, None)
+        
+        return features
 
 class IDetector(ABC):
     """
@@ -64,6 +127,11 @@ class YOLOXDetector(IDetector):
         @param num_classes Total number of predictable object classes.
         @param legacy      Boolean flag to use legacy normalization.
         """
+        if not _YOLOX_AVAILABLE:
+            raise ImportError(
+                "YOLOX dependencies are not fully installed or importable. "
+                f"Please ensure all YOLOX requirements are satisfied. Original import error: {_YOLOX_IMPORT_ERROR}"
+            )
         self.device = device
         self.fp16 = False
         self.legacy = legacy
@@ -177,7 +245,7 @@ class VideoPipeline:
     process video streams frame by frame, rendering the results aesthetically.
     """
     
-    def __init__(self, video_path: str, detector: IDetector, stress_mode: bool = False, save_path: str = None, mot_label: bool = False):
+    def __init__(self, video_path: str, detector: IDetector, stress_mode: bool = False, save_path: str = None, mot_label: bool = False, extractor: IFeatureExtractor = None):
         """
         @brief Initializes the VideoPipeline orchestrator.
         
@@ -186,10 +254,12 @@ class VideoPipeline:
         @param stress_mode Flag to disable visual rendering for maximum throughput.
         @param save_path   Optional path to save the output video.
         @param mot_label   Flag to write detections in MOT format to output/det.txt.
+        @param extractor   Optional ReID model for feature extraction.
         """
         self.video_path = video_path
         self.stress_mode = stress_mode
         self.detector = detector
+        self.extractor = extractor
         self.mot_label = mot_label
         self.det_file = None
         
@@ -309,13 +379,37 @@ class VideoPipeline:
             # 1. Detection
             detections, ratio = self.detector.inference(frame)
             
+            # 1.5 Extract Appearance Features (ReID)
+            embeddings = None
+            if self.extractor is not None and len(detections) > 0:
+                crops = []
+                for det in detections:
+                    x, y, w, h = det[0:4]
+                    x1, y1 = max(0, int(x)), max(0, int(y))
+                    x2, y2 = min(frame.shape[1], int(x+w)), min(frame.shape[0], int(y+h))
+                    
+                    if x2 <= x1 or y2 <= y1:
+                        crops.append(np.zeros((0,0,3), dtype=np.uint8))
+                    else:
+                        crops.append(frame[y1:y2, x1:x2])
+                
+                embeddings = self.extractor.extract(crops)
+            
             if self.mot_label and self.det_file is not None:
                 for det in detections:
                     x, y, w, h, score, label = det
                     self.det_file.write(f"{frame_id},-1,{x:.2f},{y:.2f},{w:.2f},{h:.2f},{score:.4f},-1,-1,-1\n")
             
             # 2. Tracking
-            tracks = tracker.update(detections)
+            # Check if tracker supports embeddings in the python bridge
+            try:
+                if embeddings is not None:
+                    tracks = tracker.update(detections, embeddings=embeddings)
+                else:
+                    tracks = tracker.update(detections)
+            except TypeError:
+                # Fallback if tracker bridge hasn't been updated yet
+                tracks = tracker.update(detections)
             
             end_time = time.time()
             total_time += (end_time - start_time)

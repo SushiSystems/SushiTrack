@@ -38,6 +38,7 @@ namespace TestInfrastructure
         float h;     ///< Dimension height.
         float score; ///< Detection confidence.
         int   label; ///< Classification label.
+        std::vector<float> feature; ///< Visual appearance embedding.
     };
 
     /**

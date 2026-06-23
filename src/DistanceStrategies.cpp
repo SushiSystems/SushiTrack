@@ -52,6 +52,39 @@ namespace SushiTrack
                 default:                          return {1.0f,  0.0f, false};
             }
         }
+
+        /**
+         * @brief Computes the plain Intersection-over-Union of two tracklet
+         *        bounding boxes in the closed range [0, 1].
+         *
+         * This deliberately bypasses the injected ICostCalculator: the gated
+         * calculators may wrap a DIoU/GIoU/SIoU variant (or even another gated
+         * calculator) whose calculate_single returns a centroid-penalised cost
+         * rather than the raw overlap. The proximity pre-filter is specified
+         * against the unmodified IoU, so it is computed directly here to keep
+         * the threshold semantics stable regardless of the primary IoU variant.
+         *
+         * @param a Source tracklet.
+         * @param b Candidate tracklet.
+         * @return Raw IoU overlap in [0, 1]; zero when the boxes are disjoint.
+         */
+        inline float rawIoU(const ICostCalculator::TrackletPtr& a,
+                            const ICostCalculator::TrackletPtr& b)
+        {
+            const auto& r1 = a->getRect();
+            const auto& r2 = b->getRect();
+
+            const float iw = std::min(r1.x() + r1.width(),  r2.x() + r2.width())
+                           - std::max(r1.x(), r2.x());
+            if (iw <= 0.0f) return 0.0f;
+            const float ih = std::min(r1.y() + r1.height(), r2.y() + r2.height())
+                           - std::max(r1.y(), r2.y());
+            if (ih <= 0.0f) return 0.0f;
+
+            const float inter = iw * ih;
+            const float ua = r1.width() * r1.height() + r2.width() * r2.height() - inter;
+            return inter / std::max(1e-6f, ua);
+        }
     }
 
     /**
@@ -480,8 +513,14 @@ namespace SushiTrack
                 float enc_h = std::max(r1.y() + r1.height(), r2.y() + r2.height()) - std::min(r1.y(), r2.y()) + offset;
 
                 float gamma = 2.0f - Lambda;
-                float rho_x = std::pow((cx1 - cx2) / std::max(1e-6f, enc_w), 2);
-                float rho_y = std::pow((cy1 - cy2) / std::max(1e-6f, enc_h), 2);
+                // Square directly instead of std::pow(x, 2): the integer exponent
+                // overload of std::pow promotes to double and narrows back to
+                // float (C4244), whereas the explicit product stays in float and
+                // is exact and cheaper.
+                float dx_norm = (cx1 - cx2) / std::max(1e-6f, enc_w);
+                float dy_norm = (cy1 - cy2) / std::max(1e-6f, enc_h);
+                float rho_x = dx_norm * dx_norm;
+                float rho_y = dy_norm * dy_norm;
                 float Delta = (1.0f - std::exp(-gamma * rho_x)) + (1.0f - std::exp(-gamma * rho_y));
 
                 float omega_w = std::abs(r1.width() - r2.width()) / std::max({1e-6f, r1.width(), r2.width()});
@@ -541,8 +580,14 @@ namespace SushiTrack
         float enc_h = std::max(r1.y() + r1.height(), r2.y() + r2.height()) - std::min(r1.y(), r2.y()) + offset;
 
         float gamma = 2.0f - Lambda;
-        float rho_x = std::pow((cx1 - cx2) / std::max(1e-6f, enc_w), 2);
-        float rho_y = std::pow((cy1 - cy2) / std::max(1e-6f, enc_h), 2);
+        // Square directly instead of std::pow(x, 2): the integer exponent
+        // overload of std::pow promotes to double and narrows back to float
+        // (C4244), whereas the explicit product stays in float and is exact
+        // and cheaper.
+        float dx_norm = (cx1 - cx2) / std::max(1e-6f, enc_w);
+        float dy_norm = (cy1 - cy2) / std::max(1e-6f, enc_h);
+        float rho_x = dx_norm * dx_norm;
+        float rho_y = dy_norm * dy_norm;
         float Delta = (1.0f - std::exp(-gamma * rho_x)) + (1.0f - std::exp(-gamma * rho_y));
 
         float omega_w = std::abs(r1.width() - r2.width()) / std::max({1e-6f, r1.width(), r2.width()});
@@ -824,14 +869,16 @@ namespace SushiTrack
                                             std::shared_ptr<IGateValidator> gate_validator,
                                             std::shared_ptr<ICostCalculator> iou_calc,
                                             std::shared_ptr<ICostCalculator> cosine_calc,
-                                            float reid_direct_assignment_weight)
+                                            float reid_direct_assignment_weight,
+                                            float proximity_thresh)
         : iou_weight_(iou_weight),
         reid_thresh_(reid_thresh),
         gating_thresh_(gating_thresh),
         gate_validator_(std::move(gate_validator)),
         iou_calc_(std::move(iou_calc)),
         cosine_calc_(std::move(cosine_calc)),
-        reid_direct_assignment_weight_(reid_direct_assignment_weight)
+        reid_direct_assignment_weight_(reid_direct_assignment_weight),
+        proximity_thresh_(proximity_thresh)
     {
     }
 
@@ -883,6 +930,16 @@ namespace SushiTrack
 
             for (size_t j = 0; j < b.size(); ++j)
             {
+                // Proximity pre-filter: reject spatially implausible pairs before
+                // the statistical gate is consulted. Operates on the raw IoU so
+                // the threshold keeps its meaning irrespective of the primary IoU
+                // variant. Disabled (no-op) when proximity_thresh_ is zero.
+                if (proximity_thresh_ > 0.0f && rawIoU(a[i], b[j]) < proximity_thresh_)
+                {
+                    out_matrix(i, j) = 1e4f;
+                    continue;
+                }
+
                 // Validation gate: Mahalanobis distance exceeding the chi-squared threshold
                 // results in a sentinel cost penalty.
                 if (!in_gate[j])
@@ -938,6 +995,11 @@ namespace SushiTrack
      */
     float FusedCostCalculator::calculate_single(const TrackletPtr& a, const TrackletPtr& b) const
     {
+        if (proximity_thresh_ > 0.0f && rawIoU(a, b) < proximity_thresh_)
+        {
+            return 1e4f;
+        }
+
         KalmanTypes::DetectBoxVector meas_workspace = { b->getMeasurement() };
         std::vector<float>           score_workspace = { b->getScore() };
         std::vector<bool> in_gate = gate_validator_->getGateFlags(
@@ -1039,9 +1101,11 @@ namespace SushiTrack
     GatedIoUCostCalculator::GatedIoUCostCalculator(float gating_thresh,
                                                 std::shared_ptr<IGateValidator> gate_validator,
                                                 std::shared_ptr<ICostCalculator> iou_calc,
-                                                float motion_cost_weight)
+                                                float motion_cost_weight,
+                                                float proximity_thresh)
         : gating_thresh_(gating_thresh),
         motion_cost_weight_(std::max(0.0f, std::min(0.999f, motion_cost_weight))),
+        proximity_thresh_(proximity_thresh),
         gate_validator_(std::move(gate_validator)),
         iou_calc_(std::move(iou_calc))
     {
@@ -1096,6 +1160,16 @@ namespace SushiTrack
 
             for (size_t j = 0; j < b.size(); ++j)
             {
+                // Proximity pre-filter: reject spatially implausible pairs before
+                // the statistical gate is consulted. Operates on the raw IoU so
+                // the threshold keeps its meaning irrespective of the primary IoU
+                // variant. Disabled (no-op) when proximity_thresh_ is zero.
+                if (proximity_thresh_ > 0.0f && rawIoU(a[i], b[j]) < proximity_thresh_)
+                {
+                    out_matrix(i, j) = 1e4f;
+                    continue;
+                }
+
                 // Validation gate: Mahalanobis distance exceeding the chi-squared threshold
                 // results in a sentinel cost penalty.
                 if (!in_gate[j])
@@ -1133,6 +1207,11 @@ namespace SushiTrack
      */
     float GatedIoUCostCalculator::calculate_single(const TrackletPtr& a, const TrackletPtr& b) const
     {
+        if (proximity_thresh_ > 0.0f && rawIoU(a, b) < proximity_thresh_)
+        {
+            return 1e4f;
+        }
+
         KalmanTypes::DetectBoxVector meas_workspace = { b->getMeasurement() };
         std::vector<float>           score_workspace = { b->getScore() };
         std::vector<bool> in_gate = gate_validator_->getGateFlags(

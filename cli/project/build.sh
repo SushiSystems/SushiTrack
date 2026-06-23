@@ -5,30 +5,33 @@ cd "$PROJECT_ROOT"
 
 BUILD_TYPE=Release
 SOURCE_DIR="."
-if [ -f "$PROJECT_ROOT/.tools/paths.env" ]; then
-    export $(grep -v '^#' "$PROJECT_ROOT/.tools/paths.env" | xargs)
+if [ -f "$PROJECT_ROOT/cli/paths.env" ]; then
+    export $(grep -v '^#' "$PROJECT_ROOT/cli/paths.env" | xargs)
 fi
 BUILD_DIR=${DIR_BUILD:-build}
 CLEAN=0
 BUILD_UNIT=0
 BUILD_REGRESSION=0
+BUILD_INTEGRATION=0
 
 for arg in "$@"; do
     case "$arg" in
         --clean)        CLEAN=1 ;;
         --unit)         BUILD_UNIT=1 ;;
         --regression)   BUILD_REGRESSION=1 ;;
-        --test)         BUILD_UNIT=1; BUILD_REGRESSION=1 ;;
+        --integration)  BUILD_INTEGRATION=1 ;;
+        --test)         BUILD_UNIT=1; BUILD_REGRESSION=1; BUILD_INTEGRATION=1 ;;
     esac
 done
 
 # ----------------------------------------------------------------
 # Compose CMake options
 # ----------------------------------------------------------------
-CMAKE_ARGS="-DBUILD_UNIT_TEST=OFF -DBUILD_REGRESSION_TEST=OFF -DBUILD_MOT_TEST=OFF"
+CMAKE_ARGS="-DBUILD_UNIT_TEST=OFF -DBUILD_REGRESSION_TEST=OFF -DBUILD_INTEGRATION_TEST=OFF -DBUILD_MOT_TEST=OFF"
 
 [ $BUILD_UNIT      -eq 1 ] && CMAKE_ARGS="$CMAKE_ARGS -DBUILD_UNIT_TEST=ON"
 [ $BUILD_REGRESSION -eq 1 ] && CMAKE_ARGS="$CMAKE_ARGS -DBUILD_REGRESSION_TEST=ON"
+[ $BUILD_INTEGRATION -eq 1 ] && CMAKE_ARGS="$CMAKE_ARGS -DBUILD_INTEGRATION_TEST=ON"
 
 # ----------------------------------------------------------------
 # Compose build targets
@@ -36,6 +39,7 @@ CMAKE_ARGS="-DBUILD_UNIT_TEST=OFF -DBUILD_REGRESSION_TEST=OFF -DBUILD_MOT_TEST=O
 TARGET_ARGS="--target sushitrack"
 [ $BUILD_UNIT       -eq 1 ] && TARGET_ARGS="$TARGET_ARGS --target unit_test"
 [ $BUILD_REGRESSION -eq 1 ] && TARGET_ARGS="$TARGET_ARGS --target regression_test --target tracker_bridge"
+[ $BUILD_INTEGRATION -eq 1 ] && TARGET_ARGS="$TARGET_ARGS --target integration_test"
 
 # ----------------------------------------------------------------
 # Clean

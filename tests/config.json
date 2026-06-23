@@ -23,8 +23,8 @@
             },
             "coordinate_system": {
                 "enable_xyah": 0,
-                "iou_type": 0,
-                "iou_plus_one": 0,
+                "iou_type": 1,
+                "iou_plus_one": 1,
                 "kalman_type": 0
             },
             "reid_params": {

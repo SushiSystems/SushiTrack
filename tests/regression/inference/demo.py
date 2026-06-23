@@ -17,7 +17,7 @@ from loguru import logger
 # Ensure we can import from the local directory and the project root
 _THIS_DIR = Path(__file__).parent
 _PROJECT_ROOT = _THIS_DIR.parent.parent.parent
-_TOOLS_DIR = _PROJECT_ROOT / ".tools"
+_TOOLS_DIR = _PROJECT_ROOT / "cli"
 
 if str(_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(_TOOLS_DIR))
@@ -34,7 +34,7 @@ sys.path.append(str(_THIS_DIR))
 sys.path.append(str(_YOLOX_DIR))
 
 from tracker_bridge import TrackerBridge
-from pipeline import VideoPipeline, YOLOXDetector
+from pipeline import VideoPipeline, YOLOXDetector, OSNetExtractor
 
 def make_parser() -> argparse.ArgumentParser:
     """
@@ -62,6 +62,10 @@ def make_parser() -> argparse.ArgumentParser:
     parser.add_argument("--legacy", action="store_true", help="Use legacy normalization (BGR2RGB, 0-1 scale, Mean/Std)")
     parser.add_argument("--mot-label", action="store_true", help="Write detections to output/det.txt in MOT format")
     parser.add_argument("--no-screen", action="store_true", help="Disable UI display for maximum speed")
+    
+    # ReID Arguments
+    parser.add_argument("--reid", action="store_true", help="Enable appearance feature extraction")
+    parser.add_argument("--reid-model", type=str, default="osnet_x1_0.onnx", help="Path to ReID ONNX model")
     
     return parser
 
@@ -116,9 +120,15 @@ def main():
         # 3. Initialize Tracker Bridge
         tracker = TrackerBridge(tracker_name=args.tracker, build_dir=str(_BUILD_DIR))
         logger.info(f"[Demo] {args.tracker} Tracker loaded successfully.")
+        
+        # 3.5 Initialize ReID Extractor
+        extractor = None
+        if args.reid:
+            logger.info(f"[Demo] Loading ReID Extractor with model: {args.reid_model}")
+            extractor = OSNetExtractor(model_path=args.reid_model, device=args.device)
 
         # 4. Initialize Pipeline
-        pipeline = VideoPipeline(video_path=args.source, detector=detector, stress_mode=is_stress, save_path=save_path, mot_label=args.mot_label)
+        pipeline = VideoPipeline(video_path=args.source, detector=detector, stress_mode=is_stress, save_path=save_path, mot_label=args.mot_label, extractor=extractor)
         logger.info("[Demo] Pipeline orchestrator initialized.")
 
         # Run Pipeline

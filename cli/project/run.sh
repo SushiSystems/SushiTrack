@@ -4,4 +4,4 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$PROJECT_ROOT"
 
 # Fallback to python runner for better logic
-python3 .tools/sushitrack.py project run "$@"
+python3 cli/sushitrack.py project run "$@"

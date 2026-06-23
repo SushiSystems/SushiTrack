@@ -5,7 +5,7 @@ BLUE='\033[94m'
 GREEN='\033[92m'
 RESET='\033[0m'
 
-# Get project root (three levels up from .tools/misc)
+# Get project root (three levels up from cli/misc)
 TOOLS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
 ROOT_DIR="$( cd "$TOOLS_DIR/.." && pwd )"
 

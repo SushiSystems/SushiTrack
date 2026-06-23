@@ -124,6 +124,8 @@ extern "C"
         float h;     ///< Dimension height.
         float score; ///< Detection confidence.
         int label;   ///< Classification label.
+        const float* feat; ///< Appearance feature embedding.
+        int feat_dim;      ///< Dimension of the feature vector.
     };
 
     /**

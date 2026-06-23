@@ -108,7 +108,7 @@ namespace TestInfrastructure
                 for (const auto& d : dets)
                     objects.emplace_back(
                         SushiTrack::Rect<float>(d.x, d.y, d.w, d.h),
-                        d.label, d.score);
+                        d.label, d.score, d.feature);
 
                 auto tracklets = impl_->tracker->update(objects, dt);
 

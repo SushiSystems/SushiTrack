@@ -5,8 +5,8 @@ cd "$PROJECT_ROOT"
 
 echo "[INFO] Cleaning project build artifacts..."
 
-if [ -f "$PROJECT_ROOT/.tools/paths.env" ]; then
-    export $(grep -v '^#' "$PROJECT_ROOT/.tools/paths.env" | xargs)
+if [ -f "$PROJECT_ROOT/cli/paths.env" ]; then
+    export $(grep -v '^#' "$PROJECT_ROOT/cli/paths.env" | xargs)
 fi
 BUILD_DIR=${DIR_BUILD:-build}
 

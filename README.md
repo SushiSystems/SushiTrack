@@ -1,6 +1,21 @@
 # SushiTrack
 
-A C++17 multi-object tracking library. SushiTrack extends the ByteTrack two-stage association pipeline with an interface-driven, dependency-injected architecture, four IoU variants, multiple cost calculators, visual ReID fusion, Mahalanobis gating, a Noise-Scale-Adaptive Kalman filter, a per-track kinematic finite state machine, a scene-level interaction graph for occlusion-aware lost-track recovery, real-time (`time_aware`) operation, tentative track validation, and a stable C API. A Python CLI (`sushitrack`/`ds`), an MOT-Challenge-style regression harness, a GTest unit suite, and a YOLOX-driven video inference pipeline are bundled.
+A C++17 multi-object tracking library built on the ByteTrack two-stage
+association pipeline. It uses an interface-driven, dependency-injected
+architecture: motion models, cost calculators, gating, and the assignment
+solver are selected at runtime through the C API.
+
+The default configuration runs the core path (IoU/DIoU two-stage association,
+tentative validation, Kalman prediction, lost-track buffering, LAPJV
+assignment). The following extensions are optional and **disabled by default**:
+four IoU variants, appearance ReID fusion, Mahalanobis gating, a
+Noise-Scale-Adaptive Kalman filter, a per-track kinematic finite state machine,
+a scene-level interaction graph for occlusion-aware lost-track recovery,
+real-time (`time_aware`) operation, and the `proximity_thresh` pre-filter.
+
+A stable C API, a Python CLI (`sushitrack`/`ds`), a MOTChallenge and DanceTrack
+regression harness, a GTest unit suite, and a YOLOX-driven video inference
+pipeline are included.
 
 ---
 
@@ -19,16 +34,19 @@ A C++17 multi-object tracking library. SushiTrack extends the ByteTrack two-stag
   - [project build](#project-build)
   - [project test all](#project-test-all)
   - [project test unit](#project-test-unit)
+  - [project test integration](#project-test-integration)
   - [project test label](#project-test-label)
   - [project test inference](#project-test-inference)
   - [project clean](#project-clean)
   - [docker build / docker run](#docker-build--docker-run)
 - [C API](#c-api)
+- [Python Binding](#python-binding)
 - [Data Layout](#data-layout)
 - [Configuration Parameters](#configuration-parameters)
 - [Test Suites](#test-suites)
 - [Evaluation Pipeline](#evaluation-pipeline)
 - [Inference Pipeline](#inference-pipeline)
+- [Ultralytics Integration](#ultralytics-integration)
 - [Internal Tools](#internal-tools)
 - [Benchmark Results](#benchmark-results)
 - [License](#license)
@@ -111,7 +129,8 @@ Visual features are L2-normalised and exponentially smoothed (`feature_momentum`
 | Python | 3.11 |
 | Docker (optional) | Engine ≥ 20.10 with NVIDIA Container Toolkit for CUDA inference |
 
-Python runtime dependencies (managed by `environment.yml` / `Dockerfile`): `numpy==2.4.3`, `pandas==3.0.2`, `scipy==1.17.1`, `pytest==9.0.3`, `absl-py==2.4.0`, `loguru==0.7.3`, `matplotlib==3.10.9`, `opencv-python==4.13.0.92`, `pillow==12.1.1`, `pycocotools==2.0.11`, `rich==15.0.0`, `tqdm==4.67.3`, `torch==2.5.1+cu121`, `torchvision==0.20.1+cu121`, `torchaudio==2.5.1+cu121`.
+Python runtime dependencies are defined by `environment.yml` (the source of
+truth): `numpy==2.4.4`, `pandas==3.0.2`, `scipy==1.17.1`, `pytest==9.0.3`, `absl-py==2.4.0`, `loguru==0.7.3`, `matplotlib==3.10.9`, `opencv-python==4.13.0.92`, `pillow==12.2.0`, `pycocotools==2.0.11`, `rich==15.0.0`, `tqdm==4.67.3`. PyTorch (`torch`/`torchvision`/`torchaudio`) is installed from the conda `pytorch` channel with `pytorch-cuda=12.1`. The `Dockerfile` mirrors the same package set via pip and pins PyTorch to `torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1` from the cu121 wheel index.
 
 Compiler flags: MSVC compiles with `/W3 /O2 /Ot /fp:fast /arch:AVX2 /DNDEBUG`; GCC/Clang compile with `-Wall -O3 -ffast-math -funroll-loops -DNDEBUG`. Library is built `SHARED`; on Windows `CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS` is `ON`. Outputs are unified under `${CMAKE_BINARY_DIR}/bin` and `${CMAKE_BINARY_DIR}/lib`.
 
@@ -159,15 +178,22 @@ sushitrack/
 │
 ├── src/                          # Library implementations (mirrors include/)
 │
+├── bindings/
+│   └── python/
+│       └── sushitrack.py          # ctypes binding to the public C API
+│
 ├── 3rdparty/
 │   ├── eigen/                    # Header-only linear algebra
+│   ├── nlohmann/                 # Header-only JSON (config parsing)
 │   ├── bytetrack/                # Reference ByteTrack for regression comparison
 │   ├── ocsort/                   # Reference OC-SORT for regression comparison
-│   ├── TrackEval/                # Official MOT-Challenge evaluator (used optionally)
-│   └── yolox/                    # YOLOX detector (used by the inference pipeline)
+│   ├── TrackEval/                # Official MOTChallenge evaluator (used optionally)
+│   ├── yolox/                    # YOLOX detector (used by the inference pipeline)
+│   ├── weight/                   # Detector / ReID model weights
+│   └── video/                    # Sample input clips
 │
 ├── tests/
-│   ├── CMakeLists.txt            # Options BUILD_UNIT_TEST / BUILD_REGRESSION_TEST
+│   ├── CMakeLists.txt            # Options BUILD_UNIT_TEST / BUILD_REGRESSION_TEST / BUILD_INTEGRATION_TEST
 │   ├── unit/                     # GTest deterministic unit tests
 │   │   ├── CMakeLists.txt
 │   │   ├── UnitTest.cpp          # GTest main
@@ -191,6 +217,17 @@ sushitrack/
 │   │   ├── TestBoundaryConditions.cpp
 │   │   └── TestConfiguration.cpp
 │   │
+│   ├── integration/             # GTest end-to-end suite over the C API
+│   │   ├── CMakeLists.txt
+│   │   ├── Main.cpp
+│   │   ├── Helpers.h
+│   │   ├── TestByteAssociation.cpp
+│   │   ├── TestOcclusionRecovery.cpp
+│   │   ├── TestMultiObject.cpp
+│   │   ├── TestConfigVariations.cpp
+│   │   ├── TestAdvancedPath.cpp
+│   │   └── TestFullStack.cpp
+│   │
 │   └── regression/
 │       ├── CMakeLists.txt        # regression_test executable + tracker_bridge shared lib
 │       ├── RegressionTest.cpp    # GTest entry; parameterised over (scenario × tracker)
@@ -213,26 +250,37 @@ sushitrack/
 │       └── inference/            # Python video inference pipeline
 │           ├── demo.py           # CLI front-end
 │           ├── pipeline.py       # IDetector, YOLOXDetector, VideoPipeline
-│           └── tracker_bridge.py # ctypes binding to libtracker_bridge.so / .dll
+│           └── tracker_bridge.py # SushiTrack -> public binding; ByteTrack/OCSORT -> shim
 │
 ├── docs/
 │   ├── CHANGELOG.md
 │   └── benchmarks/PRIVATE.md     # Internal benchmark log
 │
-└── .tools/
+└── cli/
     ├── sushitrack.py              # CLI entry point (argparse, subcommand dispatcher)
-    ├── sushitrack.sh              # Direct shell wrapper
-    ├── ds.sh                     # Short shell wrapper
+    ├── sushitrack.sh              # Shell wrapper (bash/zsh)
+    ├── sushitrack.bat             # Shell wrapper (Windows)
+    ├── ds.sh                     # Short alias (bash/zsh)
+    ├── ds.bat                    # Short alias (Windows)
     ├── install.sh                # Session installer (bash/zsh)
     ├── install.ps1               # Session installer (PowerShell)
-    ├── paths_manager.py          # Loads .tools/paths.env overrides
+    ├── paths_manager.py          # Loads cli/paths.env overrides
+    ├── paths.env                 # Optional path overrides (not tracked)
     ├── docker/
-    │   └── run.sh                # Bind-mounted container launcher
+    │   ├── build.sh              # docker build wrapper (bash)
+    │   ├── build.bat             # docker build wrapper (Windows)
+    │   ├── run.sh                # Bind-mounted container launcher (bash)
+    │   └── run.bat               # Bind-mounted container launcher (Windows)
     ├── project/
-    │   ├── run.sh                # Forwards to sushitrack.py project run
-    │   └── clean.sh              # Removes build/
+    │   ├── build.sh              # CMake configure + build (bash)
+    │   ├── build.bat             # CMake configure + build (Windows)
+    │   ├── run.sh                # Forwards to sushitrack.py project run (bash)
+    │   ├── run.bat               # Forwards to sushitrack.py project run (Windows)
+    │   ├── clean.sh              # Removes build/ (bash)
+    │   └── clean.bat             # Removes build/ (Windows)
     └── misc/
         ├── clean_preds.sh        # Wipes pred/ directories under evaluator/data
+        ├── clean_preds.bat       # Wipes pred/ directories under evaluator/data (Windows)
         └── construct_trackeval_data.ps1 # Links GT + copies preds into TrackEval layout
 ```
 
@@ -242,20 +290,20 @@ sushitrack/
 
 ### CLI installer (PowerShell / Bash)
 
-The installer registers `sushitrack` and `ds` as aliases that invoke `.tools/sushitrack.py` and prepends `.tools/` to `PATH` for the current session.
+The installer registers `sushitrack` and `ds` as aliases that invoke `cli/sushitrack.py` and prepends `cli/` to `PATH` for the current session.
 
 PowerShell:
 
 ```powershell
-Unblock-File ./.tools/install.ps1
+Unblock-File ./cli/install.ps1
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-. ./.tools/install.ps1
+. ./cli/install.ps1
 ```
 
 Bash/Zsh:
 
 ```bash
-source .tools/install.sh
+source cli/install.sh
 ```
 
 To make permanent, append the printed lines to `$PROFILE` (PowerShell) or `~/.bashrc` / `~/.zshrc` (Unix).
@@ -267,7 +315,7 @@ conda env create -f environment.yml
 conda activate sushitrack
 ```
 
-`environment.yml` installs Python 3.11, CMake, Ninja, GoogleTest, and the full pip dependency set (numpy/pandas/scipy/torch+cu121/opencv/loguru/rich/pytest/etc.).
+`environment.yml` installs Python 3.11, CMake, Ninja, GoogleTest, PyTorch from the conda `pytorch` channel (`pytorch-cuda=12.1`), and the remaining pip dependency set (numpy/pandas/scipy/opencv/loguru/rich/pytest/etc.).
 
 ### Docker
 
@@ -288,12 +336,12 @@ The build uses CMake with three options:
 |---|---|---|
 | `BUILD_UNIT_TEST` | OFF | Compiles `unit_test` GTest executable |
 | `BUILD_REGRESSION_TEST` | OFF | Compiles `regression_test` executable and `tracker_bridge` shared library |
-| `BUILD_MOT_TEST` | OFF | Deprecated alias for `BUILD_REGRESSION_TEST` |
+| `BUILD_INTEGRATION_TEST` | OFF | Compiles `integration_test` GTest executable |
 
 Direct CMake invocation:
 
 ```bash
-cmake -B build -S . -G Ninja -DBUILD_UNIT_TEST=ON -DBUILD_REGRESSION_TEST=ON
+cmake -B build -S . -G Ninja -DBUILD_UNIT_TEST=ON -DBUILD_REGRESSION_TEST=ON -DBUILD_INTEGRATION_TEST=ON
 cmake --build build --config Release
 ```
 
@@ -303,11 +351,12 @@ Through the CLI (preferred):
 sushitrack project build                      # library only
 sushitrack project build --unit               # library + unit_test
 sushitrack project build --regression         # library + regression_test + tracker_bridge
-sushitrack project build --test               # alias for --unit --regression (deprecated)
+sushitrack project build --integration        # library + integration_test
+sushitrack project build --test               # all targets: unit + regression + integration
 sushitrack project build --clean              # wipe build/ first; combinable with the above
 ```
 
-Artefacts: `build/bin/{Release,Debug}/sushitrack.{dll,so}`, `build/bin/.../unit_test{,.exe}`, `build/bin/.../regression_test{,.exe}`, `build/bin/.../tracker_bridge.{dll,so}`.
+Artefacts: `build/bin/{Release,Debug}/sushitrack.{dll,so}`, `build/bin/.../unit_test{,.exe}`, `build/bin/.../regression_test{,.exe}`, `build/bin/.../integration_test{,.exe}`, `build/bin/.../tracker_bridge.{dll,so}`.
 
 ---
 
@@ -322,11 +371,12 @@ All commands take the form `sushitrack <command> <action> [flags]`. `ds` is a sh
 | `--clean` | Remove the build directory before configuring |
 | `--unit` | Add `unit_test` target |
 | `--regression` | Add `regression_test` + `tracker_bridge` |
-| `--test` | Deprecated alias for `--unit --regression` |
+| `--integration` | Add `integration_test` target |
+| `--test` | Build all test targets: `--unit --regression --integration` |
 
 ### `project test all`
 
-Default when `test_type` is omitted. Runs the unit suite first; if it passes, runs the label regression suite. Fail-fast: label is skipped if unit fails.
+Default when `test_type` is omitted. Runs the unit suite, then the integration suite, then the label regression suite. Fail-fast: each stage is skipped if a prior stage fails.
 
 ```bash
 sushitrack project test                # equivalent to 'project test all'
@@ -344,6 +394,14 @@ Runs the compiled `unit_test` GTest binary.
 ```bash
 sushitrack project test unit
 sushitrack project test unit --filter "TrackFSMTest.*" --verbose
+```
+
+### `project test integration`
+
+Runs the compiled `integration_test` GTest binary (end-to-end coverage driven through the C API). Requires `--integration` build.
+
+```bash
+sushitrack project test integration
 ```
 
 ### `project test label`
@@ -392,6 +450,8 @@ Launches the YOLOX-driven video inference pipeline (`tests/regression/inference/
 | `--save_name <name>` | – | Output filename override |
 | `--mot-label` | off | Append detections to `output/det.txt` in MOT format |
 | `--no-screen` | off | Disable UI display |
+| `--reid` | off | Enable OSNet ReID embedding extraction (fills `feat` per detection) |
+| `--reid-model <path>` | `osnet_x1_0.onnx` | Path to the ReID ONNX model |
 
 Examples:
 
@@ -409,7 +469,7 @@ If the YOLOX checkpoint filename contains `mot17` and `--tsize` is omitted/640, 
 
 ### `project clean`
 
-Removes the build directory (`build/` by default; overridable via `.tools/paths.env`).
+Removes the build directory (`build/` by default; overridable via `cli/paths.env`).
 
 ```bash
 sushitrack project clean
@@ -417,7 +477,7 @@ sushitrack project clean
 
 ### `docker build` / `docker run`
 
-Wrappers around `.tools/docker/build.sh` and `.tools/docker/run.sh`. The run script issues `docker run -it --rm -v "$(pwd):/workspace/sushitrack" sushitrack bash`.
+Wrappers around `cli/docker/build.sh` and `cli/docker/run.sh`. The run script issues `docker run -it --rm -v "$(pwd):/workspace/sushitrack" sushitrack bash`.
 
 ```bash
 sushitrack docker build
@@ -482,6 +542,40 @@ SushiTrack_SetLogCallback(my_logger);  /* pass NULL to unregister */
 
 ---
 
+## Python Binding
+
+`bindings/python/sushitrack.py` is a dependency-free `ctypes` binding to the
+public C API. It mirrors `SushiTrack_Object`, `SushiTrack_Track`, and
+`SushiTrack_Params` exactly and wraps the entry points in a `SushiTrack` class, so
+callers never write `ctypes` themselves. The shared library is located
+automatically under `build/` (override with the `SUSHITRACK_LIB` environment
+variable or the `lib_path` argument).
+
+```python
+from sushitrack import SushiTrack, TrackState
+
+# Any SushiTrack_Params field is a keyword override; the rest keep their defaults.
+tracker = SushiTrack(frame_rate=30, enable_tentative=1, iou_type=1)
+
+for frame in stream:
+    # detections: (x, y, w, h, score, label) with top-left x, y
+    # (optionally a 7th element: a 1-D appearance embedding for ReID)
+    dets   = [(x, y, w, h, score, label), ...]
+    tracks = tracker.update(dets, dt=1.0 / 30.0)
+    for t in tracks:
+        if t.state is TrackState.TRACKED:
+            print(t.track_id, t.x, t.y, t.width, t.height)
+
+tracker.close()                       # or use `with SushiTrack(...) as tracker:`
+```
+
+`update` returns a list of `Track` named tuples (`track_id`, box, `score`,
+`label`, `state`, `kinematic_state`, `age`, `lost_time`, `hits`, …) sorted by
+lifecycle priority. `Status`, `TrackState`, and `KinematicState` are exposed as
+`IntEnum`s; `set_log_callback(fn)` registers a `fn(level, message)` logger.
+
+---
+
 ## Data Layout
 
 The regression harness reads from `tests/regression/evaluator/data/`:
@@ -508,7 +602,7 @@ MOT CSV format:
 
 `seqinfo.ini` is parsed for `frameRate` (used for `dt = 1/frameRate` when `time_aware=1`). If absent, 30 fps is assumed.
 
-Prediction files are written to `<sequence>/pred/<tracker>/<sequence>.txt` after each regression run. `.tools/misc/clean_preds.sh` wipes every `pred/` subdirectory.
+Prediction files are written to `<sequence>/pred/<tracker>/<sequence>.txt` after each regression run. `cli/misc/clean_preds.sh` wipes every `pred/` subdirectory.
 
 ### Tracker config file
 
@@ -686,6 +780,24 @@ Direct invocation:
 SUSHITRACK_CONFIG=tests/config.json ./build/bin/Release/regression_test
 ```
 
+### Integration tests (`integration_test`)
+
+GTest binary that drives the tracker end-to-end exclusively through the C API, as a downstream FFI consumer would. Targets compiled when `-DBUILD_INTEGRATION_TEST=ON`. Cover:
+
+- `TestByteAssociation` — two-stage BYTE association: low-confidence sustain, new-track seeding rules
+- `TestOcclusionRecovery` — lost-track buffering, within/beyond-buffer recovery, no id transfer
+- `TestMultiObject` — identity separation, counter-moving pass, output capacity/priority contract
+- `TestConfigVariations` — IoU variant sweep, XYAH coordinates, NSA Kalman
+- `TestAdvancedPath` — ReID + Mahalanobis gating
+- `TestFullStack` — full advanced stack enabled at once
+
+Direct invocation:
+
+```bash
+./build/bin/Release/integration_test
+ctest -R integration --output-on-failure
+```
+
 ---
 
 ## Evaluation Pipeline
@@ -704,7 +816,7 @@ SUSHITRACK_CONFIG=tests/config.json ./build/bin/Release/regression_test
 
 `tests/regression/inference/`:
 
-- **`tracker_bridge.py`** — `TrackerBridge` ctypes wrapper that loads `tracker_bridge.{dll,so}`. Exposes `create_tracker(name)`, `tracker_process_c(...)`, `delete_tracker(...)`. The shared library is built from `tests/regression/TrackerRegistry.cpp` when `-DBUILD_REGRESSION_TEST=ON`.
+- **`tracker_bridge.py`** — `TrackerBridge` dispatches per tracker. `SushiTrack` is driven through the public-API binding ([`bindings/python/sushitrack.py`](#python-binding)), so the C API is consumed in one place and the binding is exercised on every inference frame. The reference trackers (`ByteTrack`, `OCSORT`) have no public C API and stay on the `TrackerRegistry` shim (`create_tracker` / `tracker_process_c` / `delete_tracker` in `tracker_bridge.{dll,so}`, built from `tests/regression/TrackerRegistry.cpp` when `-DBUILD_REGRESSION_TEST=ON`). Both paths return the same `{track_id, bbox, score}` shape.
 - **`pipeline.py`** — defines `IDetector`, `YOLOXDetector` (loads weights via `yolox.exp.get_exp`, preprocesses with optional legacy normalisation, runs inference, postprocesses with NMS), and `VideoPipeline` (frame loop, detection→tracker hand-off, drawing, optional MOT-format detection logging, stress/no-screen modes).
 - **`demo.py`** — argparse front-end exposing the full YOLOX + tracker flag set. Invoked through `sushitrack project test inference`.
 
@@ -722,20 +834,185 @@ The pipeline auto-detects MOT17 checkpoints by filename and sets `tsize=(800,144
 
 ---
 
+## Ultralytics Integration
+
+SushiTrack can replace ByteTrack/BoT-SORT as the tracker behind an Ultralytics
+YOLO model (`model.track(...)`) so that any Ultralytics detector — YOLOv8/v9/v10/11,
+RT-DETR, or a custom-trained checkpoint — feeds its detections into SushiTrack
+per frame. The integration is **non-invasive**: you do not fork or modify the
+`ultralytics` package. You build the SushiTrack shared library, wrap its C API
+with a thin `ctypes` adapter that satisfies the Ultralytics tracker contract,
+and register that adapter through Ultralytics' public prediction callbacks.
+
+> This section documents the porting recipe only. No adapter code is shipped in
+> this repository — the snippets below are the reference implementation you copy
+> into your Ultralytics project.
+
+### How Ultralytics tracking works
+
+`model.track()` installs two callbacks (`ultralytics/trackers/track.py`):
+
+- **`on_predict_start`** — instantiates one tracker object per batch stream from
+  `TRACKER_MAP[cfg.tracker_type]` and stores them on `predictor.trackers`.
+- **`on_predict_postprocess_end`** — for each frame, takes the detection
+  `Boxes` (`predictor.results[i].boxes`), calls `tracker.update(det, img)`, and
+  expects back an `(N, 7+)` array whose **last column is the source detection
+  index**. Ultralytics slices the results by that index and overwrites the boxes
+  with columns `[:-1]`, laid out as `[x1, y1, x2, y2, track_id, conf, cls]`.
+
+Any object exposing a compatible `update(results, img=None)` method can take the
+place of `BYTETracker`. That is the single seam SushiTrack plugs into.
+
+### Step 1 — Build the shared library
+
+```bash
+sushitrack project build           # produces build/bin/<cfg>/sushitrack.{dll,so}
+# or directly:
+cmake -B build -S . -G Ninja
+cmake --build build --config Release
+```
+
+The adapter below uses the shipped Python binding
+([`bindings/python/sushitrack.py`](#python-binding)), which already wraps the
+**public C API** (`include/SushiTrackC.h`) — not the regression `tracker_bridge`,
+whose reduced struct omits the state/feature/kinematic fields.
+
+### Step 2 — Implement the Ultralytics tracker contract
+
+The adapter converts Ultralytics detections into SushiTrack detections, calls
+`SushiTrack.update`, and emits the `(N, 7)` array Ultralytics expects, plus the
+detection-index column.
+
+Two conversions matter:
+
+- **Coordinates.** Ultralytics `Boxes.xywh` is **centre-based** (`cx, cy, w, h`);
+  SushiTrack consumes **top-left** `x, y, w, h`. Use `Boxes.xyxy` and derive
+  `x = x1`, `y = y1`, `w = x2 - x1`, `h = y2 - y1` to avoid sign mistakes.
+- **Detection index.** The C API returns a filtered/Kalman-smoothed box and does
+  **not** echo which input detection produced each track. Ultralytics needs that
+  index to slice masks/probs. Recover it by greedy IoU-matching each output
+  track box against the input detections of the current frame.
+
+```python
+import numpy as np
+from sushitrack import SushiTrack, TrackState     # bindings/python/sushitrack.py
+
+class SushiTrackTracker:
+    def __init__(self, frame_rate=30, **overrides):
+        # overrides are SushiTrack_Params fields, e.g. enable_tentative=1, iou_type=1
+        self.ds = SushiTrack(frame_rate=frame_rate, **overrides)
+        self.dt = 1.0 / float(frame_rate)
+
+    def update(self, results, img=None):
+        xyxy = results.xyxy.cpu().numpy() if hasattr(results.xyxy, "cpu") else np.asarray(results.xyxy)
+        conf = np.asarray(results.conf)
+        cls  = np.asarray(results.cls)
+
+        dets = [(x1, y1, x2 - x1, y2 - y1, float(c), int(k))
+                for (x1, y1, x2, y2), c, k in zip(xyxy, conf, cls)]
+        tracks = self.ds.update(dets, dt=self.dt)
+
+        rows = []
+        for t in tracks:
+            if t.state not in (TrackState.TRACKED, TrackState.TENTATIVE):
+                continue
+            box = np.array([t.x, t.y, t.x + t.width, t.y + t.height])
+            j = self._best_iou_idx(box, xyxy)            # recover detection index
+            if j < 0:
+                continue
+            rows.append([box[0], box[1], box[2], box[3], t.track_id, t.score, t.label, j])
+        return np.asarray(rows, dtype=np.float32) if rows else np.empty((0, 8), np.float32)
+
+    @staticmethod
+    def _best_iou_idx(box, dets, thr=0.3):
+        if len(dets) == 0:
+            return -1
+        xx1 = np.maximum(box[0], dets[:, 0]); yy1 = np.maximum(box[1], dets[:, 1])
+        xx2 = np.minimum(box[2], dets[:, 2]); yy2 = np.minimum(box[3], dets[:, 3])
+        w = np.clip(xx2 - xx1, 0, None); h = np.clip(yy2 - yy1, 0, None)
+        inter = w * h
+        area_b = (box[2]-box[0]) * (box[3]-box[1])
+        area_d = (dets[:,2]-dets[:,0]) * (dets[:,3]-dets[:,1])
+        iou = inter / (area_b + area_d - inter + 1e-9)
+        j = int(iou.argmax())
+        return j if iou[j] >= thr else -1
+```
+
+### Step 3 — Register the adapter with `model.track()`
+
+No package fork required — install the adapter through the same callbacks
+Ultralytics itself uses. The binding finds the shared library automatically
+under `build/` (or set `SUSHITRACK_LIB`):
+
+```python
+from ultralytics import YOLO
+from sushitrack_adapter import SushiTrackTracker
+
+def on_predict_start(predictor, persist=False):
+    bs = predictor.dataset.bs
+    predictor.trackers = [
+        SushiTrackTracker(frame_rate=30, enable_tentative=1, iou_type=1)
+        for _ in range(bs)
+    ]
+
+model = YOLO("yolo11n.pt")
+model.add_callback("on_predict_start", on_predict_start)
+
+for result in model.track(source="video.mp4", stream=True, persist=True):
+    boxes = result.boxes
+    if boxes.id is not None:
+        ids   = boxes.id.int().tolist()
+        xyxy  = boxes.xyxy.tolist()
+        # ... your downstream logic ...
+```
+
+Because Ultralytics' built-in `on_predict_postprocess_end` already calls
+`predictor.trackers[i].update(...)` and interprets the returned array, supplying
+your own `on_predict_start` is enough to swap the tracker. (Alternatively, fork
+the package and add `"sushitrack": SushiTrackTracker` to `TRACKER_MAP` with a
+matching `sushitrack.yaml`; the callback route above avoids touching vendored
+code and is the recommended path.)
+
+### Notes and caveats
+
+- **Top-left vs. centre coordinates** are the most common integration bug —
+  always derive SushiTrack boxes from `xyxy`.
+- **Detection-index recovery** via IoU is robust when the Kalman correction is
+  small; for fast motion raise `max_tracks` and lower the IoU floor rather than
+  asserting a 1:1 mapping. Tracks with no input overlap (pure Kalman coasting
+  during a missed frame) are intentionally dropped from the Ultralytics output
+  for that frame, exactly as the built-in trackers do.
+- **ReID is off in this recipe.** SushiTrack's appearance path expects an
+  external embedding per detection; Ultralytics detection models do not produce
+  one. To enable `enable_reid=1`, run an embedding extractor (e.g. the OSNet path
+  used by the YOLOX inference pipeline) and append the 1-D embedding as a 7th
+  element of each detection tuple passed to `update`. Without it the tracker uses
+  the geometry fallback.
+- **Class handling.** SushiTrack associates across all detections regardless of
+  `label`; pass `classes=[...]` to `model.track()` if you need per-class
+  filtering upstream, or partition detections before `update()`.
+- **Stateful streaming.** Create the tracker once per stream and reuse the
+  handle across frames (as above). Re-creating it per frame resets all IDs.
+
+---
+
 ## Internal Tools
 
 | File | Purpose |
 |---|---|
-| `.tools/sushitrack.py` | argparse-based CLI; subcommand dispatcher; binary discovery; TrackEval orchestration |
-| `.tools/paths_manager.py` | Loads `paths.env` overrides for `DIR_TOOLS`, `DIR_BUILD`, `DIR_DATA`, `DIR_3RDPARTY`, `DIR_TESTS`, `DIR_REGRESSION`, `DIR_EVALUATOR`, `DIR_INFERENCE` |
-| `.tools/install.sh` | Bash/Zsh aliases and PATH setup; prints permanent-install lines |
-| `.tools/install.ps1` | PowerShell session functions for `ds` / `sushitrack` |
-| `.tools/sushitrack.sh` / `.tools/ds.sh` | Shell wrappers — `python3 sushitrack.py "$@"` |
-| `.tools/project/run.sh` | Forwards to `sushitrack.py project run` |
-| `.tools/project/clean.sh` | Removes the build directory honouring `DIR_BUILD` from `paths.env` |
-| `.tools/docker/run.sh` | `docker run -it --rm -v $(pwd):/workspace/sushitrack sushitrack bash` |
-| `.tools/misc/clean_preds.sh` | Recursively removes `pred/` directories under the evaluator data root |
-| `.tools/misc/construct_trackeval_data.ps1` | Creates the official TrackEval directory tree by symlinking GT (MOT17-SDP as representative for each sequence) and copying per-tracker predictions for `sushitrack`/`bytetrack`/`ocsort` |
+| `cli/sushitrack.py` | argparse-based CLI; subcommand dispatcher; binary discovery; TrackEval orchestration |
+| `cli/paths_manager.py` | Loads `paths.env` overrides for `DIR_TOOLS`, `DIR_BUILD`, `DIR_DATA`, `DIR_3RDPARTY`, `DIR_TESTS`, `DIR_REGRESSION`, `DIR_EVALUATOR`, `DIR_INFERENCE` |
+| `cli/install.sh` | Bash/Zsh aliases and PATH setup; prints permanent-install lines |
+| `cli/install.ps1` | PowerShell session functions for `ds` / `sushitrack` |
+| `cli/sushitrack.sh` / `cli/ds.sh` | Unix shell wrappers — `python3 sushitrack.py "$@"` |
+| `cli/sushitrack.bat` / `cli/ds.bat` | Windows batch wrappers — `python sushitrack.py %*` |
+| `cli/project/build.sh` / `cli/project/build.bat` | CMake configure + build; parses `paths.env`, handles VS dev environment on Windows |
+| `cli/project/run.sh` / `cli/project/run.bat` | Forwards to `sushitrack.py project run` |
+| `cli/project/clean.sh` / `cli/project/clean.bat` | Removes the build directory honouring `DIR_BUILD` from `paths.env` |
+| `cli/docker/build.sh` / `cli/docker/build.bat` | Builds the Docker image from `./Dockerfile` |
+| `cli/docker/run.sh` / `cli/docker/run.bat` | `docker run -it --rm -v $(pwd):/workspace/sushitrack sushitrack bash` |
+| `cli/misc/clean_preds.sh` / `cli/misc/clean_preds.bat` | Recursively removes `pred/` directories under the evaluator data root |
+| `cli/misc/construct_trackeval_data.ps1` | Creates the official TrackEval directory tree by symlinking GT (MOT17-SDP as representative for each sequence) and copying per-tracker predictions for `sushitrack`/`bytetrack`/`ocsort` |
 
 `Dockerfile`: CUDA 12.1 devel base, installs `build-essential`, `cmake`, `git`, `python3`, `python3-pip`, `libgtest-dev`, `libgl1-mesa-glx`, `libglib2.0-0`, then pip-installs the pinned wheel set, copies the project, and registers `ds`/`sushitrack` aliases in `.bashrc`.
 

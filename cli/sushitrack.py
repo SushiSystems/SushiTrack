@@ -12,11 +12,13 @@ Build
   sushitrack project build               -- build library only
   sushitrack project build --unit        -- build library + unit_test
   sushitrack project build --regression  -- build library + regression_test + tracker_bridge
+  sushitrack project build --integration -- build library + integration_test
   sushitrack project build --clean       -- wipe build dir first
 
 Test
-  sushitrack project test                -- run all: unit → label (regression) in sequence
+  sushitrack project test                -- run all: unit → integration → label (regression) in sequence
   sushitrack project test unit           -- run unit_test (GTest deterministic)
+  sushitrack project test integration    -- run integration_test (GTest end-to-end)
   sushitrack project test label          -- run regression_test on det.txt datasets + TrackEval
   sushitrack project test inference      -- run YOLOX video inference pipeline
 
@@ -91,24 +93,27 @@ def get_data_root() -> Path:
 # Build
 # ===========================================================================
 
-def project_build(clean: bool, unit: bool, regression: bool) -> bool:
+def project_build(clean: bool, unit: bool, regression: bool, integration: bool) -> bool:
     """
     @brief Invokes the platform build script with the requested options.
 
-    @param clean      Wipe the build directory before configuring.
-    @param unit       Build the unit_test target.
-    @param regression Build the regression_test + tracker_bridge targets.
+    @param clean       Wipe the build directory before configuring.
+    @param unit        Build the unit_test target.
+    @param regression  Build the regression_test + tracker_bridge targets.
+    @param integration Build the integration_test targets.
     @return True on success.
     """
     script = _TOOLS_DIR / "project" / ("build.bat" if _IS_WINDOWS else "build.sh")
     args: list[str] = []
-    if clean:      args.append("--clean")
-    if unit:       args.append("--unit")
-    if regression: args.append("--regression")
+    if clean:       args.append("--clean")
+    if unit:        args.append("--unit")
+    if regression:  args.append("--regression")
+    if integration: args.append("--integration")
 
     mode_parts = []
-    if unit:       mode_parts.append("unit")
-    if regression: mode_parts.append("regression")
+    if unit:        mode_parts.append("unit")
+    if regression:  mode_parts.append("regression")
+    if integration: mode_parts.append("integration")
     if not mode_parts: mode_parts.append("library-only")
     logger.info(f"Building: {', '.join(mode_parts)}{' (clean)' if clean else ''}")
 
@@ -217,6 +222,35 @@ def project_test_unit(gtest_filter: str | None, verbose: bool) -> bool:
         return result.returncode == 0
     except Exception as e:
         logger.error(f"unit_test execution failed: {e}")
+        return False
+
+
+# ===========================================================================
+# integration test
+# ===========================================================================
+
+def project_test_integration() -> bool:
+    """
+    @brief Runs the integration_test GTest binary.
+
+    @return True if all tests pass.
+    """
+    binary = _find_binary("integration_test")
+    if not binary:
+        logger.error(
+            "integration_test binary not found. "
+            "Build first:  sushitrack project build --integration"
+        )
+        return False
+
+    cmd = [str(binary)]
+
+    logger.info(f"Running integration tests: {binary.name}")
+    try:
+        result = subprocess.run(cmd)
+        return result.returncode == 0
+    except Exception as e:
+        logger.error(f"integration_test execution failed: {e}")
         return False
 
 
@@ -435,6 +469,11 @@ def project_test_inference(args: argparse.Namespace) -> bool:
         cmd.append("--mot-label")
     if args.no_screen:
         cmd.append("--no-screen")
+        
+    if args.reid:
+        cmd.append("--reid")
+        if args.reid_model:
+            cmd += ["--reid-model", args.reid_model]
 
     logger.info(f"Starting YOLOX inference pipeline — tracker: {tracker_display}")
     logger.info(f"Source: {args.source}")
@@ -615,18 +654,20 @@ def _build_parser() -> argparse.ArgumentParser:
     p_build.add_argument("--clean",        action="store_true", help="Wipe build dir first")
     p_build.add_argument("--unit",         action="store_true", help="Include unit_test target")
     p_build.add_argument("--regression",   action="store_true", help="Include regression_test + tracker_bridge")
-    p_build.add_argument("--test",         action="store_true", help="Alias for --regression (deprecated)")
+    p_build.add_argument("--integration",  action="store_true", help="Include integration_test target")
+    p_build.add_argument("--test",         action="store_true", help="Alias for all test targets")
 
     # project test
     p_test = proj_sub.add_parser("test", help="Run tests")
     p_test.add_argument(
         "test_type",
         nargs="?",
-        choices=["all", "unit", "label", "inference"],
+        choices=["all", "unit", "label", "inference", "integration"],
         default="all",
         help=(
-            "(default) all — unit tests then label regression in sequence\n"
+            "(default) all — unit tests then integration then label regression in sequence\n"
             "unit           — GTest deterministic unit tests (no external data)\n"
+            "integration    — GTest end-to-end integration tests\n"
             "label          — regression_test on det.txt datasets + TrackEval metrics\n"
             "inference      — YOLOX video inference pipeline via tracker_bridge"
         ),
@@ -660,6 +701,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p_test.add_argument("--mot-label",   action="store_true",           help="Write detections to output/det.txt (inference)")
     p_test.add_argument("--no-screen",   action="store_true",           help="Disable UI display (inference)")
 
+    # ReID options (inference)
+    p_test.add_argument("--reid",        action="store_true",           help="Enable OSNet ReID extraction (inference)")
+    p_test.add_argument("--reid-model",  type=str, default="osnet_x1_0.onnx", help="Path to ReID ONNX model (inference)")
+
     # project clean
     proj_sub.add_parser("clean", help="Remove build artefacts")
 
@@ -690,10 +735,12 @@ def main():
             # --test builds both unit and regression targets
             unit = args.unit or args.test
             regression = args.regression or args.test
+            integration = args.integration or args.test
             success = project_build(
-                clean      = args.clean,
-                unit       = unit,
-                regression = regression,
+                clean       = args.clean,
+                unit        = unit,
+                regression  = regression,
+                integration = integration,
             )
 
         elif args.action == "clean":
@@ -707,41 +754,51 @@ def main():
             test_type = args.test_type or "all"
 
             if test_type == "all":
-                # Sequential pipeline: unit → label (regression).
-                # Fail-fast: label stage is skipped if unit stage fails.
-                logger.info("[Pipeline] Stage 1/2 — unit tests")
+                # Sequential pipeline: unit → integration → label (regression).
+                # Fail-fast: subsequent stages are skipped if previous stage fails.
+                logger.info("[Pipeline] Stage 1/3 — unit tests")
                 unit_ok = project_test_unit(
                     gtest_filter = args.filter,
                     verbose      = args.verbose,
                 )
                 if not unit_ok:
-                    logger.error("[Pipeline] Unit tests failed — skipping label regression.")
+                    logger.error("[Pipeline] Unit tests failed — pipeline aborted.")
                     success = False
                 else:
-                    logger.info("[Pipeline] Stage 2/2 — label regression")
-                    tracker_key = args.tracker.lower()
-                    if tracker_key not in _TRACKER_MAP:
-                        logger.error(
-                            f"Unknown tracker '{args.tracker}'. "
-                            f"Available: {', '.join(_TRACKER_MAP.values())}"
+                    logger.info("[Pipeline] Stage 2/3 — integration tests")
+                    integration_ok = project_test_integration()
+                    
+                    if not integration_ok:
+                        logger.error("[Pipeline] Integration tests failed — pipeline aborted.")
+                        success = False
+                    else:
+                        logger.info("[Pipeline] Stage 3/3 — label regression")
+                        tracker_key = args.tracker.lower()
+                        if tracker_key not in _TRACKER_MAP:
+                            logger.error(
+                                f"Unknown tracker '{args.tracker}'. "
+                                f"Available: {', '.join(_TRACKER_MAP.values())}"
+                            )
+                            sys.exit(1)
+                        success = project_test_label(
+                            scenario  = args.scenario,
+                            compare   = args.compare,
+                            eval_only = args.eval_only,
+                            export    = args.export,
+                            trackeval = args.trackeval,
+                            tracker   = tracker_key,
+                            private   = args.private,
+                            public    = args.public,
                         )
-                        sys.exit(1)
-                    success = project_test_label(
-                        scenario  = args.scenario,
-                        compare   = args.compare,
-                        eval_only = args.eval_only,
-                        export    = args.export,
-                        trackeval = args.trackeval,
-                        tracker   = tracker_key,
-                        private   = args.private,
-                        public    = args.public,
-                    )
 
             elif test_type == "unit":
                 success = project_test_unit(
                     gtest_filter = args.filter,
                     verbose      = args.verbose,
                 )
+                
+            elif test_type == "integration":
+                success = project_test_integration()
 
             elif test_type == "label":
                 tracker_key = args.tracker.lower()

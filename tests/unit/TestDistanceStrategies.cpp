@@ -442,6 +442,74 @@ TEST(GatedIoUCostCalculatorTest, SingleMatchesBatch)
     EXPECT_NEAR(m(0, 0), calc.calculate_single(a, b), 1e-5f);
 }
 
+/**
+ * @brief A pair whose raw IoU falls below proximity_thresh is rejected with a
+ *        sentinel before the (passing) statistical gate is consulted.
+ *
+ * The two 100x100 boxes overlap by 30 px in x, giving IoU = 3000 / 17000 ≈ 0.18,
+ * which is below the 0.5 proximity threshold, so the cell must be a sentinel
+ * even though the NullGate would otherwise pass it.
+ */
+TEST(GatedIoUCostCalculatorTest, ProximityFilterRejectsLowOverlap)
+{
+    auto iou = std::make_shared<IoUCostCalculator>();
+    GatedIoUCostCalculator calc(9.4877f, NullGateValidator::getInstance(), iou,
+                                /*motion_cost_weight=*/0.0f,
+                                /*proximity_thresh=*/0.5f);
+
+    auto a = makeT( 0.f, 0.f, 100.f, 100.f);
+    auto b = makeT(70.f, 0.f, 100.f, 100.f);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_GE(m(0, 0), 1e3f);
+    EXPECT_GE(calc.calculate_single(a, b), 1e3f);
+}
+
+/**
+ * @brief The same low-overlap pair is accepted when proximity filtering is
+ *        disabled (proximity_thresh = 0), confirming the filter is opt-in.
+ */
+TEST(GatedIoUCostCalculatorTest, ProximityFilterDisabledByZeroThreshold)
+{
+    auto iou = std::make_shared<IoUCostCalculator>();
+    GatedIoUCostCalculator calc(9.4877f, NullGateValidator::getInstance(), iou,
+                                /*motion_cost_weight=*/0.0f,
+                                /*proximity_thresh=*/0.0f);
+
+    auto a = makeT( 0.f, 0.f, 100.f, 100.f);
+    auto b = makeT(70.f, 0.f, 100.f, 100.f);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_LT(m(0, 0), 1e3f);
+}
+
+/**
+ * @brief A high-overlap pair clears the proximity filter and yields the normal
+ *        IoU cost.
+ */
+TEST(GatedIoUCostCalculatorTest, ProximityFilterKeepsHighOverlap)
+{
+    auto iou = std::make_shared<IoUCostCalculator>();
+    GatedIoUCostCalculator calc(9.4877f, NullGateValidator::getInstance(), iou,
+                                /*motion_cost_weight=*/0.0f,
+                                /*proximity_thresh=*/0.5f);
+
+    auto a = makeT( 0.f, 0.f, 100.f, 100.f);
+    auto b = makeT(10.f, 0.f, 100.f, 100.f);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_LT(m(0, 0), 1e3f);
+}
+
 // ===========================================================================
 // FusedCostCalculator
 // ===========================================================================
@@ -531,6 +599,56 @@ TEST(FusedCostCalculatorTest, SingleMatchesBatch)
     calc.calculate(av, bv, m);
 
     EXPECT_NEAR(m(0, 0), calc.calculate_single(a, b), 1e-5f);
+}
+
+/**
+ * @brief Two tracklets with identical features (which would otherwise take the
+ *        direct-assignment path to a near-zero cost) are still rejected by the
+ *        proximity pre-filter when their boxes barely overlap, proving the
+ *        filter runs ahead of the appearance fusion.
+ */
+TEST(FusedCostCalculatorTest, ProximityFilterRejectsLowOverlapDespiteFeatureMatch)
+{
+    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto cosine = std::make_shared<CosineCostCalculator>();
+    FusedCostCalculator calc(0.5f, 0.3f, 9.4877f,
+                             NullGateValidator::getInstance(),
+                             iou, cosine, /*reid_direct_assignment_weight=*/0.5f,
+                             /*proximity_thresh=*/0.5f);
+
+    // Same feature axis, but the 50-px-wide boxes are disjoint (IoU = 0 < 0.5).
+    auto a = makeFeatT(  0.f, 0.f, 4, 0);
+    auto b = makeFeatT(120.f, 0.f, 4, 0);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_GE(m(0, 0), 1e3f);
+    EXPECT_GE(calc.calculate_single(a, b), 1e3f);
+}
+
+/**
+ * @brief With proximity filtering disabled (threshold = 0), the identical-feature
+ *        low-overlap pair takes the direct-assignment path to a near-zero cost.
+ */
+TEST(FusedCostCalculatorTest, ProximityFilterDisabledRestoresDirectAssignment)
+{
+    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto cosine = std::make_shared<CosineCostCalculator>();
+    FusedCostCalculator calc(0.5f, 0.3f, 9.4877f,
+                             NullGateValidator::getInstance(),
+                             iou, cosine, /*reid_direct_assignment_weight=*/0.5f,
+                             /*proximity_thresh=*/0.0f);
+
+    auto a = makeFeatT(  0.f, 0.f, 4, 0);
+    auto b = makeFeatT(120.f, 0.f, 4, 0);
+
+    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    EXPECT_LT(m(0, 0), 1e3f);
 }
 
 // ===========================================================================

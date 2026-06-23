@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: Get project root (three levels up from .tools/misc)
+:: Get project root (three levels up from cli/misc)
 set "TOOLS_DIR=%~dp0.."
 set "ROOT_DIR=%~dp0..\.."
 

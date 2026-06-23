@@ -17,7 +17,7 @@ WORKDIR /workspace/sushitrack
 
 # Python paketlerini yükle
 RUN pip3 install --no-cache-dir \
-    numpy==2.4.3 \
+    numpy==2.4.4 \
     pandas==3.0.2 \
     scipy==1.17.1 \
     pytest==9.0.3 \
@@ -25,7 +25,7 @@ RUN pip3 install --no-cache-dir \
     loguru==0.7.3 \
     matplotlib==3.10.9 \
     opencv-python==4.13.0.92 \
-    pillow==12.1.1 \
+    pillow==12.2.0 \
     pycocotools==2.0.11 \
     rich==15.0.0 \
     tqdm==4.67.3 \
@@ -35,8 +35,8 @@ RUN pip3 install --no-cache-dir \
 COPY . /workspace/sushitrack/
 
 # Aliaslar
-RUN echo "alias ds='/workspace/sushitrack/.tools/sushitrack.sh'" >> ~/.bashrc && \
-    echo "alias sushitrack='/workspace/sushitrack/.tools/sushitrack.sh'" >> ~/.bashrc
+RUN echo "alias ds='/workspace/sushitrack/cli/sushitrack.sh'" >> ~/.bashrc && \
+    echo "alias sushitrack='/workspace/sushitrack/cli/sushitrack.sh'" >> ~/.bashrc
 
 CMD ["/bin/bash"]
 
