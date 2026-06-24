@@ -58,3 +58,5 @@ Thumbs.db
 
 # Project Specific
 docs/html/
+# Inference pipeline output artifacts
+output/

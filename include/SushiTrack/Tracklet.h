@@ -76,12 +76,25 @@ namespace SushiTrack
             bool               isConfirmed()   const { return is_confirmed_; }
 
             float              getScore()      const { return score_; }
+            float              getSmoothScore() const { return score_smooth_; }
             int                getLabel()      const { return label_; }
             size_t             getTrackId()    const { return track_id_; }
             size_t             getFrameId()    const { return frame_id_; }
             size_t             getStartFrameId() const { return start_frame_id_; }
             size_t             getTrackletLength() const { return tracklet_len_; }
             int                getHits() const { return hits_; }
+
+            /**
+             * @brief Returns the length of the current uninterrupted match streak.
+             *
+             * Unlike getHits() (a monotonic lifetime match count) this counter is
+             * reset to zero by resetConsecutiveHits() whenever the track survives a
+             * frame without an observation. The tentative pipeline confirms on the
+             * consecutive streak, not the lifetime count, so a strobing false
+             * positive that only matches on alternate frames can never accumulate
+             * enough streak to be promoted.
+             */
+            int                getConsecutiveHits() const { return consecutive_hits_; }
             TrackFSM*          getFSM() const { return fsm_.get(); }
             KinematicState     getKinematicState() const { return fsm_ ? fsm_->getCurrentState() : KinematicState::Cruising; }
 
@@ -174,10 +187,21 @@ namespace SushiTrack
              */
             void markAsLost(float dt = 0.0f);
 
-            /** 
-             * @brief Transitions the track to the removed state. 
+            /**
+             * @brief Transitions the track to the removed state.
              */
             void markAsRemoved();
+
+            /**
+             * @brief Resets the consecutive-match streak used for tentative
+             *        confirmation.
+             *
+             * Called by the tentative pipeline when a track survives a frame
+             * without an observation. The monotonic lifetime hit count (hits_)
+             * is intentionally left untouched so output and lifecycle bookkeeping
+             * stay continuous.
+             */
+            void resetConsecutiveHits() { consecutive_hits_ = 0; }
 
             /**
              * @brief Sets the internal track identifier.
@@ -253,12 +277,14 @@ namespace SushiTrack
             bool        is_activated_;
             bool        is_confirmed_;
             float       score_;
+            float       score_smooth_;
             int         label_;
             size_t      track_id_;
             size_t      frame_id_;
             size_t      start_frame_id_;
             size_t      tracklet_len_;
             int         hits_;
+            int         consecutive_hits_;
 
             std::unique_ptr<TrackFSM>    fsm_;
             std::shared_ptr<ITimingPolicy> timing_policy_;
@@ -275,7 +301,16 @@ namespace SushiTrack
             float              alpha_;
             bool               enable_xyah_;
 
-            void addFeatureToHistory(const std::vector<float>& feat) 
+            // EMA weight for the confirmation score used by the tentative
+            // pipeline. Smoothing the score (rather than reading the latest
+            // detection score) stops a single high-confidence spike from
+            // collapsing the required hit count on an otherwise low-quality
+            // track. Tuned for the short tentative window: responsive enough to
+            // reflect a genuine quality trend over a few frames, sticky enough
+            // to reject one-frame spikes.
+            static constexpr float kScoreSmoothingMomentum = 0.7f;
+
+            void addFeatureToHistory(const std::vector<float>& feat)
             {
                 if (feature_history_.size() >= max_feature_history_)
                     feature_history_.pop_front();

@@ -751,7 +751,7 @@ def project_test_inference(args: argparse.Namespace) -> bool:
     if args.stress:
         cmd.append("--stress")
     if args.no_save:
-        cmd.append("--no_save")
+        cmd.append("--no-save")
     if args.save_name:
         cmd += ["--save_name", args.save_name]
     if args.legacy:
@@ -989,7 +989,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_test.add_argument("--num-classes", type=int, default=80,          help="YOLOX class count")
     p_test.add_argument("--legacy",      action="store_true",           help="Legacy YOLOX normalisation")
     p_test.add_argument("--stress",      action="store_true",           help="Headless maximum throughput mode")
-    p_test.add_argument("--no_save",     action="store_true",           help="Do not save output video")
+    p_test.add_argument("--no-save",     action="store_true",           help="Do not save output video")
     p_test.add_argument("--save_name",   type=str, default=None,        help="Output video filename")
     p_test.add_argument("--mot-label",   action="store_true",           help="Write detections to output/det.txt (inference)")
     p_test.add_argument("--no-screen",   action="store_true",           help="Disable UI display (inference)")

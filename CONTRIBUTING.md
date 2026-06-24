@@ -46,6 +46,16 @@ namespace SushiTrack::Detail
 
 All public library code lives in the `SushiTrack` namespace. The C ABI layer in `SushiTrackC.h` is `extern "C"` with no namespace.
 
+### Comments
+
+Write comments only when the **why** is non-obvious: a hidden constraint, a subtle invariant, or a workaround for a specific bug. Do not describe what the code does.
+
+Forbidden:
+- Decorative separator lines: `//---`, `// ===`, `// ****`, `// <--------->` and any variation.
+- Multi-line comment blocks for sections inside a function or struct body.
+
+A single `///<` trailing doc comment or a one-line `//` comment is the maximum acceptable form. If the explanation requires more than one line, that is a signal the code needs restructuring, not more comments.
+
 ### Includes
 
 Order: own header first, then standard library, then third-party. Separate groups with a blank line. Use angle brackets only for system and third-party headers; use quotes for project headers.

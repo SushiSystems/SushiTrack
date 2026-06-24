@@ -592,9 +592,12 @@ namespace SushiTrack
      *
      * Each tentative track is matched first against high-confidence detections,
      * then, if still unmatched, against low-confidence detections. A successful
-     * match increments hits_ and calls confirm() if the required hit count is
-     * reached. Unmatched tracks are aged out when their accumulated lost-time
-     * exceeds tentative_max_age_seconds.
+     * match extends the consecutive-match streak and calls confirm() once that
+     * streak reaches the required hit count, which is derived from the track's
+     * smoothed score (so a single high-confidence frame cannot collapse the bar).
+     * A track that survives a frame without a match has its streak reset, so only
+     * genuinely consecutive observations promote it. Unmatched tracks are aged out
+     * when their accumulated lost-time exceeds tentative_max_age_seconds.
      *
      * @param tentative_tracks        Predicted tentative tracklets for this frame.
      * @param det_high_remaining      Unclaimed high-confidence detections.
@@ -647,9 +650,13 @@ namespace SushiTrack
             // bypassing the validation window entirely.
             t->update(*d, frame_id_, /*update_features=*/true, /*keep_state=*/true);
 
-            int required_hits = get_dynamic_hits(t->getScore());
+            // Confirmation is driven by the smoothed score (resists a one-frame
+            // confidence spike) and the consecutive-match streak (a strobing
+            // false positive that matches on alternate frames resets its streak
+            // each miss and can never reach the threshold).
+            int required_hits = get_dynamic_hits(t->getSmoothScore());
 
-            if (t->getHits() >= required_hits)
+            if (t->getConsecutiveHits() >= required_hits)
             {
                 t->confirm(frame_id_, t->getTrackId());
                 activated_tracklets.push_back(t);
@@ -694,9 +701,9 @@ namespace SushiTrack
             // is reached, so unvalidated tentatives never appear in the output.
             t->update(*d, frame_id_, /*update_features=*/false, /*keep_state=*/true);
 
-            int required_hits = get_dynamic_hits(t->getScore());
+            int required_hits = get_dynamic_hits(t->getSmoothScore());
 
-            if (t->getHits() >= required_hits)
+            if (t->getConsecutiveHits() >= required_hits)
             {
                 t->confirm(frame_id_, t->getTrackId());
                 activated_tracklets.push_back(t);
@@ -733,6 +740,10 @@ namespace SushiTrack
             }
             else
             {
+                // Survived a frame without a match: break the confirmation streak
+                // so promotion requires genuinely consecutive observations. The
+                // monotonic lifetime hit count is untouched.
+                t->resetConsecutiveHits();
                 tentative_next.push_back(t);
             }
         }

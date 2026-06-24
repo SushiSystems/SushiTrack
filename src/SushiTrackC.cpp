@@ -48,6 +48,7 @@ extern "C"
         params->enable_fsm                = 0;
         params->fsm_stationary_vel_thresh = 40.0f;
         params->fsm_maneuver_accel_thresh = 250.0f;
+        params->fsm_reference_height      = 100.0f;
 
         params->frame_rate   = 25;
         params->track_buffer = 30;
@@ -143,6 +144,7 @@ extern "C"
             config.enable_fsm                = (params->enable_fsm != 0);
             config.fsm_stationary_vel_thresh = params->fsm_stationary_vel_thresh;
             config.fsm_maneuver_accel_thresh = params->fsm_maneuver_accel_thresh;
+            config.fsm_reference_height      = params->fsm_reference_height;
 
             config.frame_rate   = params->frame_rate;
             config.track_buffer = params->track_buffer;

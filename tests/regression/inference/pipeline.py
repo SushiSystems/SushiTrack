@@ -265,7 +265,15 @@ class VideoPipeline:
         
         if self.mot_label:
             os.makedirs("output", exist_ok=True)
-            self.det_file = open(os.path.join("output", "det.txt"), "w")
+            
+            if isinstance(video_path, str):
+                base_name = os.path.basename(os.path.normpath(video_path))
+                name_without_ext, _ = os.path.splitext(base_name)
+                det_filename = f"det_{name_without_ext}.txt"
+            else:
+                det_filename = f"det_{str(video_path)}.txt"
+                
+            self.det_file = open(os.path.join("output", det_filename), "w")
         
         self.is_image_seq = False
         self.image_files = []

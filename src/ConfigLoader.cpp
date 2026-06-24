@@ -179,6 +179,7 @@ namespace
             const auto& s = adv.at("fsm_params");
             p.fsm_stationary_vel_thresh = getFloat(s, "fsm_stationary_vel_thresh", p.fsm_stationary_vel_thresh);
             p.fsm_maneuver_accel_thresh = getFloat(s, "fsm_maneuver_accel_thresh", p.fsm_maneuver_accel_thresh);
+            p.fsm_reference_height      = getFloat(s, "fsm_reference_height",      p.fsm_reference_height);
         }
 
         if (adv.contains("tentative_logic"))

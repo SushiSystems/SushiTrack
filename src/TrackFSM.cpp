@@ -115,6 +115,26 @@ namespace SushiTrack
             return;
         }
 
+        // ----- Scale-invariant normalisation -----
+        // Pixel velocity and acceleration scale with the object's apparent size:
+        // a box twice as tall sweeps twice the pixels for the same body-relative
+        // motion. Re-express both in "reference-height-equivalent pixels" so the
+        // thresholds classify the object's *physical* motion regardless of how
+        // large it appears in frame. At box height == fsm_reference_height the
+        // factor is exactly 1, so the thresholds keep their absolute-pixel
+        // calibration and the decision is identical to the un-normalised path.
+        // A non-positive reference disables normalisation (legacy behaviour).
+        // The factor is clamped so extreme box sizes cannot saturate the FSM.
+        float scale = 1.0f;
+        if (config_.fsm_reference_height > 0.0f)
+        {
+            const float height = std::max(1e-2f, mean(3));
+            scale = std::clamp(config_.fsm_reference_height / height,
+                               kMinScaleFactor, kMaxScaleFactor);
+        }
+        const float vel_eff   = vel_residual_per_sec * scale;
+        const float accel_eff = accel_per_sec2 * scale;
+
         // ----- Threshold-based hysteresis (dead-band) -----
         const float margin_down = 0.8f;
         const float margin_up   = 1.2f;
@@ -125,21 +145,21 @@ namespace SushiTrack
         // adaptation when a parked vehicle suddenly accelerated). Sustain
         // rules keep the active state sticky inside the dead-band.
         KinematicState observed;
-        if (accel_per_sec2 > config_.fsm_maneuver_accel_thresh * margin_up)
+        if (accel_eff > config_.fsm_maneuver_accel_thresh * margin_up)
         {
             observed = KinematicState::Maneuvering;
         }
-        else if (vel_residual_per_sec < config_.fsm_stationary_vel_thresh * margin_down)
+        else if (vel_eff < config_.fsm_stationary_vel_thresh * margin_down)
         {
             observed = KinematicState::Stationary;
         }
         else if (current_state_ == KinematicState::Maneuvering &&
-                 accel_per_sec2 >= config_.fsm_maneuver_accel_thresh * margin_down)
+                 accel_eff >= config_.fsm_maneuver_accel_thresh * margin_down)
         {
             observed = KinematicState::Maneuvering;
         }
         else if (pending_state_ == KinematicState::Maneuvering &&
-                 vel_residual_per_sec > config_.fsm_stationary_vel_thresh * margin_up)
+                 vel_eff > config_.fsm_stationary_vel_thresh * margin_up)
         {
             // Pending-sustain: a Maneuvering candidate was triggered by a large
             // velocity step. On subsequent frames the instantaneous acceleration
@@ -150,7 +170,7 @@ namespace SushiTrack
             observed = KinematicState::Maneuvering;
         }
         else if (current_state_ == KinematicState::Stationary &&
-                 vel_residual_per_sec <= config_.fsm_stationary_vel_thresh * margin_up)
+                 vel_eff <= config_.fsm_stationary_vel_thresh * margin_up)
         {
             observed = KinematicState::Stationary;
         }

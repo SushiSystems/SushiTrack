@@ -97,7 +97,7 @@ Visual features are L2-normalised and exponentially smoothed (`feature_momentum`
 
 **NSA Kalman filter** — `kalman_type=1` selects `NSAKalmanFilter`, a variant that scales measurement noise by detection confidence in both `initiate` and `project`.
 
-**Kinematic FSM** — `enable_fsm=1`. Classifies motion using thresholds `fsm_stationary_vel_thresh` (default 40 units/s) and `fsm_maneuver_accel_thresh` (default 250 units/s²). `Coasting` is assigned during Lost intervals; `getLastSeenState()` returns the regime active immediately before Coasting so downstream policies can reason about the true motion profile.
+**Kinematic FSM** — `enable_fsm=1`. Classifies motion using thresholds `fsm_stationary_vel_thresh` (default 40 units/s) and `fsm_maneuver_accel_thresh` (default 250 units/s²). Velocity and acceleration are **size-normalised** by `fsm_reference_height / box_height` (default reference 100 px) before thresholding, so the regime tracks an object's body-relative motion rather than its apparent pixel motion — making the decision scale-invariant across near/far objects (set `fsm_reference_height ≤ 0` to disable and use absolute pixels). `Coasting` is assigned during Lost intervals; `getLastSeenState()` returns the regime active immediately before Coasting so downstream policies can reason about the true motion profile.
 
 **Coordinate representations** — `enable_xyah=0` (default) uses TLWH state (`[x, y, w, h, vx, vy, vw, vh]`); `enable_xyah=1` uses centroid + aspect ratio + height (`[cx, cy, a, h, …]`). `iou_plus_one=1` (default) uses inclusive box dimensions consistent with the ByteTrack reference.
 
@@ -451,7 +451,7 @@ Launches the YOLOX-driven video inference pipeline (`tests/regression/inference/
 | `--num-classes <int>` | `80` | Class count (set `1` for MOT) |
 | `--legacy` | off | Legacy YOLOX normalisation (BGR→RGB, 0–1 scale, ImageNet mean/std) |
 | `--stress` | off | Headless max-throughput mode |
-| `--no_save` | off | Disable output-video writer |
+| `--no-save` | off | Disable output-video writer |
 | `--save_name <name>` | – | Output filename override |
 | `--mot-label` | off | Append detections to `output/det.txt` in MOT format |
 | `--no-screen` | off | Disable UI display |
@@ -467,7 +467,7 @@ sushitrack project test inference \
     --num-classes 1 --legacy
 
 sushitrack project test inference \
-    --source 0 --tracker SushiTrack --no_save --no-screen --stress
+    --source 0 --tracker SushiTrack --no-save --no-screen --stress
 ```
 
 If the YOLOX checkpoint filename contains `mot17` and `--tsize` is omitted/640, the pipeline overrides `tsize` to `(800, 1440)` to match the MOT17 training resolution.
@@ -743,7 +743,7 @@ The schema is layered `basic` / `advanced`. The outer `"sushitrack"` wrapper is 
     "advanced": {
       "association":  { "primary_assoc_mode": 1, "fuse_score": 1, "iou_match_thresh": 0.5 },
       "coordinate_system": { "iou_type": 1, "enable_xyah": 0, "iou_plus_one": 1, "kalman_type": 0 },
-      "fsm_params":   { "fsm_stationary_vel_thresh": 40.0, "fsm_maneuver_accel_thresh": 250.0 }
+      "fsm_params":   { "fsm_stationary_vel_thresh": 40.0, "fsm_maneuver_accel_thresh": 250.0, "fsm_reference_height": 100.0 }
     }
   }
 }
@@ -839,6 +839,7 @@ All knobs are exposed both on `SushiTrack_Params` (C API, `include/SushiTrackC.h
 | `enable_fsm` | 0 | Per-track kinematic state machine |
 | `fsm_stationary_vel_thresh` | 40.0 | Velocity (units/s) below which → Stationary |
 | `fsm_maneuver_accel_thresh` | 250.0 | Acceleration (units/s²) above which → Maneuvering |
+| `fsm_reference_height` | 100.0 | Reference box height (px) anchoring the FSM thresholds; velocity/acceleration are size-normalised by `fsm_reference_height / box_height` for scale-invariant classification. `≤ 0` disables normalisation (absolute pixels) |
 
 ### Timing
 

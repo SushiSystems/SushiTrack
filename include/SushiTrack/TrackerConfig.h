@@ -119,6 +119,25 @@ namespace SushiTrack
         /** @brief Acceleration threshold to classify an object's kinematic state as maneuvering. */
         float fsm_maneuver_accel_thresh = 250.0f;
 
+        /**
+         * @brief Reference object height (px) anchoring the FSM velocity/acceleration thresholds.
+         *
+         * The FSM rescales each track's velocity and acceleration by
+         * (fsm_reference_height / box_height) before comparing them against
+         * fsm_stationary_vel_thresh / fsm_maneuver_accel_thresh, so the regime
+         * decision reflects an object's *physical* (size-relative) motion rather
+         * than its apparent pixel motion. This makes the classification
+         * scale-invariant across near and far objects — important on scenes with
+         * large depth variation (DanceTrack, MOT20), where a single absolute
+         * pixel threshold otherwise mislabels large boxes as perpetually
+         * maneuvering and small boxes as perpetually stationary.
+         *
+         * At box_height == fsm_reference_height the factor is 1 and the
+         * thresholds keep their literal pixel meaning. A value <= 0 disables
+         * normalisation, restoring the legacy absolute-pixel behaviour.
+         */
+        float fsm_reference_height = 100.0f;
+
         // --- Tentative Logic ---
 
         /** @brief Maximum cost limit allowed for tentative track associations. */

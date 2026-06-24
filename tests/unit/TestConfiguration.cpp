@@ -171,6 +171,7 @@ void applyConfigToParams(const Json& doc, SushiTrack_Params& params)
         const Json& s = adv["fsm_params"];
         params.fsm_stationary_vel_thresh = jsonGet<float>(s, "fsm_stationary_vel_thresh", params.fsm_stationary_vel_thresh);
         params.fsm_maneuver_accel_thresh = jsonGet<float>(s, "fsm_maneuver_accel_thresh", params.fsm_maneuver_accel_thresh);
+        params.fsm_reference_height      = jsonGet<float>(s, "fsm_reference_height",      params.fsm_reference_height);
     }
 
     if (adv.contains("tentative_logic") && adv["tentative_logic"].is_object())
@@ -372,6 +373,7 @@ TEST_F(ConfigLoaderAdvancedFieldsTest, FSMFieldsAreApplied)
     const Json& s = doc_["sushitrack"]["advanced"]["fsm_params"];
     EXPECT_FLOAT_EQ(params_.fsm_stationary_vel_thresh, s["fsm_stationary_vel_thresh"].get<float>());
     EXPECT_FLOAT_EQ(params_.fsm_maneuver_accel_thresh, s["fsm_maneuver_accel_thresh"].get<float>());
+    EXPECT_FLOAT_EQ(params_.fsm_reference_height,      s["fsm_reference_height"].get<float>());
 }
 
 /**

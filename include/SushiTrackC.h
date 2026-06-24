@@ -185,6 +185,9 @@ extern "C"
         /** @brief Acceleration threshold to classify an object's kinematic state as maneuvering. */
         float fsm_maneuver_accel_thresh;
 
+        /** @brief Reference object height (px) anchoring the FSM velocity/acceleration thresholds; each track's velocity/acceleration is size-normalised by (fsm_reference_height / box_height) before threshold comparison, making the regime decision scale-invariant. A value <= 0 disables normalisation (legacy absolute-pixel behaviour). */
+        float fsm_reference_height;
+
         // --- Tentative Logic ---
 
         /** @brief Maximum cost limit allowed for tentative track associations. */

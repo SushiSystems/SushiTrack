@@ -48,7 +48,7 @@ def make_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tracker", type=str, default="SushiTrack", help="Name of the tracker to use (e.g., SushiTrack, ByteTrack, OCSORT)")
     parser.add_argument("--source", type=str, required=True, help="Path to the input video or camera ID")
     parser.add_argument("--stress", action="store_true", help="Run in stress mode (no UI, maximum throughput)")
-    parser.add_argument("--no_save", action="store_true", help="Do not save the output video")
+    parser.add_argument("--no-save", action="store_true", help="Do not save the output video")
     parser.add_argument("--save_name", default=None, help="Explicit filename for saving output")
     
     # YOLOX Arguments

@@ -128,6 +128,16 @@ namespace SushiTrack
 
             static constexpr size_t kWarmupFrames = 3;
             static constexpr unsigned char kStableFrames = 2;
+
+            // Bounds on the size-normalisation factor (fsm_reference_height /
+            // box_height). They cap how far the classification can be rescaled by
+            // object size: a very small box would otherwise amplify detection
+            // jitter into a permanent false Maneuvering, and a very large box
+            // would be damped into a permanent Stationary. Beyond the bounds the
+            // object is treated as if it were ref/kMaxScaleFactor px tall (large
+            // boxes) or ref/kMinScaleFactor px tall (small boxes).
+            static constexpr float kMinScaleFactor = 0.25f;
+            static constexpr float kMaxScaleFactor = 4.0f;
     };
 
 } // namespace SushiTrack

@@ -1,7 +1,7 @@
 {
     "sushitrack": {
         "basic": {
-            "time_aware": 0,
+            "time_aware": 1,
             "frame_rate": 25,
             "track_buffer": 30,
             "track_thresh": 0.2,
@@ -22,8 +22,8 @@
             },
             "coordinate_system": {
                 "enable_xyah": 0,
-                "iou_type": 1,
-                "iou_plus_one": 1,
+                "iou_type": 0,
+                "iou_plus_one": 0,
                 "kalman_type": 0
             },
             "reid_params": {
@@ -38,7 +38,8 @@
             },
             "fsm_params": {
                 "fsm_stationary_vel_thresh": 40.0,
-                "fsm_maneuver_accel_thresh": 250.0
+                "fsm_maneuver_accel_thresh": 250.0,
+                "fsm_reference_height": 100.0
             },
             "tentative_logic": {
                 "tentative_match_thresh": 0.5,

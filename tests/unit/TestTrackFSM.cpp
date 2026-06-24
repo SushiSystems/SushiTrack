@@ -75,24 +75,41 @@ static TrackerConfig makeConfig()
     return cfg;
 }
 
-/** @brief Returns a StateMean with zero velocity (stationary). */
+/**
+ * @brief Reference box height used by the helpers.
+ *
+ * Equal to TrackerConfig::fsm_reference_height's default (100 px), so the
+ * size-normalisation factor is exactly 1.0 and the px-unit thresholds in these
+ * tests keep their literal meaning — i.e. the helpers exercise the FSM at the
+ * reference scale where the normalised path is identical to the absolute path.
+ * Tests that probe scale invariance pass an explicit, off-reference height.
+ */
+static constexpr float kRefHeight = 100.0f;
+
+/** @brief Returns a StateMean with zero velocity (stationary) at the reference height. */
 static KalmanTypes::StateMean zeroMean()
 {
-    return KalmanTypes::StateMean::Zero();
+    KalmanTypes::StateMean m = KalmanTypes::StateMean::Zero();
+    m(3) = kRefHeight;
+    return m;
 }
 
 /**
- * @brief Returns a StateMean with per-frame velocity components set.
+ * @brief Returns a StateMean with per-frame velocity components and a box height.
  *
  * The Kalman state stores per-frame velocity. TrackFSM multiplies by frame_rate
- * to obtain per-second values. Pass pixel-per-frame values here.
+ * to obtain per-second values. Pass pixel-per-frame values here. The height
+ * (index 3) drives the size-normalisation factor; it defaults to the reference
+ * so the thresholds keep their px meaning unless a test deliberately varies it.
  *
  * @param vx_pf  Per-frame x velocity in pixels/frame.
  * @param vy_pf  Per-frame y velocity in pixels/frame.
+ * @param height Box height in pixels (state index 3).
  */
-static KalmanTypes::StateMean velMean(float vx_pf, float vy_pf = 0.f)
+static KalmanTypes::StateMean velMean(float vx_pf, float vy_pf = 0.f, float height = kRefHeight)
 {
     KalmanTypes::StateMean m = KalmanTypes::StateMean::Zero();
+    m(3) = height;
     m(4) = vx_pf;
     m(5) = vy_pf;
     return m;
@@ -524,4 +541,125 @@ TEST(TrackFSMTest, ApplyToPredictorStationaryExactValuesVerify)
     EXPECT_FLOAT_EQ(mock.pos_mult,  0.8f);
     EXPECT_FLOAT_EQ(mock.size_mult, 0.6f);
     EXPECT_FLOAT_EQ(mock.vel_mult,  0.5f);
+}
+
+// ---------------------------------------------------------------------------
+// Scale-invariant (height-normalised) classification
+// ---------------------------------------------------------------------------
+//
+// The FSM rescales velocity and acceleration by (fsm_reference_height / box
+// height) before thresholding, so two objects with the same body-relative
+// motion are classified identically regardless of apparent pixel size. These
+// tests pin that property and the disable escape hatch. makeConfig() leaves
+// fsm_reference_height at its 100 px default, equal to kRefHeight, so a box of
+// height kRefHeight is at the reference scale (factor == 1).
+
+/**
+ * @brief A slow-moving object settles to Stationary whether small or large,
+ *        because the regime is decided on size-relative motion.
+ *
+ * Both objects move at 0.3 box-heights/s. In absolute pixels the large object
+ * (120 px/s) sits well above the 40 px/s stationary threshold and would be
+ * mislabelled Cruising; normalisation scales it back to the same 30 px/s as the
+ * small object (vel_eff = 30 < 40*0.8), so both settle to Stationary.
+ */
+TEST(TrackFSMTest, ScaleInvariantSlowMotionIsStationaryRegardlessOfSize)
+{
+    auto settle_state = [](float vx_pf, float height) {
+        TrackFSM fsm(makeConfig());
+        KalmanTypes::StateMean m = velMean(vx_pf, 0.f, height);
+        driveWarmup(fsm, m);
+        fsm.updateState(m, false, 4, 0.04f);
+        fsm.updateState(m, false, 5, 0.04f);
+        return fsm.getCurrentState();
+    };
+
+    // Small: height 100, 30 px/s  -> 1.2 px/frame, vel_eff = 30.
+    EXPECT_EQ(settle_state(1.2f, 100.0f), KinematicState::Stationary);
+    // Large: height 400, 120 px/s -> 4.8 px/frame, vel_eff = 30 (same physical motion).
+    EXPECT_EQ(settle_state(4.8f, 400.0f), KinematicState::Stationary);
+}
+
+/**
+ * @brief Two objects with identical body-relative speed (1.0 height/s) land in
+ *        the same regime (Cruising) across a 4x size difference.
+ */
+TEST(TrackFSMTest, ScaleInvariantCruisingMatchesAcrossSizes)
+{
+    auto settle_state = [](float vx_pf, float height) {
+        TrackFSM fsm(makeConfig());
+        KalmanTypes::StateMean m = velMean(vx_pf, 0.f, height);
+        driveWarmup(fsm, m);
+        fsm.updateState(m, false, 4, 0.04f);
+        fsm.updateState(m, false, 5, 0.04f);
+        return fsm.getCurrentState();
+    };
+
+    // Small: height 100, 100 px/s -> 4 px/frame,  vel_eff = 100.
+    EXPECT_EQ(settle_state(4.0f, 100.0f), KinematicState::Cruising);
+    // Large: height 400, 400 px/s -> 16 px/frame, vel_eff = 100 (same physical motion).
+    EXPECT_EQ(settle_state(16.0f, 400.0f), KinematicState::Cruising);
+}
+
+/**
+ * @brief A gentle, sustained acceleration that is sub-maneuver in body-relative
+ *        terms keeps a large object in Cruising, even though its absolute pixel
+ *        acceleration exceeds the maneuver threshold. The companion assertion
+ *        shows the same ramp latches Maneuvering once normalisation is disabled.
+ *
+ * Ramp: +0.96 px/frame each frame => +24 px/s per 0.04 s step => 600 px/s^2.
+ * For a 400 px box that is 150 px/s^2 effective (below 250) but 600 px/s^2
+ * absolute (above 250 * 1.2).
+ */
+TEST(TrackFSMTest, ScaleInvariantGentleAccelStaysCruisingForLargeObject)
+{
+    auto run_ramp = [](float reference_height) {
+        TrackerConfig cfg = makeConfig();
+        cfg.fsm_reference_height = reference_height;
+        TrackFSM fsm(cfg);
+
+        const float height = 400.0f;
+        float vx_pf = 8.0f;  // 200 px/s baseline (clearly Cruising)
+
+        // Warmup at constant baseline to seed the velocity history at 200 px/s.
+        KalmanTypes::StateMean base = velMean(vx_pf, 0.f, height);
+        driveWarmup(fsm, base);
+
+        // Ramp the velocity so per-frame acceleration holds at ~600 px/s^2.
+        KinematicState last = fsm.getCurrentState();
+        for (size_t f = 4; f <= 9; ++f)
+        {
+            vx_pf += 0.96f;
+            KalmanTypes::StateMean m = velMean(vx_pf, 0.f, height);
+            fsm.updateState(m, false, f, 0.04f);
+            last = fsm.getCurrentState();
+        }
+        return last;
+    };
+
+    // Normalised (ref=100): 600 px/s^2 -> 150 px/s^2 effective -> stays Cruising.
+    EXPECT_EQ(run_ramp(100.0f), KinematicState::Cruising);
+    // Disabled (ref<=0): 600 px/s^2 absolute -> latches Maneuvering.
+    EXPECT_EQ(run_ramp(0.0f), KinematicState::Maneuvering);
+}
+
+/**
+ * @brief With normalisation disabled (fsm_reference_height <= 0) the large
+ *        slow-mover is misclassified as Cruising — documenting the failure mode
+ *        the feature corrects and the legacy-compatible escape hatch.
+ */
+TEST(TrackFSMTest, NormalizationDisabledMislabelsLargeSlowObjectAsCruising)
+{
+    TrackerConfig cfg = makeConfig();
+    cfg.fsm_reference_height = 0.0f;  // disable -> absolute pixel thresholds
+
+    TrackFSM fsm(cfg);
+
+    // Large object, 120 px/s: above the 40 px/s stationary floor in absolute px.
+    KalmanTypes::StateMean m = velMean(4.8f, 0.f, 400.0f);
+    driveWarmup(fsm, m);
+    fsm.updateState(m, false, 4, 0.04f);
+    fsm.updateState(m, false, 5, 0.04f);
+
+    EXPECT_EQ(fsm.getCurrentState(), KinematicState::Cruising);
 }

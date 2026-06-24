@@ -66,12 +66,14 @@ namespace SushiTrack
         is_activated_(false),
         is_confirmed_(false),
         score_(score),
+        score_smooth_(score),
         label_(label),
         track_id_(0),
         frame_id_(0),
         start_frame_id_(0),
         tracklet_len_(0),
         hits_(0),
+        consecutive_hits_(0),
         alpha_(alpha),
         enable_xyah_(enable_xyah),
         max_feature_history_(static_cast<size_t>(max_feature_history))
@@ -110,6 +112,8 @@ namespace SushiTrack
         start_frame_id_ = frame_id;
         tracklet_len_ = 1;
         hits_ = 1;
+        consecutive_hits_ = 1;
+        score_smooth_ = score_;
         accumulated_lost_time_ = 0.0f;
     }
 
@@ -134,9 +138,11 @@ namespace SushiTrack
         start_frame_id_ = frame_id;
         tracklet_len_ = 1;
         hits_ = 1;
+        consecutive_hits_ = 1;
+        score_smooth_ = score_;
         accumulated_lost_time_ = 0.0f;
     }
-    
+
     /**
      * @brief Promotes a tentative tracklet to a confirmed tracked state.
      * 
@@ -166,6 +172,14 @@ namespace SushiTrack
     {
         const KalmanTypes::DetectBox new_meas = new_track.getMeasurement();
 
+        // Hold the state mutex for the full mutation, mirroring update(). Without
+        // this, reActivate() writes mean_/covariance_ while a concurrent reader
+        // (getMean/getCovariance/getMeasurement) could observe a torn state — the
+        // exact race update() already guards against. new_track is a distinct
+        // instance, so locking its mutex via getMeasurement()/getCurrFeat() does
+        // not recurse on this->state_mutex_.
+        std::lock_guard<std::mutex> lock(state_mutex_);
+
         kf_->update(mean_, covariance_, new_meas, new_track.getScore());
 
         updateRect();
@@ -173,6 +187,7 @@ namespace SushiTrack
         is_activated_ = true;
         is_confirmed_ = true;
         score_ = new_track.getScore();
+        score_smooth_ = kScoreSmoothingMomentum * score_smooth_ + (1.f - kScoreSmoothingMomentum) * score_;
         label_ = new_track.getLabel();
 
         if (!new_track.getCurrFeat().empty())
@@ -187,6 +202,7 @@ namespace SushiTrack
 
         frame_id_ = frame_id;
         hits_++;
+        consecutive_hits_++;
         tracklet_len_ = frame_id - start_frame_id_ + 1;
         accumulated_lost_time_ = 0.0f;
 
@@ -233,16 +249,35 @@ namespace SushiTrack
             }
         }
 
-        if (fsm_ && kf_) 
+        if (fsm_ && kf_)
         {
-            KinematicState old_fsm = fsm_->getCurrentState();
-            fsm_->updateState(mean_, state_ == TrackState::Lost, tracklet_len_, dt);
-            KinematicState new_fsm = fsm_->getCurrentState();
-            if (old_fsm != new_fsm) 
+            // The FSM is driven exactly once per frame from the measurement
+            // update (Tracklet::update / Tracklet::reActivate), where mean_
+            // already reflects the current observation. predict() runs before
+            // any measurement and sees the *previous* frame's posterior, so its
+            // velocity equals last_v* and the derived acceleration is ~0. Calling
+            // updateState here for an actively tracked target therefore injects a
+            // spurious zero-acceleration sample every frame, which resets the
+            // hysteresis counter and makes Maneuvering effectively unreachable.
+            //
+            // Lost tracks are the exception: they receive no measurement update,
+            // so predict() is the only place that can advance them into Coasting
+            // (and capture the pre-coast regime). Drive the FSM here for them only.
+            if (state_ == TrackState::Lost)
             {
-                SUSHITRACK_LOG_DEBUG("[Tracklet] Track %llu FSM state: %d -> %d", 
-                    (unsigned long long)track_id_, (int)old_fsm, (int)new_fsm);
+                KinematicState old_fsm = fsm_->getCurrentState();
+                fsm_->updateState(mean_, true, tracklet_len_, dt);
+                KinematicState new_fsm = fsm_->getCurrentState();
+                if (old_fsm != new_fsm)
+                {
+                    SUSHITRACK_LOG_DEBUG("[Tracklet] Track %llu FSM state: %d -> %d",
+                        (unsigned long long)track_id_, (int)old_fsm, (int)new_fsm);
+                }
             }
+
+            // Process noise for this prediction step is scaled by the regime
+            // determined from the most recent observation — the correct causal
+            // order (set noise from the known regime, then predict, then observe).
             fsm_->applyToPredictor(kf_.get(), dt);
         }
 
@@ -282,6 +317,7 @@ namespace SushiTrack
         updateRect();
 
         score_ = new_track.getScore();
+        score_smooth_ = kScoreSmoothingMomentum * score_smooth_ + (1.f - kScoreSmoothingMomentum) * score_;
         label_ = new_track.getLabel();
 
         if (update_features && !new_track.getCurrFeat().empty())
@@ -297,6 +333,7 @@ namespace SushiTrack
         }
         frame_id_ = frame_id;
         hits_++;
+        consecutive_hits_++;
         tracklet_len_ = frame_id - start_frame_id_ + 1;
         accumulated_lost_time_ = 0.0f;
 

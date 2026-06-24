@@ -170,6 +170,7 @@ class SushiTrackParams(Structure):
         # --- FSM params ---
         ("fsm_stationary_vel_thresh", c_float),
         ("fsm_maneuver_accel_thresh", c_float),
+        ("fsm_reference_height", c_float),
         # --- Tentative logic ---
         ("tentative_match_thresh", c_float),
         ("tentative_confirm_hits", c_int),
