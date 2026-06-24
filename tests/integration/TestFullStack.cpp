@@ -11,9 +11,8 @@
  * Every advanced subsystem is unit-tested alone and several are paired in the
  * unit-level integration suite, but no test drives the *entire* advanced stack
  * simultaneously: ReID + Mahalanobis gating + kinematic FSM + tentative
- * lifecycle + interaction-context occlusion modelling + NSA Kalman. Feature
- * interactions (e.g. FSM gate scaling feeding the fused cost, interaction
- * snapshots biasing lost-recovery while ReID also competes) only surface when
+ * lifecycle + NSA Kalman. Feature interactions (e.g. FSM gate scaling feeding
+ * the fused cost while ReID also competes for lost-recovery) only surface when
  * they run together. This file is that composition test.
  *
  * Assertions are invariant-style: with so many interacting policies the exact
@@ -50,7 +49,6 @@ protected:
         params_.enable_mahalanobis                    = 1;
         params_.enable_fsm                            = 1;
         params_.enable_tentative                      = 1;
-        params_.enable_interaction_context            = 1;
         params_.kalman_type                           = 1;   // NSA
         params_.primary_assoc_mode                    = 1;
         params_.frame_rate                            = 25;
@@ -65,9 +63,6 @@ protected:
         // 0.7 default can drop legitimate matches across a displacement gap
         // (see docs/RELEASE_READINESS.md, gap 4). The gate still governs here.
         params_.proximity_thresh                      = 0.0f;
-        params_.interaction_iou_thresh                = 0.5f;
-        params_.interaction_occluder_penalty          = 0.3f;
-        params_.interaction_occluder_validity_seconds = 2.0f;
 
         hdl_ = SushiTrack_Create(&params_);
         ASSERT_NE(hdl_, nullptr);

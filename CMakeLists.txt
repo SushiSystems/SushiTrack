@@ -89,7 +89,6 @@ add_library(${PROJECT_NAME} SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/src/AssignmentSolvers.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/LAPJV.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/TrackFSM.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/InteractionGraph.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Object.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Rect.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Logger.cpp

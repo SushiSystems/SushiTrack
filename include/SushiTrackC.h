@@ -233,46 +233,6 @@ extern "C"
         /** @brief Scaling factor for high-confidence direct visual matches. */
         float reid_direct_assignment_weight;
 
-        // ====================================================================
-        // INTERACTION CONTEXT (GLOBAL OCCLUSION MODELLING)
-        // ====================================================================
-
-        /**
-         * @brief Master switch for the scene-level interaction context module.
-         *
-         * When non-zero, the tracker builds a per-frame interaction graph over
-         * the predicted bounding boxes of all confirmed and lost tracklets,
-         * captures an occluder identifier at the moment a track transitions
-         * to the lost state, and biases lost-recovery association against
-         * detections that geometrically coincide with that occluder while the
-         * snapshot remains valid. Has no effect unless enable_fsm is also
-         * non-zero.
-         */
-        int   enable_interaction_context;
-
-        /**
-         * @brief Minimum predicted-box intersection-over-union required to
-         *        register a pairwise interaction in the graph.
-         */
-        float interaction_iou_thresh;
-
-        /**
-         * @brief Additive cost penalty applied to recovery matches that
-         *        coincide with a still-valid occluder snapshot.
-         */
-        float interaction_occluder_penalty;
-
-        /**
-         * @brief Base lifetime of an occluder snapshot, in seconds.
-         *
-         * Interpreted the same way in both timing modes. In frame-based mode
-         * the value is multiplied by frame_rate to obtain the equivalent frame
-         * count. The effective window is further scaled by the occluder's
-         * kinematic state at evaluation time. Default 2.0 s equals 50 frames
-         * at 25 fps.
-         */
-        float interaction_occluder_validity_seconds;
-
     } SushiTrack_Params;
 
     /**

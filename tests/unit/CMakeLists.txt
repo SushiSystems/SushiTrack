@@ -25,7 +25,6 @@ add_executable(unit_test
     TestTimingPolicies.cpp
     TestDistanceStrategies.cpp
     TestAssignmentSolvers.cpp
-    TestInteractionGraph.cpp
     TestTrackerTentative.cpp
     TestTrackerBuffers.cpp
     TestLogger.cpp

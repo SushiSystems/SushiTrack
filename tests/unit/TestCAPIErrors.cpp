@@ -65,6 +65,7 @@
 #include <gtest/gtest.h>
 #include "SushiTrackC.h"
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <vector>
 
@@ -175,7 +176,7 @@ TEST(CAPIInvalidArgumentStandaloneTest, CreateWithNullParamsAutoLoadsConfig)
  */
 TEST(CAPIInvalidArgumentStandaloneTest, CreateExNullParamsPropagatesStatusViaOutHandle)
 {
-    SushiTrackHdl     hdl    = reinterpret_cast<SushiTrackHdl>(0xDEADBEEFul);
+    SushiTrackHdl     hdl    = reinterpret_cast<SushiTrackHdl>(static_cast<uintptr_t>(0xDEADBEEFul));
     SushiTrack_Status status = SushiTrack_CreateEx(nullptr, &hdl);
     EXPECT_EQ(status, SUSHITRACK_INVALID_ARGUMENT);
 }

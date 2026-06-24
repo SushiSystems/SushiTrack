@@ -20,7 +20,6 @@ add_executable(integration_test
     TestFullStack.cpp
     TestTimeAware.cpp
     TestKinematicState.cpp
-    TestInteractionContext.cpp
     TestDuplicateSuppression.cpp
 )
 

@@ -27,11 +27,6 @@
  *   - getMaxFeatureSimilarity() returns < 1.0 for orthogonal feature.
  *   - Feature history is capped at max_feature_history.
  *
- * Occluder snapshot
- *   - setOccluderSnapshot() sets interaction state to Occluded.
- *   - clearOccluderSnapshot() resets interaction state to Free.
- *   - reActivate() clears the occluder snapshot automatically.
- *
  * Tentative fast-path
  *   - update() with keep_state=true does not change TrackState.
  *   - update() with keep_state=false promotes to Tracked.
@@ -43,7 +38,6 @@
 #include "SushiTrack/KalmanFilter.h"
 #include "SushiTrack/KalmanTypes.h"
 #include "SushiTrack/TrackerConfig.h"
-#include "SushiTrack/InteractionState.h"
 
 #include <memory>
 #include <vector>
@@ -374,56 +368,6 @@ TEST(TrackletTest, FeatureHistoryCapIsRespected)
     }
 
     EXPECT_LE(static_cast<int>(t->getFeatureHistory().size()), max_hist);
-}
-
-// ---------------------------------------------------------------------------
-// Occluder snapshot
-// ---------------------------------------------------------------------------
-
-/**
- * @brief setOccluderSnapshot() sets interaction state to Occluded.
- */
-TEST(TrackletTest, SetOccluderSnapshotMarksOccluded)
-{
-    auto t = makeTracklet();
-    t->activate(makeKF(), 1, 1);
-    t->setOccluderSnapshot(42, 5, 0.2f);
-
-    EXPECT_EQ(t->getInteractionState(), InteractionState::Occluded);
-    EXPECT_EQ(t->getOccluderId(), 42);
-}
-
-/**
- * @brief clearOccluderSnapshot() resets interaction state to Free and
- *        occluder id to -1.
- */
-TEST(TrackletTest, ClearOccluderSnapshotResetsToFree)
-{
-    auto t = makeTracklet();
-    t->activate(makeKF(), 1, 1);
-    t->setOccluderSnapshot(42, 5, 0.2f);
-    t->clearOccluderSnapshot();
-
-    EXPECT_EQ(t->getInteractionState(), InteractionState::Free);
-    EXPECT_EQ(t->getOccluderId(), -1);
-}
-
-/**
- * @brief reActivate() clears any occluder snapshot automatically.
- */
-TEST(TrackletTest, ReActivateClearsOccluderSnapshot)
-{
-    auto t = makeTracklet();
-    t->activate(makeKF(), 1, 1);
-    t->markAsLost(0.04f);
-    t->setOccluderSnapshot(42, 2, 0.08f);
-    ASSERT_EQ(t->getInteractionState(), InteractionState::Occluded);
-
-    auto obs = makeTracklet(105.f, 205.f);
-    t->reActivate(*obs, 5);
-
-    EXPECT_EQ(t->getInteractionState(), InteractionState::Free);
-    EXPECT_EQ(t->getOccluderId(), -1);
 }
 
 // ===========================================================================

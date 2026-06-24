@@ -137,7 +137,6 @@ namespace
             p.enable_fsm                 = getInt(b, "enable_fsm",                 p.enable_fsm);
             p.enable_reid                = getInt(b, "enable_reid",                p.enable_reid);
             p.enable_mahalanobis         = getInt(b, "enable_mahalanobis",         p.enable_mahalanobis);
-            p.enable_interaction_context = getInt(b, "enable_interaction_context", p.enable_interaction_context);
         }
 
         if (!ds.contains("advanced")) return;
@@ -202,14 +201,6 @@ namespace
             p.gating_thresh      = getFloat(s, "gating_thresh",      p.gating_thresh);
             p.motion_cost_weight = getFloat(s, "motion_cost_weight", p.motion_cost_weight);
             p.max_area_ratio     = getFloat(s, "max_area_ratio",     p.max_area_ratio);
-        }
-
-        if (adv.contains("interaction_context"))
-        {
-            const auto& s = adv.at("interaction_context");
-            p.interaction_iou_thresh                = getFloat(s, "interaction_iou_thresh",                p.interaction_iou_thresh);
-            p.interaction_occluder_penalty          = getFloat(s, "interaction_occluder_penalty",          p.interaction_occluder_penalty);
-            p.interaction_occluder_validity_seconds = getFloat(s, "interaction_occluder_validity_seconds", p.interaction_occluder_validity_seconds);
         }
     }
 } // namespace

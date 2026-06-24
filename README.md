@@ -10,7 +10,6 @@ tentative validation, Kalman prediction, lost-track buffering, LAPJV
 assignment). The following extensions are optional and **disabled by default**:
 four IoU variants, appearance ReID fusion, Mahalanobis gating, a
 Noise-Scale-Adaptive Kalman filter, a per-track kinematic finite state machine,
-a scene-level interaction graph for occlusion-aware lost-track recovery,
 real-time (`time_aware`) operation, and the `proximity_thresh` pre-filter.
 
 A stable C API, a Python CLI (`sushitrack`/`ds`), a MOTChallenge and DanceTrack
@@ -70,7 +69,6 @@ The runtime is organised around interfaces that the tracker depends on. Concrete
 | `ICostCalculator` | Pairwise association cost | `IoUCostCalculator`, `DIoUCostCalculator`, `GIoUCostCalculator`, `SIoUCostCalculator`, `CosineCostCalculator`, `ReIDFirstCostCalculator`, `PureReIDCostCalculator`, `FusedCostCalculator`, `GatedIoUCostCalculator`, `FuseScoreDecorator` |
 | `IAssignmentSolver` | Bipartite assignment | `LAPJVSolver` (Jonker–Volgenant with active-row/column reduction) |
 | `ITimingPolicy` | dt normalisation, expiry | `FrameTimingPolicy`, `WallClockTimingPolicy` |
-| `IInteractionGraph` | Pairwise occlusion graph | `BottomYInteractionGraph` (bottom-Y depth ordering + kinematic tiebreaker, DIoU activation) |
 
 `KalmanFilterRegistry` is a singleton plug-in registry. New Kalman variants register themselves through `KalmanFilterRegistrar<T>` and become selectable by `kalman_type`.
 
@@ -100,8 +98,6 @@ Visual features are L2-normalised and exponentially smoothed (`feature_momentum`
 **NSA Kalman filter** — `kalman_type=1` selects `NSAKalmanFilter`, a variant that scales measurement noise by detection confidence in both `initiate` and `project`.
 
 **Kinematic FSM** — `enable_fsm=1`. Classifies motion using thresholds `fsm_stationary_vel_thresh` (default 40 units/s) and `fsm_maneuver_accel_thresh` (default 250 units/s²). `Coasting` is assigned during Lost intervals; `getLastSeenState()` returns the regime active immediately before Coasting so downstream policies can reason about the true motion profile.
-
-**Interaction context** — `enable_interaction_context=1` (requires `enable_fsm`). `BottomYInteractionGraph` builds a per-frame occlusion graph using DIoU activation (`interaction_iou_thresh`, default 0.3) and bottom-Y depth ordering with a kinematic tiebreaker. When a track transitions to `Lost`, the front-most occluder identifier is snapshotted on the tracklet. The lost-recovery and primary stages add `interaction_occluder_penalty` (default 0.3) to candidate detections that geometrically coincide with the still-valid occluder. Snapshot validity (`interaction_occluder_validity_seconds`, default 2.0 s ≈ 50 frames at 25 fps) is scaled per occluder kinematic state (`Stationary`×1.5, `Cruising`×1.0, `Coasting`×0.7, `Maneuvering`×0.5). Penalty magnitude is further scaled by the occludee's kinematic state and by velocity alignment between occluder and occludee (cosine of heading angle mapped into [0.6, 1.4]).
 
 **Coordinate representations** — `enable_xyah=0` (default) uses TLWH state (`[x, y, w, h, vx, vy, vw, vh]`); `enable_xyah=1` uses centroid + aspect ratio + height (`[cx, cy, a, h, …]`). `iou_plus_one=1` (default) uses inclusive box dimensions consistent with the ByteTrack reference.
 
@@ -158,9 +154,6 @@ sushitrack/
 │       ├── TrackerConfig.h       # C++ config struct (mirror of SushiTrack_Params)
 │       ├── Tracklet.h            # Per-track state, lifecycle, feature history
 │       ├── TrackFSM.h            # Kinematic FSM
-│       ├── InteractionState.h    # Free / Occluded enum
-│       ├── InteractionGraph.h    # BottomYInteractionGraph
-│       ├── IInteractionGraph.h   # Strategy interface
 │       ├── KalmanFilter.h        # Linear Kalman filter
 │       ├── NSAKalmanFilter.h     # Noise-Scale Adaptive variant
 │       ├── KalmanFilterRegistry.h# Plug-in registry
@@ -213,7 +206,6 @@ sushitrack/
 │   │   ├── TestTimingPolicies.cpp
 │   │   ├── TestDistanceStrategies.cpp
 │   │   ├── TestAssignmentSolvers.cpp
-│   │   ├── TestInteractionGraph.cpp
 │   │   ├── TestTrackerTentative.cpp
 │   │   ├── TestTrackerBuffers.cpp
 │   │   ├── TestLogger.cpp
@@ -746,13 +738,12 @@ The schema is layered `basic` / `advanced`. The outer `"sushitrack"` wrapper is 
       "track_thresh": 0.2, "high_thresh": 0.5, "match_thresh": 0.7,
       "frame_rate": 25, "track_buffer": 30,
       "enable_tentative": 1, "enable_fsm": 1, "enable_reid": 0,
-      "enable_mahalanobis": 0, "enable_interaction_context": 0
+      "enable_mahalanobis": 0
     },
     "advanced": {
       "association":  { "primary_assoc_mode": 1, "fuse_score": 1, "iou_match_thresh": 0.5 },
       "coordinate_system": { "iou_type": 1, "enable_xyah": 0, "iou_plus_one": 1, "kalman_type": 0 },
-      "fsm_params":   { "fsm_stationary_vel_thresh": 40.0, "fsm_maneuver_accel_thresh": 250.0 },
-      "interaction_context": { "interaction_iou_thresh": 0.6, "interaction_occluder_penalty": 0.15 }
+      "fsm_params":   { "fsm_stationary_vel_thresh": 40.0, "fsm_maneuver_accel_thresh": 250.0 }
     }
   }
 }
@@ -849,15 +840,6 @@ All knobs are exposed both on `SushiTrack_Params` (C API, `include/SushiTrackC.h
 | `fsm_stationary_vel_thresh` | 40.0 | Velocity (units/s) below which → Stationary |
 | `fsm_maneuver_accel_thresh` | 250.0 | Acceleration (units/s²) above which → Maneuvering |
 
-### Interaction context
-
-| Key | Default | Description |
-|---|---|---|
-| `enable_interaction_context` | 0 | Per-frame interaction graph + occluder-aware penalty (requires `enable_fsm`) |
-| `interaction_iou_thresh` | 0.3 | Minimum DIoU to register an interaction pair |
-| `interaction_occluder_penalty` | 0.3 | Additive cost penalty against still-valid occluders |
-| `interaction_occluder_validity_seconds` | 2.0 | Snapshot lifetime (scaled by occluder kinematic state) |
-
 ### Timing
 
 | Key | Default | Description |
@@ -874,14 +856,13 @@ GTest-based, deterministic, no external data. Targets compiled when `-DBUILD_UNI
 
 - `TestTrackFSM` — kinematic transitions, hysteresis, warmup, last-seen state
 - `TestKalmanFilter` — initiate/predict/update, Mahalanobis distance, gate flags, LLT cache
-- `TestTracklet` — lifecycle transitions, feature EMA, occluder snapshot
+- `TestTracklet` — lifecycle transitions, feature EMA
 - `TestRect` — TLWH/TLBR/XYWH conversions
 - `TestReID` — cosine similarity, max-history lookup
 - `TestCostMatrix` — resize semantics, sentinel preservation
 - `TestTimingPolicies` — frame vs wall-clock conversion and expiry symmetry
 - `TestDistanceStrategies` — each cost calculator (IoU/DIoU/GIoU/SIoU/Cosine/ReIDFirst/PureReID/Fused/GatedIoU/FuseScoreDecorator)
 - `TestAssignmentSolvers` — LAPJV correctness on dense and sparse matrices
-- `TestInteractionGraph` — build, occluder selection, kinematic tiebreaker, overlap query
 - `TestTrackerTentative` — adaptive confirmation logic
 - `TestTrackerBuffers` — track_buffer expiry under both timing modes
 - `TestLogger` — callback dispatch, va_list path

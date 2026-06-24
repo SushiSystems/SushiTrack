@@ -186,11 +186,6 @@ class SushiTrackParams(Structure):
         ("tentative_slow_hits_offset", c_int),
         ("tentative_vslow_hits_offset", c_int),
         ("reid_direct_assignment_weight", c_float),
-        # --- Interaction context ---
-        ("enable_interaction_context", c_int),
-        ("interaction_iou_thresh", c_float),
-        ("interaction_occluder_penalty", c_float),
-        ("interaction_occluder_validity_seconds", c_float),
     ]
 
 

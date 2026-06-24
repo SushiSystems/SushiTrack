@@ -11,9 +11,8 @@
  * Closes the configuration-system gap flagged in UNIT_TEST_VALIDATION_REPORT.md
  * Section 2.3.1 and the verified-report's Omission #2:
  *   - The canonical config file is sushitrack.json at the repository root.
- *   - The advanced.interaction_context.* fields, advanced.tentative_logic
- *     fast_/slow_/vslow_ tiers, and reid_direct_assignment_weight have no
- *     existing tests.
+ *   - The advanced.tentative_logic fast_/slow_/vslow_ tiers and
+ *     reid_direct_assignment_weight have no existing tests.
  *
  * Approach
  * --------
@@ -46,7 +45,6 @@
  *   - fsm_params.* fields load.
  *   - tentative_logic.* including fast/slow/vslow tiers load.
  *   - mahalanobis_gating.* fields load.
- *   - interaction_context.* fields load (Verified Omission #1 follow-up).
  *
  * ConfigLoaderDefaultsTest
  *   - A missing section leaves the corresponding Params fields at the
@@ -131,7 +129,6 @@ void applyConfigToParams(const Json& doc, SushiTrack_Params& params)
         params.enable_fsm                 = jsonGet<int>  (b, "enable_fsm",                 params.enable_fsm);
         params.enable_reid                = jsonGet<int>  (b, "enable_reid",                params.enable_reid);
         params.enable_mahalanobis         = jsonGet<int>  (b, "enable_mahalanobis",         params.enable_mahalanobis);
-        params.enable_interaction_context = jsonGet<int>  (b, "enable_interaction_context", params.enable_interaction_context);
     }
 
     if (!root.contains("advanced") || !root["advanced"].is_object()) return;
@@ -197,14 +194,6 @@ void applyConfigToParams(const Json& doc, SushiTrack_Params& params)
         params.motion_cost_weight = jsonGet<float>(s, "motion_cost_weight", params.motion_cost_weight);
         params.max_area_ratio     = jsonGet<float>(s, "max_area_ratio",     params.max_area_ratio);
     }
-
-    if (adv.contains("interaction_context") && adv["interaction_context"].is_object())
-    {
-        const Json& s = adv["interaction_context"];
-        params.interaction_iou_thresh                = jsonGet<float>(s, "interaction_iou_thresh",                params.interaction_iou_thresh);
-        params.interaction_occluder_penalty          = jsonGet<float>(s, "interaction_occluder_penalty",          params.interaction_occluder_penalty);
-        params.interaction_occluder_validity_seconds = jsonGet<float>(s, "interaction_occluder_validity_seconds", params.interaction_occluder_validity_seconds);
-    }
 }
 
 /**
@@ -262,7 +251,7 @@ TEST(ConfigLoaderBaselineTest, BasicSectionContainsAllDocumentedSwitches)
     for (const char* key : { "time_aware", "frame_rate", "track_buffer",
                               "track_thresh", "high_thresh", "match_thresh",
                               "enable_tentative", "enable_fsm", "enable_reid",
-                              "enable_mahalanobis", "enable_interaction_context" })
+                              "enable_mahalanobis" })
     {
         EXPECT_TRUE(b.contains(key)) << "missing key: " << key;
     }
@@ -309,7 +298,6 @@ TEST(ConfigLoaderBasicFieldsTest, EnableFlagsRoundTripIntoParams)
     EXPECT_EQ(p.enable_fsm,                 b["enable_fsm"].get<int>());
     EXPECT_EQ(p.enable_reid,                b["enable_reid"].get<int>());
     EXPECT_EQ(p.enable_mahalanobis,         b["enable_mahalanobis"].get<int>());
-    EXPECT_EQ(p.enable_interaction_context, b["enable_interaction_context"].get<int>());
 }
 
 // ============================================================================
@@ -413,21 +401,6 @@ TEST_F(ConfigLoaderAdvancedFieldsTest, MahalanobisGatingFieldsAreApplied)
     EXPECT_FLOAT_EQ(params_.gating_thresh,      s["gating_thresh"].get<float>());
     EXPECT_FLOAT_EQ(params_.motion_cost_weight, s["motion_cost_weight"].get<float>());
     EXPECT_FLOAT_EQ(params_.max_area_ratio,     s["max_area_ratio"].get<float>());
-}
-
-/**
- * @brief Interaction Context fields are applied — addresses Verified
- *        Omission #1 (feature missing from coverage table).
- */
-TEST_F(ConfigLoaderAdvancedFieldsTest, InteractionContextFieldsAreApplied)
-{
-    const Json& s = doc_["sushitrack"]["advanced"]["interaction_context"];
-    EXPECT_FLOAT_EQ(params_.interaction_iou_thresh,
-                    s["interaction_iou_thresh"].get<float>());
-    EXPECT_FLOAT_EQ(params_.interaction_occluder_penalty,
-                    s["interaction_occluder_penalty"].get<float>());
-    EXPECT_FLOAT_EQ(params_.interaction_occluder_validity_seconds,
-                    s["interaction_occluder_validity_seconds"].get<float>());
 }
 
 // ============================================================================
@@ -545,12 +518,9 @@ TEST(ConfigLoaderLibraryApiTest, LibraryLoaderMatchesReferenceParser)
               SUSHITRACK_SUCCESS);
 
     EXPECT_EQ      (loaded.enable_fsm,                 reference.enable_fsm);
-    EXPECT_EQ      (loaded.enable_interaction_context, reference.enable_interaction_context);
     EXPECT_EQ      (loaded.frame_rate,                 reference.frame_rate);
     EXPECT_EQ      (loaded.primary_assoc_mode,         reference.primary_assoc_mode);
     EXPECT_FLOAT_EQ(loaded.match_thresh,               reference.match_thresh);
-    EXPECT_FLOAT_EQ(loaded.interaction_occluder_penalty,
-                    reference.interaction_occluder_penalty);
     EXPECT_FLOAT_EQ(loaded.fsm_maneuver_accel_thresh,  reference.fsm_maneuver_accel_thresh);
 }
 

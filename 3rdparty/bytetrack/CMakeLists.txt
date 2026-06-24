@@ -39,6 +39,10 @@ target_include_directories(${PROJECT_NAME} PUBLIC
   )
 target_link_libraries(${PROJECT_NAME} Eigen3::Eigen)
 
+if(MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE /wd4244 /wd4267)
+endif()
+
 # Build the tests if the 'BUILD_BYTETRACK_TEST' variable is set to 'ON'
 set(BUILD_BYTETRACK_TEST OFF CACHE BOOL "The flag whether to build the tests or not")
 if(BUILD_BYTETRACK_TEST)

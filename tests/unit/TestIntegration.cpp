@@ -12,7 +12,6 @@
  *   - Issue #2 (HIGH): ReID never exercised in the full tracker pipeline.
  *   - Issue #3 (HIGH): No long-sequence (300+ frame) integration test.
  *   - Issue #6 (MED) : Tentative pipeline never combined with ReID.
- *   - 2.2.5 / 2.3.1  : Interaction Context end-to-end never exercised.
  *   - 2.3.2          : FSM-aware Mahalanobis gating not exercised end-to-end.
  *   - 2.3.4          : time_aware=1 with a variable-dt sequence not exercised.
  *
@@ -55,13 +54,6 @@
  *     and slow (1/10 s) frames without losing identity.
  *   - A large discontinuous dt (1 s gap) does not crash the predictor and
  *     leaves the track in a documented state.
- *
- * TrackerInteractionContextTest (enable_fsm=1, enable_interaction_context=1)
- *   - Enabling Interaction Context does not destabilise single-object tracking.
- *   - A track that becomes Lost behind a stationary occluder is preferentially
- *     not re-bound to a coincident detection while the occluder snapshot is
- *     still valid (assertion is invariant: no spurious re-bind to the occluder
- *     box mid-validity window).
  *
  * TrackerHighToLowConfidenceTest (enable_tentative=1)
  *   - A confirmed track whose subsequent detection drops from high to low
@@ -578,132 +570,6 @@ TEST_F(TrackerVariableDtTest, OneSecondGapDoesNotCrash)
 
     int n = SushiTrack_Update(hdl_, nullptr, 0, out.data(), 4, 1.0f);
     EXPECT_GE(n, 0);
-}
-
-// ============================================================================
-// TrackerInteractionContextTest — Verified Omission #1 (MED)
-// ============================================================================
-
-/**
- * @brief Fixture exercising the Interaction Context / Occluder snapshot path.
- *
- * Per SushiTrackC.h, enable_interaction_context has no effect unless
- * enable_fsm is also non-zero — both flags are set here.
- */
-class TrackerInteractionContextTest : public ::testing::Test
-{
-protected:
-    SushiTrackHdl     hdl_    = nullptr;
-    SushiTrack_Params params_ = {};
-
-    void SetUp() override
-    {
-        SushiTrack_GetDefaultParams(&params_);
-        params_.time_aware                            = 1;
-        params_.enable_tentative                      = 0;
-        params_.enable_fsm                            = 1;
-        params_.enable_interaction_context            = 1;
-        params_.primary_assoc_mode                    = 1;
-        params_.frame_rate                            = 25;
-        params_.track_buffer                          = 30;
-        params_.track_thresh                          = 0.1f;
-        params_.high_thresh                           = 0.2f;
-        params_.match_thresh                          = 0.9f;
-        params_.interaction_iou_thresh                = 0.5f;
-        params_.interaction_occluder_penalty          = 0.3f;
-        params_.interaction_occluder_validity_seconds = 2.0f;
-
-        hdl_ = SushiTrack_Create(&params_);
-        ASSERT_NE(hdl_, nullptr);
-    }
-
-    void TearDown() override { SushiTrack_Destroy(hdl_); }
-};
-
-/**
- * @brief Enabling Interaction Context together with FSM must not destabilise
- *        single-object tracking — a smoke baseline before the harder assertion.
- */
-TEST_F(TrackerInteractionContextTest, SingleObjectTrackingRemainsStable)
-{
-    std::vector<SushiTrack_Track> out(4);
-    SushiTrack_Object d0 = makeDet(100.0f, 200.0f);
-    SushiTrack_Update(hdl_, &d0, 1, out.data(), 4, 0.04f);
-    ASSERT_EQ(out[0].state, 1);
-    const int64_t persistent_id = out[0].track_id;
-
-    for (int i = 1; i < 25; ++i)
-    {
-        SushiTrack_Object d = makeDet(100.0f + 1.5f * i, 200.0f);
-        int n = SushiTrack_Update(hdl_, &d, 1, out.data(), 4, 0.04f);
-        ASSERT_GE(n, 1);
-        ASSERT_NE(findById(out, n, persistent_id), nullptr);
-    }
-}
-
-/**
- * @brief A track lost behind a stationary occluder must not silently rebind
- *        to the occluder's box while the snapshot is still valid.
- *
- * Scenario:
- *   - Object A (small) tracked for several frames.
- *   - A stationary large box B begins overlapping A's predicted region.
- *   - A's detection drops out (occluded).
- *   - During the validity window, only B is present.
- *   - Assertion: A's original ID is not transferred onto B.
- */
-TEST_F(TrackerInteractionContextTest, LostTrackDoesNotBindToOccluderBox)
-{
-    std::vector<SushiTrack_Track> out(8);
-
-    SushiTrack_Object a = makeDet(100.0f, 200.0f, 0.95f, 40.0f, 80.0f);
-    SushiTrack_Object b = makeDet(400.0f, 200.0f, 0.95f, 200.0f, 200.0f);
-
-    SushiTrack_Object dets[2] = { a, b };
-    int n0 = SushiTrack_Update(hdl_, dets, 2, out.data(), 8, 0.04f);
-    ASSERT_GE(n0, 2);
-
-    int64_t id_a = -1, id_b = -1;
-    for (int i = 0; i < n0; ++i)
-    {
-        const SushiTrack_Track& t = out[static_cast<std::size_t>(i)];
-        if (t.width < 100.0f) id_a = t.track_id;
-        else                  id_b = t.track_id;
-    }
-    ASSERT_NE(id_a, -1);
-    ASSERT_NE(id_b, -1);
-
-    // Move A into B's region over a couple of frames so the interaction graph
-    // links them as occluder/occludee, then drop A's detection.
-    for (int k = 1; k <= 3; ++k)
-    {
-        SushiTrack_Object a_step = makeDet(100.0f + 80.0f * k, 200.0f, 0.95f, 40.0f, 80.0f);
-        SushiTrack_Object dets_step[2] = { a_step, b };
-        SushiTrack_Update(hdl_, dets_step, 2, out.data(), 8, 0.04f);
-    }
-
-    // During occlusion, only B is reported.
-    for (int k = 0; k < 4; ++k)
-    {
-        SushiTrack_Update(hdl_, &b, 1, out.data(), 8, 0.04f);
-    }
-
-    int n_final = SushiTrack_Update(hdl_, &b, 1, out.data(), 8, 0.04f);
-    ASSERT_GE(n_final, 1);
-    const SushiTrack_Track* b_now = findById(out, n_final, id_b);
-    ASSERT_NE(b_now, nullptr) << "Occluder track B lost its identity.";
-
-    // If A's ID has migrated to B's geometry, that would be a spurious rebind.
-    const SushiTrack_Track* a_now = findById(out, n_final, id_a);
-    if (a_now != nullptr)
-    {
-        // A should report Lost or Removed, not Tracked at B's location.
-        const bool migrated = (a_now->state == 1) &&
-                              (std::abs(a_now->x - b_now->x) < 5.0f) &&
-                              (std::abs(a_now->y - b_now->y) < 5.0f);
-        EXPECT_FALSE(migrated)
-            << "Track A spuriously rebound to occluder B's geometry.";
-    }
 }
 
 // ============================================================================
