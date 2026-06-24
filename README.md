@@ -41,6 +41,10 @@ pipeline are included.
   - [docker build / docker run](#docker-build--docker-run)
 - [C API](#c-api)
 - [Python Binding](#python-binding)
+- [Deploy Packages](#deploy-packages)
+  - [`--deploy cpp` layout](#--deploy-cpp-layout)
+  - [`--deploy python` layout](#--deploy-python-layout)
+  - [How discovery works](#how-discovery-works)
 - [Data Layout](#data-layout)
 - [Configuration Parameters](#configuration-parameters)
 - [Test Suites](#test-suites)
@@ -357,9 +361,14 @@ sushitrack project build --regression         # library + regression_test + trac
 sushitrack project build --integration        # library + integration_test
 sushitrack project build --test               # all targets: unit + regression + integration
 sushitrack project build --clean              # wipe build/ first; combinable with the above
+sushitrack project build --deploy cpp         # build, then assemble package/ for C/C++ consumers
+sushitrack project build --deploy python      # build, then assemble package/ for Python consumers
 ```
 
 Artefacts: `build/bin/{Release,Debug}/sushitrack.{dll,so}`, `build/bin/.../unit_test{,.exe}`, `build/bin/.../regression_test{,.exe}`, `build/bin/.../integration_test{,.exe}`, `build/bin/.../tracker_bridge.{dll,so}`.
+
+`--deploy` additionally assembles a self-contained, redistributable `package/`
+directory at the repository root — see [Deploy Packages](#deploy-packages).
 
 ---
 
@@ -376,6 +385,7 @@ All commands take the form `sushitrack <command> <action> [flags]`. `ds` is a sh
 | `--regression` | Add `regression_test` + `tracker_bridge` |
 | `--integration` | Add `integration_test` target |
 | `--test` | Build all test targets: `--unit --regression --integration` |
+| `--deploy {cpp,python}` | After a successful build, assemble a redistributable `package/` for the chosen consumer ([details](#deploy-packages)) |
 
 ### `project test all`
 
@@ -576,6 +586,115 @@ tracker.close()                       # or use `with SushiTrack(...) as tracker:
 `label`, `state`, `kinematic_state`, `age`, `lost_time`, `hits`, …) sorted by
 lifecycle priority. `Status`, `TrackState`, and `KinematicState` are exposed as
 `IntEnum`s; `set_log_callback(fn)` registers a `fn(level, message)` logger.
+
+---
+
+## Deploy Packages
+
+`sushitrack project build --deploy {cpp,python}` builds the library and then
+assembles a **self-contained, copy-and-run package** under `package/` at the
+repository root. The package bundles everything a downstream project needs — the
+compiled library, the headers or binding, a default config, and a working
+example — so it can be lifted out of this repository and dropped into another
+project without a build tree or environment variables. The directory is
+regenerated from scratch on every deploy and is git-ignored.
+
+The deploy is **platform-specific**: it copies the artefacts for the OS it runs
+on. Run it on Windows to get a Windows package (`.dll` + `.lib`), and on Linux to
+get a Linux package (`.so`). There is no cross-compilation — to ship both
+platforms, run the deploy once on each.
+
+```bash
+sushitrack project build --deploy cpp        # C/C++ package
+sushitrack project build --deploy python     # Python package
+sushitrack project build --clean --deploy cpp   # clean rebuild, then deploy
+```
+
+Deploy reuses the same artefacts a plain `project build` produces; it never needs
+a test target. If the shared library (or, on Windows, its import library) is
+missing, the deploy fails with an explicit message telling you to build first.
+
+### `--deploy cpp` layout
+
+Targets a C or C++ consumer through the **C ABI** (`SushiTrackC.h`). The C ABI is
+deliberately dependency-free — it does **not** pull in Eigen or any C++ header —
+so only two headers are shipped.
+
+```
+package/
+├── include/
+│   ├── SushiTrackC.h                 # public C API
+│   └── SushiTrack/SushiTrackTypes.h   # status codes, log levels (only C dependency of the API)
+├── lib/
+│   └── sushitrack.lib                # Windows import library (Linux: libsushitrack.so)
+├── bin/
+│   └── sushitrack.dll                # Windows runtime library (Linux: omitted — the .so in lib/ is both)
+├── sushitrack.json                   # default runtime config; edit to retune without recompiling
+├── example/
+│   ├── example.c                    # minimal create → update loop → destroy
+│   └── CMakeLists.txt               # links lib/, copies the DLL beside the exe (Windows), sets RPATH (Linux)
+└── README.md
+```
+
+Build and run the bundled example:
+
+```bash
+cd package/example
+cmake -B build
+cmake --build build
+./build/sushitrack_example            # Windows: the DLL is auto-copied next to the exe by CMake
+```
+
+To integrate into your own project: add `package/include` to the include path,
+include `SushiTrackC.h`, link against `package/lib/sushitrack.lib` (Windows) or
+`package/lib/libsushitrack.so` (Linux), and ensure the runtime library is
+resolvable at load time (DLL on `PATH`/beside the exe on Windows; RPATH or
+`LD_LIBRARY_PATH` on Linux). Create the tracker with
+`SushiTrack_CreateFromConfig("sushitrack.json")` to pick up the bundled config, and
+edit that JSON to retune the algorithm without recompiling.
+
+### `--deploy python` layout
+
+Targets a Python consumer. The native library is bundled **inside** the package
+directory, beside the binding module, so the package is portable with no build
+tree and no `SUSHITRACK_LIB` variable.
+
+```
+package/
+├── sushitrack/
+│   ├── __init__.py                  # re-exports the public API (from .sushitrack import *)
+│   ├── sushitrack.py                 # the ctypes binding (copied from bindings/python/)
+│   └── sushitrack.dll                # bundled native library (Linux: libsushitrack.so)
+├── sushitrack.json                   # default runtime config
+├── example.py                       # minimal update loop using the bundled package
+└── README.md
+```
+
+Run the bundled example:
+
+```bash
+cd package
+python example.py
+```
+
+To integrate into your own project, copy the `sushitrack/` directory into your
+source tree (or add `package/` to `PYTHONPATH`) and use it as a normal package:
+
+```python
+from sushitrack import SushiTrack, TrackState
+tracker = SushiTrack(frame_rate=30, enable_fsm=1)
+tracks  = tracker.update([(x, y, w, h, score, label)], dt=1/30)
+```
+
+### How discovery works
+
+The Python binding's `find_library` resolves the shared library in this order:
+an explicit `lib_path` argument, the `SUSHITRACK_LIB` environment variable, **the
+directory next to the binding module** (this is what makes the deployed package
+self-contained), then the standard `build/` output locations. A binding used
+in-place from this repository finds the library under `build/`; the same binding
+copied into a deploy package finds the bundled library sitting beside it. No
+configuration is required in either case.
 
 ---
 
@@ -881,19 +1000,37 @@ and register that adapter through Ultralytics' public prediction callbacks.
 Any object exposing a compatible `update(results, img=None)` method can take the
 place of `BYTETracker`. That is the single seam SushiTrack plugs into.
 
-### Step 1 — Build the shared library
+### Step 1 — Get the library and binding into your project
+
+You have two options. For an Ultralytics project living **outside** this
+repository, the deploy package is the cleaner path because it is self-contained.
+
+**Option A — deploy package (recommended for external projects).** Produce a
+portable Python package and copy it next to your Ultralytics code:
+
+```bash
+sushitrack project build --deploy python      # builds + assembles package/
+# then, in your Ultralytics project:
+cp -r /path/to/sushitrack/package/sushitrack   ./sushitrack      # bundles the .py + native lib
+```
+
+The bundled `sushitrack/` directory carries the binding and the native library
+together, so importing `from sushitrack import SushiTrack` works with no build tree
+and no `SUSHITRACK_LIB` variable on the consumer side. See
+[Deploy Packages](#deploy-packages).
+
+**Option B — in-repo binding.** When you work inside this repository, build the
+library and import the binding directly:
 
 ```bash
 sushitrack project build           # produces build/bin/<cfg>/sushitrack.{dll,so}
-# or directly:
-cmake -B build -S . -G Ninja
-cmake --build build --config Release
+# bindings/python/sushitrack.py then finds the library under build/ automatically
 ```
 
-The adapter below uses the shipped Python binding
-([`bindings/python/sushitrack.py`](#python-binding)), which already wraps the
-**public C API** (`include/SushiTrackC.h`) — not the regression `tracker_bridge`,
-whose reduced struct omits the state/feature/kinematic fields.
+Either way the adapter uses the shipped Python binding
+([`bindings/python/sushitrack.py`](#python-binding)), which wraps the **public C
+API** (`include/SushiTrackC.h`) — not the regression `tracker_bridge`, whose
+reduced struct omits the state/feature/kinematic fields.
 
 ### Step 2 — Implement the Ultralytics tracker contract
 
@@ -959,8 +1096,9 @@ class SushiTrackTracker:
 ### Step 3 — Register the adapter with `model.track()`
 
 No package fork required — install the adapter through the same callbacks
-Ultralytics itself uses. The binding finds the shared library automatically
-under `build/` (or set `SUSHITRACK_LIB`):
+Ultralytics itself uses. The binding finds the shared library automatically:
+beside the module when you used the deploy package (Option A), or under `build/`
+when you import in-repo (Option B); `SUSHITRACK_LIB` overrides both:
 
 ```python
 from ultralytics import YOLO

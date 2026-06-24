@@ -14,6 +14,8 @@ Build
   sushitrack project build --regression  -- build library + regression_test + tracker_bridge
   sushitrack project build --integration -- build library + integration_test
   sushitrack project build --clean       -- wipe build dir first
+  sushitrack project build --deploy cpp     -- build, then assemble package/ for C/C++ consumers
+  sushitrack project build --deploy python  -- build, then assemble package/ for Python consumers
 
 Test
   sushitrack project test                -- run all: unit → integration → label (regression) in sequence
@@ -123,6 +125,295 @@ def project_build(clean: bool, unit: bool, regression: bool, integration: bool) 
     except subprocess.CalledProcessError as e:
         logger.error(f"Build failed (exit {e.returncode})")
         return False
+
+
+# ===========================================================================
+# Deploy (package assembly)
+# ===========================================================================
+
+# Library file names per platform. On Windows the runtime DLL and its import
+# library are distinct files; on Linux the single .so serves both roles.
+def _shared_lib_name() -> str:
+    return "sushitrack.dll" if _IS_WINDOWS else "libsushitrack.so"
+
+
+def _import_lib_name() -> str:
+    return "sushitrack.lib" if _IS_WINDOWS else "libsushitrack.so"
+
+
+def _find_artifact(name: str) -> Path | None:
+    """
+    @brief Locates a freshly built artifact under the build tree.
+
+    @param name  File name (e.g. "sushitrack.dll", "sushitrack.lib").
+    @return Path to the artifact, or None if not present.
+    """
+    candidates = [
+        DIR_BUILD / "bin" / "Release" / name,
+        DIR_BUILD / "bin" / name,
+        DIR_BUILD / "bin" / "Debug" / name,
+        DIR_BUILD / "lib" / "Release" / name,
+        DIR_BUILD / "lib" / name,
+        DIR_BUILD / "lib" / "Debug" / name,
+        DIR_BUILD / name,
+    ]
+    for c in candidates:
+        if c.exists():
+            return c
+    found = list(DIR_BUILD.rglob(name))
+    return found[0] if found else None
+
+
+_CPP_EXAMPLE = """\
+/*
+ * Minimal SushiTrack C-API usage example.
+ *
+ * Build (after `sushitrack project build --deploy cpp`):
+ *   cd example && cmake -B build && cmake --build build
+ *   ./build/sushitrack_example        (Windows: copy ../bin/sushitrack.dll next to the exe)
+ */
+#include <stdio.h>
+#include "SushiTrackC.h"
+
+int main(void)
+{
+    SushiTrack_Params params;
+    SushiTrack_GetDefaultParams(&params);
+    params.frame_rate = 30;
+
+    SushiTrackHdl tracker = SushiTrack_Create(&params);
+    if (!tracker) { fprintf(stderr, "failed to create tracker\\n"); return 1; }
+
+    SushiTrack_Object dets[1] = { { 100.f, 100.f, 50.f, 80.f, 0.9f, 0, NULL, 0 } };
+    SushiTrack_Track  out[64];
+
+    for (int frame = 0; frame < 5; ++frame) {
+        dets[0].x += 5.f;  /* move the box */
+        int n = SushiTrack_Update(tracker, dets, 1, out, 64, 1.0f / 30.0f);
+        printf("frame %d: %d track(s)\\n", frame, n);
+        for (int i = 0; i < n; ++i)
+            printf("  id=%lld  (%.1f, %.1f, %.1f, %.1f)  state=%d\\n",
+                   (long long)out[i].track_id, out[i].x, out[i].y,
+                   out[i].width, out[i].height, out[i].state);
+    }
+
+    SushiTrack_Destroy(tracker);
+    return 0;
+}
+"""
+
+_CPP_EXAMPLE_CMAKE = """\
+cmake_minimum_required(VERSION 3.14)
+project(sushitrack_example C)
+
+# The package root is one directory up from this example.
+set(SUSHITRACK_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
+
+add_executable(sushitrack_example example.c)
+target_include_directories(sushitrack_example PRIVATE "${SUSHITRACK_ROOT}/include")
+
+if(WIN32)
+    target_link_libraries(sushitrack_example PRIVATE "${SUSHITRACK_ROOT}/lib/sushitrack.lib")
+    # Copy the runtime DLL next to the executable so it can be launched directly.
+    add_custom_command(TARGET sushitrack_example POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${SUSHITRACK_ROOT}/bin/sushitrack.dll" $<TARGET_FILE_DIR:sushitrack_example>)
+else()
+    target_link_libraries(sushitrack_example PRIVATE "${SUSHITRACK_ROOT}/lib/libsushitrack.so")
+    set_target_properties(sushitrack_example PROPERTIES
+        BUILD_RPATH   "${SUSHITRACK_ROOT}/lib"
+        INSTALL_RPATH "${SUSHITRACK_ROOT}/lib")
+endif()
+"""
+
+_CPP_README = """\
+# SushiTrack — C/C++ Deployment Package
+
+Self-contained, ready-to-link build of the SushiTrack tracker (C ABI).
+
+## Contents
+```
+include/         Public C headers (SushiTrackC.h + SushiTrack/SushiTrackTypes.h)
+lib/             Link library  ({import_lib})
+bin/             Runtime library ({runtime_lib})   [Windows only]
+sushitrack.json   Default runtime configuration (editable, no recompile needed)
+example/         Minimal usage example + CMakeLists.txt
+```
+
+## Quick start
+```sh
+cd example
+cmake -B build
+cmake --build build
+```
+
+## Integrating into your own project
+- Add `include/` to your include path and include `SushiTrackC.h`.
+- Link against `lib/{import_lib}`.
+- On Windows, ensure `bin/sushitrack.dll` is on the PATH or beside your executable.
+- Edit `sushitrack.json` and create the tracker with `SushiTrack_CreateFromConfig("sushitrack.json")`
+  to retune the algorithm without recompiling.
+
+Platform: {platform}
+"""
+
+_PY_EXAMPLE = """\
+\"\"\"Minimal SushiTrack Python usage example.
+
+Run (after `sushitrack project build --deploy python`):
+    python example.py
+\"\"\"
+from sushitrack import SushiTrack, TrackState
+
+# The shared library is bundled inside the sushitrack/ package directory and
+# discovered automatically.
+tracker = SushiTrack(frame_rate=30, enable_fsm=1)
+
+x = 100.0
+for frame in range(5):
+    x += 5.0
+    dets = [(x, 100.0, 50.0, 80.0, 0.9, 0)]   # (x, y, w, h, score, label)
+    tracks = tracker.update(dets, dt=1.0 / 30.0)
+    print(f"frame {frame}: {len(tracks)} track(s)")
+    for t in tracks:
+        print(f"  id={t.track_id}  ({t.x:.1f}, {t.y:.1f}, {t.width:.1f}, {t.height:.1f})"
+              f"  state={TrackState(t.state).name}")
+
+tracker.close()
+"""
+
+_PY_README = """\
+# SushiTrack — Python Deployment Package
+
+Self-contained ctypes binding bundled with the native SushiTrack library.
+
+## Contents
+```
+sushitrack/
+    __init__.py
+    sushitrack.py     Pure-Python ctypes wrapper (no dependencies)
+    {runtime_lib}    Bundled native library
+sushitrack.json       Default runtime configuration
+example.py           Minimal usage example
+```
+
+## Quick start
+```sh
+python example.py
+```
+
+## Integrating into your own project
+Copy the `sushitrack/` directory into your project (or add it to PYTHONPATH):
+```python
+from sushitrack import SushiTrack
+tracker = SushiTrack(frame_rate=30, enable_fsm=1)
+tracks = tracker.update([(x, y, w, h, score, label)], dt=1/30)
+```
+The native library is loaded from inside the package automatically; no build
+tree or environment variable is required.
+
+Platform: {platform}
+"""
+
+
+def _deploy_cpp(pkg_dir: Path) -> bool:
+    """@brief Assembles a ready-to-link C/C++ package under @p pkg_dir."""
+    import shutil
+    root = get_project_root()
+
+    runtime = _find_artifact(_shared_lib_name())
+    if not runtime:
+        logger.error(f"Shared library {_shared_lib_name()} not found. Build first.")
+        return False
+    import_lib = _find_artifact(_import_lib_name())
+    if not import_lib:
+        logger.error(f"Import library {_import_lib_name()} not found. Build first.")
+        return False
+
+    # Public C headers (the C ABI is dependency-free: no Eigen required).
+    inc_dst = pkg_dir / "include"
+    (inc_dst / "SushiTrack").mkdir(parents=True, exist_ok=True)
+    shutil.copy2(root / "include" / "SushiTrackC.h", inc_dst / "SushiTrackC.h")
+    shutil.copy2(root / "include" / "SushiTrack" / "SushiTrackTypes.h",
+                 inc_dst / "SushiTrack" / "SushiTrackTypes.h")
+
+    # Link / runtime libraries.
+    (pkg_dir / "lib").mkdir(parents=True, exist_ok=True)
+    shutil.copy2(import_lib, pkg_dir / "lib" / _import_lib_name())
+    if _IS_WINDOWS:
+        (pkg_dir / "bin").mkdir(parents=True, exist_ok=True)
+        shutil.copy2(runtime, pkg_dir / "bin" / _shared_lib_name())
+
+    # Config + example + readme.
+    cfg = root / "sushitrack.json"
+    if cfg.exists():
+        shutil.copy2(cfg, pkg_dir / "sushitrack.json")
+    (pkg_dir / "example").mkdir(parents=True, exist_ok=True)
+    (pkg_dir / "example" / "example.c").write_text(_CPP_EXAMPLE, encoding="utf-8")
+    (pkg_dir / "example" / "CMakeLists.txt").write_text(_CPP_EXAMPLE_CMAKE, encoding="utf-8")
+    (pkg_dir / "README.md").write_text(
+        _CPP_README.format(import_lib=_import_lib_name(), runtime_lib=_shared_lib_name(),
+                           platform=platform.system()),
+        encoding="utf-8")
+    return True
+
+
+def _deploy_python(pkg_dir: Path) -> bool:
+    """@brief Assembles a self-contained Python package under @p pkg_dir."""
+    import shutil
+    root = get_project_root()
+
+    runtime = _find_artifact(_shared_lib_name())
+    if not runtime:
+        logger.error(f"Shared library {_shared_lib_name()} not found. Build first.")
+        return False
+
+    binding = root / "bindings" / "python" / "sushitrack.py"
+    if not binding.exists():
+        logger.error(f"Python binding not found at {binding}")
+        return False
+
+    mod_dir = pkg_dir / "sushitrack"
+    mod_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(binding, mod_dir / "sushitrack.py")
+    # Bundle the native library beside the module (find_library checks here).
+    shutil.copy2(runtime, mod_dir / _shared_lib_name())
+    (mod_dir / "__init__.py").write_text(
+        "from .sushitrack import *  # noqa: F401,F403\n", encoding="utf-8")
+
+    cfg = root / "sushitrack.json"
+    if cfg.exists():
+        shutil.copy2(cfg, pkg_dir / "sushitrack.json")
+    (pkg_dir / "example.py").write_text(_PY_EXAMPLE, encoding="utf-8")
+    (pkg_dir / "README.md").write_text(
+        _PY_README.format(runtime_lib=_shared_lib_name(), platform=platform.system()),
+        encoding="utf-8")
+    return True
+
+
+def project_deploy(kind: str) -> bool:
+    """
+    @brief Assembles a ready-to-use package under <root>/package for the
+           requested consumer flavour.
+
+    @param kind  "cpp" or "python".
+    @return True on success.
+    """
+    import shutil
+    pkg_dir = get_project_root() / "package"
+
+    if pkg_dir.exists():
+        logger.info(f"Clearing existing package directory: {pkg_dir}")
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.info(f"Deploying '{kind}' package for {platform.system()} -> {pkg_dir}")
+    ok = _deploy_cpp(pkg_dir) if kind == "cpp" else _deploy_python(pkg_dir)
+    if ok:
+        logger.success(f"Package ready at {pkg_dir}")
+    else:
+        logger.error("Deploy failed.")
+    return ok
 
 
 def project_clean() -> bool:
@@ -656,6 +947,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p_build.add_argument("--regression",   action="store_true", help="Include regression_test + tracker_bridge")
     p_build.add_argument("--integration",  action="store_true", help="Include integration_test target")
     p_build.add_argument("--test",         action="store_true", help="Alias for all test targets")
+    p_build.add_argument("--deploy",       choices=["cpp", "python"], default=None,
+                         help="After building, assemble a ready-to-use package/ (cpp or python)")
 
     # project test
     p_test = proj_sub.add_parser("test", help="Run tests")
@@ -742,6 +1035,10 @@ def main():
                 regression  = regression,
                 integration = integration,
             )
+            # Deploy requires the shared library, which a plain build always
+            # produces; assemble the package only if the build succeeded.
+            if success and args.deploy:
+                success = project_deploy(args.deploy)
 
         elif args.action == "clean":
             success = project_clean()

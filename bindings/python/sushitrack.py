@@ -237,6 +237,12 @@ def find_library(explicit: Optional[str] = None) -> str:
         candidates.append(env)
 
     lib_name = "sushitrack.dll" if platform.system() == "Windows" else "libsushitrack.so"
+
+    # Self-contained deploy: the shared library sits next to this module
+    # (see `sushitrack project build --deploy python`).
+    here = Path(__file__).resolve().parent
+    candidates.append(str(here / lib_name))
+
     root = Path(__file__).resolve().parents[2]   # bindings/python/ -> project root
     build = root / "build"
     for sub in ("bin/Release", "bin/Debug", "bin", "lib", "Release", "Debug", ""):
