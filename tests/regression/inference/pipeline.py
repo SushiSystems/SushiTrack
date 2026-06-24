@@ -267,7 +267,14 @@ class VideoPipeline:
             os.makedirs("output", exist_ok=True)
             
             if isinstance(video_path, str):
-                base_name = os.path.basename(os.path.normpath(video_path))
+                norm_path = os.path.normpath(video_path)
+                base_name = os.path.basename(norm_path)
+                
+                # Eğer verilen yol bir MOT diziniyse (img1 vs.), klasör adını (parent) al
+                if base_name.lower() in ("img1", "img"):
+                    parent_dir = os.path.dirname(norm_path)
+                    base_name = os.path.basename(parent_dir)
+                    
                 name_without_ext, _ = os.path.splitext(base_name)
                 det_filename = f"det_{name_without_ext}.txt"
             else:

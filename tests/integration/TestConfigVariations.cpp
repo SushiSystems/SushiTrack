@@ -80,9 +80,7 @@ SushiTrack_Params baseParams()
     return p;
 }
 
-// ---------------------------------------------------------------------------
 // IoU variant sweep
-// ---------------------------------------------------------------------------
 
 /** @brief Parameterised over iou_type: 0=IoU, 1=DIoU, 2=GIoU, 3=SIoU. */
 class IoUVariantTest : public ::testing::TestWithParam<int> {};
@@ -97,9 +95,7 @@ TEST_P(IoUVariantTest, EachIoUVariantTracksSingleObjectStably)
 INSTANTIATE_TEST_SUITE_P(AllVariants, IoUVariantTest,
                          ::testing::Values(0, 1, 2, 3));
 
-// ---------------------------------------------------------------------------
 // Coordinate parameterisation
-// ---------------------------------------------------------------------------
 
 /**
  * @brief XYAH (centroid / aspect-ratio / height) mode tracks an object whose
@@ -119,8 +115,7 @@ TEST(CoordinateSystemTest, XyahModeHandlesAspectChange)
     ASSERT_GE(n0, 1);
     const int64_t id = out[0].track_id;
 
-    // Grow the box (person stands up / approaches camera): width and height both
-    // increase, changing the aspect ratio the XYAH state tracks directly.
+    // Grow the box (person stands up / approaches camera): width and height both increase, changing the aspect ratio the XYAH state tracks directly.
     for (int k = 1; k <= 20; ++k)
     {
         const float w = 50.0f + 1.5f * k;
@@ -136,9 +131,7 @@ TEST(CoordinateSystemTest, XyahModeHandlesAspectChange)
     SushiTrack_Destroy(hdl);
 }
 
-// ---------------------------------------------------------------------------
 // Kalman filter variant
-// ---------------------------------------------------------------------------
 
 /**
  * @brief The NSA (Noise Scale Adaptive) Kalman filter tracks an object whose

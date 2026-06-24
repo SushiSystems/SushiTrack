@@ -104,7 +104,7 @@ namespace SushiTrack
 
         for (const auto& obj : objects)
         {
-            TrackletPtr tracklet = std::make_shared<Tracklet>(nullptr, obj.rect, obj.label, obj.prob, obj.feature, config_.feature_momentum, config_.enable_xyah, config_.max_feature_history);
+            TrackletPtr tracklet = std::make_shared<Tracklet>(nullptr, obj.rect, obj.label, obj.prob, obj.feature, config_.feature_momentum, config_.enable_xyah, config_.max_feature_history, config_.ocm_delta_t);
 
             tracklet->setTimingPolicy(timing_policy_);
 
@@ -311,12 +311,7 @@ namespace SushiTrack
     {
         if (config_.primary_assoc_mode == 1)
         {
-            // ----- Global LAPJV (ByteTrack-identical) -----
-            // Single cost matrix and single solve over the entire candidate set.
-            // Mirrors byte_track::BYTETracker::update step 2 exactly so that, with
-            // matching cost calculator and thresholds, the assignment is bit-for-bit
-            // identical to the reference implementation.
-
+            // Global LAPJV: single cost matrix and solve over all candidates, mirroring byte_track::BYTETracker::update step 2 for bit-identical assignment.
             if (tracklet_pool.empty())
             {
                 det_high_remaining = det_high;
@@ -381,7 +376,7 @@ namespace SushiTrack
             return;
         }
 
-        // ----- Age-cascade (legacy mode 0) -----
+        // Age-cascade (legacy mode 0)
         det_high_remaining = det_high;
 
         std::map<size_t, std::vector<TrackletPtr>> tracks_by_age;
@@ -644,16 +639,10 @@ namespace SushiTrack
             auto& t = tentative_tracks[m[0]];
             auto& d = det_high_remaining[m[1]];
 
-            // keep_state=true: do not flip is_activated_/is_confirmed_/state_
-            // until the dynamic hit threshold is met. Without this, a tentative
-            // track would leak as an activated output on the first match,
-            // bypassing the validation window entirely.
+            // keep_state=true: don't activate/confirm until the dynamic hit threshold is met, so a tentative can't leak as output on its first match.
             t->update(*d, frame_id_, /*update_features=*/true, /*keep_state=*/true);
 
-            // Confirmation is driven by the smoothed score (resists a one-frame
-            // confidence spike) and the consecutive-match streak (a strobing
-            // false positive that matches on alternate frames resets its streak
-            // each miss and can never reach the threshold).
+            // Confirm on smoothed score (resists a one-frame spike) and consecutive streak (a strobing FP resets each miss and never reaches the threshold).
             int required_hits = get_dynamic_hits(t->getSmoothScore());
 
             if (t->getConsecutiveHits() >= required_hits)
@@ -696,9 +685,7 @@ namespace SushiTrack
             auto& t = tentative_remaining[m[0]];
             auto& d = det_low_remaining[m[1]];
 
-            // keep_state=true: same rationale as the high-confidence loop above
-            // — defer activation/confirmation to confirm() once required_hits
-            // is reached, so unvalidated tentatives never appear in the output.
+            // keep_state=true: same as the high-confidence loop — defer activation/confirmation to confirm() so unvalidated tentatives never appear in output.
             t->update(*d, frame_id_, /*update_features=*/false, /*keep_state=*/true);
 
             int required_hits = get_dynamic_hits(t->getSmoothScore());
@@ -718,17 +705,7 @@ namespace SushiTrack
         {
             auto& t = tentative_remaining[idx];
 
-            // Age is measured using accumulated_lost_time_, which predict() increments
-            // by the real dt on every frame where state == Tentative. update() resets it
-            // to zero on every successful match, so it always reflects the time elapsed
-            // since the last observation. In frame-based mode dt = 1/fps per frame, so
-            // accumulated_lost_time_ counts seconds just as in time-aware mode — the
-            // single tentative_max_age_seconds threshold therefore works identically in
-            // both modes without any frame-rate conversion at the call site.
-            // The current unmatched frame's dt is added here because predict() has already
-            // run before matchTentative is called, but the miss on this frame hasn't yet
-            // been reflected in accumulated_lost_time_ (update() would have zeroed it on
-            // a match; no match occurred, so we account for this frame manually).
+            // accumulated_lost_time_ counts seconds since the last match in both timing modes; add this frame's dt manually since predict() ran before the miss was recorded.
             const float accumulated = t->getAccumulatedLostTime() + dt;
 
             if (accumulated > config_.tentative_max_age_seconds)
@@ -740,9 +717,7 @@ namespace SushiTrack
             }
             else
             {
-                // Survived a frame without a match: break the confirmation streak
-                // so promotion requires genuinely consecutive observations. The
-                // monotonic lifetime hit count is untouched.
+                // Survived a miss: break the confirmation streak so promotion needs consecutive observations (the monotonic lifetime hit count is untouched).
                 t->resetConsecutiveHits();
                 tentative_next.push_back(t);
             }
@@ -842,16 +817,7 @@ namespace SushiTrack
     {
         for (auto& s : lost_tracklets_)
         {
-            // State-aware buffer scaling. The kinematic regime captured just
-            // before the track went dark drives how long we are willing to
-            // wait for a recovery:
-            //   - Stationary tracks reliably reappear at the same spot, so a
-            //     longer buffer helps reclaim them before identity churn.
-            //   - Maneuvering tracks have noisy predictions; a modest extra
-            //     budget keeps them recoverable through brief occlusions.
-            //   - Cruising / no-FSM tracks use the configured buffer as-is.
-            // Defaults collapse to 1.0x when no FSM is attached so the policy
-            // is bit-identical to the prior behaviour with the FSM disabled.
+            // Scale the lost buffer by the pre-dark regime: Stationary gets longer (reliable reappearance), Maneuvering a modest extra, others as-is; 1.0x with no FSM (bit-identical to before).
             float buffer_scale = 1.0f;
             if (s->getFSM())
             {
@@ -1027,8 +993,7 @@ namespace SushiTrack
             {
                 if (iou_cost_matrix_(i, j) < config_.duplicate_iou_thresh)
                 {
-                    // Lifetime: how many frames the track has existed for.
-                    // Longer-lived track wins; the younger one is dropped.
+                    // Longer-lived track wins the duplicate; the younger one is dropped.
                     const int ta = (int)(a[i]->getFrameId() - a[i]->getStartFrameId());
                     const int tb = (int)(b[j]->getFrameId() - b[j]->getStartFrameId());
                     if (ta > tb) b_dup[j] = true;

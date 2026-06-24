@@ -27,9 +27,7 @@
 
 using namespace SushiTrack;
 
-// ===========================================================================
 // FrameTimingPolicy
-// ===========================================================================
 
 /**
  * @brief toKfDt() returns 1.0 for any raw_dt value.
@@ -71,9 +69,7 @@ TEST(FrameTimingPolicyTest, IsExpiredTrueAbove)
     EXPECT_TRUE(p.isExpired(31.f, 30));
 }
 
-// ===========================================================================
 // WallClockTimingPolicy
-// ===========================================================================
 
 /**
  * @brief toKfDt(1/fps) converts exactly one real frame to 1.0 (with snap).
@@ -137,8 +133,7 @@ TEST(WallClockTimingPolicyTest, IsExpiredFalseWhenUnderThreshold)
 TEST(WallClockTimingPolicyTest, IsExpiredFalseAtExactBoundary)
 {
     WallClockTimingPolicy p(25);
-    // Compute the timeout the same way the implementation does so both sides
-    // of the comparison hold the identical float bit-pattern.
+    // Compute the timeout the same way the implementation does so both sides of the comparison hold the identical float bit-pattern.
     const float timeout = static_cast<float>(30) / 25.0f;
     EXPECT_FALSE(p.isExpired(timeout, 30));
 }
@@ -168,9 +163,7 @@ TEST(WallClockTimingPolicyTest, ZeroFpsClampedToOneHz)
     EXPECT_TRUE(p.isExpired(5.1f, 5));
 }
 
-// ===========================================================================
 // Tier 3 edge cases
-// ===========================================================================
 
 /**
  * @brief toKfDt() with a negative raw_dt does not return a positive value

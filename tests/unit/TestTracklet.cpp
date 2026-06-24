@@ -45,9 +45,7 @@
 
 using namespace SushiTrack;
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 /** @brief Creates a real KalmanFilter-backed IStatePredictor. */
 static std::unique_ptr<IStatePredictor> makeKF()
@@ -77,9 +75,7 @@ static std::unique_ptr<Tracklet> makeTracklet(
     );
 }
 
-// ---------------------------------------------------------------------------
 // Construction
-// ---------------------------------------------------------------------------
 
 /**
  * @brief A newly constructed Tracklet has state New, is not activated, and
@@ -93,9 +89,7 @@ TEST(TrackletTest, ConstructionStateIsNew)
     EXPECT_FALSE(t->isConfirmed());
 }
 
-// ---------------------------------------------------------------------------
 // activate()
-// ---------------------------------------------------------------------------
 
 /**
  * @brief activate() at frame_id=1 sets Tracked, isActivated=true, isConfirmed=true.
@@ -125,9 +119,7 @@ TEST(TrackletTest, ActivateOnLaterFrameIsNotActivated)
     EXPECT_FALSE(t->isActivated());
 }
 
-// ---------------------------------------------------------------------------
 // activateTentative()
-// ---------------------------------------------------------------------------
 
 /**
  * @brief activateTentative() sets state to Tentative with isActivated=false
@@ -143,9 +135,7 @@ TEST(TrackletTest, ActivateTentativeState)
     EXPECT_FALSE(t->isConfirmed());
 }
 
-// ---------------------------------------------------------------------------
 // confirm()
-// ---------------------------------------------------------------------------
 
 /**
  * @brief confirm() promotes a Tentative track to Tracked with isActivated=true
@@ -163,9 +153,7 @@ TEST(TrackletTest, ConfirmPromotesTentative)
     EXPECT_EQ(t->getTrackId(), static_cast<size_t>(99));
 }
 
-// ---------------------------------------------------------------------------
 // markAsLost()
-// ---------------------------------------------------------------------------
 
 /**
  * @brief markAsLost() transitions the track to Lost and clears isActivated.
@@ -194,9 +182,7 @@ TEST(TrackletTest, MarkAsLostInitialisesAccumulatedTime)
     EXPECT_FLOAT_EQ(t->getAccumulatedLostTime(), 0.04f);
 }
 
-// ---------------------------------------------------------------------------
 // markAsRemoved()
-// ---------------------------------------------------------------------------
 
 /**
  * @brief markAsRemoved() transitions the track to Removed.
@@ -211,9 +197,7 @@ TEST(TrackletTest, MarkAsRemovedSetsRemovedState)
     EXPECT_FALSE(t->isActivated());
 }
 
-// ---------------------------------------------------------------------------
 // reActivate()
-// ---------------------------------------------------------------------------
 
 /**
  * @brief reActivate() recovers a Lost track back to Tracked with
@@ -235,9 +219,7 @@ TEST(TrackletTest, ReActivateRestoresTrackedState)
     EXPECT_FLOAT_EQ(t->getAccumulatedLostTime(), 0.f);
 }
 
-// ---------------------------------------------------------------------------
 // predict() — accumulated_lost_time
-// ---------------------------------------------------------------------------
 
 /**
  * @brief predict() increments accumulated_lost_time for a Lost track.
@@ -268,9 +250,7 @@ TEST(TrackletTest, PredictDoesNotIncrementLostTimeForTrackedTrack)
     EXPECT_FLOAT_EQ(t->getAccumulatedLostTime(), 0.f);
 }
 
-// ---------------------------------------------------------------------------
 // update() keep_state flag
-// ---------------------------------------------------------------------------
 
 /**
  * @brief update() with keep_state=true does not change the TrackState.
@@ -303,9 +283,7 @@ TEST(TrackletTest, UpdateNoKeepStatePromotesToTracked)
     EXPECT_TRUE(t->isActivated());
 }
 
-// ---------------------------------------------------------------------------
 // ReID — feature normalisation and similarity
-// ---------------------------------------------------------------------------
 
 /**
  * @brief updateFeatures() L2-normalises the stored feature vector.
@@ -370,9 +348,7 @@ TEST(TrackletTest, FeatureHistoryCapIsRespected)
     EXPECT_LE(static_cast<int>(t->getFeatureHistory().size()), max_hist);
 }
 
-// ===========================================================================
 // Tier 3 edge cases
-// ===========================================================================
 
 /**
  * @brief predict() increments accumulated_lost_time for a Tentative track.
@@ -445,9 +421,7 @@ TEST(TrackletTest, HitsIncrementOnConsecutiveUpdates)
     EXPECT_EQ(t->getHits(), 3);
 }
 
-// ---------------------------------------------------------------------------
 // Lost-time and State Transitions
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Verifies that prediction increments the accumulated lost time for tracks 
@@ -504,5 +478,117 @@ TEST(TrackletTest, MarkAsLostWithZeroDtInitialisesToZeroOverride)
 
     EXPECT_EQ(t->getTrackState(), TrackState::Lost);
     EXPECT_FLOAT_EQ(t->getAccumulatedLostTime(), 0.0f);
+}
+
+// Observation-Centric Momentum: observation channel
+
+/**
+ * @brief Activation records the first raw observation but cannot yet derive a
+ *        direction of travel from a single sample.
+ */
+TEST(TrackletTest, ActivateRecordsObservationWithoutVelocity)
+{
+    auto t = makeTracklet(100.f, 200.f);
+    t->activate(makeKF(), 1, 1);
+
+    EXPECT_TRUE(t->hasLastObservation());
+    EXPECT_FALSE(t->hasObsVelocity());
+    EXPECT_EQ(t->getFramesSinceObservation(), 0);
+}
+
+/**
+ * @brief Each unobserved predict() advances the frames-since-observation counter.
+ */
+TEST(TrackletTest, PredictIncrementsFramesSinceObservation)
+{
+    auto t = makeTracklet();
+    t->activate(makeKF(), 1, 1);
+    ASSERT_EQ(t->getFramesSinceObservation(), 0);
+
+    t->predict(1.0f);
+    EXPECT_EQ(t->getFramesSinceObservation(), 1);
+    t->predict(1.0f);
+    EXPECT_EQ(t->getFramesSinceObservation(), 2);
+}
+
+/**
+ * @brief A matched update() resets the frames-since-observation counter to zero.
+ */
+TEST(TrackletTest, UpdateResetsFramesSinceObservation)
+{
+    auto t = makeTracklet();
+    t->activate(makeKF(), 1, 1);
+    t->predict(1.0f);
+    ASSERT_EQ(t->getFramesSinceObservation(), 1);
+
+    auto obs = makeTracklet(110.f, 200.f);
+    t->update(*obs, 2, true, false);
+    EXPECT_EQ(t->getFramesSinceObservation(), 0);
+}
+
+/**
+ * @brief The observed direction tracks horizontal motion: the unit vector points
+ *        along +x and the speed equals the per-frame step.
+ */
+TEST(TrackletTest, ObservationVelocityFollowsHorizontalMotion)
+{
+    auto t = makeTracklet(100.f, 200.f);
+    t->activate(makeKF(), 1, 1);
+
+    float x = 100.f;
+    for (size_t f = 2; f <= 4; ++f)
+    {
+        t->predict(1.0f);
+        x += 10.f;
+        auto obs = makeTracklet(x, 200.f);
+        t->update(*obs, f, true, false);
+    }
+
+    ASSERT_TRUE(t->hasObsVelocity());
+    EXPECT_NEAR(t->getObsVelocityX(), 1.0f, 1e-3f);
+    EXPECT_NEAR(t->getObsVelocityY(), 0.0f, 1e-3f);
+    EXPECT_NEAR(t->getObsSpeed(), 10.0f, 1e-3f);
+}
+
+/**
+ * @brief The observed direction is computed from raw observations, so reversing
+ *        the motion reverses the sign of the direction vector.
+ */
+TEST(TrackletTest, ObservationVelocitySignTracksDirection)
+{
+    auto t = makeTracklet(300.f, 200.f);
+    t->activate(makeKF(), 1, 1);
+
+    float x = 300.f;
+    for (size_t f = 2; f <= 4; ++f)
+    {
+        t->predict(1.0f);
+        x -= 8.f;
+        auto obs = makeTracklet(x, 200.f);
+        t->update(*obs, f, true, false);
+    }
+
+    ASSERT_TRUE(t->hasObsVelocity());
+    EXPECT_LT(t->getObsVelocityX(), 0.0f);
+    EXPECT_NEAR(t->getObsVelocityY(), 0.0f, 1e-3f);
+}
+
+/**
+ * @brief getLastObservation() is the unfiltered detection box, not the
+ *        Kalman-blended estimate; a detection placed far from the prediction is
+ *        stored verbatim.
+ */
+TEST(TrackletTest, LastObservationIsRawDetection)
+{
+    auto t = makeTracklet(100.f, 200.f);
+    t->activate(makeKF(), 1, 1);
+    t->predict(1.0f);
+
+    auto obs = makeTracklet(140.f, 260.f);
+    t->update(*obs, 2, true, false);
+
+    const auto& lo = t->getLastObservation();
+    EXPECT_FLOAT_EQ(lo.x(), 140.f);
+    EXPECT_FLOAT_EQ(lo.y(), 260.f);
 }
 

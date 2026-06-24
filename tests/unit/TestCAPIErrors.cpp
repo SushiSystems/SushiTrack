@@ -113,9 +113,7 @@ void driveFrames(SushiTrackHdl                   hdl,
 
 }
 
-// ============================================================================
 // CAPIInvalidArgumentTest
-// ============================================================================
 
 /**
  * @brief Fixture providing default params for invalid-argument tests.
@@ -239,9 +237,7 @@ TEST_F(CAPIInvalidArgumentTest, UpdateWithNegativeMaxTracksReturnsNonPositive)
     EXPECT_LE(n, 0);
 }
 
-// ============================================================================
 // CAPIParameterRangeTest
-// ============================================================================
 
 /**
  * @brief Fixture for parameter-range validation tests.
@@ -357,9 +353,7 @@ TEST_F(CAPIParameterRangeTest, TrackThreshGreaterThanHighThreshDoesNotCrash)
     SushiTrack_Destroy(hdl);
 }
 
-// ============================================================================
 // CAPIBufferCapacityTest
-// ============================================================================
 
 /**
  * @brief Fixture for output-buffer capacity behaviour.
@@ -435,14 +429,11 @@ TEST_F(CAPIBufferCapacityTest, ReturnedCountIsBoundedByCapacity)
  */
 TEST_F(CAPIBufferCapacityTest, DISABLED_BufferOverflowReturnsErrorCode)
 {
-    // TODO: Wire SushiTrack_UpdateEx with status pointer; assert
-    //       *status == SUSHITRACK_BUFFER_OVERFLOW when truncation occurs.
+    // TODO: Wire SushiTrack_UpdateEx with status pointer; assert *status == SUSHITRACK_BUFFER_OVERFLOW when truncation occurs.
     FAIL() << "Pending SushiTrack_UpdateEx with status channel.";
 }
 
-// ============================================================================
 // CAPILifecycleSafetyTest
-// ============================================================================
 
 /**
  * @brief Destroying a null handle must be a safe no-op so consumers can call
@@ -485,9 +476,7 @@ TEST(CAPILifecycleSafetyTest, RepeatedCreateDestroyCycleSucceeds)
     }
 }
 
-// ============================================================================
 // CAPIStatusCodeCoverageTest — Disabled placeholders for future status codes
-// ============================================================================
 
 /**
  * @brief DISABLED. Documents the desired propagation path for
@@ -496,9 +485,7 @@ TEST(CAPILifecycleSafetyTest, RepeatedCreateDestroyCycleSucceeds)
  */
 TEST(CAPIStatusCodeCoverageTest, DISABLED_InitFailureReturnsInitializationFailureCode)
 {
-    // TODO: Inject a controlled init failure (e.g. a registered factory that
-    //       throws) and assert SushiTrack_CreateEx returns
-    //       SUSHITRACK_INITIALIZATION_FAILURE.
+    // TODO: Inject a controlled init failure (e.g. a registered factory that throws) and assert SushiTrack_CreateEx returns SUSHITRACK_INITIALIZATION_FAILURE.
     FAIL() << "Pending fault-injection hook for sub-component initialisation.";
 }
 
@@ -508,8 +495,7 @@ TEST(CAPIStatusCodeCoverageTest, DISABLED_InitFailureReturnsInitializationFailur
  */
 TEST(CAPIStatusCodeCoverageTest, DISABLED_RuntimeErrorReturnsRuntimeErrorCode)
 {
-    // TODO: When SushiTrack_UpdateEx is added, assert that an exception caught
-    //       inside the C bridge surfaces as SUSHITRACK_RUNTIME_ERROR.
+    // TODO: When SushiTrack_UpdateEx is added, assert that an exception caught inside the C bridge surfaces as SUSHITRACK_RUNTIME_ERROR.
     FAIL() << "Pending SushiTrack_UpdateEx with status channel.";
 }
 
@@ -520,7 +506,6 @@ TEST(CAPIStatusCodeCoverageTest, DISABLED_RuntimeErrorReturnsRuntimeErrorCode)
  */
 TEST(CAPIStatusCodeCoverageTest, DISABLED_OutOfMemoryReturnsOutOfMemoryCode)
 {
-    // TODO: Inject a controlled bad_alloc and assert SushiTrack_CreateEx
-    //       returns SUSHITRACK_OUT_OF_MEMORY.
+    // TODO: Inject a controlled bad_alloc and assert SushiTrack_CreateEx returns SUSHITRACK_OUT_OF_MEMORY.
     FAIL() << "Pending allocator fault-injection hook.";
 }

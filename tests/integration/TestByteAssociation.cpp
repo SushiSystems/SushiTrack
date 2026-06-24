@@ -78,8 +78,7 @@ TEST_F(ByteAssociationTest, ConfirmedTrackSustainedByLowConfidenceDetections)
     }
     ASSERT_NE(id, -1);
 
-    // Three frames of low-confidence (below track_thresh) detections on the
-    // object's path. These land in the low pool and must keep the track alive.
+    // Three frames of low-confidence (below track_thresh) detections on the object's path. These land in the low pool and must keep the track alive.
     for (int i = 0; i < 3; ++i)
     {
         SushiTrack_Object d_low = makeDet(116.0f + 4.0f * i, 200.0f, /*score=*/0.35f);
@@ -134,8 +133,7 @@ TEST_F(ByteAssociationTest, MidConfidenceDetectionDoesNotSeedNewTrack)
 {
     std::vector<SushiTrack_Track> out(8);
 
-    // score 0.55 is in [track_thresh=0.5, high_thresh=0.6): primary pool, but
-    // below the new-track seeding bar.
+    // score 0.55 is in [track_thresh=0.5, high_thresh=0.6): primary pool, but below the new-track seeding bar.
     for (int i = 0; i < 4; ++i)
     {
         SushiTrack_Object d = makeDet(300.0f, 300.0f, /*score=*/0.55f);

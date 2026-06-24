@@ -97,6 +97,12 @@ extern "C"
 
         params->primary_assoc_mode   = 1;
         params->fuse_score           = 1;
+
+        params->enable_ocm      = 0;
+        params->ocm_vdc_weight  = 0.1f;
+        params->ocm_delta_t     = 3;
+        params->ocm_min_velocity = 1.0f;
+        params->ocm_max_age     = 1;
     }
 
     /**
@@ -191,6 +197,12 @@ extern "C"
 
             config.primary_assoc_mode   = params->primary_assoc_mode;
             config.fuse_score           = (params->fuse_score != 0);
+
+            config.enable_ocm       = (params->enable_ocm != 0);
+            config.ocm_vdc_weight   = params->ocm_vdc_weight;
+            config.ocm_delta_t      = params->ocm_delta_t;
+            config.ocm_min_velocity = params->ocm_min_velocity;
+            config.ocm_max_age      = params->ocm_max_age;
 
             auto kf_factory = std::make_shared<SushiTrack::GenericKalmanFactory>(
                 config.kalman_type, config.enable_xyah);
@@ -362,6 +374,26 @@ extern "C"
             if (config.fuse_score)
             {
                 high_conf_metric = std::make_shared<SushiTrack::FuseScoreDecorator>(high_conf_metric);
+            }
+
+            /**
+             * @brief Observation-centric momentum is the outermost primary-stage
+             *        decorator.
+             *
+             * It must wrap the final high-confidence metric (after score fusion)
+             * so it re-ranks the same costs the solver sees. The contribution is
+             * a bounded subtractive tie-breaker, applied only to high-confidence
+             * primary association; the low-confidence, tentative, duplicate, and
+             * lost-recovery stages are intentionally left untouched, mirroring the
+             * placement of fuse_score.
+             */
+            if (config.enable_ocm)
+            {
+                high_conf_metric = std::make_shared<SushiTrack::ObservationMomentumDecorator>(
+                    high_conf_metric,
+                    config.ocm_vdc_weight,
+                    config.ocm_min_velocity,
+                    config.ocm_max_age);
             }
 
             auto impl     = new SushiTrackHdlImpl();

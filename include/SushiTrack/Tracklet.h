@@ -59,11 +59,13 @@ namespace SushiTrack
              * @param alpha EMA weight for feature updates.
              * @param enable_xyah Coordinate system flag.
              * @param max_feature_history Maximum number of visual appearance vectors stored per tracklet.
+             * @param ocm_delta_t Observation window (in observed frames) for the observation-centric direction estimate.
              */
             Tracklet(std::unique_ptr<IStatePredictor> kf,
                    const Rect<float>& rect, int label, float score,
                    std::vector<float> feat = {}, float alpha = 0.9f,
-                   bool enable_xyah = false, int max_feature_history = 100);
+                   bool enable_xyah = false, int max_feature_history = 100,
+                   int ocm_delta_t = 3);
 
             /**
              * @brief Destroys the Tracklet instance.
@@ -108,6 +110,38 @@ namespace SushiTrack
              * behaviour rather than a special-cased no-op.
              */
             KinematicState     getLastSeenState() const { return fsm_ ? fsm_->getLastSeenState() : KinematicState::Cruising; }
+
+            /**
+             * @brief Returns the last raw matched detection box.
+             *
+             * Unlike getRect(), which tracks the Kalman-smoothed (and, after
+             * predict(), extrapolated) estimate, this is the unmodified box of
+             * the most recently associated observation. It is the anchor from
+             * which observation-centric momentum measures the direction to a
+             * candidate detection. Valid only when hasLastObservation() is true.
+             */
+            const Rect<float>& getLastObservation() const { return last_observation_; }
+            bool  hasLastObservation() const { return has_last_observation_; }
+
+            /**
+             * @brief Components of the unit vector of the track's observed
+             *        direction of travel.
+             *
+             * Computed from two raw observations spanning the configured
+             * observation window (not from Kalman velocity), so the direction
+             * stays reliable in the low-frame-rate and nonlinear regimes where
+             * the filter's velocity estimate lags. Valid only when
+             * hasObsVelocity() is true.
+             */
+            float getObsVelocityX() const { return obs_vx_; }
+            float getObsVelocityY() const { return obs_vy_; }
+
+            /** @brief Observed speed magnitude in pixels per observed frame; zero for a near-stationary track. */
+            float getObsSpeed() const { return obs_speed_; }
+            bool  hasObsVelocity() const { return obs_velocity_valid_; }
+
+            /** @brief Frames elapsed since the last associated observation; zero on a freshly matched frame, incremented by each unobserved predict(). */
+            int   getFramesSinceObservation() const { return frames_since_observation_; }
 
             const std::vector<float>& getSmoothFeat() const { return smooth_feat_; }
             const std::vector<float>& getCurrFeat()   const { return curr_feat_;   }
@@ -296,19 +330,24 @@ namespace SushiTrack
             std::deque<std::vector<float>> feature_history_;
             float accumulated_lost_time_ = 0.0f;
 
+            Rect<float> last_observation_;
+            bool  has_last_observation_ = false;
+            int   ocm_delta_t_ = 3;
+            float obs_vx_ = 0.0f;
+            float obs_vy_ = 0.0f;
+            float obs_speed_ = 0.0f;
+            bool  obs_velocity_valid_ = false;
+            int   frames_since_observation_ = 0;
+
+            struct ObsSample { size_t frame_id; float cx; float cy; };
+            std::deque<ObsSample> obs_history_; ///< Recent observation centres, capped to ocm_delta_t_ + 1, used to measure the direction of travel from raw detections.
+
             float last_dt_ = 1.0f;
 
             float              alpha_;
             bool               enable_xyah_;
 
-            // EMA weight for the confirmation score used by the tentative
-            // pipeline. Smoothing the score (rather than reading the latest
-            // detection score) stops a single high-confidence spike from
-            // collapsing the required hit count on an otherwise low-quality
-            // track. Tuned for the short tentative window: responsive enough to
-            // reflect a genuine quality trend over a few frames, sticky enough
-            // to reject one-frame spikes.
-            static constexpr float kScoreSmoothingMomentum = 0.7f;
+            static constexpr float kScoreSmoothingMomentum = 0.7f; ///< EMA weight for the tentative confirmation score; smoothing stops a one-frame spike from collapsing the required hit count.
 
             void addFeatureToHistory(const std::vector<float>& feat)
             {
@@ -319,6 +358,21 @@ namespace SushiTrack
 
             void updateRect();
             void updateRectXyah();
+
+            /**
+             * @brief Records a raw observation and refreshes the observation-centric
+             *        direction estimate.
+             *
+             * Stores the box as the new last observation, resets the
+             * frames-since-observation counter, and recomputes the direction of
+             * travel over the configured observation window. Lock-free: callers
+             * that mutate shared state (update/reActivate) already hold the state
+             * mutex; the activation paths run single-threaded at track birth.
+             *
+             * @param obs_rect Raw detection box of the matched observation.
+             * @param frame_id Frame in which the observation occurred.
+             */
+            void recordObservation(const Rect<float>& obs_rect, size_t frame_id);
 
             static void normalizeL2(std::vector<float>& v);
 

@@ -56,8 +56,7 @@ protected:
         params_.enable_mahalanobis     = 1;
         params_.primary_assoc_mode     = 1;
         params_.time_aware             = 1;
-        // Disable spatial proximity pre-filter so we can test ReID discrimination
-        // at a slightly larger distance within the Mahalanobis gate.
+        // Disable spatial proximity pre-filter so we can test ReID discrimination at a slightly larger distance within the Mahalanobis gate.
         params_.proximity_thresh       = 0.0f;
         params_.match_thresh           = 0.9f;
 
@@ -90,14 +89,12 @@ TEST_F(AdvancedPathIntegrationTest, ReIDAndMahalanobisEndToEnd)
     }
     ASSERT_NE(target_id, -1);
 
-    // Frame 4: An object appears at the exact same location, but with a different feature (Decoy)
-    // And our true target object appears a bit further away (Mahalanobis gate should catch it, and ReID should match it)
+    // Frame 4: An object appears at the exact same location, but with a different feature (Decoy) And our true target object appears a bit further away (Mahalanobis gate should catch it, and ReID should match it)
     
     // Decoy object at the predicted location (IoU is high, but ReID feature is very different)
     SushiTrack_Object decoy = makeDetWithFeat(100.0f, 115.0f, decoy_feat_.data(), 512, 0.9f);
     
-    // True object further away (IoU is lower, but ReID feature matches perfectly)
-    // Placed at 110, so it's still well within the Mahalanobis gate.
+    // True object further away (IoU is lower, but ReID feature matches perfectly) Placed at 110, so it's still well within the Mahalanobis gate.
     SushiTrack_Object target = makeDetWithFeat(110.0f, 115.0f, target_feat_.data(), 512, 0.9f);
 
     SushiTrack_Object dets_f4[2] = { decoy, target };
@@ -108,13 +105,6 @@ TEST_F(AdvancedPathIntegrationTest, ReIDAndMahalanobisEndToEnd)
     const SushiTrack_Track* t = findById(out, n4, target_id);
     ASSERT_NE(t, nullptr) << "The tracker failed to associate the target using ReID and Mahalanobis gating.";
     
-    // The decoy sits at the predicted location (x~=100); the ReID-matched target
-    // is at x=110. The Kalman output is the filtered estimate, not the raw
-    // detection: it blends prediction and measurement as x = 100 + K*(110-100),
-    // which lands near 107.6 for this covariance. Asserting equality with the
-    // raw 110 would test "did the KF ignore its own prediction", not the ReID
-    // association. Instead assert the track moved decisively toward the target
-    // (x>105) rather than staying at the decoy (x~=100), which is the property
-    // this test actually validates and is robust to the Kalman gain.
+    // The decoy sits at the predicted location (x~=100); the ReID-matched target is at x=110. The Kalman output is the filtered estimate, not the raw detection: it blends prediction and measurement as x = 100 + K*(110-100), which lands near 107.6 for this covariance. Asserting equality with the raw 110 would test "did the KF ignore its own prediction", not the ReID association. Instead assert the track moved decisively toward the target (x>105) rather than staying at the decoy (x~=100), which is the property this test actually validates and is robust to the Kalman gain.
     EXPECT_GT(t->x, 105.0f) << "Tracker associated the ID with the decoy object instead of using ReID.";
 }

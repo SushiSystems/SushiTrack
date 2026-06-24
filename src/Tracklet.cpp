@@ -57,7 +57,8 @@ namespace SushiTrack
                     std::vector<float> feat,
                     float alpha,
                     bool enable_xyah,
-                    int max_feature_history)
+                    int max_feature_history,
+                    int ocm_delta_t)
         : kf_(std::move(kf)),
         mean_(KalmanTypes::StateMean::Zero()),
         covariance_(KalmanTypes::StateCov::Zero()),
@@ -76,7 +77,8 @@ namespace SushiTrack
         consecutive_hits_(0),
         alpha_(alpha),
         enable_xyah_(enable_xyah),
-        max_feature_history_(static_cast<size_t>(max_feature_history))
+        max_feature_history_(static_cast<size_t>(max_feature_history)),
+        ocm_delta_t_(std::max(1, ocm_delta_t))
     {
         if (!feat.empty())
         {
@@ -115,6 +117,7 @@ namespace SushiTrack
         consecutive_hits_ = 1;
         score_smooth_ = score_;
         accumulated_lost_time_ = 0.0f;
+        recordObservation(rect_, frame_id);
     }
 
     /**
@@ -141,6 +144,7 @@ namespace SushiTrack
         consecutive_hits_ = 1;
         score_smooth_ = score_;
         accumulated_lost_time_ = 0.0f;
+        recordObservation(rect_, frame_id);
     }
 
     /**
@@ -172,12 +176,7 @@ namespace SushiTrack
     {
         const KalmanTypes::DetectBox new_meas = new_track.getMeasurement();
 
-        // Hold the state mutex for the full mutation, mirroring update(). Without
-        // this, reActivate() writes mean_/covariance_ while a concurrent reader
-        // (getMean/getCovariance/getMeasurement) could observe a torn state — the
-        // exact race update() already guards against. new_track is a distinct
-        // instance, so locking its mutex via getMeasurement()/getCurrFeat() does
-        // not recurse on this->state_mutex_.
+        // Hold the state mutex for the whole mutation (mirrors update()) so concurrent readers never see a torn mean_/covariance_.
         std::lock_guard<std::mutex> lock(state_mutex_);
 
         kf_->update(mean_, covariance_, new_meas, new_track.getScore());
@@ -205,6 +204,7 @@ namespace SushiTrack
         consecutive_hits_++;
         tracklet_len_ = frame_id - start_frame_id_ + 1;
         accumulated_lost_time_ = 0.0f;
+        recordObservation(new_track.getRect(), frame_id);
 
         if (fsm_)
         {
@@ -222,28 +222,19 @@ namespace SushiTrack
         std::lock_guard<std::mutex> lock(state_mutex_);
 
         last_dt_ = dt;
+        frames_since_observation_++;
 
         if (state_ != TrackState::Tracked)
         {
-            // Match the reference ByteTrack STrack::predict policy: when a
-            // track is not actively being observed, freeze the size-velocity
-            // components only. Position velocity is left intact so that a
-            // walking target keeps propagating through brief occlusions and
-            // gets re-acquired close to its true position when a detection
-            // reappears. The previous policy zeroed aspect/height velocity
-            // AND damped (x, y) velocity by 5% per frame, which made Lost
-            // tracks stall and produced wrong-position re-associations on
-            // clean sequences (visible as elevated IDSW on MOT17-04-SDP).
+            // ByteTrack STrack::predict policy: on an unobserved track freeze only the size velocities, keeping (vx, vy) so it propagates through brief occlusions.
             if (enable_xyah_)
             {
-                // state = [x, y, a, h, vx, vy, va, vh]
-                // freeze height velocity, leave (vx, vy, va) intact.
+                // [x, y, a, h, vx, vy, va, vh]: freeze height velocity only.
                 mean_[7] = 0.f;
             }
             else
             {
-                // state = [x, y, w, h, vx, vy, vw, vh]
-                // freeze size velocities (vw, vh), leave (vx, vy) intact.
+                // [x, y, w, h, vx, vy, vw, vh]: freeze (vw, vh) only.
                 mean_[6] = 0.f;
                 mean_[7] = 0.f;
             }
@@ -251,18 +242,7 @@ namespace SushiTrack
 
         if (fsm_ && kf_)
         {
-            // The FSM is driven exactly once per frame from the measurement
-            // update (Tracklet::update / Tracklet::reActivate), where mean_
-            // already reflects the current observation. predict() runs before
-            // any measurement and sees the *previous* frame's posterior, so its
-            // velocity equals last_v* and the derived acceleration is ~0. Calling
-            // updateState here for an actively tracked target therefore injects a
-            // spurious zero-acceleration sample every frame, which resets the
-            // hysteresis counter and makes Maneuvering effectively unreachable.
-            //
-            // Lost tracks are the exception: they receive no measurement update,
-            // so predict() is the only place that can advance them into Coasting
-            // (and capture the pre-coast regime). Drive the FSM here for them only.
+            // FSM runs once per frame from update()/reActivate(); driving it here for a Tracked target would inject a spurious zero-accel sample. Only Lost tracks (no measurement) advance into Coasting here.
             if (state_ == TrackState::Lost)
             {
                 KinematicState old_fsm = fsm_->getCurrentState();
@@ -275,9 +255,7 @@ namespace SushiTrack
                 }
             }
 
-            // Process noise for this prediction step is scaled by the regime
-            // determined from the most recent observation — the correct causal
-            // order (set noise from the known regime, then predict, then observe).
+            // Scale process noise from the last-observed regime before predicting (set noise, then predict, then observe).
             fsm_->applyToPredictor(kf_.get(), dt);
         }
 
@@ -336,6 +314,7 @@ namespace SushiTrack
         consecutive_hits_++;
         tracklet_len_ = frame_id - start_frame_id_ + 1;
         accumulated_lost_time_ = 0.0f;
+        recordObservation(new_track.getRect(), frame_id);
 
         if (fsm_)
         {
@@ -447,6 +426,52 @@ namespace SushiTrack
         }
 
         return max_similarity;
+    }
+
+    /**
+     * @brief Records a raw observation and refreshes the observation-centric direction.
+     *
+     * @param obs_rect Raw detection box of the matched observation.
+     * @param frame_id Frame in which the observation occurred.
+     */
+    void Tracklet::recordObservation(const Rect<float>& obs_rect, size_t frame_id)
+    {
+        last_observation_     = obs_rect;
+        has_last_observation_ = true;
+        frames_since_observation_ = 0;
+
+        const float cx = obs_rect.x() + obs_rect.width()  * 0.5f;
+        const float cy = obs_rect.y() + obs_rect.height() * 0.5f;
+
+        obs_history_.push_back({frame_id, cx, cy});
+        while (obs_history_.size() > static_cast<size_t>(ocm_delta_t_) + 1)
+            obs_history_.pop_front();
+
+        if (obs_history_.size() < 2)
+        {
+            obs_velocity_valid_ = false;
+            obs_speed_ = 0.0f;
+            return;
+        }
+
+        // Direction is measured from the oldest sample in the window (raw observations), not from Kalman velocity, so it stays reliable under nonlinear/low-frame-rate motion.
+        const ObsSample& prev = obs_history_.front();
+        const float dx = cx - prev.cx;
+        const float dy = cy - prev.cy;
+        const float dist = std::sqrt(dx * dx + dy * dy);
+        const size_t frame_gap = (frame_id > prev.frame_id) ? (frame_id - prev.frame_id) : 1;
+        obs_speed_ = dist / static_cast<float>(std::max<size_t>(1, frame_gap));
+
+        if (dist > 1e-3f)
+        {
+            obs_vx_ = dx / dist;
+            obs_vy_ = dy / dist;
+            obs_velocity_valid_ = true;
+        }
+        else
+        {
+            obs_velocity_valid_ = false;
+        }
     }
 
     /**

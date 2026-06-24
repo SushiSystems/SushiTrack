@@ -27,9 +27,7 @@
 #include "SushiTrackC.h"
 #include <vector>
 
-// ===========================================================================
 // TrackerTentativeTest
-// ===========================================================================
 
 /**
  * @brief Tracker fixture configured for time-aware tentative testing.
@@ -236,9 +234,7 @@ TEST_F(TrackerTentativeTest, TentativePromotedTrackPersistsAfterPromotion)
     EXPECT_EQ(out[0].hits,     4);
 }
 
-// ===========================================================================
 // TrackerTentativeDisabledTest — enable_tentative=0
-// ===========================================================================
 
 /**
  * @brief Tracker fixture with tentative mode disabled.

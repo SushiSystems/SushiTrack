@@ -440,6 +440,87 @@ namespace SushiTrack
     };
 
     /**
+     * @brief Observation-centric momentum decorator for the primary association stage.
+     *
+     * Wraps an inner cost calculator and applies a bounded subtractive
+     * re-ranking term that rewards detections lying in the direction a track was
+     * observed to be moving and penalises those moving against it. The direction
+     * is derived from raw observations (Tracklet::recordObservation), not from
+     * Kalman velocity, so it complements the filter-based gating in the inner
+     * metric instead of duplicating it.
+     *
+     * The term is deliberately conservative — a tie-breaker, not a primary
+     * signal — to avoid the identity-switch failure mode of an unbounded momentum
+     * bonus on a pipeline that already fuses score, DIoU, and Mahalanobis gating:
+     *   - bounded: clamped to [-vdc_weight, +vdc_weight], so it can only re-order
+     *     candidates inside the gate and never rescues a gated-out (sentinel) pair.
+     *   - regime-gated: applied only to tracks the FSM reports as Cruising (steady
+     *     linear motion). Stationary, Maneuvering, and Coasting tracks are skipped,
+     *     since their observed direction is meaningless or unreliable — exactly the
+     *     cases where naive momentum injects switches. With the FSM disabled every
+     *     track reports Cruising and the speed/age gates below carry the load.
+     *   - speed-gated: tracks slower than min_velocity (px per observed frame)
+     *     contribute nothing; their direction is dominated by noise.
+     *   - freshness-gated: applied only when the last observation is at most
+     *     max_age frames old, so a stale pre-occlusion direction cannot pull a
+     *     recovered identity toward where it used to be heading.
+     */
+    class ObservationMomentumDecorator : public ICostCalculator
+    {
+        public:
+            /**
+             * @brief Wraps an inner cost calculator with the momentum re-ranking term.
+             *
+             * @param inner Cost calculator whose output matrix is re-ranked in place.
+             * @param vdc_weight Strength and bound of the momentum contribution.
+             * @param min_velocity Minimum observed speed (px per observed frame) for the term to apply.
+             * @param max_age Maximum frames since the last observation for the term to apply.
+             */
+            ObservationMomentumDecorator(std::shared_ptr<ICostCalculator> inner,
+                                         float vdc_weight,
+                                         float min_velocity,
+                                         int max_age)
+                : inner_(std::move(inner)),
+                  vdc_weight_(vdc_weight),
+                  min_velocity_(min_velocity),
+                  max_age_(max_age) {}
+
+            /**
+             * @brief Computes inner costs and applies the momentum re-ranking in place.
+             *
+             * @param a Collection of source tracklets.
+             * @param b Collection of target tracklets (observations).
+             * @param out_matrix Output cost matrix to be populated and re-ranked.
+             */
+            void calculate(const std::vector<TrackletPtr>& __restrict a,
+                        const std::vector<TrackletPtr>& __restrict b,
+                        CostMatrix& __restrict out_matrix) override;
+            /**
+             * @brief Computes the momentum-adjusted association cost for a single pair.
+             *
+             * @param a Source tracklet for association.
+             * @param b Candidate tracklet for association.
+             * @return float Re-ranked association cost.
+             */
+            float calculate_single(const TrackletPtr& a, const TrackletPtr& b) const override;
+
+        private:
+            /**
+             * @brief Bounded directional bonus for one track/detection pair.
+             *
+             * @param track Source tracklet supplying the observed direction.
+             * @param det Candidate detection.
+             * @return Value in [-vdc_weight, +vdc_weight]; positive when aligned with travel.
+             */
+            float momentumBonus(const TrackletPtr& track, const TrackletPtr& det) const;
+
+            std::shared_ptr<ICostCalculator> inner_;
+            float vdc_weight_;
+            float min_velocity_;
+            int   max_age_;
+    };
+
+    /**
      * @brief Spatial overlap calculator with motion-based gating.
      *
      * Calculates IoU costs and applies penalties based on Mahalanobis distance

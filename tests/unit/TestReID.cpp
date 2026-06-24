@@ -30,9 +30,7 @@
 
 using namespace SushiTrack;
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 /** @brief Creates a Tracklet with the given max_feature_history limit. */
 static std::unique_ptr<Tracklet> makeTracklet(int max_hist = 100, float alpha = 0.9f)
@@ -64,9 +62,7 @@ static float l2Norm(const std::vector<float>& v)
     return std::sqrt(s);
 }
 
-// ---------------------------------------------------------------------------
 // hasFeature()
-// ---------------------------------------------------------------------------
 
 /**
  * @brief A freshly constructed Tracklet has no feature (hasFeature = false).
@@ -87,9 +83,7 @@ TEST(ReIDTest, HasFeatureAfterUpdate)
     EXPECT_TRUE(t->hasFeature());
 }
 
-// ---------------------------------------------------------------------------
 // L2 normalisation
-// ---------------------------------------------------------------------------
 
 /**
  * @brief smooth_feat is unit-normalised after updateFeatures() for a
@@ -116,9 +110,7 @@ TEST(ReIDTest, CurrFeatIsUnitNormalised)
     EXPECT_NEAR(l2Norm(cf), 1.f, 1e-5f);
 }
 
-// ---------------------------------------------------------------------------
 // EMA blending
-// ---------------------------------------------------------------------------
 
 /**
  * @brief After two updateFeatures() calls, smooth_feat lies strictly between
@@ -147,9 +139,7 @@ TEST(ReIDTest, EMABlendsConsecutiveFeatures)
     EXPECT_GT(proj_e2, 0.f) << "EMA should have component of e2";
 }
 
-// ---------------------------------------------------------------------------
 // getMaxFeatureSimilarity()
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Querying with the same (unit-normalised) feature that was stored
@@ -198,9 +188,7 @@ TEST(ReIDTest, SimilarityChecksHistory)
     EXPECT_GT(sim, 0.5f) << "history should preserve the original feature";
 }
 
-// ---------------------------------------------------------------------------
 // Feature history capacity
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Feature history never exceeds max_feature_history entries.
@@ -219,9 +207,7 @@ TEST(ReIDTest, HistoryDoesNotExceedCapacity)
     EXPECT_LE(static_cast<int>(t->getFeatureHistory().size()), cap);
 }
 
-// ---------------------------------------------------------------------------
 // Empty / zero feature vector
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Calling updateFeatures() with an empty vector is a no-op:
@@ -232,15 +218,9 @@ TEST(ReIDTest, EmptyFeatureVectorIsNoOp)
     auto t = makeTracklet();
     ASSERT_FALSE(t->hasFeature());
 
-    // Empty vector should not set a feature
-    // (The implementation moves the empty vector in; if it's empty it skips the update)
-    // We test by checking the Tracklet's own guard: feat.empty() check
+    // Empty vector should not set a feature (The implementation moves the empty vector in; if it's empty it skips the update) We test by checking the Tracklet's own guard: feat.empty() check
     std::vector<float> empty;
-    // updateFeatures with empty: hasFeature should stay false
-    // (Implementation: if feat.empty() guard is in place via !feat.empty() in constructor
-    //  path, but updateFeatures itself does not guard — the feature IS empty after move.
-    //  The hasFeature() check is smooth_feat_.empty(). So if updateFeatures assigns
-    //  an empty vector it normalises nothing and smooth_feat_ stays empty.)
+    // updateFeatures with empty: hasFeature should stay false (Implementation: if feat.empty() guard is in place via !feat.empty() in constructor path, but updateFeatures itself does not guard — the feature IS empty after move. The hasFeature() check is smooth_feat_.empty(). So if updateFeatures assigns an empty vector it normalises nothing and smooth_feat_ stays empty.)
     t->updateFeatures(empty);
     // After empty update, smooth_feat_ is still empty
     EXPECT_FALSE(t->hasFeature());

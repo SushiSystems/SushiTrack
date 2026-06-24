@@ -392,8 +392,7 @@ TEST_F(TrackerTentativeTiersTest, HighScoreDetectionPromotesAfterOneConfirmingHi
     EXPECT_EQ(out[0].state,        4);
     EXPECT_EQ(out[0].is_confirmed, 0);
 
-    // Frame 2: the confirming match promotes the tentative to Tracked under
-    // the fast tier (tentative_fast_hits=1, score still above fast_thresh).
+    // Frame 2: the confirming match promotes the tentative to Tracked under the fast tier (tentative_fast_hits=1, score still above fast_thresh).
     SushiTrack_Object d1 = makeDet(102.0f, 202.0f, 0.9f);
     n = SushiTrack_Update(hdl_, &d1, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);

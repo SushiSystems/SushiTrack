@@ -107,36 +107,17 @@ namespace SushiTrack
             float last_vx_per_sec_ = 0.0f;
             float last_vy_per_sec_ = 0.0f;
 
-            // Lazy-init flag for the velocity history. The first updateState call
-            // seeds last_v* from the current velocity so the first dvx/dvy is zero
-            // (instead of equal to the full velocity, which would otherwise produce
-            // a spurious Maneuvering classification on born-with-velocity tracks).
-            bool has_velocity_history_ = false;
+            bool has_velocity_history_ = false; ///< Seeds last_v* on the first call so the first accel sample is zero, not a born-with-velocity spike into Maneuvering.
 
-            // Pre-Coasting motion regime, used to restore the active state when
-            // an observation is reacquired after a Lost period. Without this, every
-            // recovery would demote the track to Cruising regardless of what it
-            // was doing pre-occlusion, losing kinematic context exactly when
-            // adaptive behaviour matters most.
-            KinematicState pre_coast_state_ = KinematicState::Cruising;
+            KinematicState pre_coast_state_ = KinematicState::Cruising; ///< Regime before the track went dark, restored on recovery so occlusion doesn't demote it to Cruising.
 
-            // Time-based hysteresis: a candidate transition must be observed for
-            // kStableFrames consecutive frames before it is committed. Single-frame
-            // jitter cannot flip the state.
-            KinematicState pending_state_ = KinematicState::Stationary;
+            KinematicState pending_state_ = KinematicState::Stationary; ///< Candidate transition; must hold kStableFrames consecutive frames before commit (kills single-frame jitter).
             unsigned char  pending_count_ = 0;
 
             static constexpr size_t kWarmupFrames = 3;
             static constexpr unsigned char kStableFrames = 2;
 
-            // Bounds on the size-normalisation factor (fsm_reference_height /
-            // box_height). They cap how far the classification can be rescaled by
-            // object size: a very small box would otherwise amplify detection
-            // jitter into a permanent false Maneuvering, and a very large box
-            // would be damped into a permanent Stationary. Beyond the bounds the
-            // object is treated as if it were ref/kMaxScaleFactor px tall (large
-            // boxes) or ref/kMinScaleFactor px tall (small boxes).
-            static constexpr float kMinScaleFactor = 0.25f;
+            static constexpr float kMinScaleFactor = 0.25f; ///< Clamp on the size-normalisation factor; stops tiny boxes amplifying jitter into false Maneuvering and huge boxes damping into permanent Stationary.
             static constexpr float kMaxScaleFactor = 4.0f;
     };
 

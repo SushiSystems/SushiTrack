@@ -46,33 +46,23 @@ namespace SushiTrack
 
         if (is_lost)
         {
-            // Capture the pre-Coasting motion regime so it can be restored on
-            // recovery and consumed by lost-buffer / gating policies that need
-            // to reason about the underlying motion category while the track is
-            // dark. Only sample if we are not already Coasting, otherwise we
-            // would clobber the captured state on every successive Lost frame.
+            // Capture the pre-Coasting regime once (skip if already Coasting) so recovery can restore the underlying motion category.
             if (current_state_ != KinematicState::Coasting)
                 pre_coast_state_ = current_state_;
             current_state_ = KinematicState::Coasting;
             return;
         }
 
-        // ----- Time normalisation -----
         const float actual_dt = config_.time_aware ? dt : (1.0f / static_cast<float>(std::max(1, config_.frame_rate)));
         const float safe_dt = std::max(actual_dt, 0.001f);
         const float reference_fps = static_cast<float>(std::max(1, config_.frame_rate));
 
-        // The Kalman state stores per-frame velocity; convert to per-second so
-        // thresholds keep their physical meaning regardless of frame rate.
+        // Kalman velocity is per-frame; convert to per-second so thresholds stay frame-rate-independent.
         const float vx_per_sec = mean(4) * reference_fps;
         const float vy_per_sec = mean(5) * reference_fps;
         const float vel_residual_per_sec = std::sqrt(vx_per_sec * vx_per_sec + vy_per_sec * vy_per_sec);
 
-        // ----- Cold-start ghost-acceleration fix -----
-        // Seed the velocity history on the very first call so the first
-        // dvx/dvy is zero. Without this, a track born with non-zero velocity
-        // would compute (full velocity - 0) / dt on its first acceleration
-        // sample and immediately jump into Maneuvering once warmup ends.
+        // Seed velocity history on the first call so the first accel sample is zero, not a born-with-velocity spike into Maneuvering.
         if (!has_velocity_history_)
         {
             last_vx_per_sec_ = vx_per_sec;
@@ -80,14 +70,7 @@ namespace SushiTrack
             has_velocity_history_ = true;
         }
 
-        // ----- Coasting recovery -----
-        // When an observation arrives after a Lost period, snap the velocity
-        // history to the freshly observed velocity (otherwise the gap shows up
-        // as a giant acceleration spike) AND restore the kinematic regime that
-        // was active before the track went dark. A pedestrian who was
-        // Maneuvering before brief occlusion comes back as Maneuvering, not
-        // Cruising — preserving the noise / association policy that matched
-        // their underlying motion.
+        // On recovery from Lost, snap velocity history to the new observation (avoids a false accel spike) and restore the pre-coast regime.
         if (current_state_ == KinematicState::Coasting)
         {
             last_vx_per_sec_ = vx_per_sec;
@@ -98,7 +81,6 @@ namespace SushiTrack
             return;
         }
 
-        // ----- Acceleration estimate -----
         const float dvx = vx_per_sec - last_vx_per_sec_;
         const float dvy = vy_per_sec - last_vy_per_sec_;
         const float accel_per_sec2 = std::sqrt(dvx * dvx + dvy * dvy) / safe_dt;
@@ -106,7 +88,6 @@ namespace SushiTrack
         last_vx_per_sec_ = vx_per_sec;
         last_vy_per_sec_ = vy_per_sec;
 
-        // ----- Warmup -----
         if (tracklet_len < kWarmupFrames)
         {
             current_state_ = KinematicState::Cruising;
@@ -115,16 +96,7 @@ namespace SushiTrack
             return;
         }
 
-        // ----- Scale-invariant normalisation -----
-        // Pixel velocity and acceleration scale with the object's apparent size:
-        // a box twice as tall sweeps twice the pixels for the same body-relative
-        // motion. Re-express both in "reference-height-equivalent pixels" so the
-        // thresholds classify the object's *physical* motion regardless of how
-        // large it appears in frame. At box height == fsm_reference_height the
-        // factor is exactly 1, so the thresholds keep their absolute-pixel
-        // calibration and the decision is identical to the un-normalised path.
-        // A non-positive reference disables normalisation (legacy behaviour).
-        // The factor is clamped so extreme box sizes cannot saturate the FSM.
+        // Rescale velocity/accel to reference-height-equivalent pixels so classification tracks physical motion, not apparent size; factor 1 at ref height, clamped, disabled when ref <= 0.
         float scale = 1.0f;
         if (config_.fsm_reference_height > 0.0f)
         {
@@ -135,15 +107,11 @@ namespace SushiTrack
         const float vel_eff   = vel_residual_per_sec * scale;
         const float accel_eff = accel_per_sec2 * scale;
 
-        // ----- Threshold-based hysteresis (dead-band) -----
+        // Threshold-based hysteresis (dead-band)
         const float margin_down = 0.8f;
         const float margin_up   = 1.2f;
 
-        // Single-frame classification suggested by the current sample. Allows
-        // direct Stationary <-> Maneuvering transitions (the previous state
-        // machine had to pass through Cruising for a frame, which delayed
-        // adaptation when a parked vehicle suddenly accelerated). Sustain
-        // rules keep the active state sticky inside the dead-band.
+        // Single-frame classification; allows direct Stationary<->Maneuvering (the old FSM forced a Cruising frame between, delaying adaptation).
         KinematicState observed;
         if (accel_eff > config_.fsm_maneuver_accel_thresh * margin_up)
         {
@@ -161,12 +129,7 @@ namespace SushiTrack
         else if (pending_state_ == KinematicState::Maneuvering &&
                  vel_eff > config_.fsm_stationary_vel_thresh * margin_up)
         {
-            // Pending-sustain: a Maneuvering candidate was triggered by a large
-            // velocity step. On subsequent frames the instantaneous acceleration
-            // may drop to zero because the new velocity is now constant, but the
-            // object is still clearly moving fast. Keep the Maneuvering
-            // observation alive so the stability counter can reach kStableFrames
-            // without being reset by a spurious Cruising classification.
+            // Pending-sustain: keep a fast-but-now-constant-velocity candidate Maneuvering so accel falling to zero doesn't reset the stability counter.
             observed = KinematicState::Maneuvering;
         }
         else if (current_state_ == KinematicState::Stationary &&
@@ -179,10 +142,7 @@ namespace SushiTrack
             observed = KinematicState::Cruising;
         }
 
-        // ----- Time-based stability -----
-        // A candidate transition must persist for kStableFrames consecutive
-        // frames before it is committed. Eliminates one-frame state flicker
-        // under detection jitter even when the threshold dead-band is crossed.
+        // A candidate transition must persist kStableFrames consecutive frames before commit, killing one-frame flicker under jitter.
         if (observed == current_state_)
         {
             pending_state_ = observed;

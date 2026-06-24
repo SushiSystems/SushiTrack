@@ -19,9 +19,7 @@ namespace SushiTrack
      */
     struct TrackerConfig
     {
-        // ====================================================================
         // BASIC PARAMETERS
-        // ====================================================================
 
         /** @brief Flag to enable real-time interval processing rather than frame-based intervals. */
         bool  time_aware = false;
@@ -53,11 +51,9 @@ namespace SushiTrack
         /** @brief Flag to enable Mahalanobis distance gating to filter impossible associations. */
         bool  enable_mahalanobis = false;
 
-        // ====================================================================
         // ADVANCED PARAMETERS
-        // ====================================================================
 
-        // --- Association ---
+        // Association
 
         /** @brief Primary association mode (0: Age-cascade legacy, 1: Global LAPJV). */
         int   primary_assoc_mode = 1;
@@ -74,7 +70,7 @@ namespace SushiTrack
         /** @brief IoU threshold to identify and remove redundant, duplicate tracks. */
         float duplicate_iou_thresh = 0.15f;
 
-        // --- Coordinate System ---
+        // Coordinate System
 
         /** @brief Flag to enable centroid-based (XYAH) coordinate representation instead of XYWH. */
         bool  enable_xyah = false;
@@ -88,7 +84,7 @@ namespace SushiTrack
         /** @brief Defines the type of Kalman Filter utilized (0: Linear, 1: Noise Scale Adaptive). */
         int   kalman_type = 0;
 
-        // --- ReID Params ---
+        // ReID Params
 
         /** @brief Exponential moving average weight for smoothing visual feature updates. */
         float feature_momentum = 0.9f;
@@ -111,7 +107,7 @@ namespace SushiTrack
         /** @brief Maximum capacity of visual appearance vectors stored in the gallery per tracklet. */
         int   max_feature_history = 100;
 
-        // --- FSM Params ---
+        // FSM Params
 
         /** @brief Velocity threshold to classify an object's kinematic state as stationary. */
         float fsm_stationary_vel_thresh = 40.0f;
@@ -138,7 +134,35 @@ namespace SushiTrack
          */
         float fsm_reference_height = 100.0f;
 
-        // --- Tentative Logic ---
+        // Observation-Centric Momentum (OCM)
+
+        /** @brief Flag to enable the observation-centric momentum re-ranking term in primary association. */
+        bool  enable_ocm = false;
+
+        /**
+         * @brief Strength of the momentum re-ranking term.
+         *
+         * The decorator subtracts ocm_vdc_weight * cos(theta) from each primary
+         * cost cell, where theta is the angle between a track's observed
+         * direction of travel and the direction from its last observation to the
+         * candidate detection. The term is clamped to [-ocm_vdc_weight,
+         * +ocm_vdc_weight], so it can only re-rank candidates inside the gate; it
+         * cannot rescue a gated-out pair or overpower geometry. Keep it small
+         * relative to the primary cost scale (~1.0): this is a tie-breaker, not a
+         * primary signal. Zero disables the contribution.
+         */
+        float ocm_vdc_weight = 0.1f;
+
+        /** @brief Observation window, in observed frames, over which a track's direction of travel is measured (OC-SORT delta_t). */
+        int   ocm_delta_t = 3;
+
+        /** @brief Minimum observed speed (px per observed frame) below which the direction is treated as noise and momentum is suppressed; guards against near-stationary tracks contributing a meaningless direction. */
+        float ocm_min_velocity = 1.0f;
+
+        /** @brief Maximum frames since the last observation for which momentum is applied; a longer gap leaves the stored direction stale, so the term is suppressed. */
+        int   ocm_max_age = 1;
+
+        // Tentative Logic
 
         /** @brief Maximum cost limit allowed for tentative track associations. */
         float tentative_match_thresh = 0.3f;
@@ -160,7 +184,7 @@ namespace SushiTrack
          */
         float tentative_max_age_seconds = 0.08f;
 
-        // --- Mahalanobis Gating ---
+        // Mahalanobis Gating
 
         /** @brief Proximity threshold for initial broad spatial filtering before statistical gating. */
         float proximity_thresh = 0.7f;
@@ -174,9 +198,7 @@ namespace SushiTrack
         /** @brief Maximum allowed area ratio disparity to filter impossible candidate pairs. */
         float max_area_ratio = 50.0f;
 
-        // ====================================================================
         // EXTENDED PARAMETERS
-        // ====================================================================
 
         /**
          * @brief Score threshold for single-hit tentative confirmation.

@@ -21,6 +21,7 @@ add_executable(integration_test
     TestTimeAware.cpp
     TestKinematicState.cpp
     TestDuplicateSuppression.cpp
+    TestObservationMomentum.cpp
 )
 
 target_include_directories(integration_test PRIVATE

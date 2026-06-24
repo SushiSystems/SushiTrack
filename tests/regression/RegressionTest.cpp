@@ -38,9 +38,7 @@
 using namespace TestInfrastructure;
 namespace fs = std::filesystem;
 
-// ---------------------------------------------------------------------------
 // Config resolution
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Resolves a configuration file by walking up from the working directory.
@@ -69,16 +67,11 @@ static std::string resolveConfigUp(const std::string& rel)
     return "";
 }
 
-// SushiTrack resolves its own sushitrack.json inside the library (SUSHITRACK_CONFIG
-// env var, then an upward search), so its factory passes an empty path and lets
-// the loader decide. The reference trackers are configured here from their own
-// files under tests/.
+// SushiTrack resolves its own sushitrack.json inside the library (SUSHITRACK_CONFIG env var, then an upward search), so its factory passes an empty path and lets the loader decide. The reference trackers are configured here from their own files under tests/.
 static const std::string kByteTrackConfig = resolveConfigUp("tests/bytetrack.json");
 static const std::string kOCSortConfig    = resolveConfigUp("tests/ocsort.json");
 
-// ---------------------------------------------------------------------------
 // Adapter factories
-// ---------------------------------------------------------------------------
 
 using AdapterFactory = std::function<std::unique_ptr<ITrackerAdapter>()>;
 
@@ -98,9 +91,7 @@ static const NamedFactory kFactories[] =
     { "ocsort",    []() { return std::make_unique<OCSORTAdapter>(kOCSortConfig);        } },
 };
 
-// ---------------------------------------------------------------------------
 // Parameterised test
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Combines a benchmark scenario with a tracker factory for parametrisation.
@@ -162,9 +153,7 @@ TEST_P(RegressionTest, LabelInference)
     EXPECT_GT(result.total_tracking_us, 0.0);
 }
 
-// ---------------------------------------------------------------------------
 // Test instantiation
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Builds the cross-product of scenarios and tracker factories.
@@ -190,9 +179,7 @@ INSTANTIATE_TEST_SUITE_P(
         return sc + "_" + info.param.tracker_name;
     });
 
-// ---------------------------------------------------------------------------
 // Entry point
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Program entry point for the regression_test binary.

@@ -23,9 +23,7 @@
 
 using namespace SushiTrack;
 
-// ---------------------------------------------------------------------------
 // Default construction
-// ---------------------------------------------------------------------------
 
 /**
  * @brief A default-constructed CostMatrix has zero dimensions and is empty.
@@ -38,9 +36,7 @@ TEST(CostMatrixTest, DefaultConstructionIsEmpty)
     EXPECT_TRUE(m.empty());
 }
 
-// ---------------------------------------------------------------------------
 // resize() — sentinel initialisation
-// ---------------------------------------------------------------------------
 
 /**
  * @brief resize() with no explicit initial_val fills every cell with 1e4f.
@@ -74,9 +70,7 @@ TEST(CostMatrixTest, ResizeExplicitFillValue)
                 << "cell (" << r << "," << c << ") not 0.5";
 }
 
-// ---------------------------------------------------------------------------
 // operator() — read and write
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Individual cells can be written and read back correctly.
@@ -109,9 +103,7 @@ TEST(CostMatrixTest, ConstAccessorReadsCorrectly)
     EXPECT_FLOAT_EQ(cm(0, 1), 3.14f);
 }
 
-// ---------------------------------------------------------------------------
 // empty()
-// ---------------------------------------------------------------------------
 
 /**
  * @brief empty() returns false after a resize to non-zero dimensions.
@@ -123,9 +115,7 @@ TEST(CostMatrixTest, EmptyFalseAfterResize)
     EXPECT_FALSE(m.empty());
 }
 
-// ---------------------------------------------------------------------------
 // Buffer reuse — shrink then grow
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Shrinking the matrix reuses the existing buffer; all active cells
@@ -168,9 +158,7 @@ TEST(CostMatrixTest, GrowResizeReinitialises)
                 << "cell (" << r << "," << c << ") after grow is not 2.0";
 }
 
-// ---------------------------------------------------------------------------
 // data()
-// ---------------------------------------------------------------------------
 
 /**
  * @brief data() is non-null after a resize and points to contiguous storage.
@@ -198,9 +186,7 @@ TEST(CostMatrixTest, ConstDataPointerMatchesAccessor)
     EXPECT_FLOAT_EQ(cm.data()[0], 5.f);
 }
 
-// ===========================================================================
 // Tier 3 edge cases
-// ===========================================================================
 
 /**
  * @brief resize() to 0×0 produces an empty matrix; data() may be null.

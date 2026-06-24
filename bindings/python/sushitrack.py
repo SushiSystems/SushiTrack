@@ -171,6 +171,12 @@ class SushiTrackParams(Structure):
         ("fsm_stationary_vel_thresh", c_float),
         ("fsm_maneuver_accel_thresh", c_float),
         ("fsm_reference_height", c_float),
+        # --- Observation-Centric Momentum (OCM) ---
+        ("enable_ocm", c_int),
+        ("ocm_vdc_weight", c_float),
+        ("ocm_delta_t", c_int),
+        ("ocm_min_velocity", c_float),
+        ("ocm_max_age", c_int),
         # --- Tentative logic ---
         ("tentative_match_thresh", c_float),
         ("tentative_confirm_hits", c_int),

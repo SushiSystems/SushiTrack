@@ -166,8 +166,7 @@ TEST_F(TimeAwareTest, IrregularFrameIntervalsKeepIdentityStable)
     ASSERT_GE(n0, 1);
     int64_t id = out[0].track_id;
 
-    // Constant real-world velocity of 100 px/s; position advances by v*dt so the
-    // detection always lands on the propagated prediction regardless of the gap.
+    // Constant real-world velocity of 100 px/s; position advances by v*dt so the detection always lands on the propagated prediction regardless of the gap.
     const float vx = 100.0f;
     const float dts[] = { 0.02f, 0.09f, 0.04f, 0.12f, 0.03f, 0.08f, 0.05f, 0.15f };
     float x = 100.0f;
@@ -201,8 +200,7 @@ TEST_F(TimeAwareTest, ExcessiveDtIsCappedAndGeometryStaysFinite)
     const int64_t id = confirmStationary(out, x, y, /*frames=*/5, /*dt=*/0.04f);
     ASSERT_NE(id, -1);
 
-    // One enormous interval with the object still present at the same spot. The
-    // 5-KF-step cap must keep the propagated covariance/state finite.
+    // One enormous interval with the object still present at the same spot. The 5-KF-step cap must keep the propagated covariance/state finite.
     SushiTrack_Object stall = makeDet(x, y);
     int n = SushiTrack_Update(hdl_, &stall, 1, out.data(), 4, 10.0f);
     ASSERT_GE(n, 1);

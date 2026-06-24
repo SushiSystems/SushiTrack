@@ -120,9 +120,7 @@ void expectFiniteGeometry(const std::vector<SushiTrack_Track>& out, int n)
 
 }
 
-// ============================================================================
 // MalformedDetectionTest
-// ============================================================================
 
 /**
  * @brief Fixture providing a clean tracker for each malformed-input test.
@@ -264,9 +262,7 @@ TEST_F(MalformedDetectionTest, NaNFeatureVectorDoesNotPoisonTracker)
     expectFiniteGeometry(out, n);
 }
 
-// ============================================================================
 // LargeCoordinateTest
-// ============================================================================
 
 /**
  * @brief Fixture validating numerical headroom at large coordinate magnitudes.
@@ -324,9 +320,7 @@ TEST_F(LargeCoordinateTest, HugeFrameToFrameJumpDoesNotProduceNonFinite)
     expectFiniteGeometry(out, n);
 }
 
-// ============================================================================
 // HighDimensionalReIDTest
-// ============================================================================
 
 /**
  * @brief Builds a unit feature vector with all mass on a single axis.
@@ -431,9 +425,7 @@ TEST(HighDimensionalReIDZeroNormTest, ZeroNormFeatureIsToleratedWithoutNaN)
     SushiTrack_Destroy(hdl);
 }
 
-// ============================================================================
 // LongRunStabilityTest
-// ============================================================================
 
 /**
  * @brief 1000 frames of a stationary detection must not produce NaN/Inf in
@@ -477,9 +469,7 @@ TEST(LongRunStabilityTest, OneThousandFramesStationaryNoNumericalDrift)
     SushiTrack_Destroy(hdl);
 }
 
-// ============================================================================
 // SimilarityBoundaryTest
-// ============================================================================
 
 /**
  * @brief Near-unity cosine similarity (almost-identical features) must be

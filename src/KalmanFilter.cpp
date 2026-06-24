@@ -213,9 +213,8 @@ namespace SushiTrack
     {
         std::lock_guard<std::mutex> lock(llt_cache_mutex_);
 
-        // Address-based validation is safer and faster than floating-point matrix comparison.
-        // If the state is modified, llt_cache_valid_ is set to false via invalidateLLTCache().
-        if (llt_cache_valid_ && 
+        // Validate the cache by address, not matrix compare; mutations call invalidateLLTCache() to clear llt_cache_valid_.
+        if (llt_cache_valid_ &&
             &mean == cached_mean_ptr_ && 
             &covariance == cached_cov_ptr_)
         {
@@ -335,8 +334,7 @@ namespace SushiTrack
 
         if (use_scores)
         {
-            // Per-measurement projection: required for NSAKalmanFilter so the
-            // score-scaled noise is actually applied during gating.
+            // Per-measurement projection so NSAKalmanFilter's score-scaled noise is applied during gating.
             for (size_t i = 0; i < measurements.size(); ++i)
             {
                 StateHMean projected_mean;

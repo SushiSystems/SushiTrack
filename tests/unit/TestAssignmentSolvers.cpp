@@ -28,9 +28,7 @@
 
 using namespace SushiTrack;
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Constructs an n×n identity-like cost matrix:
@@ -45,9 +43,7 @@ static CostMatrix makeIdentityCost(int n)
     return m;
 }
 
-// ---------------------------------------------------------------------------
 // Empty matrix
-// ---------------------------------------------------------------------------
 
 /**
  * @brief solve() on a 0×0 matrix reports no matches and all indices unmatched.
@@ -66,9 +62,7 @@ TEST(LAPJVSolverTest, EmptyMatrixAllUnmatched)
     EXPECT_TRUE(b_unm.empty());
 }
 
-// ---------------------------------------------------------------------------
 // 1×1 matrix
-// ---------------------------------------------------------------------------
 
 /**
  * @brief A 1×1 matrix with cost below threshold produces exactly one match.
@@ -110,9 +104,7 @@ TEST(LAPJVSolverTest, OneByOneMatchAboveThreshold)
     EXPECT_EQ(b_unm[0], 0);
 }
 
-// ---------------------------------------------------------------------------
 // Square identity matrix
-// ---------------------------------------------------------------------------
 
 /**
  * @brief An n×n identity cost matrix produces n diagonal matches with zero
@@ -142,9 +134,7 @@ TEST(LAPJVSolverTest, IdentityMatrixPerfectDiagonalMatch)
     }
 }
 
-// ---------------------------------------------------------------------------
 // Rectangular: more rows than columns
-// ---------------------------------------------------------------------------
 
 /**
  * @brief In a 4×2 identity-like matrix, rows 2 and 3 are unmatched;
@@ -173,9 +163,7 @@ TEST(LAPJVSolverTest, MoreRowsThanColsSurplusRowsUnmatched)
     EXPECT_EQ(matched_cols, (std::vector<int>{0, 1}));
 }
 
-// ---------------------------------------------------------------------------
 // Rectangular: more columns than rows
-// ---------------------------------------------------------------------------
 
 /**
  * @brief In a 2×4 identity-like matrix, columns 2 and 3 are unmatched;
@@ -204,9 +192,7 @@ TEST(LAPJVSolverTest, MoreColsThanRowsSurplusColsUnmatched)
     EXPECT_EQ(matched_cols, (std::vector<int>{0, 1}));
 }
 
-// ---------------------------------------------------------------------------
 // Threshold sensitivity
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Tightening the threshold from 0.9 to 0.3 suppresses matches whose
@@ -244,9 +230,7 @@ TEST(LAPJVSolverTest, ThresholdControlsAcceptedAssignments)
     }
 }
 
-// ---------------------------------------------------------------------------
 // No double-assignments
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Each row and each column appears at most once across all returned
@@ -272,9 +256,7 @@ TEST(LAPJVSolverTest, NoDoubleAssignments)
     }
 }
 
-// ---------------------------------------------------------------------------
 // Repeated calls
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Two consecutive calls on the same solver instance produce identical
@@ -298,9 +280,7 @@ TEST(LAPJVSolverTest, RepeatedCallsProduceConsistentResults)
     EXPECT_EQ(first, 3u);
 }
 
-// ===========================================================================
 // Tier 3 edge cases
-// ===========================================================================
 
 /**
  * @brief A matrix where every cell equals the sentinel value (1e4f) produces

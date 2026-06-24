@@ -112,9 +112,7 @@ TEST_F(KinematicStateTest, SteadyMotionReportsCruising)
 {
     std::vector<SushiTrack_Track> out(4);
 
-    // Ramp up to 5 px/frame (125 px/s) at 0.25 px/frame per frame, then hold.
-    // The ramp acceleration (~156 px/s^2) stays below the 250 px/s^2 maneuver
-    // threshold; the hold speed sits well above the 40 px/s stationary floor.
+    // Ramp up to 5 px/frame (125 px/s) at 0.25 px/frame per frame, then hold. The ramp acceleration (~156 px/s^2) stays below the 250 px/s^2 maneuver threshold; the hold speed sits well above the 40 px/s stationary floor.
     float x = 100.0f, v = 0.0f;
     int64_t id = -1;
     int last_state = -1;
@@ -149,12 +147,7 @@ TEST_F(KinematicStateTest, AbruptAccelerationReportsManeuvering)
         ASSERT_GE(n, 1);
     }
 
-    // Sudden onset of motion at 15 px/frame (375 px/s). The step is small enough
-    // that the detection keeps overlapping the (previously stationary) predicted
-    // box, so the track stays associated rather than being dropped and reseeded;
-    // the Kalman velocity ramps up over several frames, sustaining an
-    // acceleration well above the 250 px/s^2 maneuver threshold long enough for
-    // the hysteresis window to commit the transition.
+    // Sudden onset of motion at 15 px/frame (375 px/s). The step is small enough that the detection keeps overlapping the (previously stationary) predicted box, so the track stays associated rather than being dropped and reseeded; the Kalman velocity ramps up over several frames, sustaining an acceleration well above the 250 px/s^2 maneuver threshold long enough for the hysteresis window to commit the transition.
     float x = 100.0f;
     bool saw_maneuver = false;
     for (int i = 0; i < 8; ++i)

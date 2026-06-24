@@ -31,9 +31,7 @@
 
 using namespace SushiTrack;
 
-// ---------------------------------------------------------------------------
 // Stub predictor — records the last setNoiseMultipliers call.
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Minimal IStatePredictor stub that records noise multiplier arguments.
@@ -59,9 +57,7 @@ public:
     }
 };
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 /** @brief Returns a TrackerConfig with FSM enabled, 25 fps, default thresholds. */
 static TrackerConfig makeConfig()
@@ -127,9 +123,7 @@ static void driveWarmup(TrackFSM& fsm, const KalmanTypes::StateMean& mean)
         fsm.updateState(mean, false, i, 0.04f);
 }
 
-// ---------------------------------------------------------------------------
 // Construction
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Initial state is Stationary immediately after construction.
@@ -140,9 +134,7 @@ TEST(TrackFSMTest, InitialStateIsStationary)
     EXPECT_EQ(fsm.getCurrentState(), KinematicState::Stationary);
 }
 
-// ---------------------------------------------------------------------------
 // Warmup window
-// ---------------------------------------------------------------------------
 
 /**
  * @brief During warmup (tracklet_len < 3), the FSM reports Cruising regardless
@@ -161,9 +153,7 @@ TEST(TrackFSMTest, WarmupWindowForcesCruising)
     EXPECT_EQ(fsm.getCurrentState(), KinematicState::Cruising);
 }
 
-// ---------------------------------------------------------------------------
 // Stationary detection
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Zero velocity (well below threshold) settles to Stationary after warmup.
@@ -178,9 +168,7 @@ TEST(TrackFSMTest, StationaryAfterWarmup)
     EXPECT_EQ(fsm.getCurrentState(), KinematicState::Stationary);
 }
 
-// ---------------------------------------------------------------------------
 // Cruising detection
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Velocity above stationary threshold and low acceleration transitions
@@ -199,9 +187,7 @@ TEST(TrackFSMTest, CruisingTransition)
     EXPECT_EQ(fsm.getCurrentState(), KinematicState::Cruising);
 }
 
-// ---------------------------------------------------------------------------
 // Maneuvering detection
-// ---------------------------------------------------------------------------
 
 /**
  * @brief A large velocity step held for kStableFrames frames transitions to
@@ -225,9 +211,7 @@ TEST(TrackFSMTest, ManeuveringTransition)
     EXPECT_EQ(fsm.getCurrentState(), KinematicState::Maneuvering);
 }
 
-// ---------------------------------------------------------------------------
 // Coasting
-// ---------------------------------------------------------------------------
 
 /**
  * @brief is_lost = true immediately assigns Coasting regardless of velocity.
@@ -245,9 +229,7 @@ TEST(TrackFSMTest, CoastingOnLost)
     EXPECT_EQ(fsm.getCurrentState(), KinematicState::Coasting);
 }
 
-// ---------------------------------------------------------------------------
 // Pre-Coasting state capture and restore
-// ---------------------------------------------------------------------------
 
 /**
  * @brief getLastSeenState() returns the pre-Coasting state while Coasting.
@@ -307,9 +289,7 @@ TEST(TrackFSMTest, PreCoastingStateNotOverwrittenOnSuccessiveLostFrames)
     EXPECT_EQ(fsm.getCurrentState(), KinematicState::Cruising);
 }
 
-// ---------------------------------------------------------------------------
 // Hysteresis — single-frame spike
-// ---------------------------------------------------------------------------
 
 /**
  * @brief A single frame above the maneuver threshold does not flip a Cruising
@@ -329,9 +309,7 @@ TEST(TrackFSMTest, SingleFrameSpikeDoesNotFlipState)
     EXPECT_EQ(fsm.getCurrentState(), KinematicState::Cruising);
 }
 
-// ---------------------------------------------------------------------------
 // applyToPredictor noise multipliers
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Stationary state applies reduced noise multipliers (0.8, 0.6, 0.5).
@@ -456,9 +434,7 @@ TEST(TrackFSMTest, ManeuveringToStationaryRecovery)
     EXPECT_EQ(fsm.getCurrentState(), KinematicState::Stationary);
 }
 
-// ---------------------------------------------------------------------------
 // Additional coverage requests
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Verifies that the kinematic state remains unchanged when the FSM is disabled.
@@ -543,16 +519,7 @@ TEST(TrackFSMTest, ApplyToPredictorStationaryExactValuesVerify)
     EXPECT_FLOAT_EQ(mock.vel_mult,  0.5f);
 }
 
-// ---------------------------------------------------------------------------
-// Scale-invariant (height-normalised) classification
-// ---------------------------------------------------------------------------
-//
-// The FSM rescales velocity and acceleration by (fsm_reference_height / box
-// height) before thresholding, so two objects with the same body-relative
-// motion are classified identically regardless of apparent pixel size. These
-// tests pin that property and the disable escape hatch. makeConfig() leaves
-// fsm_reference_height at its 100 px default, equal to kRefHeight, so a box of
-// height kRefHeight is at the reference scale (factor == 1).
+// Scale-invariant classification: the FSM rescales velocity/accel by (fsm_reference_height / box height), so equal body-relative motion classifies identically regardless of pixel size. makeConfig() leaves fsm_reference_height at its 100 px kRefHeight default, so a kRefHeight box is at reference scale (factor == 1).
 
 /**
  * @brief A slow-moving object settles to Stationary whether small or large,

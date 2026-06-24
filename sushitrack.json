@@ -8,6 +8,7 @@
             "high_thresh": 0.5,
             "match_thresh": 0.7,
             "enable_fsm": 1,
+            "enable_ocm": 1,
             "enable_reid": 0,
             "enable_tentative": 1,
             "enable_mahalanobis": 0
@@ -37,8 +38,8 @@
                 "reid_direct_assignment_weight": 1.0
             },
             "fsm_params": {
-                "fsm_stationary_vel_thresh": 40.0,
-                "fsm_maneuver_accel_thresh": 250.0,
+                "fsm_stationary_vel_thresh": 30.0,
+                "fsm_maneuver_accel_thresh": 150.0,
                 "fsm_reference_height": 100.0
             },
             "tentative_logic": {
@@ -56,6 +57,12 @@
                 "gating_thresh": 9.4877,
                 "motion_cost_weight": 0.15,
                 "max_area_ratio": 50.0
+            },
+            "ocm": {
+                "ocm_vdc_weight": 0.1,
+                "ocm_delta_t": 3,
+                "ocm_min_velocity": 1.0,
+                "ocm_max_age": 1
             }
         }
     }

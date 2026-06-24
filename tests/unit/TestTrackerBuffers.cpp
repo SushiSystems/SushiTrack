@@ -28,9 +28,7 @@
 #include "SushiTrackC.h"
 #include <vector>
 
-// ===========================================================================
 // TrackerBuffersTest — standard 0.08 s buffer window
-// ===========================================================================
 
 /**
  * @brief Tracker fixture configured for time-aware buffer expiry testing.
@@ -233,9 +231,7 @@ TEST_F(TrackerBuffersTest, MultipleTrackIndependentLostState)
     EXPECT_EQ(lost_count,    1);
 }
 
-// ===========================================================================
 // TrackerBuffersLargeBufferTest — wide 0.4 s expiry window
-// ===========================================================================
 
 /**
  * @brief Tracker fixture with track_buffer=10 yielding a 0.4 s expiry window.

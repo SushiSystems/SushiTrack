@@ -513,10 +513,7 @@ namespace SushiTrack
                 float enc_h = std::max(r1.y() + r1.height(), r2.y() + r2.height()) - std::min(r1.y(), r2.y()) + offset;
 
                 float gamma = 2.0f - Lambda;
-                // Square directly instead of std::pow(x, 2): the integer exponent
-                // overload of std::pow promotes to double and narrows back to
-                // float (C4244), whereas the explicit product stays in float and
-                // is exact and cheaper.
+                // Explicit product, not std::pow(x, 2): pow's integer-exponent overload promotes to double and narrows back (C4244).
                 float dx_norm = (cx1 - cx2) / std::max(1e-6f, enc_w);
                 float dy_norm = (cy1 - cy2) / std::max(1e-6f, enc_h);
                 float rho_x = dx_norm * dx_norm;
@@ -580,10 +577,7 @@ namespace SushiTrack
         float enc_h = std::max(r1.y() + r1.height(), r2.y() + r2.height()) - std::min(r1.y(), r2.y()) + offset;
 
         float gamma = 2.0f - Lambda;
-        // Square directly instead of std::pow(x, 2): the integer exponent
-        // overload of std::pow promotes to double and narrows back to float
-        // (C4244), whereas the explicit product stays in float and is exact
-        // and cheaper.
+        // Explicit product, not std::pow(x, 2): pow's integer-exponent overload promotes to double and narrows back (C4244).
         float dx_norm = (cx1 - cx2) / std::max(1e-6f, enc_w);
         float dy_norm = (cy1 - cy2) / std::max(1e-6f, enc_h);
         float rho_x = dx_norm * dx_norm;
@@ -660,10 +654,7 @@ namespace SushiTrack
 
         for (size_t i = 0; i < a.size(); ++i)
         {
-            // Per-row policy. Cruising tracks (and tracks with no FSM) keep
-            // the existing weights; Stationary tracks lean further into IoU,
-            // Maneuvering / Coasting tracks lean further into appearance, and
-            // Coasting tracks reject geometry-only fallback associations.
+            // Per-row state policy: Stationary leans into IoU, Maneuvering/Coasting into appearance, Coasting also rejects geometry-only fallback.
             const StateAssocMods sm = stateAssocMods(a[i]->getLastSeenState());
             const float row_iou_weight = std::clamp(iou_weight_ - sm.reid_shift, 0.0f, 1.0f);
 
@@ -694,10 +685,7 @@ namespace SushiTrack
                     continue;
                 }
 
-                // Geometry-only fallback (one or both sides have no appearance).
-                // Coasting tracks suppress this path: a recovery without an
-                // appearance match is exactly the failure mode that produces
-                // identity hijacks after occlusion.
+                // Geometry-only fallback (no appearance on one side); Coasting suppresses it, as appearance-free recovery is the main post-occlusion identity-hijack source.
                 if (sm.require_reid)
                 {
                     out_matrix(i, j) = 1e4f;
@@ -911,10 +899,7 @@ namespace SushiTrack
 
         for (size_t i = 0; i < a.size(); ++i)
         {
-            // Per-track state-aware association policy. When the FSM is
-            // disabled, getKinematicState() returns Cruising, so the modifiers
-            // collapse to identity and behaviour is bit-identical to the
-            // pre-FSM cost calculation.
+            // Per-track state-aware policy; with FSM disabled the state is Cruising and the modifiers collapse to identity (bit-identical to pre-FSM).
             const StateAssocMods sm = stateAssocMods(a[i]->getLastSeenState());
             const float row_gate_thresh = std::max(1e-3f, gating_thresh_ * sm.gate_scale);
             const float row_motion_w    = std::clamp(iou_weight_ - sm.reid_shift, 0.0f, 1.0f);
@@ -930,18 +915,14 @@ namespace SushiTrack
 
             for (size_t j = 0; j < b.size(); ++j)
             {
-                // Proximity pre-filter: reject spatially implausible pairs before
-                // the statistical gate is consulted. Operates on the raw IoU so
-                // the threshold keeps its meaning irrespective of the primary IoU
-                // variant. Disabled (no-op) when proximity_thresh_ is zero.
+                // Proximity pre-filter on raw IoU (threshold stays meaningful across IoU variants); reject implausible pairs before the gate. No-op when proximity_thresh_ is 0.
                 if (proximity_thresh_ > 0.0f && rawIoU(a[i], b[j]) < proximity_thresh_)
                 {
                     out_matrix(i, j) = 1e4f;
                     continue;
                 }
 
-                // Validation gate: Mahalanobis distance exceeding the chi-squared threshold
-                // results in a sentinel cost penalty.
+                // Validation gate: Mahalanobis distance past the chi-squared threshold gets a sentinel cost penalty.
                 if (!in_gate[j])
                 {
                     SUSHITRACK_LOG_DEBUG("[Distance] Gating: Track %llu gated out detection %zu (Mahalanobis).", (unsigned long long)a[i]->getTrackId(), j);
@@ -969,10 +950,7 @@ namespace SushiTrack
                 }
                 else if (sm.require_reid)
                 {
-                    // Coasting recoveries demand appearance corroboration.
-                    // Geometry alone is too unreliable after an occlusion gap
-                    // and is the dominant source of identity hijacks in
-                    // crowded scenes.
+                    // Coasting recoveries demand appearance corroboration; geometry alone after an occlusion gap is the dominant identity-hijack source in crowds.
                     out_matrix(i, j) = 1e4f;
                 }
                 else
@@ -1091,6 +1069,90 @@ namespace SushiTrack
     }
 
     /**
+     * @brief Bounded directional bonus for one track/detection pair.
+     *
+     * Returns zero unless the track carries a fresh, fast-enough, Cruising-regime
+     * observed direction; otherwise the cosine between that direction and the
+     * vector from the track's last observation to the candidate, scaled and
+     * clamped to [-vdc_weight, +vdc_weight].
+     *
+     * @param track Source tracklet supplying the observed direction.
+     * @param det Candidate detection.
+     * @return Bounded bonus; positive when the candidate lies ahead along travel.
+     */
+    float ObservationMomentumDecorator::momentumBonus(const TrackletPtr& track, const TrackletPtr& det) const
+    {
+        if (vdc_weight_ <= 0.0f) return 0.0f;
+        if (!track->hasObsVelocity() || !track->hasLastObservation()) return 0.0f;
+        if (track->getObsSpeed() < min_velocity_) return 0.0f;
+        if (track->getFramesSinceObservation() > max_age_) return 0.0f;
+        if (track->getKinematicState() != KinematicState::Cruising) return 0.0f;
+
+        const auto& lo = track->getLastObservation();
+        const float ocx = lo.x() + lo.width()  * 0.5f;
+        const float ocy = lo.y() + lo.height() * 0.5f;
+
+        const auto& dr = det->getRect();
+        const float dcx = dr.x() + dr.width()  * 0.5f;
+        const float dcy = dr.y() + dr.height() * 0.5f;
+
+        const float ddx = dcx - ocx;
+        const float ddy = dcy - ocy;
+        const float dn  = std::sqrt(ddx * ddx + ddy * ddy);
+        if (dn < 1e-3f) return 0.0f;
+
+        const float cos_theta = (track->getObsVelocityX() * ddx + track->getObsVelocityY() * ddy) / dn;
+        return std::clamp(vdc_weight_ * cos_theta, -vdc_weight_, vdc_weight_);
+    }
+
+    /**
+     * @brief Computes inner costs and applies the momentum re-ranking in place.
+     *
+     * @param a Collection of source tracklets.
+     * @param b Collection of target tracklets (observations).
+     * @param out_matrix Output cost matrix populated by the inner calculator and re-ranked in place.
+     */
+    void ObservationMomentumDecorator::calculate(const std::vector<TrackletPtr>& __restrict a,
+                                                 const std::vector<TrackletPtr>& __restrict b,
+                                                 CostMatrix& __restrict out_matrix)
+    {
+        inner_->calculate(a, b, out_matrix);
+        if (a.empty() || b.empty() || vdc_weight_ <= 0.0f) return;
+
+        constexpr float kSentinel = 1e3f;
+
+        for (size_t i = 0; i < a.size(); ++i)
+        {
+            // Per-row gate first so non-Cruising/stale/slow tracks skip the whole detection loop.
+            if (!a[i]->hasObsVelocity() || !a[i]->hasLastObservation()) continue;
+            if (a[i]->getObsSpeed() < min_velocity_) continue;
+            if (a[i]->getFramesSinceObservation() > max_age_) continue;
+            if (a[i]->getKinematicState() != KinematicState::Cruising) continue;
+
+            for (size_t j = 0; j < b.size(); ++j)
+            {
+                float c = out_matrix(i, j);
+                if (c >= kSentinel) continue;
+                out_matrix(i, j) = c - momentumBonus(a[i], b[j]);
+            }
+        }
+    }
+
+    /**
+     * @brief Computes the momentum-adjusted association cost for a single pair.
+     *
+     * @param a Source tracklet for association.
+     * @param b Candidate tracklet for association.
+     * @return float Re-ranked association cost; sentinel pairs are passed through unchanged.
+     */
+    float ObservationMomentumDecorator::calculate_single(const TrackletPtr& a, const TrackletPtr& b) const
+    {
+        float c = inner_->calculate_single(a, b);
+        if (c >= 1e3f) return c;
+        return c - momentumBonus(a, b);
+    }
+
+    /**
      * @brief Initializes a GatedIoUCostCalculator instance.
      * 
      * @param gating_thresh Chi-squared threshold for Mahalanobis gating.
@@ -1142,9 +1204,7 @@ namespace SushiTrack
 
         for (size_t i = 0; i < a.size(); ++i)
         {
-            // Tighten the gate for Stationary, loosen for Maneuvering /
-            // Coasting. Identity for Cruising / no-FSM, so this preserves the
-            // pre-FSM behaviour bit-for-bit when the state machine is off.
+            // Tighten the gate for Stationary, loosen for Maneuvering/Coasting; identity for Cruising/no-FSM (bit-identical to pre-FSM).
             const StateAssocMods sm = stateAssocMods(a[i]->getLastSeenState());
             const float row_gate_thresh = std::max(1e-3f, gating_thresh_ * sm.gate_scale);
             const float gate            = row_gate_thresh;
@@ -1160,18 +1220,14 @@ namespace SushiTrack
 
             for (size_t j = 0; j < b.size(); ++j)
             {
-                // Proximity pre-filter: reject spatially implausible pairs before
-                // the statistical gate is consulted. Operates on the raw IoU so
-                // the threshold keeps its meaning irrespective of the primary IoU
-                // variant. Disabled (no-op) when proximity_thresh_ is zero.
+                // Proximity pre-filter on raw IoU (threshold stays meaningful across IoU variants); reject implausible pairs before the gate. No-op when proximity_thresh_ is 0.
                 if (proximity_thresh_ > 0.0f && rawIoU(a[i], b[j]) < proximity_thresh_)
                 {
                     out_matrix(i, j) = 1e4f;
                     continue;
                 }
 
-                // Validation gate: Mahalanobis distance exceeding the chi-squared threshold
-                // results in a sentinel cost penalty.
+                // Validation gate: Mahalanobis distance past the chi-squared threshold gets a sentinel cost penalty.
                 if (!in_gate[j])
                 {
                     SUSHITRACK_LOG_DEBUG("[Distance] Gating: Track %llu gated out detection %zu (Mahalanobis).", (unsigned long long)a[i]->getTrackId(), j);

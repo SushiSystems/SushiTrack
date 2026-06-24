@@ -85,9 +85,7 @@ extern "C"
     */
     typedef struct 
     {
-        // ====================================================================
         // BASIC PARAMETERS
-        // ====================================================================
 
         /** @brief Flag to enable real-time interval processing rather than frame-based intervals. */
         int   time_aware;
@@ -119,11 +117,9 @@ extern "C"
         /** @brief Flag to enable Mahalanobis distance gating to filter impossible associations. */
         int   enable_mahalanobis;
 
-        // ====================================================================
         // ADVANCED PARAMETERS
-        // ====================================================================
 
-        // --- Association ---
+        // Association
 
         /** @brief Primary association mode (0: Age-cascade legacy, 1: Global LAPJV). */
         int   primary_assoc_mode;
@@ -140,7 +136,7 @@ extern "C"
         /** @brief IoU threshold to identify and remove redundant, duplicate tracks. */
         float duplicate_iou_thresh;
 
-        // --- Coordinate System ---
+        // Coordinate System
 
         /** @brief Flag to enable centroid-based (XYAH) coordinate representation instead of XYWH. */
         int   enable_xyah;
@@ -154,7 +150,7 @@ extern "C"
         /** @brief Defines the type of Kalman Filter utilized (0: Linear, 1: Noise Scale Adaptive). */
         int   kalman_type;
 
-        // --- ReID Params ---
+        // ReID Params
 
         /** @brief Exponential moving average weight for smoothing visual feature updates. */
         float feature_momentum;
@@ -177,7 +173,7 @@ extern "C"
         /** @brief Maximum capacity of visual appearance vectors stored in the gallery per tracklet. */
         int   max_feature_history;
 
-        // --- FSM Params ---
+        // FSM Params
 
         /** @brief Velocity threshold to classify an object's kinematic state as stationary. */
         float fsm_stationary_vel_thresh;
@@ -188,7 +184,24 @@ extern "C"
         /** @brief Reference object height (px) anchoring the FSM velocity/acceleration thresholds; each track's velocity/acceleration is size-normalised by (fsm_reference_height / box_height) before threshold comparison, making the regime decision scale-invariant. A value <= 0 disables normalisation (legacy absolute-pixel behaviour). */
         float fsm_reference_height;
 
-        // --- Tentative Logic ---
+        // Observation-Centric Momentum (OCM)
+
+        /** @brief Flag to enable the observation-centric momentum re-ranking term in primary association. */
+        int   enable_ocm;
+
+        /** @brief Strength of the momentum re-ranking term; subtracted (clamped) from each primary cost cell as a bounded tie-breaker. Keep small relative to the ~1.0 primary cost scale. */
+        float ocm_vdc_weight;
+
+        /** @brief Observation window, in observed frames, over which a track's direction of travel is measured. */
+        int   ocm_delta_t;
+
+        /** @brief Minimum observed speed (px per observed frame) below which momentum is suppressed. */
+        float ocm_min_velocity;
+
+        /** @brief Maximum frames since the last observation for which momentum is applied. */
+        int   ocm_max_age;
+
+        // Tentative Logic
 
         /** @brief Maximum cost limit allowed for tentative track associations. */
         float tentative_match_thresh;
@@ -205,7 +218,7 @@ extern "C"
          */
         float tentative_max_age_seconds;
 
-        // --- Mahalanobis Gating ---
+        // Mahalanobis Gating
 
         /** @brief Proximity threshold for initial broad spatial filtering before statistical gating. */
         float proximity_thresh;
@@ -219,9 +232,7 @@ extern "C"
         /** @brief Maximum allowed area ratio disparity to filter impossible candidate pairs. */
         float max_area_ratio;
 
-        // ====================================================================
         // EXTENDED PARAMETERS
-        // ====================================================================
 
         /** @brief Score threshold for instant tentative track confirmation. */
         float tentative_fast_thresh;

@@ -221,9 +221,7 @@ Json loadConfigJson()
 
 }
 
-// ============================================================================
 // ConfigLoaderBaselineTest
-// ============================================================================
 
 /**
  * @brief sushitrack.json must parse and contain the expected root object.
@@ -258,9 +256,7 @@ TEST(ConfigLoaderBaselineTest, BasicSectionContainsAllDocumentedSwitches)
     }
 }
 
-// ============================================================================
 // ConfigLoaderBasicFieldsTest
-// ============================================================================
 
 /**
  * @brief Round-trip of the five numeric basic fields into Params.
@@ -301,9 +297,7 @@ TEST(ConfigLoaderBasicFieldsTest, EnableFlagsRoundTripIntoParams)
     EXPECT_EQ(p.enable_mahalanobis,         b["enable_mahalanobis"].get<int>());
 }
 
-// ============================================================================
 // ConfigLoaderAdvancedFieldsTest
-// ============================================================================
 
 /**
  * @brief Fixture providing a loader-populated Params instance.
@@ -405,9 +399,7 @@ TEST_F(ConfigLoaderAdvancedFieldsTest, MahalanobisGatingFieldsAreApplied)
     EXPECT_FLOAT_EQ(params_.max_area_ratio,     s["max_area_ratio"].get<float>());
 }
 
-// ============================================================================
 // ConfigLoaderDefaultsTest
-// ============================================================================
 
 /**
  * @brief A document missing the "basic" section must not perturb the basic
@@ -445,9 +437,7 @@ TEST(ConfigLoaderDefaultsTest, EmptyDocumentLeavesAllDefaults)
     EXPECT_EQ(after.enable_fsm,    before.enable_fsm);
 }
 
-// ============================================================================
 // ConfigLoaderTrackerSmokeTest
-// ============================================================================
 
 /**
  * @brief Params produced by the loader must build a tracker successfully.
@@ -493,9 +483,7 @@ TEST(ConfigLoaderTrackerSmokeTest, LoadedParamsSurviveSingleDetectionUpdate)
     SushiTrack_Destroy(hdl);
 }
 
-// ============================================================================
 // ConfigLoaderLibraryApiTest
-// ============================================================================
 
 /**
  * @brief The library-owned loader (SushiTrack_LoadParamsFromJson) must produce

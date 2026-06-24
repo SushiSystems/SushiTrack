@@ -105,7 +105,7 @@ TEST_F(DuplicateSuppressionTest, TransientDuplicateCollapsesToSingleIdentity)
 {
     std::vector<SushiTrack_Track> out(8);
 
-    // ---- Confirm a single, long-lived track at a fixed location ----
+    // Confirm a single, long-lived track at a fixed location
     for (int i = 0; i < 6; ++i)
     {
         SushiTrack_Object d = makeDet(100.0f, 200.0f);
@@ -114,8 +114,7 @@ TEST_F(DuplicateSuppressionTest, TransientDuplicateCollapsesToSingleIdentity)
         expectNoOverlappingTrackedPair(out, n);
     }
 
-    // ---- One frame with a near-coincident twin (IoU ~0.89). The extra
-    //      high-confidence detection seeds a second, younger track. ----
+    // One frame with a near-coincident twin (IoU ~0.89). The extra high-confidence detection seeds a second, younger track.
     {
         SushiTrack_Object d1 = makeDet(100.0f, 200.0f);
         SushiTrack_Object d2 = makeDet(103.0f, 200.0f);   // 3 px offset -> IoU > 0.85
@@ -124,8 +123,7 @@ TEST_F(DuplicateSuppressionTest, TransientDuplicateCollapsesToSingleIdentity)
         ASSERT_GE(n, 1);
     }
 
-    // ---- Resume single detections. The unmatched twin falls to Lost and is
-    //      removed as a duplicate of the surviving track within a few frames. ----
+    // Resume single detections. The unmatched twin falls to Lost and is removed as a duplicate of the surviving track within a few frames.
     int final_tracked = 0;
     for (int i = 0; i < 4; ++i)
     {

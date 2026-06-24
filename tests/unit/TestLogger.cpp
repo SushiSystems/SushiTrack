@@ -160,9 +160,7 @@ TEST(LoggerThreadSafetyTest, ConcurrentCallsDeliverAllMessages)
     SushiTrack::Logger::setCallback(nullptr);
 }
 
-// ============================================================================
 // LoggerLevelRoutingTest — Verified Omission #4 (Logger level filtering)
-// ============================================================================
 
 /**
  * @brief Fixture exercising per-level routing.
@@ -222,9 +220,7 @@ TEST_F(LoggerLevelRoutingTest, EmptyFormatStringDoesNotCrash)
     SUCCEED();
 }
 
-// ============================================================================
 // LoggerCallbackHotSwapTest — Verified Omission #4 (atomic callback updates)
-// ============================================================================
 
 /**
  * @brief Replacing the callback mid-flight must not lose messages. We log a
@@ -286,8 +282,7 @@ TEST(LoggerCallbackHotSwapTest, ConcurrentSetCallbackAndLogIsRaceFree)
     stop.store(true, std::memory_order_relaxed);
     swapper.join();
 
-    // The callback was the same function pointer for every swap, so every
-    // logged message must have been delivered exactly once.
+    // The callback was the same function pointer for every swap, so every logged message must have been delivered exactly once.
     EXPECT_GE(total.load(), kIterations);
 
     SushiTrack::Logger::setCallback(nullptr);

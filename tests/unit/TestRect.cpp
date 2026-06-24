@@ -21,9 +21,7 @@
 
 using namespace SushiTrack;
 
-// ---------------------------------------------------------------------------
 // Construction
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Constructor stores x, y, w, h in TLWH order.
@@ -37,9 +35,7 @@ TEST(RectTest, ConstructorStoresComponents)
     EXPECT_FLOAT_EQ(r.height(), 80.f);
 }
 
-// ---------------------------------------------------------------------------
 // getXywh() — centroid format
-// ---------------------------------------------------------------------------
 
 /**
  * @brief getXywh() returns [cx, cy, w, h] where cx = x + w/2, cy = y + h/2.
@@ -55,9 +51,7 @@ TEST(RectTest, GetXywhReturnsCentroid)
     EXPECT_FLOAT_EQ(xywh[3], 80.f);
 }
 
-// ---------------------------------------------------------------------------
 // getTlbr() — bottom-right format
-// ---------------------------------------------------------------------------
 
 /**
  * @brief getTlbr() returns [x1, y1, x2, y2] where x2 = x + w, y2 = y + h.
@@ -73,9 +67,7 @@ TEST(RectTest, GetTlbrReturnsBoundingCorners)
     EXPECT_FLOAT_EQ(tlbr[3], 20.f + 80.f);   // y2 = 100
 }
 
-// ---------------------------------------------------------------------------
 // Factory: generate_rect_by_tlbr()
-// ---------------------------------------------------------------------------
 
 /**
  * @brief generate_rect_by_tlbr() followed by getTlbr() returns the original
@@ -112,9 +104,7 @@ TEST(RectTest, GenerateByTlbrProducesCorrectDimensions)
     EXPECT_FLOAT_EQ(r.height(), 80.f);   // 100 - 20
 }
 
-// ---------------------------------------------------------------------------
 // Factory: generate_rect_by_xywh()
-// ---------------------------------------------------------------------------
 
 /**
  * @brief generate_rect_by_xywh() followed by getXywh() returns the original
@@ -149,9 +139,7 @@ TEST(RectTest, GenerateByXywhProducesCorrectTopLeft)
     EXPECT_NEAR(r.y(), 60.f - 40.f, 1e-4f);   // cy - h/2 = 20
 }
 
-// ---------------------------------------------------------------------------
 // Mutable accessors
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Mutable accessors allow modifying individual components in-place.
@@ -170,9 +158,7 @@ TEST(RectTest, MutableAccessorsModifyComponents)
     EXPECT_FLOAT_EQ(r.height(), 90.f);
 }
 
-// ---------------------------------------------------------------------------
 // Integer specialisation smoke test
-// ---------------------------------------------------------------------------
 
 /**
  * @brief Rect<int> compiles and stores integer coordinates correctly.
@@ -184,9 +170,7 @@ TEST(RectTest, IntSpecialisationCompiles)
     EXPECT_EQ(r.height(), 200);
 }
 
-// ===========================================================================
 // Tier 3 edge cases
-// ===========================================================================
 
 /**
  * @brief A zero-width, zero-height Rect stores dimensions as zero without

@@ -137,6 +137,7 @@ namespace
             p.enable_fsm                 = getInt(b, "enable_fsm",                 p.enable_fsm);
             p.enable_reid                = getInt(b, "enable_reid",                p.enable_reid);
             p.enable_mahalanobis         = getInt(b, "enable_mahalanobis",         p.enable_mahalanobis);
+            p.enable_ocm                 = getInt(b, "enable_ocm",                 p.enable_ocm);
         }
 
         if (!ds.contains("advanced")) return;
@@ -193,6 +194,15 @@ namespace
             p.tentative_slow_thresh       = getFloat(s, "tentative_slow_thresh",       p.tentative_slow_thresh);
             p.tentative_slow_hits_offset  = getInt(s, "tentative_slow_hits_offset",  p.tentative_slow_hits_offset);
             p.tentative_vslow_hits_offset = getInt(s, "tentative_vslow_hits_offset", p.tentative_vslow_hits_offset);
+        }
+
+        if (adv.contains("ocm"))
+        {
+            const auto& s = adv.at("ocm");
+            p.ocm_vdc_weight  = getFloat(s, "ocm_vdc_weight",  p.ocm_vdc_weight);
+            p.ocm_delta_t     = getInt(s, "ocm_delta_t",     p.ocm_delta_t);
+            p.ocm_min_velocity = getFloat(s, "ocm_min_velocity", p.ocm_min_velocity);
+            p.ocm_max_age     = getInt(s, "ocm_max_age",     p.ocm_max_age);
         }
 
         if (adv.contains("mahalanobis_gating"))

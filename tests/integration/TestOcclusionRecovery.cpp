@@ -105,14 +105,12 @@ TEST_F(OcclusionRecoveryTest, ShortOcclusionRecoversOriginalId)
                                            /*frames=*/6, last_x, last_y);
     ASSERT_NE(id, -1);
 
-    // Occlude for 3 frames. The Kalman prediction keeps propagating position
-    // velocity for Lost tracks, so the predicted box stays on the trajectory.
+    // Occlude for 3 frames. The Kalman prediction keeps propagating position velocity for Lost tracks, so the predicted box stays on the trajectory.
     constexpr int kGap = 3;
     for (int i = 0; i < kGap; ++i)
         SushiTrack_Update(hdl_, nullptr, 0, out.data(), 8, 0.04f);
 
-    // Reappear at the extrapolated position so the detection overlaps the
-    // propagated prediction.
+    // Reappear at the extrapolated position so the detection overlaps the propagated prediction.
     const float reappear_x = last_x + vx * static_cast<float>(kGap + 1);
     const float reappear_y = last_y + vy * static_cast<float>(kGap + 1);
     SushiTrack_Object back = makeDet(reappear_x, reappear_y);
@@ -140,8 +138,7 @@ TEST_F(OcclusionRecoveryTest, LongOcclusionRetiresTrackAndReassignsNewId)
                                            /*frames=*/6, last_x, last_y);
     ASSERT_NE(id, -1);
 
-    // Gap far exceeding the 5-frame buffer: the lost track must be removed by
-    // cleanupLost before the object returns.
+    // Gap far exceeding the 5-frame buffer: the lost track must be removed by cleanupLost before the object returns.
     for (int i = 0; i < 20; ++i)
         SushiTrack_Update(hdl_, nullptr, 0, out.data(), 8, 0.04f);
 
@@ -155,8 +152,7 @@ TEST_F(OcclusionRecoveryTest, LongOcclusionRetiresTrackAndReassignsNewId)
         << "A track gone far longer than the buffer was resurrected under its "
            "old id instead of being retired.";
 
-    // Whatever identity now exists for the reappeared object must differ from
-    // the retired one and have sane geometry.
+    // Whatever identity now exists for the reappeared object must differ from the retired one and have sane geometry.
     bool found_new = false;
     for (int i = 0; i < n; ++i)
     {
@@ -200,8 +196,7 @@ TEST_F(OcclusionRecoveryTest, OneOfTwoObjectsRecoversWithoutIdTransfer)
     ASSERT_NE(id_bot, -1);
     ASSERT_NE(id_top, id_bot);
 
-    // Drop the top object for 2 frames; the bottom object stays visible and
-    // must never lose its identity.
+    // Drop the top object for 2 frames; the bottom object stays visible and must never lose its identity.
     for (int i = 0; i < 2; ++i)
     {
         SushiTrack_Object bot = makeDet(100.0f + 5.0f * (6 + i), 400.0f);
@@ -223,8 +218,7 @@ TEST_F(OcclusionRecoveryTest, OneOfTwoObjectsRecoversWithoutIdTransfer)
     const SushiTrack_Track* a = findById(out, n, id_top);
     ASSERT_NE(b, nullptr) << "Continuously-visible object lost its identity.";
     ASSERT_NE(a, nullptr) << "Occluded object failed to recover its identity.";
-    // The recovered top object must still be in the top lane — its id was not
-    // swapped onto the bottom detection.
+    // The recovered top object must still be in the top lane — its id was not swapped onto the bottom detection.
     EXPECT_LT(a->y, 250.0f) << "Recovered identity migrated into the wrong lane.";
     EXPECT_GT(b->y, 250.0f);
 }

@@ -59,9 +59,7 @@ protected:
         // Confirm quickly on strong detections so the scenario stays short.
         params_.tentative_fast_thresh                 = 0.85f;
         params_.tentative_fast_hits                   = 1;
-        // Disable the aggressive raw-IoU pre-filter: with Mahalanobis on, the
-        // 0.7 default can drop legitimate matches across a displacement gap
-        // (see docs/RELEASE_READINESS.md, gap 4). The gate still governs here.
+        // Disable the aggressive raw-IoU pre-filter: with Mahalanobis on, the 0.7 default can drop legitimate matches across a displacement gap (see docs/RELEASE_READINESS.md, gap 4). The gate still governs here.
         params_.proximity_thresh                      = 0.0f;
 
         hdl_ = SushiTrack_Create(&params_);
@@ -91,7 +89,7 @@ TEST_F(FullStackTest, AdvancedStackTracksConfirmsAndRecovers)
         return SushiTrack_Update(hdl_, dets, 2, out.data(), 8, 0.04f);
     };
 
-    // ---- Confirmation + sustained tracking over several frames ----
+    // Confirmation + sustained tracking over several frames
     float ax = 100.0f, bx = 100.0f;
     const float ay = 150.0f, by = 400.0f; // separate lanes
     const float vx = 6.0f;
@@ -128,7 +126,7 @@ TEST_F(FullStackTest, AdvancedStackTracksConfirmsAndRecovers)
         ax += vx; bx += vx;
     }
 
-    // ---- Occlude object A for 3 frames; B stays visible ----
+    // Occlude object A for 3 frames; B stays visible
     constexpr int kGap = 3;
     for (int i = 0; i < kGap; ++i)
     {
@@ -142,7 +140,7 @@ TEST_F(FullStackTest, AdvancedStackTracksConfirmsAndRecovers)
         ax += vx; // A keeps moving while unobserved
     }
 
-    // ---- A reappears on its trajectory with the SAME feature ----
+    // A reappears on its trajectory with the SAME feature
     int n = step(ax, ay, bx, by);
     ASSERT_GE(n, 1);
 
@@ -171,8 +169,7 @@ TEST_F(FullStackTest, LongRunUnderFullStackStaysStable)
     ASSERT_GE(n0, 1);
     int64_t id = out[0].track_id;
 
-    // The id can legitimately settle after the tentative window; capture it
-    // once the track is confirmed Tracked.
+    // The id can legitimately settle after the tentative window; capture it once the track is confirmed Tracked.
     float x = 100.0f, y = 200.0f;
     for (int k = 1; k <= 120; ++k)
     {
@@ -183,8 +180,7 @@ TEST_F(FullStackTest, LongRunUnderFullStackStaysStable)
         int n = SushiTrack_Update(hdl_, &d, 1, out.data(), 4, 0.04f);
         ASSERT_GE(n, 1) << "Full-stack tracker dropped the object at frame " << k;
 
-        // Re-anchor the id when confirmed (handles the tentative->Tracked
-        // transition without assuming the frame it occurs on).
+        // Re-anchor the id when confirmed (handles the tentative->Tracked transition without assuming the frame it occurs on).
         if (out[0].state == kTracked && out[0].is_confirmed)
             id = out[0].track_id;
 

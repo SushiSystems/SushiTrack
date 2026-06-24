@@ -124,9 +124,7 @@ const SushiTrack_Track* findById(const std::vector<SushiTrack_Track>& out,
 
 }
 
-// ============================================================================
 // LongSequenceTrackingTest — Issue #3 (HIGH)
-// ============================================================================
 
 /**
  * @brief Fixture exercising a long, single-object trajectory to validate the
@@ -201,9 +199,7 @@ TEST_F(LongSequenceTrackingTest, ThreeHundredFrameSingleObjectKeepsIdentity)
     }
 }
 
-// ============================================================================
 // TrackerReIDEndToEndTest — Issue #2 (HIGH)
-// ============================================================================
 
 /**
  * @brief Fixture for full-pipeline ReID validation.
@@ -329,9 +325,7 @@ TEST_F(TrackerReIDEndToEndTest, LostTrackRecoveredByMatchingFeature)
         << "ReID failed to recover the lost track to its original ID.";
 }
 
-// ============================================================================
 // TrackerTentativeWithReIDTest — Issue #6 (MED)
-// ============================================================================
 
 /**
  * @brief Fixture exercising tentative-stage promotion under ReID.
@@ -414,9 +408,7 @@ TEST_F(TrackerTentativeWithReIDTest, TentativeReAcquiresAfterSingleMissedFrame)
         << "Tentative track lost its ID across a single missed frame.";
 }
 
-// ============================================================================
 // TrackerFSMGatingEndToEndTest — Section 2.3.2 (MED)
-// ============================================================================
 
 /**
  * @brief Fixture combining FSM with Mahalanobis gating end-to-end.
@@ -498,9 +490,7 @@ TEST_F(TrackerFSMGatingEndToEndTest, OutOfGateDetectionDoesNotBindEstablishedTra
     }
 }
 
-// ============================================================================
 // TrackerVariableDtTest — Section 2.3.4 (MED)
-// ============================================================================
 
 /**
  * @brief Fixture exercising time_aware=1 with non-uniform dt.
@@ -572,9 +562,7 @@ TEST_F(TrackerVariableDtTest, OneSecondGapDoesNotCrash)
     EXPECT_GE(n, 0);
 }
 
-// ============================================================================
 // TrackerHighToLowConfidenceTest — verified gap (MED)
-// ============================================================================
 
 /**
  * @brief Fixture exercising a confirmed track whose detections drop in score

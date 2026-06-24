@@ -39,9 +39,7 @@ using StateMean = KalmanTypes::StateMean;
 using StateCov  = KalmanTypes::StateCov;
 using DetectBox = KalmanTypes::DetectBox;
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 /** @brief Constructs a [x, y, w, h] detection box. */
 static DetectBox makeBox(float x, float y, float w, float h)
@@ -51,9 +49,7 @@ static DetectBox makeBox(float x, float y, float w, float h)
     return b;
 }
 
-// ---------------------------------------------------------------------------
 // initiate()
-// ---------------------------------------------------------------------------
 
 /**
  * @brief After initiation, the position/size block of the mean equals the
@@ -98,9 +94,7 @@ TEST(KalmanFilterTest, InitiateCovarianceIsDiagonalAndPositive)
     }
 }
 
-// ---------------------------------------------------------------------------
 // predict()
-// ---------------------------------------------------------------------------
 
 /**
  * @brief After one predict step with constant velocity, the position components
@@ -149,9 +143,7 @@ TEST(KalmanFilterTest, PredictIncreasesCovariance)
             << "diagonal entry " << i << " decreased after predict";
 }
 
-// ---------------------------------------------------------------------------
 // update()
-// ---------------------------------------------------------------------------
 
 /**
  * @brief After a Kalman update with the exact current position as measurement,
@@ -196,9 +188,7 @@ TEST(KalmanFilterTest, UpdateDecreasesCovariance)
             << "diagonal entry " << i << " increased after update";
 }
 
-// ---------------------------------------------------------------------------
 // Gating
-// ---------------------------------------------------------------------------
 
 /**
  * @brief An observation placed exactly at the predicted mean passes the
@@ -218,9 +208,7 @@ TEST(KalmanFilterTest, IsInGate_ObservationAtMeanPasses)
            mean(1),
            mean(2),
            mean(3);
-    // Actually for XYWH mode the measurement is [cx, cy, w, h] but the filter
-    // uses update_mat_ = identity (4x8 top rows), so measurement space = [x,y,w,h].
-    // Use the box we initiated with for a zero-residual gate check.
+    // Actually for XYWH mode the measurement is [cx, cy, w, h] but the filter uses update_mat_ = identity (4x8 top rows), so measurement space = [x,y,w,h]. Use the box we initiated with for a zero-residual gate check.
     EXPECT_TRUE(kf.isInGate(mean, cov, box, 9.4877f));
 }
 
@@ -260,9 +248,7 @@ TEST(KalmanFilterTest, GetGateFlagsMatchesScalarIsInGate)
             << "mismatch at index " << i;
 }
 
-// ---------------------------------------------------------------------------
 // setNoiseMultipliers
-// ---------------------------------------------------------------------------
 
 /**
  * @brief With noise multipliers > 1, predict produces larger covariance
@@ -288,9 +274,7 @@ TEST(KalmanFilterTest, ElevatedMultipliersIncreaseProcessNoise)
             << "elevated multipliers did not increase covariance at diagonal " << i;
 }
 
-// ---------------------------------------------------------------------------
 // XYAH coordinate mode
-// ---------------------------------------------------------------------------
 
 /**
  * @brief In XYAH mode, initiate() stores [cx, cy, aspect, height] correctly.
@@ -314,9 +298,7 @@ TEST(KalmanFilterTest, XYAHModeInitiateMeanMatchesMeasurement)
         EXPECT_FLOAT_EQ(mean(i), 0.f);
 }
 
-// ---------------------------------------------------------------------------
 // NSAKalmanFilter
-// ---------------------------------------------------------------------------
 
 class NSAKalmanFilterTest : public ::testing::Test
 {

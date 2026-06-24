@@ -48,9 +48,7 @@
 
 using namespace SushiTrack;
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 /** @brief Returns a Tracklet with TLWH (x, y, w, h) at score s. */
 static std::shared_ptr<Tracklet> makeT(float x, float y, float w, float h,
@@ -75,9 +73,7 @@ static std::shared_ptr<Tracklet> makeFeatT(float x, float y,
     return makeT(x, y, 50.f, 80.f, score, std::move(feat));
 }
 
-// ===========================================================================
 // IoUCostCalculator
-// ===========================================================================
 
 /** @brief Identical boxes — IoU = 1.0 → cost ≈ 0. */
 TEST(IoUCostCalculatorTest, IdenticalBoxesCostIsZero)
@@ -165,9 +161,7 @@ TEST(IoUCostCalculatorTest, SingleMatchesBatch)
     EXPECT_NEAR(m(0, 0), single, 1e-5f);
 }
 
-// ===========================================================================
 // DIoUCostCalculator
-// ===========================================================================
 
 /** @brief Identical boxes — cost ≈ 0. */
 TEST(DIoUCostCalculatorTest, IdenticalBoxesCostIsZero)
@@ -211,9 +205,7 @@ TEST(DIoUCostCalculatorTest, SingleMatchesBatch)
     EXPECT_NEAR(m(0, 0), calc.calculate_single(a, b), 1e-5f);
 }
 
-// ===========================================================================
 // CosineCostCalculator
-// ===========================================================================
 
 /** @brief Same unit-feature tracklets → cosine similarity 1 → cost ≈ 0. */
 TEST(CosineCostCalculatorTest, IdenticalFeaturesCostIsZero)
@@ -271,15 +263,12 @@ TEST(CosineCostCalculatorTest, SingleMatchesBatch)
     EXPECT_NEAR(m(0, 0), calc.calculate_single(a, b), 1e-5f);
 }
 
-// ===========================================================================
 // FuseScoreDecorator
-// ===========================================================================
 
 /** @brief A detection score < 1 lowers the effective cost below the raw IoU cost. */
 TEST(FuseScoreDecoratorTest, HighScoreLowersCost)
 {
-    // Inner calculator: IoU on identical boxes → cost = 0.
-    // Decorated cost = 1 - (1 - 0) * 0.8 = 0.2.
+    // Inner calculator: IoU on identical boxes → cost = 0. Decorated cost = 1 - (1 - 0) * 0.8 = 0.2.
     auto inner = std::make_shared<IoUCostCalculator>();
     FuseScoreDecorator dec(inner);
 
@@ -346,9 +335,7 @@ TEST(FuseScoreDecoratorTest, SingleMatchesBatch)
     EXPECT_NEAR(m(0, 0), dec.calculate_single(a, b), 1e-5f);
 }
 
-// ===========================================================================
 // GatedIoUCostCalculator
-// ===========================================================================
 
 /**
  * @brief NullGateValidator passes every cell; identical boxes yield IoU cost ≈ 0.
@@ -510,9 +497,7 @@ TEST(GatedIoUCostCalculatorTest, ProximityFilterKeepsHighOverlap)
     EXPECT_LT(m(0, 0), 1e3f);
 }
 
-// ===========================================================================
 // FusedCostCalculator
-// ===========================================================================
 
 /**
  * @brief NullGate + identical features → cosine_dist = 0 < reid_thresh → direct
@@ -651,9 +636,7 @@ TEST(FusedCostCalculatorTest, ProximityFilterDisabledRestoresDirectAssignment)
     EXPECT_LT(m(0, 0), 1e3f);
 }
 
-// ===========================================================================
 // ReIDFirstCostCalculator
-// ===========================================================================
 
 /**
  * @brief Both tracklets carry identical features; reid_dist = 0 < thresh → direct
@@ -752,9 +735,7 @@ TEST(ReIDFirstCostCalculatorTest, SingleMatchesBatch)
     EXPECT_NEAR(m(0, 0), calc.calculate_single(a, b), 1e-5f);
 }
 
-// ===========================================================================
 // PureReIDCostCalculator
-// ===========================================================================
 
 /**
  * @brief NullGate + identical features → reid_dist = 0 < thresh = 0.4 → cost near 0.
@@ -903,9 +884,7 @@ TEST(CosineCostCalculatorTest, MissingFeatureOnBProducesCostOne)
     EXPECT_FLOAT_EQ(m(0, 0), 1.f);
 }
 
-// ===========================================================================
 // GIoUCostCalculator
-// ===========================================================================
 
 /** @brief Identical boxes — cost ≈ 0. */
 TEST(GIoUCostCalculatorTest, IdenticalBoxesCostIsZero)
@@ -949,9 +928,7 @@ TEST(GIoUCostCalculatorTest, SingleMatchesBatch)
     EXPECT_NEAR(m(0, 0), calc.calculate_single(a, b), 1e-5f);
 }
 
-// ===========================================================================
 // SIoUCostCalculator
-// ===========================================================================
 
 /** @brief Identical boxes — cost ≈ 0. */
 TEST(SIoUCostCalculatorTest, IdenticalBoxesCostIsZero)
@@ -993,4 +970,180 @@ TEST(SIoUCostCalculatorTest, SingleMatchesBatch)
     calc.calculate(av, bv, m);
 
     EXPECT_NEAR(m(0, 0), calc.calculate_single(a, b), 1e-5f);
+}
+
+// ObservationMomentumDecorator
+
+namespace
+{
+    /** @brief Inner calculator returning a fixed cost, isolating the momentum term. */
+    class ConstCost : public ICostCalculator
+    {
+        public:
+            explicit ConstCost(float c) : c_(c) {}
+            void calculate(const std::vector<TrackletPtr>& __restrict a,
+                           const std::vector<TrackletPtr>& __restrict b,
+                           CostMatrix& __restrict m) override
+            {
+                m.resize(a.size(), b.size(), c_);
+            }
+            float calculate_single(const TrackletPtr&, const TrackletPtr&) const override { return c_; }
+        private:
+            float c_;
+    };
+
+    /** @brief Builds a track cruising in +x at the given per-frame step; no FSM, so it reports Cruising. */
+    std::shared_ptr<Tracklet> makeCruiser(float start_x, float y, float step, int steps)
+    {
+        auto t = makeT(start_x, y, 50.f, 80.f);
+        t->activate(std::make_unique<KalmanFilter>(), 1, 1);
+        float x = start_x;
+        for (int f = 2; f <= steps + 1; ++f)
+        {
+            t->predict(1.0f);
+            x += step;
+            auto obs = makeT(x, y, 50.f, 80.f);
+            t->update(*obs, static_cast<size_t>(f), true, false);
+        }
+        return t;
+    }
+
+    /** @brief Detection whose box centre sits exactly at (cx, cy). */
+    std::shared_ptr<Tracklet> detAtCenter(float cx, float cy)
+    {
+        return makeT(cx - 25.f, cy - 40.f, 50.f, 80.f);
+    }
+
+    /** @brief Centre of a track's last raw observation. */
+    void lastObsCenter(const std::shared_ptr<Tracklet>& t, float& cx, float& cy)
+    {
+        const auto& lo = t->getLastObservation();
+        cx = lo.x() + lo.width()  * 0.5f;
+        cy = lo.y() + lo.height() * 0.5f;
+    }
+}
+
+/** @brief A detection straight ahead along travel has its cost reduced by the full weight. */
+TEST(ObservationMomentumDecoratorTest, AlignedDetectionGetsLowerCost)
+{
+    auto t = makeCruiser(100.f, 200.f, 10.f, 5);
+    float cx, cy; lastObsCenter(t, cx, cy);
+    auto ahead = detAtCenter(cx + 100.f, cy);
+
+    ObservationMomentumDecorator dec(std::make_shared<ConstCost>(0.5f), 0.2f, 0.5f, 5);
+    std::vector<std::shared_ptr<Tracklet>> av{t}, bv{ahead};
+    CostMatrix m;
+    dec.calculate(av, bv, m);
+
+    EXPECT_NEAR(m(0, 0), 0.3f, 1e-3f);
+}
+
+/** @brief A detection directly behind travel has its cost raised by the full weight. */
+TEST(ObservationMomentumDecoratorTest, OpposingDetectionGetsHigherCost)
+{
+    auto t = makeCruiser(100.f, 200.f, 10.f, 5);
+    float cx, cy; lastObsCenter(t, cx, cy);
+    auto behind = detAtCenter(cx - 100.f, cy);
+
+    ObservationMomentumDecorator dec(std::make_shared<ConstCost>(0.5f), 0.2f, 0.5f, 5);
+    std::vector<std::shared_ptr<Tracklet>> av{t}, bv{behind};
+    CostMatrix m;
+    dec.calculate(av, bv, m);
+
+    EXPECT_NEAR(m(0, 0), 0.7f, 1e-3f);
+}
+
+/** @brief A detection perpendicular to travel leaves the cost unchanged (cos = 0). */
+TEST(ObservationMomentumDecoratorTest, PerpendicularDetectionUnchanged)
+{
+    auto t = makeCruiser(100.f, 200.f, 10.f, 5);
+    float cx, cy; lastObsCenter(t, cx, cy);
+    auto side = detAtCenter(cx, cy + 100.f);
+
+    ObservationMomentumDecorator dec(std::make_shared<ConstCost>(0.5f), 0.2f, 0.5f, 5);
+    std::vector<std::shared_ptr<Tracklet>> av{t}, bv{side};
+    CostMatrix m;
+    dec.calculate(av, bv, m);
+
+    EXPECT_NEAR(m(0, 0), 0.5f, 1e-3f);
+}
+
+/** @brief Sentinel cells from the inner calculator are passed through untouched. */
+TEST(ObservationMomentumDecoratorTest, SentinelPairsArePreserved)
+{
+    auto t = makeCruiser(100.f, 200.f, 10.f, 5);
+    float cx, cy; lastObsCenter(t, cx, cy);
+    auto ahead = detAtCenter(cx + 100.f, cy);
+
+    ObservationMomentumDecorator dec(std::make_shared<ConstCost>(1e4f), 0.2f, 0.5f, 5);
+    std::vector<std::shared_ptr<Tracklet>> av{t}, bv{ahead};
+    CostMatrix m;
+    dec.calculate(av, bv, m);
+
+    EXPECT_FLOAT_EQ(m(0, 0), 1e4f);
+}
+
+/** @brief A track slower than min_velocity contributes no momentum. */
+TEST(ObservationMomentumDecoratorTest, SlowTrackIsGatedOff)
+{
+    auto t = makeCruiser(100.f, 200.f, 0.2f, 5);
+    float cx, cy; lastObsCenter(t, cx, cy);
+    auto ahead = detAtCenter(cx + 100.f, cy);
+
+    ObservationMomentumDecorator dec(std::make_shared<ConstCost>(0.5f), 0.2f, 0.5f, 5);
+    std::vector<std::shared_ptr<Tracklet>> av{t}, bv{ahead};
+    CostMatrix m;
+    dec.calculate(av, bv, m);
+
+    EXPECT_NEAR(m(0, 0), 0.5f, 1e-4f);
+}
+
+/** @brief A track whose last observation is older than max_age contributes no momentum. */
+TEST(ObservationMomentumDecoratorTest, StaleTrackIsGatedOff)
+{
+    auto t = makeCruiser(100.f, 200.f, 10.f, 5);
+    t->predict(1.0f);
+    t->predict(1.0f);   // frames-since-observation now 2, beyond max_age = 1
+
+    float cx, cy; lastObsCenter(t, cx, cy);
+    auto ahead = detAtCenter(cx + 100.f, cy);
+
+    ObservationMomentumDecorator dec(std::make_shared<ConstCost>(0.5f), 0.2f, 0.5f, 1);
+    std::vector<std::shared_ptr<Tracklet>> av{t}, bv{ahead};
+    CostMatrix m;
+    dec.calculate(av, bv, m);
+
+    EXPECT_NEAR(m(0, 0), 0.5f, 1e-4f);
+}
+
+/** @brief A track with only one observation has no direction and contributes no momentum. */
+TEST(ObservationMomentumDecoratorTest, TrackWithoutVelocityIsGatedOff)
+{
+    auto t = makeT(100.f, 200.f, 50.f, 80.f);
+    t->activate(std::make_unique<KalmanFilter>(), 1, 1);
+
+    float cx, cy; lastObsCenter(t, cx, cy);
+    auto ahead = detAtCenter(cx + 100.f, cy);
+
+    ObservationMomentumDecorator dec(std::make_shared<ConstCost>(0.5f), 0.2f, 0.5f, 5);
+    std::vector<std::shared_ptr<Tracklet>> av{t}, bv{ahead};
+    CostMatrix m;
+    dec.calculate(av, bv, m);
+
+    EXPECT_NEAR(m(0, 0), 0.5f, 1e-4f);
+}
+
+/** @brief calculate_single agrees with the batch path. */
+TEST(ObservationMomentumDecoratorTest, SingleMatchesBatch)
+{
+    auto t = makeCruiser(100.f, 200.f, 10.f, 5);
+    float cx, cy; lastObsCenter(t, cx, cy);
+    auto ahead = detAtCenter(cx + 100.f, cy);
+
+    ObservationMomentumDecorator dec(std::make_shared<ConstCost>(0.5f), 0.2f, 0.5f, 5);
+    std::vector<std::shared_ptr<Tracklet>> av{t}, bv{ahead};
+    CostMatrix m;
+    dec.calculate(av, bv, m);
+
+    EXPECT_NEAR(dec.calculate_single(t, ahead), m(0, 0), 1e-5f);
 }
