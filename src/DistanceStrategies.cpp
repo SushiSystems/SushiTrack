@@ -10,7 +10,7 @@
 #include "SushiTrack/DistanceStrategies.h"
 #include <algorithm>
 #include "SushiTrack/Logger.h"
-#include "SushiTrack/TrackFSM.h"
+#include "SushiTrack/KinematicState.h"
 #include <cmath>
 #include <deque>
 
@@ -887,7 +887,7 @@ namespace SushiTrack
 
         for (size_t i = 0; i < a.size(); ++i)
         {
-            // Per-track state-aware policy; with FSM disabled the state is Cruising and the modifiers collapse to identity (bit-identical to pre-FSM).
+            // Per-track state-aware policy; without an IMM regime the state is Cruising and the modifiers collapse to identity.
             const StateAssocMods sm = stateAssocMods(a[i]->getLastSeenState());
             const float row_gate_thresh = std::max(1e-3f, gating_thresh_ * sm.gate_scale);
             const float row_motion_w    = std::clamp(iou_weight_ - sm.reid_shift, 0.0f, 1.0f);
@@ -1201,7 +1201,7 @@ namespace SushiTrack
 
         for (size_t i = 0; i < a.size(); ++i)
         {
-            // Tighten the gate for Stationary, loosen for Maneuvering/Coasting; identity for Cruising/no-FSM (bit-identical to pre-FSM).
+            // Tighten the gate for Stationary, loosen for Maneuvering/Coasting; identity for Cruising/no-IMM.
             const StateAssocMods sm = stateAssocMods(a[i]->getLastSeenState());
             const float row_gate_thresh = std::max(1e-3f, gating_thresh_ * sm.gate_scale);
             const float gate            = row_gate_thresh;

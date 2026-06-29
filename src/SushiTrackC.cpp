@@ -45,10 +45,6 @@ extern "C"
         params->enable_reid  = 0;
         params->time_aware   = 0;
 
-        params->enable_fsm                = 0;
-        params->fsm_stationary_vel_thresh = 40.0f;
-        params->fsm_maneuver_accel_thresh = 250.0f;
-        params->fsm_reference_height      = 100.0f;
 
         params->frame_rate   = 25;
         params->track_buffer = 30;
@@ -150,10 +146,6 @@ extern "C"
             config.enable_reid  = (params->enable_reid  != 0);
             config.time_aware   = (params->time_aware   != 0);
 
-            config.enable_fsm                = (params->enable_fsm != 0);
-            config.fsm_stationary_vel_thresh = params->fsm_stationary_vel_thresh;
-            config.fsm_maneuver_accel_thresh = params->fsm_maneuver_accel_thresh;
-            config.fsm_reference_height      = params->fsm_reference_height;
 
             config.frame_rate   = params->frame_rate;
             config.track_buffer = params->track_buffer;
@@ -518,6 +510,8 @@ extern "C"
                 out_tracks[i].label      = res->getLabel();
                 out_tracks[i].state      = static_cast<int>(res->getTrackState());
                 out_tracks[i].kinematic_state = static_cast<int>(res->getKinematicState());
+                out_tracks[i].maneuver_probability =
+                    res->immActive() ? res->getManeuverProbability() : -1.0f;
                 impl->last_features[i] = res->getSmoothFeat();
                 out_tracks[i].feat     = impl->last_features[i].empty() ? nullptr : impl->last_features[i].data();
                 out_tracks[i].feat_dim = static_cast<int>(impl->last_features[i].size());

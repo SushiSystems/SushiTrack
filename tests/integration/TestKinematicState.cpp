@@ -1,6 +1,6 @@
 /**
  * @file      TestKinematicState.cpp
- * @brief     End-to-end coverage of the kinematic FSM's reported state.
+ * @brief     End-to-end coverage of the IMM-derived kinematic regime output.
  * @author    Mustafa Garip (mustafagarip@sushisystems.io)
  * @date      23.06.2026
  * @version   v1.0.0
@@ -8,13 +8,11 @@
  *
  * Scope
  * -----
- * The FSM is thoroughly unit-tested in isolation, but no end-to-end test drives
- * it through the C API and asserts the `kinematic_state` field on the output
- * track. That field is part of the public contract (consumers branch on it), and
- * it only carries meaning once the FSM has been fed real Kalman-estimated
- * velocity/acceleration via the full update loop — not the synthetic state means
- * the unit suite injects. This file closes that gap by reproducing each motion
- * regime through actual detections and reading the regime back off the track.
+ * The `kinematic_state` field is part of the public contract (consumers branch
+ * on it). With the IMM estimator (kalman_type=2) it is derived from the mode
+ * probabilities once the bank has been fed real Kalman-estimated motion via the
+ * full update loop. This file drives each motion regime through actual
+ * detections and reads the regime back off the track.
  *
  * Reported codes (SushiTrack_Track::kinematic_state):
  *   0 = Stationary, 1 = Cruising, 2 = Maneuvering, 3 = Coasting.
@@ -41,11 +39,11 @@ enum KinematicCode
 };
 
 /**
- * @brief FSM fixture: enable_fsm=1 on the otherwise-core path.
+ * @brief IMM fixture: kalman_type=2 on the otherwise-core path.
  *
- * Frame-counted timing keeps the per-frame velocity-to-px/s conversion identical
- * to the FSM unit tests (per-frame velocity x frame_rate), so the documented
- * thresholds (40 px/s stationary, 250 px/s^2 maneuver) apply directly.
+ * Frame-counted timing; the IMM mode bank produces the regime that is mapped to
+ * the kinematic_state output (NCP mass -> Stationary, CA+CT mass -> Maneuvering,
+ * otherwise Cruising, Lost -> Coasting).
  */
 class KinematicStateTest : public ::testing::Test
 {
@@ -58,7 +56,7 @@ protected:
         SushiTrack_GetDefaultParams(&params_);
         params_.time_aware         = 0;
         params_.enable_tentative   = 0;
-        params_.enable_fsm         = 1;
+        params_.kalman_type        = 2;   // IMM multi-model estimator
         params_.primary_assoc_mode = 1;
         params_.frame_rate         = 25;
         params_.track_buffer       = 30;
@@ -75,7 +73,7 @@ protected:
 
 /**
  * @brief An object held at a fixed position settles to the Stationary regime
- *        once the FSM clears its warmup window.
+ *        once the estimator settles.
  */
 TEST_F(KinematicStateTest, StationaryObjectReportsStationary)
 {
@@ -139,7 +137,7 @@ TEST_F(KinematicStateTest, AbruptAccelerationReportsManeuvering)
 {
     std::vector<SushiTrack_Track> out(4);
 
-    // Settle stationary so the FSM has a zero-velocity baseline.
+    // Settle stationary so the estimator has a zero-velocity baseline.
     for (int i = 0; i < 6; ++i)
     {
         SushiTrack_Object d = makeDet(100.0f, 200.0f);
@@ -165,7 +163,7 @@ TEST_F(KinematicStateTest, AbruptAccelerationReportsManeuvering)
 
 /**
  * @brief A confirmed track that loses its detection enters the Coasting regime:
- *        the FSM reports Coasting on the Lost output track while it is propagated
+ *        the estimator reports Coasting on the Lost output track while it is propagated
  *        through the buffer without observations.
  */
 TEST_F(KinematicStateTest, OccludedTrackReportsCoasting)

@@ -206,10 +206,7 @@ namespace SushiTrack
         accumulated_lost_time_ = 0.0f;
         recordObservation(new_track.getRect(), frame_id);
 
-        if (fsm_)
-        {
-            fsm_->updateState(mean_, false, tracklet_len_, last_dt_);
-        }
+        refreshRegime(false);
     }
 
     /**
@@ -240,28 +237,15 @@ namespace SushiTrack
             }
         }
 
-        if (fsm_ && kf_)
-        {
-            // FSM runs once per frame from update()/reActivate(); driving it here for a Tracked target would inject a spurious zero-accel sample. Only Lost tracks (no measurement) advance into Coasting here.
-            if (state_ == TrackState::Lost)
-            {
-                KinematicState old_fsm = fsm_->getCurrentState();
-                fsm_->updateState(mean_, true, tracklet_len_, dt);
-                KinematicState new_fsm = fsm_->getCurrentState();
-                if (old_fsm != new_fsm)
-                {
-                    SUSHITRACK_LOG_DEBUG("[Tracklet] Track %llu FSM state: %d -> %d",
-                        (unsigned long long)track_id_, (int)old_fsm, (int)new_fsm);
-                }
-            }
-
-            // Scale process noise from the last-observed regime before predicting (set noise, then predict, then observe).
-            fsm_->applyToPredictor(kf_.get(), dt);
-        }
-
         const float kf_dt = timing_policy_ ? timing_policy_->toKfDt(dt) : 1.0f;
         kf_->predict(mean_, covariance_, kf_dt);
         updateRect();
+
+        // Unobserved frame: drive the IMM regime into Coasting. The per-mode
+        // process noise is intrinsic to the IMM, so there is nothing to set on
+        // the predictor before predicting (unlike the removed hand-switched path).
+        if (state_ == TrackState::Lost)
+            refreshRegime(true);
 
         if (state_ == TrackState::Lost || state_ == TrackState::Tentative)
         {
@@ -316,10 +300,7 @@ namespace SushiTrack
         accumulated_lost_time_ = 0.0f;
         recordObservation(new_track.getRect(), frame_id);
 
-        if (fsm_)
-        {
-            fsm_->updateState(mean_, false, tracklet_len_, last_dt_);
-        }
+        refreshRegime(false);
     }
 
     /**
@@ -355,11 +336,47 @@ namespace SushiTrack
      *
      * @param dt Time interval of the frame triggering the transition.
      */
-    void Tracklet::markAsLost(float dt) 
+    void Tracklet::markAsLost(float dt)
     {
         state_ = TrackState::Lost;
         is_activated_ = false;
         accumulated_lost_time_ = dt;
+        refreshRegime(true);
+    }
+
+    /**
+     * @brief Refreshes the IMM-derived motion regime from the predictor.
+     *
+     * Reports the regime semantics (Stationary / Cruising / Maneuvering /
+     * Coasting) from the IMM mode probabilities so downstream consumers read a
+     * single regime contract.
+     *
+     * @param is_lost True when the track currently has no observation.
+     */
+    void Tracklet::refreshRegime(bool is_lost)
+    {
+        if (!kf_) return;
+        const float m = kf_->maneuverProbability();
+        if (m < 0.0f) return;   // single-model predictor: leave the Cruising default in charge
+
+        maneuver_prob_   = m;
+        stationary_prob_ = kf_->stationaryProbability();
+
+        if (is_lost)
+        {
+            // Capture the pre-dark regime once so recovery can restore it.
+            if (imm_state_ != KinematicState::Coasting)
+                imm_pre_coast_ = imm_state_;
+            imm_state_ = KinematicState::Coasting;
+            return;
+        }
+
+        if (stationary_prob_ > kRegimeStationaryProb)
+            imm_state_ = KinematicState::Stationary;
+        else if (maneuver_prob_ > kRegimeManeuverProb)
+            imm_state_ = KinematicState::Maneuvering;
+        else
+            imm_state_ = KinematicState::Cruising;
     }
 
     /**

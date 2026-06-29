@@ -10,8 +10,8 @@
  * -----
  * Every advanced subsystem is unit-tested alone and several are paired in the
  * unit-level integration suite, but no test drives the *entire* advanced stack
- * simultaneously: ReID + Mahalanobis gating + kinematic FSM + tentative
- * lifecycle + NSA Kalman. Feature interactions (e.g. FSM gate scaling feeding
+ * simultaneously: ReID + Mahalanobis gating + IMM regime + tentative
+ * lifecycle + NSA Kalman. Feature interactions (e.g. IMM regime gate scaling feeding
  * the fused cost while ReID also competes for lost-recovery) only surface when
  * they run together. This file is that composition test.
  *
@@ -47,9 +47,8 @@ protected:
         params_.time_aware                            = 1;
         params_.enable_reid                           = 1;
         params_.enable_mahalanobis                    = 1;
-        params_.enable_fsm                            = 1;
         params_.enable_tentative                      = 1;
-        params_.kalman_type                           = 1;   // NSA
+        params_.kalman_type                           = 2;   // IMM multi-model
         params_.primary_assoc_mode                    = 1;
         params_.frame_rate                            = 25;
         params_.track_buffer                          = 30;

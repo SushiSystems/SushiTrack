@@ -67,6 +67,26 @@ namespace SushiTrack
              * @param vel_mult Multiplier for velocity uncertainty.
              */
             virtual void setNoiseMultipliers(float pos_mult, float size_mult, float vel_mult) = 0;
+
+            /**
+             * @brief Probability that the target is manoeuvring.
+             *
+             * Multi-model estimators (IMM) report the mass on their manoeuvring
+             * models as a continuous [0, 1] regime signal that replaces the
+             * prior hard Maneuvering category for downstream policies.
+             * Single-model predictors return a negative sentinel meaning "no
+             * regime estimate available", so callers fall back to their legacy
+             * behaviour. Default: not available.
+             */
+            virtual float maneuverProbability() const { return -1.0f; }
+
+            /**
+             * @brief Probability that the target is near-stationary.
+             *
+             * Companion to maneuverProbability(): the mass an IMM places on its
+             * near-constant-position model. Negative when unavailable.
+             */
+            virtual float stationaryProbability() const { return -1.0f; }
     };
 
 } // namespace SushiTrack

@@ -10,7 +10,7 @@
  * -----
  * The momentum decorator is unit-tested in isolation against a stub cost; this
  * file exercises it through the public C API with enable_ocm=1, driving real
- * Kalman-estimated motion so the FSM regime gate (momentum applies only while a
+ * Kalman-estimated motion so the IMM regime gate (momentum applies only while a
  * track is Cruising) is genuinely in the loop. The assertions check observable
  * contract — identity persistence, output sanity, and that the term stays inert
  * exactly where it is gated off — rather than a metric delta, which belongs to
@@ -30,14 +30,14 @@ using namespace sushitrack_it;
 namespace
 {
 
-/** @brief Builds a tracker on the FSM path with OCM toggled by @p ocm. */
+/** @brief Builds a tracker on the IMM regime path with OCM toggled by @p ocm. */
 inline SushiTrackHdl buildHdl(int ocm)
 {
     SushiTrack_Params p = {};
     SushiTrack_GetDefaultParams(&p);
     p.time_aware         = 0;
     p.enable_tentative   = 0;
-    p.enable_fsm         = 1;
+    p.kalman_type        = 2;   // IMM provides the motion regime
     p.enable_ocm         = ocm;
     p.primary_assoc_mode = 1;
     p.frame_rate         = 25;

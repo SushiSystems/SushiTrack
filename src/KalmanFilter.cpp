@@ -111,7 +111,7 @@ namespace SushiTrack
      * only updates. That destroys the velocity estimate between frames and
      * shows up as elevated IDSW and reduced AssA on clean sequences.
      *
-     * Per-state dynamic_*_mult multipliers (set transiently by the FSM) still
+     * Per-state dynamic_*_mult multipliers (set via setNoiseMultipliers) still
      * apply because they encode short-term motion regime changes.
      *
      * @param mean Reference to state mean for prediction.

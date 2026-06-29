@@ -10,13 +10,12 @@
 #
 # Run directly:
 #   ./unit_test
-#   ./unit_test --gtest_filter="TrackFSMTest.*"
+#   ./unit_test --gtest_filter="IMMFilterTest.*"
 # ==============================================================================
 
 find_package(GTest REQUIRED)
 
 add_executable(unit_test
-    TestTrackFSM.cpp
     TestKalmanFilter.cpp
     TestTracklet.cpp
     TestRect.cpp

@@ -992,7 +992,7 @@ namespace
             float c_;
     };
 
-    /** @brief Builds a track cruising in +x at the given per-frame step; no FSM, so it reports Cruising. */
+    /** @brief Builds a track cruising in +x at the given per-frame step; no IMM, so it reports Cruising. */
     std::shared_ptr<Tracklet> makeCruiser(float start_x, float y, float step, int steps)
     {
         auto t = makeT(start_x, y, 50.f, 80.f);
@@ -1154,7 +1154,7 @@ TEST(ObservationMomentumDecoratorTest, SingleMatchesBatch)
  */
 TEST(ObservationMomentumDecoratorTest, ManeuverScaleDoesNotAffectCruisingTrack)
 {
-    auto t = makeCruiser(100.f, 200.f, 10.f, 5);  // no FSM -> reports Cruising
+    auto t = makeCruiser(100.f, 200.f, 10.f, 5);  // no IMM -> reports Cruising
     float cx, cy; lastObsCenter(t, cx, cy);
     auto ahead = detAtCenter(cx + 100.f, cy);
     std::vector<std::shared_ptr<Tracklet>> av{t}, bv{ahead};

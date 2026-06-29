@@ -78,6 +78,17 @@ extern "C"
          */
         int   frames_since_last_update;
 
+        /**
+         * @brief Continuous manoeuvre likelihood in [0, 1].
+         *
+         * The IMM estimator's probability mass on its manoeuvring models
+         * (constant-acceleration + coordinated-turn); a soft companion to the
+         * discrete kinematic_state. Equals -1 when the active predictor is not
+         * an IMM (kalman_type != 2), so consumers can distinguish "no estimate"
+         * from "confidently not manoeuvring".
+         */
+        float maneuver_probability;
+
     } SushiTrack_Track;
 
     /**
@@ -107,9 +118,6 @@ extern "C"
 
         /** @brief Flag to enable the tentative, unconfirmed track lifecycle state. */
         int   enable_tentative;
-
-        /** @brief Flag to enable the Kinematic Finite State Machine for dynamic noise adjustment. */
-        int   enable_fsm;
 
         /** @brief Flag to enable ReID visual feature extraction and association. */
         int   enable_reid;
@@ -172,17 +180,6 @@ extern "C"
 
         /** @brief Maximum capacity of visual appearance vectors stored in the gallery per tracklet. */
         int   max_feature_history;
-
-        // FSM Params
-
-        /** @brief Velocity threshold to classify an object's kinematic state as stationary. */
-        float fsm_stationary_vel_thresh;
-
-        /** @brief Acceleration threshold to classify an object's kinematic state as maneuvering. */
-        float fsm_maneuver_accel_thresh;
-
-        /** @brief Reference object height (px) anchoring the FSM velocity/acceleration thresholds; each track's velocity/acceleration is size-normalised by (fsm_reference_height / box_height) before threshold comparison, making the regime decision scale-invariant. A value <= 0 disables normalisation (legacy absolute-pixel behaviour). */
-        float fsm_reference_height;
 
         // Observation-Centric Momentum (OCM)
 

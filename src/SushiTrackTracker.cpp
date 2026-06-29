@@ -108,9 +108,6 @@ namespace SushiTrack
 
             tracklet->setTimingPolicy(timing_policy_);
 
-            if (config_.enable_fsm)
-                tracklet->setFSM(std::make_unique<TrackFSM>(config_));
-
             if (obj.prob >= config_.track_thresh)
                 det_high.push_back(tracklet);
             else
@@ -840,8 +837,8 @@ namespace SushiTrack
      * The configured track_buffer is scaled by the track's last-seen kinematic
      * state (stationary tracks get a longer buffer, maneuvering tracks a modest
      * extension). When the accumulated lost time exceeds the scaled buffer the
-     * track is marked Removed. Defaults collapse to 1.0x when no FSM is
-     * attached, preserving the prior behaviour.
+     * track is marked Removed. Defaults collapse to 1.0x when no IMM regime is
+     * available, preserving the prior behaviour.
      *
      * @param removed_tracklets_curr Output collection for expired tracklets.
      */
@@ -849,9 +846,9 @@ namespace SushiTrack
     {
         for (auto& s : lost_tracklets_)
         {
-            // Scale the lost buffer by the pre-dark regime: Stationary gets longer (reliable reappearance), Maneuvering a modest extra, others as-is; 1.0x with no FSM (bit-identical to before).
+            // Scale the lost buffer by the pre-dark regime: Stationary gets longer (reliable reappearance), Maneuvering a modest extra, others as-is; 1.0x without an IMM regime (bit-identical to before).
             float buffer_scale = 1.0f;
-            if (s->getFSM())
+            if (s->immActive())
             {
                 switch (s->getLastSeenState())
                 {

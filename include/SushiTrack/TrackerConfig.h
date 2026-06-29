@@ -42,9 +42,6 @@ namespace SushiTrack
         /** @brief Flag to enable the tentative, unconfirmed track lifecycle state. */
         bool  enable_tentative = false;
 
-        /** @brief Flag to enable the Kinematic Finite State Machine for dynamic noise adjustment. */
-        bool  enable_fsm = false;
-
         /** @brief Flag to enable ReID visual feature extraction and association. */
         bool  enable_reid = false;
 
@@ -81,7 +78,7 @@ namespace SushiTrack
         /** @brief Flag to add a +1 offset in bounding box dimension calculations (inclusive). */
         bool  iou_plus_one = true;
 
-        /** @brief Defines the type of Kalman Filter utilized (0: Linear, 1: Noise Scale Adaptive). */
+        /** @brief Defines the motion estimator (0: Linear Kalman, 1: Noise Scale Adaptive, 2: IMM multi-model). */
         int   kalman_type = 0;
 
         // ReID Params
@@ -106,33 +103,6 @@ namespace SushiTrack
 
         /** @brief Maximum capacity of visual appearance vectors stored in the gallery per tracklet. */
         int   max_feature_history = 100;
-
-        // FSM Params
-
-        /** @brief Velocity threshold to classify an object's kinematic state as stationary. */
-        float fsm_stationary_vel_thresh = 40.0f;
-
-        /** @brief Acceleration threshold to classify an object's kinematic state as maneuvering. */
-        float fsm_maneuver_accel_thresh = 250.0f;
-
-        /**
-         * @brief Reference object height (px) anchoring the FSM velocity/acceleration thresholds.
-         *
-         * The FSM rescales each track's velocity and acceleration by
-         * (fsm_reference_height / box_height) before comparing them against
-         * fsm_stationary_vel_thresh / fsm_maneuver_accel_thresh, so the regime
-         * decision reflects an object's *physical* (size-relative) motion rather
-         * than its apparent pixel motion. This makes the classification
-         * scale-invariant across near and far objects — important on scenes with
-         * large depth variation (DanceTrack, MOT20), where a single absolute
-         * pixel threshold otherwise mislabels large boxes as perpetually
-         * maneuvering and small boxes as perpetually stationary.
-         *
-         * At box_height == fsm_reference_height the factor is 1 and the
-         * thresholds keep their literal pixel meaning. A value <= 0 disables
-         * normalisation, restoring the legacy absolute-pixel behaviour.
-         */
-        float fsm_reference_height = 100.0f;
 
         // Observation-Centric Momentum (OCM)
 
@@ -163,11 +133,11 @@ namespace SushiTrack
         int   ocm_max_age = 1;
 
         /**
-         * @brief Fraction of ocm_vdc_weight applied to FSM-Maneuvering tracks; 0 restricts momentum to Cruising only.
+         * @brief Fraction of ocm_vdc_weight applied to Maneuvering-regime tracks; 0 restricts momentum to Cruising only.
          *
          * The decorator applies full weight to Cruising tracks. A value > 0 also
          * applies momentum to Maneuvering tracks at ocm_vdc_weight * this scale,
-         * which is what lets OCM engage on scenes the FSM mostly labels
+         * which is what lets OCM engage on scenes the estimator mostly labels
          * Maneuvering (DanceTrack). Stationary and Coasting are always skipped:
          * their stored direction is meaningless. Default 0 keeps the prior
          * Cruising-only behaviour bit-identical.

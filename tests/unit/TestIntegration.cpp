@@ -12,7 +12,7 @@
  *   - Issue #2 (HIGH): ReID never exercised in the full tracker pipeline.
  *   - Issue #3 (HIGH): No long-sequence (300+ frame) integration test.
  *   - Issue #6 (MED) : Tentative pipeline never combined with ReID.
- *   - 2.3.2          : FSM-aware Mahalanobis gating not exercised end-to-end.
+ *   - 2.3.2          : IMM-aware Mahalanobis gating not exercised end-to-end.
  *   - 2.3.4          : time_aware=1 with a variable-dt sequence not exercised.
  *
  * Conventions
@@ -42,7 +42,7 @@
  *   - A tentative track that re-acquires after a single missed frame retains
  *     its identity rather than spawning a fresh tentative.
  *
- * TrackerFSMGatingEndToEndTest (enable_fsm=1, enable_mahalanobis=1)
+ * TrackerImmGatingEndToEndTest (kalman_type=2, enable_mahalanobis=1)
  *   - A confirmed track sustained through a maneuvering segment retains its
  *     identity when the predicted box overlaps the detection within the
  *     Mahalanobis gate.
@@ -408,12 +408,12 @@ TEST_F(TrackerTentativeWithReIDTest, TentativeReAcquiresAfterSingleMissedFrame)
         << "Tentative track lost its ID across a single missed frame.";
 }
 
-// TrackerFSMGatingEndToEndTest — Section 2.3.2 (MED)
+// TrackerImmGatingEndToEndTest — Section 2.3.2 (MED)
 
 /**
- * @brief Fixture combining FSM with Mahalanobis gating end-to-end.
+ * @brief Fixture combining the IMM regime with Mahalanobis gating end-to-end.
  */
-class TrackerFSMGatingEndToEndTest : public ::testing::Test
+class TrackerImmGatingEndToEndTest : public ::testing::Test
 {
 protected:
     SushiTrackHdl     hdl_    = nullptr;
@@ -424,7 +424,7 @@ protected:
         SushiTrack_GetDefaultParams(&params_);
         params_.time_aware             = 1;
         params_.enable_tentative       = 0;
-        params_.enable_fsm             = 1;
+        params_.kalman_type            = 2;
         params_.enable_mahalanobis     = 1;
         params_.primary_assoc_mode     = 1;
         params_.frame_rate             = 25;
@@ -442,9 +442,9 @@ protected:
 
 /**
  * @brief A track sustained through a maneuvering segment retains its identity
- *        when each successive detection lies inside the FSM-modulated gate.
+ *        when each successive detection lies inside the motion gate.
  */
-TEST_F(TrackerFSMGatingEndToEndTest, ManeuveringTrackKeepsIdentityInsideGate)
+TEST_F(TrackerImmGatingEndToEndTest, ManeuveringTrackKeepsIdentityInsideGate)
 {
     std::vector<SushiTrack_Track> out(4);
     SushiTrack_Object d0 = makeDet(100.0f, 200.0f);
@@ -469,7 +469,7 @@ TEST_F(TrackerFSMGatingEndToEndTest, ManeuveringTrackKeepsIdentityInsideGate)
  * @brief A detection placed far outside any plausible motion envelope does
  *        not bind to a confirmed track; the track instead drops to Lost.
  */
-TEST_F(TrackerFSMGatingEndToEndTest, OutOfGateDetectionDoesNotBindEstablishedTrack)
+TEST_F(TrackerImmGatingEndToEndTest, OutOfGateDetectionDoesNotBindEstablishedTrack)
 {
     std::vector<SushiTrack_Track> out(4);
     SushiTrack_Object d0 = makeDet(100.0f, 200.0f);

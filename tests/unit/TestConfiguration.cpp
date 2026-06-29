@@ -42,7 +42,7 @@
  *   - association.* fields load into Params.
  *   - coordinate_system.* fields load into Params.
  *   - reid_params.* fields including reid_direct_assignment_weight load.
- *   - fsm_params.* fields load.
+ *   - advanced numeric fields load.
  *   - tentative_logic.* including fast/slow/vslow tiers load.
  *   - mahalanobis_gating.* fields load.
  *
@@ -126,7 +126,6 @@ void applyConfigToParams(const Json& doc, SushiTrack_Params& params)
         params.high_thresh                = jsonGet<float>(b, "high_thresh",                params.high_thresh);
         params.match_thresh               = jsonGet<float>(b, "match_thresh",               params.match_thresh);
         params.enable_tentative           = jsonGet<int>  (b, "enable_tentative",           params.enable_tentative);
-        params.enable_fsm                 = jsonGet<int>  (b, "enable_fsm",                 params.enable_fsm);
         params.enable_reid                = jsonGet<int>  (b, "enable_reid",                params.enable_reid);
         params.enable_mahalanobis         = jsonGet<int>  (b, "enable_mahalanobis",         params.enable_mahalanobis);
     }
@@ -164,14 +163,6 @@ void applyConfigToParams(const Json& doc, SushiTrack_Params& params)
         params.reid_recovery_thresh          = jsonGet<float>(s, "reid_recovery_thresh",          params.reid_recovery_thresh);
         params.max_feature_history           = jsonGet<int>  (s, "max_feature_history",           params.max_feature_history);
         params.reid_direct_assignment_weight = jsonGet<float>(s, "reid_direct_assignment_weight", params.reid_direct_assignment_weight);
-    }
-
-    if (adv.contains("fsm_params") && adv["fsm_params"].is_object())
-    {
-        const Json& s = adv["fsm_params"];
-        params.fsm_stationary_vel_thresh = jsonGet<float>(s, "fsm_stationary_vel_thresh", params.fsm_stationary_vel_thresh);
-        params.fsm_maneuver_accel_thresh = jsonGet<float>(s, "fsm_maneuver_accel_thresh", params.fsm_maneuver_accel_thresh);
-        params.fsm_reference_height      = jsonGet<float>(s, "fsm_reference_height",      params.fsm_reference_height);
     }
 
     if (adv.contains("tentative_logic") && adv["tentative_logic"].is_object())
@@ -251,7 +242,7 @@ TEST(ConfigLoaderBaselineTest, BasicSectionContainsAllDocumentedSwitches)
 
     for (const char* key : { "time_aware", "frame_rate", "track_buffer",
                               "track_thresh", "high_thresh", "match_thresh",
-                              "enable_tentative", "enable_fsm", "enable_reid",
+                              "enable_tentative", "enable_reid",
                               "enable_mahalanobis" })
     {
         EXPECT_TRUE(b.contains(key)) << "missing key: " << key;
@@ -294,7 +285,6 @@ TEST(ConfigLoaderBasicFieldsTest, EnableFlagsRoundTripIntoParams)
 
     const Json& b = doc["sushitrack"]["basic"];
     EXPECT_EQ(p.enable_tentative,           b["enable_tentative"].get<int>());
-    EXPECT_EQ(p.enable_fsm,                 b["enable_fsm"].get<int>());
     EXPECT_EQ(p.enable_reid,                b["enable_reid"].get<int>());
     EXPECT_EQ(p.enable_mahalanobis,         b["enable_mahalanobis"].get<int>());
 }
@@ -359,17 +349,6 @@ TEST_F(ConfigLoaderAdvancedFieldsTest, ReIDFieldsIncludingDirectAssignmentWeight
     EXPECT_FLOAT_EQ(params_.reid_recovery_thresh,          s["reid_recovery_thresh"].get<float>());
     EXPECT_EQ      (params_.max_feature_history,           s["max_feature_history"].get<int>());
     EXPECT_FLOAT_EQ(params_.reid_direct_assignment_weight, s["reid_direct_assignment_weight"].get<float>());
-}
-
-/**
- * @brief FSM threshold fields are applied to Params.
- */
-TEST_F(ConfigLoaderAdvancedFieldsTest, FSMFieldsAreApplied)
-{
-    const Json& s = doc_["sushitrack"]["advanced"]["fsm_params"];
-    EXPECT_FLOAT_EQ(params_.fsm_stationary_vel_thresh, s["fsm_stationary_vel_thresh"].get<float>());
-    EXPECT_FLOAT_EQ(params_.fsm_maneuver_accel_thresh, s["fsm_maneuver_accel_thresh"].get<float>());
-    EXPECT_FLOAT_EQ(params_.fsm_reference_height,      s["fsm_reference_height"].get<float>());
 }
 
 /**
@@ -438,7 +417,7 @@ TEST(ConfigLoaderDefaultsTest, EmptyDocumentLeavesAllDefaults)
     EXPECT_EQ(after.frame_rate,    before.frame_rate);
     EXPECT_EQ(after.track_buffer,  before.track_buffer);
     EXPECT_FLOAT_EQ(after.match_thresh, before.match_thresh);
-    EXPECT_EQ(after.enable_fsm,    before.enable_fsm);
+    EXPECT_EQ(after.enable_reid,   before.enable_reid);
 }
 
 // ConfigLoaderTrackerSmokeTest
@@ -511,11 +490,11 @@ TEST(ConfigLoaderLibraryApiTest, LibraryLoaderMatchesReferenceParser)
     ASSERT_EQ(SushiTrack_LoadParamsFromJson(configPath().c_str(), &loaded),
               SUSHITRACK_SUCCESS);
 
-    EXPECT_EQ      (loaded.enable_fsm,                 reference.enable_fsm);
+    EXPECT_EQ      (loaded.enable_reid,                reference.enable_reid);
     EXPECT_EQ      (loaded.frame_rate,                 reference.frame_rate);
     EXPECT_EQ      (loaded.primary_assoc_mode,         reference.primary_assoc_mode);
     EXPECT_FLOAT_EQ(loaded.match_thresh,               reference.match_thresh);
-    EXPECT_FLOAT_EQ(loaded.fsm_maneuver_accel_thresh,  reference.fsm_maneuver_accel_thresh);
+    EXPECT_FLOAT_EQ(loaded.ocm_vdc_weight,             reference.ocm_vdc_weight);
 }
 
 /**
@@ -540,5 +519,5 @@ TEST(ConfigLoaderLibraryApiTest, MissingFileLeavesDefaultsAndSucceeds)
     EXPECT_EQ(SushiTrack_LoadParamsFromJson("this/path/does/not/exist.json", &after),
               SUSHITRACK_SUCCESS);
     EXPECT_EQ(after.frame_rate,  before.frame_rate);
-    EXPECT_EQ(after.enable_fsm,  before.enable_fsm);
+    EXPECT_EQ(after.enable_reid,  before.enable_reid);
 }

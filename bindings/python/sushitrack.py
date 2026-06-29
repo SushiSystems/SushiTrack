@@ -131,6 +131,7 @@ class SushiTrackTrack(Structure):
         ("is_confirmed", c_int),
         ("hits", c_int),
         ("frames_since_last_update", c_int),
+        ("maneuver_probability", c_float),
     ]
 
 
@@ -145,7 +146,6 @@ class SushiTrackParams(Structure):
         ("high_thresh", c_float),
         ("match_thresh", c_float),
         ("enable_tentative", c_int),
-        ("enable_fsm", c_int),
         ("enable_reid", c_int),
         ("enable_mahalanobis", c_int),
         # --- Advanced: association ---
@@ -167,10 +167,6 @@ class SushiTrackParams(Structure):
         ("reid_low_iou_weight", c_float),
         ("reid_recovery_thresh", c_float),
         ("max_feature_history", c_int),
-        # --- FSM params ---
-        ("fsm_stationary_vel_thresh", c_float),
-        ("fsm_maneuver_accel_thresh", c_float),
-        ("fsm_reference_height", c_float),
         # --- Observation-Centric Momentum (OCM) ---
         ("enable_ocm", c_int),
         ("ocm_vdc_weight", c_float),
@@ -213,7 +209,7 @@ Track = namedtuple(
         "track_id", "x", "y", "width", "height", "score", "label",
         "state", "kinematic_state", "age", "last_seen_frame", "lost_time",
         "is_activated", "is_confirmed", "hits", "frames_since_last_update",
-        "feat",
+        "maneuver_probability", "feat",
     ],
 )
 Track.__doc__ = "A single output track. Coordinates are top-left x, y plus width, height."
@@ -311,7 +307,7 @@ class SushiTrack:
         explicit file path. Values are layered defaults → file → keyword
         overrides, so explicit ``param_overrides`` always win.
     :param param_overrides: Any ``SushiTrack_Params`` field, e.g.
-        ``enable_fsm=1``, ``iou_type=1``, ``time_aware=1``. Unspecified fields
+        ``kalman_type=2``, ``iou_type=1``, ``time_aware=1``. Unspecified fields
         keep whatever the defaults/config established.
     """
 
@@ -398,6 +394,7 @@ class SushiTrack:
             age=int(t.age), last_seen_frame=int(t.last_seen_frame), lost_time=t.lost_time,
             is_activated=bool(t.is_activated), is_confirmed=bool(t.is_confirmed),
             hits=int(t.hits), frames_since_last_update=int(t.frames_since_last_update),
+            maneuver_probability=float(t.maneuver_probability),
             feat=feat,
         )
 

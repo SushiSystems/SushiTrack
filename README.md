@@ -72,7 +72,7 @@ The runtime is organised around interfaces that the tracker depends on. Concrete
 
 `KalmanFilterRegistry` is a singleton plug-in registry. New Kalman variants register themselves through `KalmanFilterRegistrar<T>` and become selectable by `kalman_type`.
 
-Track lifecycle is governed by `TrackState` (`New`, `Tracked`, `Lost`, `Removed`, `Tentative`). When `enable_fsm` is set, each track also carries a `TrackFSM` that classifies its motion as `Stationary`, `Cruising`, `Maneuvering`, or `Coasting`, with hysteresis (`kStableFrames=2`) and a warmup of `kWarmupFrames=3` frames. The FSM rescales process-noise multipliers on the predictor.
+Track lifecycle is governed by `TrackState` (`New`, `Tracked`, `Lost`, `Removed`, `Tentative`). When the IMM estimator is selected (`kalman_type=2`), each track also reports a motion regime (`Stationary`, `Cruising`, `Maneuvering`, or `Coasting`) derived from the IMM mode probabilities, plus a continuous `maneuver_probability` on the output track.
 
 ---
 
@@ -97,7 +97,7 @@ Visual features are L2-normalised and exponentially smoothed (`feature_momentum`
 
 **NSA Kalman filter** — `kalman_type=1` selects `NSAKalmanFilter`, a variant that scales measurement noise by detection confidence in both `initiate` and `project`.
 
-**Kinematic FSM** — `enable_fsm=1`. Classifies motion using thresholds `fsm_stationary_vel_thresh` (default 40 units/s) and `fsm_maneuver_accel_thresh` (default 250 units/s²). Velocity and acceleration are **size-normalised** by `fsm_reference_height / box_height` (default reference 100 px) before thresholding, so the regime tracks an object's body-relative motion rather than its apparent pixel motion — making the decision scale-invariant across near/far objects (set `fsm_reference_height ≤ 0` to disable and use absolute pixels). `Coasting` is assigned during Lost intervals; `getLastSeenState()` returns the regime active immediately before Coasting so downstream policies can reason about the true motion profile.
+**IMM motion estimator** — `kalman_type=2`. A four-model Interacting Multiple Model filter (constant velocity, constant acceleration, near-constant-position, and a nonlinear coordinated-turn mode handled with an unscented update) replaces the single Kalman model. Its mode probabilities yield a continuous `maneuver_probability` (mass on the manoeuvring models) and a discrete `kinematic_state` (`Stationary`/`Cruising`/`Maneuvering`, or `Coasting` while Lost), consumed by association cost shaping, lost-buffer scaling and OCM weighting. See [docs/IMM_DESIGN.md](docs/IMM_DESIGN.md).
 
 **Coordinate representations** — `enable_xyah=0` (default) uses TLWH state (`[x, y, w, h, vx, vy, vw, vh]`); `enable_xyah=1` uses centroid + aspect ratio + height (`[cx, cy, a, h, …]`). `iou_plus_one=1` (default) uses inclusive box dimensions consistent with the ByteTrack reference.
 
@@ -153,7 +153,7 @@ sushitrack/
 │       ├── SushiTrackTypes.h      # Status codes, log levels, callback typedef
 │       ├── TrackerConfig.h       # C++ config struct (mirror of SushiTrack_Params)
 │       ├── Tracklet.h            # Per-track state, lifecycle, feature history
-│       ├── TrackFSM.h            # Kinematic FSM
+│       ├── IMMFilter.h          # IMM multi-model estimator
 │       ├── KalmanFilter.h        # Linear Kalman filter
 │       ├── NSAKalmanFilter.h     # Noise-Scale Adaptive variant
 │       ├── KalmanFilterRegistry.h# Plug-in registry
@@ -197,7 +197,6 @@ sushitrack/
 │   ├── unit/                     # GTest deterministic unit tests
 │   │   ├── CMakeLists.txt
 │   │   ├── UnitTest.cpp          # GTest main
-│   │   ├── TestTrackFSM.cpp
 │   │   ├── TestKalmanFilter.cpp
 │   │   ├── TestTracklet.cpp
 │   │   ├── TestRect.cpp
@@ -398,7 +397,7 @@ Runs the compiled `unit_test` GTest binary.
 
 ```bash
 sushitrack project test unit
-sushitrack project test unit --filter "TrackFSMTest.*" --verbose
+sushitrack project test unit --filter "IMMFilterTest.*" --verbose
 ```
 
 ### `project test integration`
@@ -502,7 +501,7 @@ Minimal usage:
 
 SushiTrack_Params params;
 SushiTrack_GetDefaultParams(&params);
-params.enable_fsm        = 1;
+params.kalman_type      = 2;
 params.enable_tentative  = 1;
 params.frame_rate        = 25;
 
@@ -674,7 +673,7 @@ source tree (or add `package/` to `PYTHONPATH`) and use it as a normal package:
 
 ```python
 from sushitrack import SushiTrack, TrackState
-tracker = SushiTrack(frame_rate=30, enable_fsm=1)
+tracker = SushiTrack(frame_rate=30, kalman_type=2)
 tracks  = tracker.update([(x, y, w, h, score, label)], dt=1/30)
 ```
 
@@ -737,13 +736,12 @@ The schema is layered `basic` / `advanced`. The outer `"sushitrack"` wrapper is 
     "basic": {
       "track_thresh": 0.2, "high_thresh": 0.5, "match_thresh": 0.7,
       "frame_rate": 25, "track_buffer": 30,
-      "enable_tentative": 1, "enable_fsm": 1, "enable_reid": 0,
+      "enable_tentative": 1, "enable_reid": 0,
       "enable_mahalanobis": 0
     },
     "advanced": {
       "association":  { "primary_assoc_mode": 1, "fuse_score": 1, "iou_match_thresh": 0.5 },
       "coordinate_system": { "iou_type": 1, "enable_xyah": 0, "iou_plus_one": 1, "kalman_type": 0 },
-      "fsm_params":   { "fsm_stationary_vel_thresh": 40.0, "fsm_maneuver_accel_thresh": 250.0, "fsm_reference_height": 100.0 }
     }
   }
 }
@@ -832,14 +830,11 @@ All knobs are exposed both on `SushiTrack_Params` (C API, `include/SushiTrackC.h
 | `reid_recovery_thresh` | 0.4 | Similarity threshold for PureReID lost recovery |
 | `reid_direct_assignment_weight` | 0.2 | Scaling for high-confidence direct visual matches |
 
-### Kinematic FSM
+### Motion estimator
 
 | Key | Default | Description |
 |---|---|---|
-| `enable_fsm` | 0 | Per-track kinematic state machine |
-| `fsm_stationary_vel_thresh` | 40.0 | Velocity (units/s) below which → Stationary |
-| `fsm_maneuver_accel_thresh` | 250.0 | Acceleration (units/s²) above which → Maneuvering |
-| `fsm_reference_height` | 100.0 | Reference box height (px) anchoring the FSM thresholds; velocity/acceleration are size-normalised by `fsm_reference_height / box_height` for scale-invariant classification. `≤ 0` disables normalisation (absolute pixels) |
+| `kalman_type` | 0 | Motion estimator: `0` linear Kalman, `1` NSA, `2` IMM multi-model. With `2` each track reports a `kinematic_state` and continuous `maneuver_probability`; the IMM noise/transition parameters are built-in (see [docs/IMM_DESIGN.md](docs/IMM_DESIGN.md)). |
 
 ### Timing
 
@@ -855,7 +850,7 @@ All knobs are exposed both on `SushiTrack_Params` (C API, `include/SushiTrackC.h
 
 GTest-based, deterministic, no external data. Targets compiled when `-DBUILD_UNIT_TEST=ON`. Cover:
 
-- `TestTrackFSM` — kinematic transitions, hysteresis, warmup, last-seen state
+- `TestKinematicState` — IMM-derived regime reported end-to-end (Stationary/Cruising/Maneuvering/Coasting)
 - `TestKalmanFilter` — initiate/predict/update, Mahalanobis distance, gate flags, LLT cache
 - `TestTracklet` — lifecycle transitions, feature EMA
 - `TestRect` — TLWH/TLBR/XYWH conversions
@@ -876,7 +871,7 @@ Direct invocation:
 
 ```bash
 ./build/bin/Release/unit_test
-./build/bin/Release/unit_test --gtest_filter="TrackFSMTest.*"
+./build/bin/Release/unit_test --gtest_filter="IMMFilterTest.*"
 ctest -R unit --output-on-failure
 ```
 

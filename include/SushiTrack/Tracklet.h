@@ -13,7 +13,7 @@
 #include "SushiTrack/ITimingPolicy.h"
 #include "SushiTrack/Rect.h"
 #include "SushiTrack/KalmanTypes.h"
-#include "SushiTrack/TrackFSM.h"
+#include "SushiTrack/KinematicState.h"
 
 #include <cstdint>
 #include <cstddef>
@@ -97,19 +97,48 @@ namespace SushiTrack
              * enough streak to be promoted.
              */
             int                getConsecutiveHits() const { return consecutive_hits_; }
-            TrackFSM*          getFSM() const { return fsm_.get(); }
-            KinematicState     getKinematicState() const { return fsm_ ? fsm_->getCurrentState() : KinematicState::Cruising; }
+            /**
+             * @brief True when an IMM predictor is driving the motion regime.
+             *
+             * An IMM reports a non-negative manoeuvre probability; single-model
+             * predictors (KalmanFilter/NSA) return the negative sentinel, so the
+             * regime getters fall back to the Cruising default.
+             */
+            bool immActive() const { return kf_ && kf_->maneuverProbability() >= 0.0f; }
+
+            /**
+             * @brief Continuous [0, 1] manoeuvre likelihood for the track.
+             *
+             * Sourced from the IMM mode probabilities (mass on the CA + CT
+             * models); 0 when no IMM predictor is present. This is the
+             * continuous regime signal consumed by OCM, lost-buffer scaling and
+             * association cost shaping.
+             */
+            float getManeuverProbability() const
+            {
+                return immActive() ? maneuver_prob_ : 0.0f;
+            }
+
+            KinematicState     getKinematicState() const
+            {
+                return immActive() ? imm_state_ : KinematicState::Cruising;
+            }
 
             /**
              * @brief Retrieves the last observed motion regime.
              *
              * Resolves to the kinematic state recorded just before the track
-             * went Lost when the FSM is currently Coasting, or the active
-             * state otherwise. When no FSM is attached this falls back to
+             * went Lost when the regime is currently Coasting, or the active
+             * state otherwise. When no IMM regime is available this falls back to
              * Cruising so that downstream policies degrade to identity
              * behaviour rather than a special-cased no-op.
              */
-            KinematicState     getLastSeenState() const { return fsm_ ? fsm_->getLastSeenState() : KinematicState::Cruising; }
+            KinematicState     getLastSeenState() const
+            {
+                if (immActive())
+                    return imm_state_ == KinematicState::Coasting ? imm_pre_coast_ : imm_state_;
+                return KinematicState::Cruising;
+            }
 
             /**
              * @brief Returns the last raw matched detection box.
@@ -244,12 +273,6 @@ namespace SushiTrack
             void setTrackId(size_t id) { track_id_ = id; }
 
             /**
-             * @brief Assigns a kinematic state machine to the tracklet.
-             * @param fsm Unique pointer to the TrackFSM instance.
-             */
-            void setFSM(std::unique_ptr<TrackFSM> fsm) { fsm_ = std::move(fsm); }
-
-            /**
              * @brief Assigns a timing policy to the tracklet.
              * @param policy Shared pointer to the ITimingPolicy instance.
              */
@@ -320,8 +343,31 @@ namespace SushiTrack
             int         hits_;
             int         consecutive_hits_;
 
-            std::unique_ptr<TrackFSM>    fsm_;
             std::shared_ptr<ITimingPolicy> timing_policy_;
+
+            // IMM-derived motion regime (active when the predictor is an IMM).
+            // imm_state_ carries the KinematicState contract so the existing
+            // consumers (OCM, lost-buffer scaling, association cost mods, the C
+            // API output) read a single regime contract regardless of source.
+            KinematicState imm_state_      = KinematicState::Cruising;
+            KinematicState imm_pre_coast_  = KinematicState::Cruising; ///< Regime before going Lost, restored on recovery.
+            float          maneuver_prob_   = 0.0f;
+            float          stationary_prob_ = 0.0f;
+
+            static constexpr float kRegimeStationaryProb = 0.5f; ///< Near-constant-position mass above which the regime reads Stationary.
+            static constexpr float kRegimeManeuverProb   = 0.5f; ///< CA+CT mass above which the regime reads Maneuvering.
+
+            /**
+             * @brief Refreshes the IMM-derived regime from the predictor's mode
+             *        probabilities.
+             *
+             * No-op for single-model predictors (negative manoeuvre probability).
+             * When @p is_lost the regime is forced to Coasting and the pre-dark
+             * regime is captured for restoration on recovery.
+             *
+             * @param is_lost True when the track currently has no observation.
+             */
+            void refreshRegime(bool is_lost);
 
             std::vector<float> curr_feat_;
             std::vector<float> smooth_feat_;

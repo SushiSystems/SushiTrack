@@ -455,10 +455,10 @@ namespace SushiTrack
      * bonus on a pipeline that already fuses score, DIoU, and Mahalanobis gating:
      *   - bounded: clamped to [-vdc_weight, +vdc_weight], so it can only re-order
      *     candidates inside the gate and never rescues a gated-out (sentinel) pair.
-     *   - regime-gated: applied only to tracks the FSM reports as Cruising (steady
+     *   - regime-gated: applied only to tracks reported as Cruising (steady
      *     linear motion). Stationary, Maneuvering, and Coasting tracks are skipped,
      *     since their observed direction is meaningless or unreliable — exactly the
-     *     cases where naive momentum injects switches. With the FSM disabled every
+     *     cases where naive momentum injects switches. Without an IMM regime every
      *     track reports Cruising and the speed/age gates below carry the load.
      *   - speed-gated: tracks slower than min_velocity (px per observed frame)
      *     contribute nothing; their direction is dominated by noise.

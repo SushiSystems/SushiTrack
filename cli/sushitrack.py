@@ -267,7 +267,7 @@ from sushitrack import SushiTrack, TrackState
 
 # The shared library is bundled inside the sushitrack/ package directory and
 # discovered automatically.
-tracker = SushiTrack(frame_rate=30, enable_fsm=1)
+tracker = SushiTrack(frame_rate=30, kalman_type=2)
 
 x = 100.0
 for frame in range(5):
@@ -306,7 +306,7 @@ python example.py
 Copy the `sushitrack/` directory into your project (or add it to PYTHONPATH):
 ```python
 from sushitrack import SushiTrack
-tracker = SushiTrack(frame_rate=30, enable_fsm=1)
+tracker = SushiTrack(frame_rate=30, kalman_type=2)
 tracks = tracker.update([(x, y, w, h, score, label)], dt=1/30)
 ```
 The native library is loaded from inside the package automatically; no build
@@ -489,7 +489,7 @@ def project_test_unit(gtest_filter: str | None, verbose: bool) -> bool:
     """
     @brief Runs the unit_test GTest binary.
 
-    @param gtest_filter  Optional --gtest_filter string (e.g. "TrackFSMTest.*").
+    @param gtest_filter  Optional --gtest_filter string (e.g. "IMMFilterTest.*").
     @param verbose       Forward --gtest_print_time=1 and colour output.
     @return True if all tests pass.
     """

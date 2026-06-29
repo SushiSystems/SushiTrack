@@ -134,7 +134,6 @@ namespace
             p.high_thresh                = getFloat(b, "high_thresh",              p.high_thresh);
             p.match_thresh               = getFloat(b, "match_thresh",             p.match_thresh);
             p.enable_tentative           = getInt(b, "enable_tentative",           p.enable_tentative);
-            p.enable_fsm                 = getInt(b, "enable_fsm",                 p.enable_fsm);
             p.enable_reid                = getInt(b, "enable_reid",                p.enable_reid);
             p.enable_mahalanobis         = getInt(b, "enable_mahalanobis",         p.enable_mahalanobis);
             p.enable_ocm                 = getInt(b, "enable_ocm",                 p.enable_ocm);
@@ -173,14 +172,6 @@ namespace
             p.reid_recovery_thresh = getFloat(s, "reid_recovery_thresh", p.reid_recovery_thresh);
             p.max_feature_history  = getInt(s, "max_feature_history",  p.max_feature_history);
             p.reid_direct_assignment_weight = getFloat(s, "reid_direct_assignment_weight", p.reid_direct_assignment_weight);
-        }
-
-        if (adv.contains("fsm_params"))
-        {
-            const auto& s = adv.at("fsm_params");
-            p.fsm_stationary_vel_thresh = getFloat(s, "fsm_stationary_vel_thresh", p.fsm_stationary_vel_thresh);
-            p.fsm_maneuver_accel_thresh = getFloat(s, "fsm_maneuver_accel_thresh", p.fsm_maneuver_accel_thresh);
-            p.fsm_reference_height      = getFloat(s, "fsm_reference_height",      p.fsm_reference_height);
         }
 
         if (adv.contains("tentative_logic"))
