@@ -177,6 +177,7 @@ class SushiTrackParams(Structure):
         ("ocm_delta_t", c_int),
         ("ocm_min_velocity", c_float),
         ("ocm_max_age", c_int),
+        ("ocm_maneuver_weight_scale", c_float),
         # --- Tentative logic ---
         ("tentative_match_thresh", c_float),
         ("tentative_confirm_hits", c_int),

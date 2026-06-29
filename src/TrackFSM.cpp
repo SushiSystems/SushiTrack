@@ -183,7 +183,7 @@ namespace SushiTrack
         switch (current_state_)
         {
             case KinematicState::Stationary:
-                kf->setNoiseMultipliers(0.8f, 0.6f, 0.5f);
+                kf->setNoiseMultipliers(1.0f, 1.0f, 1.0f);
                 break;
 
             case KinematicState::Cruising:

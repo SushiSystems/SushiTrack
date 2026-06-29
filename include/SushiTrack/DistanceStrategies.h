@@ -11,6 +11,7 @@
 
 #include "SushiTrack/ICostCalculator.h"
 #include "SushiTrack/IGateValidator.h"
+#include <algorithm>
 #include <memory>
 
 namespace SushiTrack
@@ -475,15 +476,18 @@ namespace SushiTrack
              * @param vdc_weight Strength and bound of the momentum contribution.
              * @param min_velocity Minimum observed speed (px per observed frame) for the term to apply.
              * @param max_age Maximum frames since the last observation for the term to apply.
+             * @param maneuver_weight_scale Fraction of vdc_weight applied to Maneuvering tracks; 0 restricts the term to Cruising.
              */
             ObservationMomentumDecorator(std::shared_ptr<ICostCalculator> inner,
                                          float vdc_weight,
                                          float min_velocity,
-                                         int max_age)
+                                         int max_age,
+                                         float maneuver_weight_scale = 0.0f)
                 : inner_(std::move(inner)),
                   vdc_weight_(vdc_weight),
                   min_velocity_(min_velocity),
-                  max_age_(max_age) {}
+                  max_age_(max_age),
+                  maneuver_weight_scale_(std::clamp(maneuver_weight_scale, 0.0f, 1.0f)) {}
 
             /**
              * @brief Computes inner costs and applies the momentum re-ranking in place.
@@ -510,14 +514,25 @@ namespace SushiTrack
              *
              * @param track Source tracklet supplying the observed direction.
              * @param det Candidate detection.
-             * @return Value in [-vdc_weight, +vdc_weight]; positive when aligned with travel.
+             * @param weight Effective bound for this track (full for Cruising, scaled for Maneuvering).
+             * @return Value in [-weight, +weight]; positive when aligned with travel.
              */
-            float momentumBonus(const TrackletPtr& track, const TrackletPtr& det) const;
+            float momentumBonus(const TrackletPtr& track, const TrackletPtr& det, float weight) const;
+
+            /**
+             * @brief Per-track effective momentum weight, or 0 when the track must be skipped.
+             *
+             * Returns vdc_weight for Cruising, vdc_weight * maneuver_weight_scale for
+             * Maneuvering (0 disables that case), and 0 for Stationary/Coasting and any
+             * track failing the velocity/age/observation gates.
+             */
+            float effectiveWeight(const TrackletPtr& track) const;
 
             std::shared_ptr<ICostCalculator> inner_;
             float vdc_weight_;
             float min_velocity_;
             int   max_age_;
+            float maneuver_weight_scale_;
     };
 
     /**

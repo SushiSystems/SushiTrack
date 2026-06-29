@@ -205,6 +205,7 @@ namespace
             p.ocm_delta_t     = getInt(s, "ocm_delta_t",     p.ocm_delta_t);
             p.ocm_min_velocity = getFloat(s, "ocm_min_velocity", p.ocm_min_velocity);
             p.ocm_max_age     = getInt(s, "ocm_max_age",     p.ocm_max_age);
+            p.ocm_maneuver_weight_scale = getFloat(s, "ocm_maneuver_weight_scale", p.ocm_maneuver_weight_scale);
         }
 
         if (adv.contains("mahalanobis_gating"))

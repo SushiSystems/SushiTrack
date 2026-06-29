@@ -105,6 +105,7 @@ extern "C"
         params->ocm_delta_t     = 3;
         params->ocm_min_velocity = 1.0f;
         params->ocm_max_age     = 1;
+        params->ocm_maneuver_weight_scale = 0.0f;
     }
 
     /**
@@ -207,6 +208,7 @@ extern "C"
             config.ocm_delta_t      = params->ocm_delta_t;
             config.ocm_min_velocity = params->ocm_min_velocity;
             config.ocm_max_age      = params->ocm_max_age;
+            config.ocm_maneuver_weight_scale = params->ocm_maneuver_weight_scale;
 
             auto kf_factory = std::make_shared<SushiTrack::GenericKalmanFactory>(
                 config.kalman_type, config.enable_xyah);
@@ -397,7 +399,8 @@ extern "C"
                     high_conf_metric,
                     config.ocm_vdc_weight,
                     config.ocm_min_velocity,
-                    config.ocm_max_age);
+                    config.ocm_max_age,
+                    config.ocm_maneuver_weight_scale);
             }
 
             auto impl     = new SushiTrackHdlImpl();

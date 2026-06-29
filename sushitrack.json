@@ -62,9 +62,10 @@
             },
             "ocm": {
                 "ocm_vdc_weight": 0.1,
-                "ocm_delta_t": 3,
-                "ocm_min_velocity": 1.0,
-                "ocm_max_age": 1
+                "ocm_delta_t": 4,
+                "ocm_min_velocity": 1.5,
+                "ocm_max_age": 3,
+                "ocm_maneuver_weight_scale": 1
             }
         }
     }

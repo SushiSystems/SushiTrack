@@ -201,6 +201,9 @@ extern "C"
         /** @brief Maximum frames since the last observation for which momentum is applied. */
         int   ocm_max_age;
 
+        /** @brief Fraction of ocm_vdc_weight applied to Maneuvering tracks; 0 restricts momentum to Cruising only. */
+        float ocm_maneuver_weight_scale;
+
         // Tentative Logic
 
         /** @brief Maximum cost limit allowed for tentative track associations. */

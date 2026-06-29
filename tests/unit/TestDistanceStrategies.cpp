@@ -1147,3 +1147,24 @@ TEST(ObservationMomentumDecoratorTest, SingleMatchesBatch)
 
     EXPECT_NEAR(dec.calculate_single(t, ahead), m(0, 0), 1e-5f);
 }
+
+/**
+ * @brief maneuver_weight_scale only governs Maneuvering tracks; a Cruising track
+ *        always receives the full weight, so the scale must not alter its result.
+ */
+TEST(ObservationMomentumDecoratorTest, ManeuverScaleDoesNotAffectCruisingTrack)
+{
+    auto t = makeCruiser(100.f, 200.f, 10.f, 5);  // no FSM -> reports Cruising
+    float cx, cy; lastObsCenter(t, cx, cy);
+    auto ahead = detAtCenter(cx + 100.f, cy);
+    std::vector<std::shared_ptr<Tracklet>> av{t}, bv{ahead};
+
+    ObservationMomentumDecorator off(std::make_shared<ConstCost>(0.5f), 0.2f, 0.5f, 5, 0.0f);
+    ObservationMomentumDecorator on (std::make_shared<ConstCost>(0.5f), 0.2f, 0.5f, 5, 0.5f);
+    CostMatrix mo, mn;
+    off.calculate(av, bv, mo);
+    on.calculate(av, bv, mn);
+
+    EXPECT_FLOAT_EQ(mo(0, 0), mn(0, 0));
+    EXPECT_NEAR(mn(0, 0), 0.3f, 1e-3f);  // full 0.2 bonus, not scaled
+}

@@ -162,6 +162,18 @@ namespace SushiTrack
         /** @brief Maximum frames since the last observation for which momentum is applied; a longer gap leaves the stored direction stale, so the term is suppressed. */
         int   ocm_max_age = 1;
 
+        /**
+         * @brief Fraction of ocm_vdc_weight applied to FSM-Maneuvering tracks; 0 restricts momentum to Cruising only.
+         *
+         * The decorator applies full weight to Cruising tracks. A value > 0 also
+         * applies momentum to Maneuvering tracks at ocm_vdc_weight * this scale,
+         * which is what lets OCM engage on scenes the FSM mostly labels
+         * Maneuvering (DanceTrack). Stationary and Coasting are always skipped:
+         * their stored direction is meaningless. Default 0 keeps the prior
+         * Cruising-only behaviour bit-identical.
+         */
+        float ocm_maneuver_weight_scale = 0.0f;
+
         // Tentative Logic
 
         /** @brief Maximum cost limit allowed for tentative track associations. */

@@ -1068,13 +1068,24 @@ namespace SushiTrack
      * @param det Candidate detection.
      * @return Bounded bonus; positive when the candidate lies ahead along travel.
      */
-    float ObservationMomentumDecorator::momentumBonus(const TrackletPtr& track, const TrackletPtr& det) const
+    float ObservationMomentumDecorator::effectiveWeight(const TrackletPtr& track) const
     {
         if (vdc_weight_ <= 0.0f) return 0.0f;
         if (!track->hasObsVelocity() || !track->hasLastObservation()) return 0.0f;
         if (track->getObsSpeed() < min_velocity_) return 0.0f;
         if (track->getFramesSinceObservation() > max_age_) return 0.0f;
-        if (track->getKinematicState() != KinematicState::Cruising) return 0.0f;
+
+        switch (track->getKinematicState())
+        {
+            case KinematicState::Cruising:    return vdc_weight_;
+            case KinematicState::Maneuvering: return vdc_weight_ * maneuver_weight_scale_;
+            default:                          return 0.0f;  // Stationary/Coasting: stored direction is meaningless.
+        }
+    }
+
+    float ObservationMomentumDecorator::momentumBonus(const TrackletPtr& track, const TrackletPtr& det, float weight) const
+    {
+        if (weight <= 0.0f) return 0.0f;
 
         const auto& lo = track->getLastObservation();
         const float ocx = lo.x() + lo.width()  * 0.5f;
@@ -1090,7 +1101,7 @@ namespace SushiTrack
         if (dn < 1e-3f) return 0.0f;
 
         const float cos_theta = (track->getObsVelocityX() * ddx + track->getObsVelocityY() * ddy) / dn;
-        return std::clamp(vdc_weight_ * cos_theta, -vdc_weight_, vdc_weight_);
+        return std::clamp(weight * cos_theta, -weight, weight);
     }
 
     /**
@@ -1111,17 +1122,15 @@ namespace SushiTrack
 
         for (size_t i = 0; i < a.size(); ++i)
         {
-            // Per-row gate first so non-Cruising/stale/slow tracks skip the whole detection loop.
-            if (!a[i]->hasObsVelocity() || !a[i]->hasLastObservation()) continue;
-            if (a[i]->getObsSpeed() < min_velocity_) continue;
-            if (a[i]->getFramesSinceObservation() > max_age_) continue;
-            if (a[i]->getKinematicState() != KinematicState::Cruising) continue;
+            // Per-row gate first so skipped (stale/slow/non-eligible-state) tracks avoid the whole detection loop.
+            const float weight = effectiveWeight(a[i]);
+            if (weight <= 0.0f) continue;
 
             for (size_t j = 0; j < b.size(); ++j)
             {
                 float c = out_matrix(i, j);
                 if (c >= kSentinel) continue;
-                out_matrix(i, j) = c - momentumBonus(a[i], b[j]);
+                out_matrix(i, j) = c - momentumBonus(a[i], b[j], weight);
             }
         }
     }
@@ -1137,7 +1146,7 @@ namespace SushiTrack
     {
         float c = inner_->calculate_single(a, b);
         if (c >= 1e3f) return c;
-        return c - momentumBonus(a, b);
+        return c - momentumBonus(a, b, effectiveWeight(a));
     }
 
     /**
