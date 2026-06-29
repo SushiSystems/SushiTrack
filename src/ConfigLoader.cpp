@@ -189,6 +189,8 @@ namespace
             p.tentative_match_thresh    = getFloat(s, "tentative_match_thresh",    p.tentative_match_thresh);
             p.tentative_confirm_hits    = getInt(s, "tentative_confirm_hits",    p.tentative_confirm_hits);
             p.tentative_max_age_seconds = getFloat(s, "tentative_max_age_seconds", p.tentative_max_age_seconds);
+            p.tentative_max_miss_frames = getInt(s, "tentative_max_miss_frames", p.tentative_max_miss_frames);
+            p.tentative_init_suppress_iou = getFloat(s, "tentative_init_suppress_iou", p.tentative_init_suppress_iou);
             p.tentative_fast_thresh       = getFloat(s, "tentative_fast_thresh",       p.tentative_fast_thresh);
             p.tentative_fast_hits         = getInt(s, "tentative_fast_hits",         p.tentative_fast_hits);
             p.tentative_slow_thresh       = getFloat(s, "tentative_slow_thresh",       p.tentative_slow_thresh);

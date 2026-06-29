@@ -180,6 +180,8 @@ void applyConfigToParams(const Json& doc, SushiTrack_Params& params)
         params.tentative_match_thresh      = jsonGet<float>(s, "tentative_match_thresh",      params.tentative_match_thresh);
         params.tentative_confirm_hits      = jsonGet<int>  (s, "tentative_confirm_hits",      params.tentative_confirm_hits);
         params.tentative_max_age_seconds   = jsonGet<float>(s, "tentative_max_age_seconds",   params.tentative_max_age_seconds);
+        params.tentative_max_miss_frames   = jsonGet<int>  (s, "tentative_max_miss_frames",   params.tentative_max_miss_frames);
+        params.tentative_init_suppress_iou = jsonGet<float>(s, "tentative_init_suppress_iou", params.tentative_init_suppress_iou);
         params.tentative_fast_thresh       = jsonGet<float>(s, "tentative_fast_thresh",       params.tentative_fast_thresh);
         params.tentative_fast_hits         = jsonGet<int>  (s, "tentative_fast_hits",         params.tentative_fast_hits);
         params.tentative_slow_thresh       = jsonGet<float>(s, "tentative_slow_thresh",       params.tentative_slow_thresh);
@@ -380,6 +382,8 @@ TEST_F(ConfigLoaderAdvancedFieldsTest, TentativeLogicTiersAreApplied)
     EXPECT_FLOAT_EQ(params_.tentative_match_thresh,      s["tentative_match_thresh"].get<float>());
     EXPECT_EQ      (params_.tentative_confirm_hits,      s["tentative_confirm_hits"].get<int>());
     EXPECT_FLOAT_EQ(params_.tentative_max_age_seconds,   s["tentative_max_age_seconds"].get<float>());
+    EXPECT_EQ      (params_.tentative_max_miss_frames,   s["tentative_max_miss_frames"].get<int>());
+    EXPECT_FLOAT_EQ(params_.tentative_init_suppress_iou, s["tentative_init_suppress_iou"].get<float>());
     EXPECT_FLOAT_EQ(params_.tentative_fast_thresh,       s["tentative_fast_thresh"].get<float>());
     EXPECT_EQ      (params_.tentative_fast_hits,         s["tentative_fast_hits"].get<int>());
     EXPECT_FLOAT_EQ(params_.tentative_slow_thresh,       s["tentative_slow_thresh"].get<float>());

@@ -9,6 +9,9 @@
 
 #pragma once
 
+#include <algorithm>
+#include <vector>
+
 #include "Eigen/Dense"
 
 namespace SushiTrack
@@ -105,6 +108,25 @@ namespace SushiTrack
      */
     template<typename T>
     Rect<T> generate_rect_by_xywh(const Xywh<T>& xywh);
+
+    /**
+     * @brief Plain Intersection-over-Union of two boxes in [0, 1]; zero when disjoint.
+     *
+     * Raw overlap with no centroid penalty, so callers gating on a fixed IoU threshold
+     * get stable semantics regardless of which DIoU/GIoU variant the association cost uses.
+     */
+    template<typename T>
+    inline T iou(const Rect<T>& a, const Rect<T>& b)
+    {
+        const T iw = std::min(a.x() + a.width(),  b.x() + b.width())  - std::max(a.x(), b.x());
+        if (iw <= T(0)) return T(0);
+        const T ih = std::min(a.y() + a.height(), b.y() + b.height()) - std::max(a.y(), b.y());
+        if (ih <= T(0)) return T(0);
+
+        const T inter = iw * ih;
+        const T ua = a.width() * a.height() + b.width() * b.height() - inter;
+        return inter / std::max(static_cast<T>(1e-6), ua);
+    }
 
     /** @brief Aligned vector for Rect instances. */
     template<typename T>

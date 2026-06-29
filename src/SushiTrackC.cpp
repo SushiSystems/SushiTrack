@@ -80,6 +80,8 @@ extern "C"
         params->tentative_match_thresh   = 0.3f;
         params->tentative_confirm_hits   = 3;
         params->tentative_max_age_seconds = 0.08f;
+        params->tentative_max_miss_frames = 2;
+        params->tentative_init_suppress_iou = 0.7f;
 
 
         params->tentative_fast_thresh       = 0.85f;
@@ -175,6 +177,8 @@ extern "C"
             config.tentative_match_thresh    = params->tentative_match_thresh;
             config.tentative_confirm_hits    = params->tentative_confirm_hits;
             config.tentative_max_age_seconds = params->tentative_max_age_seconds;
+            config.tentative_max_miss_frames = params->tentative_max_miss_frames;
+            config.tentative_init_suppress_iou = params->tentative_init_suppress_iou;
             config.tentative_fast_thresh       = params->tentative_fast_thresh;
             config.tentative_fast_hits         = params->tentative_fast_hits;
             config.tentative_slow_thresh       = params->tentative_slow_thresh;

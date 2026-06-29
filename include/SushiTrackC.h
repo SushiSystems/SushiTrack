@@ -210,13 +210,24 @@ extern "C"
         int   tentative_confirm_hits;
 
         /**
-         * @brief Maximum time a tentative track may go without a match, in seconds.
+         * @brief Wall-clock age budget for a tentative track, in seconds.
          *
-         * Works identically in both timing modes. In frame-based mode the value is
-         * compared against accumulated_lost_time_, which predict() increments by
-         * 1/frame_rate per frame. Default 0.08 s equals 2 frames at 25 fps.
+         * Governs age-out in time-aware mode (time_aware = 1), compared against the
+         * accumulated lost-time. In frame-counted mode tentative_max_miss_frames governs
+         * instead. Default 0.08 s equals 2 frames at 25 fps.
          */
         float tentative_max_age_seconds;
+
+        /**
+         * @brief Maximum consecutive missed frames a tentative track may survive.
+         *
+         * Age budget used in frame-counted mode (time_aware = 0); does not drift with frame
+         * rate. In time-aware mode tentative_max_age_seconds governs instead.
+         */
+        int   tentative_max_miss_frames;
+
+        /** @brief IoU above which a new-track detection overlapping a confirmed track is suppressed. */
+        float tentative_init_suppress_iou;
 
         // Mahalanobis Gating
 

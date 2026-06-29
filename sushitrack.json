@@ -1,7 +1,7 @@
 {
     "sushitrack": {
         "basic": {
-            "time_aware": 1,
+            "time_aware": 0,
             "frame_rate": 25,
             "track_buffer": 30,
             "track_thresh": 0.2,
@@ -46,6 +46,8 @@
                 "tentative_match_thresh": 0.5,
                 "tentative_confirm_hits": 3,
                 "tentative_max_age_seconds": 0.08,
+                "tentative_max_miss_frames": 2,
+                "tentative_init_suppress_iou": 0.7,
                 "tentative_fast_thresh": 0.7,
                 "tentative_fast_hits": 1,
                 "tentative_slow_thresh": 0.2,

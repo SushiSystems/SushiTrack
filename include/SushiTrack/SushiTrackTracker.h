@@ -175,7 +175,6 @@ namespace SushiTrack
              * @param tentative_next Output list for tracks remaining tentative.
              * @param removed_tentative_curr Output list for tentative tracks that aged out.
              * @param det_for_new_init Output list for detections qualifying for track initiation.
-             * @param dt Time interval of the current frame, forwarded for time-aware tentative expiry calculations.
              */
             void matchTentative(std::vector<TrackletPtr>& tentative_tracks,
                                 std::vector<TrackletPtr>& det_high_remaining,
@@ -183,8 +182,7 @@ namespace SushiTrack
                                 std::vector<TrackletPtr>& activated_tracklets,
                                 std::vector<TrackletPtr>& tentative_next,
                                 std::vector<TrackletPtr>& removed_tentative_curr,
-                                std::vector<TrackletPtr>& det_for_new_init,
-                                float dt);
+                                std::vector<TrackletPtr>& det_for_new_init);
             
             /**
              * @brief Initializes new tentative tracks from detections.
@@ -193,6 +191,17 @@ namespace SushiTrack
              * @param tentative_curr Output collection for the newly created tracklets.
              */
             void initializeTentative(const std::vector<TrackletPtr>& det_high_remaining, std::vector<TrackletPtr>& tentative_curr);
+
+            /**
+             * @brief Drops new-track detections that overlap a confirmed track above the
+             *        tentative_init_suppress_iou gate, so a fresh tentative cannot duplicate
+             *        an already-tracked target and split its ID on confirmation.
+             *
+             * @param det_for_new_init In/out collection of detections eligible for initiation.
+             * @param confirmed Confirmed tracked tracklets to test overlap against.
+             */
+            void suppressOverlappingInits(std::vector<TrackletPtr>& det_for_new_init,
+                                          const std::vector<TrackletPtr>& confirmed) const;
 
             /**
              * @brief Handles unconfirmed tracks in non-tentative mode.

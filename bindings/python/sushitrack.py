@@ -181,6 +181,8 @@ class SushiTrackParams(Structure):
         ("tentative_match_thresh", c_float),
         ("tentative_confirm_hits", c_int),
         ("tentative_max_age_seconds", c_float),
+        ("tentative_max_miss_frames", c_int),
+        ("tentative_init_suppress_iou", c_float),
         # --- Mahalanobis gating ---
         ("proximity_thresh", c_float),
         ("gating_thresh", c_float),

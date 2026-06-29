@@ -171,18 +171,34 @@ namespace SushiTrack
         int   tentative_confirm_hits = 3;
 
         /**
-         * @brief Maximum time a tentative track may go without a match before it is removed,
-         *        expressed in seconds.
+         * @brief Wall-clock age budget for a tentative track, in seconds.
          *
-         * Interpreted identically in both timing modes:
-         *   - time_aware = true:  compared directly against the accumulated lost-time of the
-         *     tentative track, which predict() increments by the real dt on each frame.
-         *   - time_aware = false: multiplied by frame_rate to obtain the equivalent frame
-         *     count, then compared against frames elapsed since the last successful match.
-         *
-         * Default 0.08 s equals 2 frames at 25 fps, preserving the prior integer default.
+         * Governs age-out in time-aware mode (time_aware = true): compared against the
+         * accumulated lost-time, which predict() increments by the real dt each frame, so a
+         * tentative expires after a fixed amount of elapsed time regardless of frame rate.
+         * In frame-counted mode (time_aware = false) tentative_max_miss_frames governs instead.
+         * Default 0.08 s equals 2 frames at 25 fps.
          */
         float tentative_max_age_seconds = 0.08f;
+
+        /**
+         * @brief Maximum consecutive missed frames a tentative track may survive before removal.
+         *
+         * Used as the age budget in frame-counted mode (time_aware = false), where it keeps
+         * strictness constant regardless of frame rate. In time-aware mode the wall-clock
+         * tentative_max_age_seconds governs instead, mirroring the confirmed-track lost buffer.
+         * Default 2 matches the prior 0.08 s @ 25 fps.
+         */
+        int   tentative_max_miss_frames = 2;
+
+        /**
+         * @brief IoU above which a new-track detection overlapping a confirmed track is suppressed.
+         *
+         * Prevents a freshly initialised tentative from duplicating an already-tracked target and
+         * producing a momentary ID split when it later confirms. Checked against confirmed tracked
+         * tracks only.
+         */
+        float tentative_init_suppress_iou = 0.7f;
 
         // Mahalanobis Gating
 

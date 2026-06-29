@@ -210,10 +210,11 @@ namespace SushiTrack
                         activated_tracklets,
                         tentative_next,
                         removed_tentative_curr,
-                        det_for_new_init,
-                        effective_dt);
+                        det_for_new_init);
 
             std::vector<TrackletPtr> newborn_tentative;
+            // Drop init candidates that overlap a track confirmed this frame: gated association can leave such a detection unmatched, and initialising on it would duplicate the target and split its ID once the tentative confirms.
+            suppressOverlappingInits(det_for_new_init, activated_tracklets);
             initializeTentative(det_for_new_init, newborn_tentative);
             tentative_next = jointTracklets(tentative_next, newborn_tentative);
 
@@ -592,7 +593,8 @@ namespace SushiTrack
      * smoothed score (so a single high-confidence frame cannot collapse the bar).
      * A track that survives a frame without a match has its streak reset, so only
      * genuinely consecutive observations promote it. Unmatched tracks are aged out
-     * when their accumulated lost-time exceeds tentative_max_age_seconds.
+     * on the wall-clock tentative_max_age_seconds in time-aware mode or the
+     * tentative_max_miss_frames count otherwise, mirroring the confirmed-track lost buffer.
      *
      * @param tentative_tracks        Predicted tentative tracklets for this frame.
      * @param det_high_remaining      Unclaimed high-confidence detections.
@@ -601,11 +603,9 @@ namespace SushiTrack
      * @param tentative_next          Output: tracks that remain tentative.
      * @param removed_tentative_curr  Output: tracks that aged out this frame.
      * @param det_for_new_init        Output: detections eligible for new track init.
-     * @param dt                      Time interval of the current frame in seconds.
-     *                                Used to compute the age of unmatched tentatives
-     *                                at the end of this call: accumulated_lost_time_
-     *                                has already been incremented by predict(dt), and
-     *                                the current unmatched frame adds one more dt.
+     *
+     * Both age counters (accumulated_lost_time_ and frames_since_observation_) were already
+     * advanced for this frame by predict() before this call.
      */
     void SushiTrackTracker::matchTentative(std::vector<TrackletPtr>& tentative_tracks,
                                         std::vector<TrackletPtr>& det_high_remaining,
@@ -613,8 +613,7 @@ namespace SushiTrack
                                         std::vector<TrackletPtr>& activated_tracklets,
                                         std::vector<TrackletPtr>& tentative_next,
                                         std::vector<TrackletPtr>& removed_tentative_curr,
-                                        std::vector<TrackletPtr>& det_for_new_init,
-                                        float dt)
+                                        std::vector<TrackletPtr>& det_for_new_init)
     {
         auto get_dynamic_hits = [&](float score) -> int {
             if (score >= config_.tentative_fast_thresh) return config_.tentative_fast_hits;
@@ -705,15 +704,17 @@ namespace SushiTrack
         {
             auto& t = tentative_remaining[idx];
 
-            // accumulated_lost_time_ counts seconds since the last match in both timing modes; add this frame's dt manually since predict() ran before the miss was recorded.
-            const float accumulated = t->getAccumulatedLostTime() + dt;
+            // Mirror cleanupLost: time-aware mode ages out on wall-clock seconds (correct under fluctuating frame rate), frame-counted mode on missed frames (constant strictness regardless of frame rate). predict() already advanced both counters for this missed frame.
+            const bool aged_out = config_.time_aware
+                ? t->getAccumulatedLostTime() > config_.tentative_max_age_seconds
+                : t->getFramesSinceObservation() > config_.tentative_max_miss_frames;
 
-            if (accumulated > config_.tentative_max_age_seconds)
+            if (aged_out)
             {
                 t->markAsRemoved();
                 removed_tentative_curr.push_back(t);
-                SUSHITRACK_LOG_DEBUG("[Tracker] Tentative track %llu aged out (lost_time=%.3fs, limit=%.3fs).",
-                    (unsigned long long)t->getTrackId(), accumulated, config_.tentative_max_age_seconds);
+                SUSHITRACK_LOG_DEBUG("[Tracker] Tentative track %llu aged out (misses=%d, limit=%d).",
+                    (unsigned long long)t->getTrackId(), t->getFramesSinceObservation(), config_.tentative_max_miss_frames);
             }
             else
             {
@@ -743,6 +744,37 @@ namespace SushiTrack
             tentative_curr.push_back(det);
             SUSHITRACK_LOG_DEBUG("[Tracker] Initialized new tentative track %llu.", (unsigned long long)initial_id);
         }
+    }
+
+    /**
+     * @brief Suppresses new-track detections that duplicate a confirmed track.
+     *
+     * @param det_for_new_init In/out collection of detections eligible for initiation.
+     * @param confirmed Confirmed tracked tracklets to test overlap against.
+     */
+    void SushiTrackTracker::suppressOverlappingInits(std::vector<TrackletPtr>& det_for_new_init,
+                                                    const std::vector<TrackletPtr>& confirmed) const
+    {
+        if (confirmed.empty() || det_for_new_init.empty()) return;
+
+        std::vector<TrackletPtr> kept;
+        kept.reserve(det_for_new_init.size());
+        for (auto& det : det_for_new_init)
+        {
+            bool overlaps = false;
+            for (const auto& trk : confirmed)
+            {
+                if (iou(det->getRect(), trk->getRect()) > config_.tentative_init_suppress_iou)
+                {
+                    overlaps = true;
+                    SUSHITRACK_LOG_DEBUG("[Tracker] Suppressed new tentative overlapping confirmed track %llu.",
+                        (unsigned long long)trk->getTrackId());
+                    break;
+                }
+            }
+            if (!overlaps) kept.push_back(det);
+        }
+        det_for_new_init.swap(kept);
     }
 
     /**

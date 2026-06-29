@@ -329,6 +329,7 @@ namespace SushiTrack
             size_t max_feature_history_;
             std::deque<std::vector<float>> feature_history_;
             float accumulated_lost_time_ = 0.0f;
+            int   frames_since_observation_ = 0; ///< Tracklet-owned shared counter; consumed independently by OCM's velocity gate and the tentative frame-counted age budget, not OCM-private.
 
             Rect<float> last_observation_;
             bool  has_last_observation_ = false;
@@ -337,7 +338,6 @@ namespace SushiTrack
             float obs_vy_ = 0.0f;
             float obs_speed_ = 0.0f;
             bool  obs_velocity_valid_ = false;
-            int   frames_since_observation_ = 0;
 
             struct ObsSample { size_t frame_id; float cx; float cy; };
             std::deque<ObsSample> obs_history_; ///< Recent observation centres, capped to ocm_delta_t_ + 1, used to measure the direction of travel from raw detections.

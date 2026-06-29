@@ -71,19 +71,7 @@ namespace SushiTrack
         inline float rawIoU(const ICostCalculator::TrackletPtr& a,
                             const ICostCalculator::TrackletPtr& b)
         {
-            const auto& r1 = a->getRect();
-            const auto& r2 = b->getRect();
-
-            const float iw = std::min(r1.x() + r1.width(),  r2.x() + r2.width())
-                           - std::max(r1.x(), r2.x());
-            if (iw <= 0.0f) return 0.0f;
-            const float ih = std::min(r1.y() + r1.height(), r2.y() + r2.height())
-                           - std::max(r1.y(), r2.y());
-            if (ih <= 0.0f) return 0.0f;
-
-            const float inter = iw * ih;
-            const float ua = r1.width() * r1.height() + r2.width() * r2.height() - inter;
-            return inter / std::max(1e-6f, ua);
+            return SushiTrack::iou(a->getRect(), b->getRect());
         }
     }
 
