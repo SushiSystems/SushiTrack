@@ -60,12 +60,13 @@ namespace SushiTrack
              * @param enable_xyah Coordinate system flag.
              * @param max_feature_history Maximum number of visual appearance vectors stored per tracklet.
              * @param ocm_delta_t Observation window (in observed frames) for the observation-centric direction estimate.
+             * @param enable_oru Enables Observation-centric Re-Update on lost-track recovery.
              */
             Tracklet(std::unique_ptr<IStatePredictor> kf,
                    const Rect<float>& rect, int label, float score,
                    std::vector<float> feat = {}, float alpha = 0.9f,
                    bool enable_xyah = false, int max_feature_history = 100,
-                   int ocm_delta_t = 3);
+                   int ocm_delta_t = 3, bool enable_oru = false);
 
             /**
              * @brief Destroys the Tracklet instance.
@@ -392,6 +393,37 @@ namespace SushiTrack
 
             float              alpha_;
             bool               enable_xyah_;
+            bool               enable_oru_ = false;
+
+            // ORU (Observation-centric Re-Update) checkpoint: the estimator state
+            // captured at the last real observation. On recovery the predictor is
+            // rolled back here and the lost interval is replayed along a virtual
+            // trajectory, repairing the velocity that drifted while coasting.
+            KalmanTypes::StateMean last_obs_mean_;
+            KalmanTypes::StateCov  last_obs_cov_;
+            bool                   has_checkpoint_ = false;
+
+            /** @brief Captures the estimator state (Tracklet mean/cov + predictor internals) at a real observation. */
+            void captureCheckpoint();
+
+            /**
+             * @brief Observation-centric Re-Update along the virtual recovery trajectory.
+             *
+             * Rolls the estimator back to the last-observation checkpoint, then
+             * replays @p gap predict/update steps interpolating linearly from the
+             * pre-loss observation to @p new_meas. Routing through the predictor's
+             * standard predict/update applies the repair to every IMM mode without
+             * mode-specific code. Returns false (no checkpoint / gap too small) so
+             * the caller falls back to a plain single update.
+             *
+             * @param new_meas Recovery detection in measurement space.
+             * @param gap Unobserved frames bridged (>= 2 for ORU to engage).
+             * @param score Recovery detection confidence.
+             */
+            bool recoveryReupdate(const KalmanTypes::DetectBox& new_meas, int gap, float score);
+
+            /** @brief Converts a box to the predictor's measurement vector (matches getMeasurement, lock-free). */
+            KalmanTypes::DetectBox toMeasurement(const Rect<float>& r) const;
 
             static constexpr float kScoreSmoothingMomentum = 0.7f; ///< EMA weight for the tentative confirmation score; smoothing stops a one-frame spike from collapsing the required hit count.
 

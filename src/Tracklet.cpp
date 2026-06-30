@@ -58,7 +58,8 @@ namespace SushiTrack
                     float alpha,
                     bool enable_xyah,
                     int max_feature_history,
-                    int ocm_delta_t)
+                    int ocm_delta_t,
+                    bool enable_oru)
         : kf_(std::move(kf)),
         mean_(KalmanTypes::StateMean::Zero()),
         covariance_(KalmanTypes::StateCov::Zero()),
@@ -77,6 +78,7 @@ namespace SushiTrack
         consecutive_hits_(0),
         alpha_(alpha),
         enable_xyah_(enable_xyah),
+        enable_oru_(enable_oru),
         max_feature_history_(static_cast<size_t>(max_feature_history)),
         ocm_delta_t_(std::max(1, ocm_delta_t))
     {
@@ -118,6 +120,7 @@ namespace SushiTrack
         score_smooth_ = score_;
         accumulated_lost_time_ = 0.0f;
         recordObservation(rect_, frame_id);
+        captureCheckpoint();
     }
 
     /**
@@ -145,6 +148,7 @@ namespace SushiTrack
         score_smooth_ = score_;
         accumulated_lost_time_ = 0.0f;
         recordObservation(rect_, frame_id);
+        captureCheckpoint();
     }
 
     /**
@@ -179,7 +183,11 @@ namespace SushiTrack
         // Hold the state mutex for the whole mutation (mirrors update()) so concurrent readers never see a torn mean_/covariance_.
         std::lock_guard<std::mutex> lock(state_mutex_);
 
-        kf_->update(mean_, covariance_, new_meas, new_track.getScore());
+        // ORU bridges the unobserved gap along a virtual straight-line trajectory;
+        // it falls back to a plain update when disabled or the gap is too small.
+        const int gap = frames_since_observation_;
+        if (!recoveryReupdate(new_meas, gap, new_track.getScore()))
+            kf_->update(mean_, covariance_, new_meas, new_track.getScore());
 
         updateRect();
         state_ = TrackState::Tracked;
@@ -205,6 +213,7 @@ namespace SushiTrack
         tracklet_len_ = frame_id - start_frame_id_ + 1;
         accumulated_lost_time_ = 0.0f;
         recordObservation(new_track.getRect(), frame_id);
+        captureCheckpoint();
 
         refreshRegime(false);
     }
@@ -299,6 +308,7 @@ namespace SushiTrack
         tracklet_len_ = frame_id - start_frame_id_ + 1;
         accumulated_lost_time_ = 0.0f;
         recordObservation(new_track.getRect(), frame_id);
+        captureCheckpoint();
 
         refreshRegime(false);
     }
@@ -492,6 +502,79 @@ namespace SushiTrack
     }
 
     /**
+     * @brief Captures the estimator state at a real observation for ORU rollback.
+     *
+     * Lock-free: callers either run single-threaded at track birth (activate*)
+     * or already hold the state mutex (update/reActivate), matching
+     * recordObservation. The Tracklet owns the external mean/covariance; the
+     * predictor checkpoints whatever internal state the projection cannot
+     * reconstruct (the IMM mode bank), so together they snapshot the whole
+     * estimator.
+     */
+    void Tracklet::captureCheckpoint()
+    {
+        last_obs_mean_  = mean_;
+        last_obs_cov_   = covariance_;
+        if (kf_) kf_->saveCheckpoint();
+        has_checkpoint_ = true;
+    }
+
+    /**
+     * @brief Observation-centric Re-Update along the virtual recovery trajectory.
+     *
+     * @param new_meas Recovery detection in measurement space.
+     * @param gap Unobserved frames bridged.
+     * @param score Recovery detection confidence.
+     * @return True when ORU ran; false to signal the caller to do a plain update.
+     */
+    bool Tracklet::recoveryReupdate(const KalmanTypes::DetectBox& new_meas, int gap, float score)
+    {
+        if (!enable_oru_ || !has_checkpoint_ || !kf_ || gap < 2) return false;
+
+        // Roll the estimator back to the last-observation posterior.
+        mean_       = last_obs_mean_;
+        covariance_ = last_obs_cov_;
+        kf_->restoreCheckpoint();
+
+        const KalmanTypes::DetectBox z1 = toMeasurement(last_observation_); // pre-loss observation
+        const KalmanTypes::DetectBox z2 = new_meas;                         // recovery detection
+
+        // Spread the accumulated lost time evenly across the gap (collapses to a
+        // unit step in frame-counted mode, where toKfDt is constant).
+        const float per_frame_dt = accumulated_lost_time_ / static_cast<float>(gap);
+        const float step_kf_dt   = timing_policy_ ? timing_policy_->toKfDt(per_frame_dt) : 1.0f;
+
+        // Replay predict+update along the straight line; the final step (i == gap)
+        // lands on the real recovery observation z2.
+        for (int i = 1; i <= gap; ++i)
+        {
+            const float t = static_cast<float>(i) / static_cast<float>(gap);
+            const KalmanTypes::DetectBox virtual_z = z1 + t * (z2 - z1);
+            kf_->predict(mean_, covariance_, step_kf_dt);
+            kf_->update(mean_, covariance_, virtual_z, score);
+        }
+        return true;
+    }
+
+    /**
+     * @brief Converts a box to the predictor's measurement vector (matches getMeasurement).
+     */
+    KalmanTypes::DetectBox Tracklet::toMeasurement(const Rect<float>& r) const
+    {
+        if (enable_xyah_)
+        {
+            float cx = r.x() + r.width() * 0.5f;
+            float cy = r.y() + r.height() * 0.5f;
+            float h  = r.height();
+            float a  = r.width() / std::max(1e-6f, h);
+            KalmanTypes::DetectBox m;
+            m << cx, cy, a, h;
+            return m;
+        }
+        return r.getXywh();
+    }
+
+    /**
      * @brief Synchronizes the geometric rectangle with the current state mean.
      */
     void Tracklet::updateRect()
@@ -529,18 +612,7 @@ namespace SushiTrack
     KalmanTypes::DetectBox Tracklet::getMeasurement() const
     {
         std::lock_guard<std::mutex> lock(state_mutex_);
-
-        if (enable_xyah_)
-        {
-            float cx = rect_.x() + rect_.width() * 0.5f;
-            float cy = rect_.y() + rect_.height() * 0.5f;
-            float h  = rect_.height();
-            float a  = rect_.width() / std::max(1e-6f, h);
-            KalmanTypes::DetectBox m;
-            m << cx, cy, a, h;
-            return m;
-        }
-        return rect_.getXywh();
+        return toMeasurement(rect_);
     }
 
 } // namespace SushiTrack

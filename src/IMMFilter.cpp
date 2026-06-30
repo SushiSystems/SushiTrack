@@ -495,6 +495,30 @@ namespace SushiTrack
         last_combined_ = mean;
     }
 
+    void IMMFilter::saveCheckpoint()
+    {
+        checkpoint_.x             = x_;
+        checkpoint_.P             = P_;
+        checkpoint_.mu            = mu_;
+        checkpoint_.cbar          = cbar_;
+        checkpoint_.last_combined = last_combined_;
+        checkpoint_.initialized   = initialized_;
+        checkpoint_.valid         = true;
+    }
+
+    void IMMFilter::restoreCheckpoint()
+    {
+        if (!checkpoint_.valid) return;
+        x_              = checkpoint_.x;
+        P_              = checkpoint_.P;
+        mu_             = checkpoint_.mu;
+        cbar_           = checkpoint_.cbar;
+        last_combined_  = checkpoint_.last_combined;
+        initialized_    = checkpoint_.initialized;
+        maneuver_probability_   = mu_(CA) + mu_(CT);
+        stationary_probability_ = mu_(NCP);
+    }
+
     void IMMFilter::setNoiseMultipliers(float pos_mult, float size_mult, float vel_mult)
     {
         // Intentional no-op: the IMM model bank carries per-mode process noise.

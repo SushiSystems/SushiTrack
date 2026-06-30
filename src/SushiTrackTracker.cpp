@@ -104,7 +104,7 @@ namespace SushiTrack
 
         for (const auto& obj : objects)
         {
-            TrackletPtr tracklet = std::make_shared<Tracklet>(nullptr, obj.rect, obj.label, obj.prob, obj.feature, config_.feature_momentum, config_.enable_xyah, config_.max_feature_history, config_.ocm_delta_t);
+            TrackletPtr tracklet = std::make_shared<Tracklet>(nullptr, obj.rect, obj.label, obj.prob, obj.feature, config_.feature_momentum, config_.enable_xyah, config_.max_feature_history, config_.ocm_delta_t, config_.enable_oru);
 
             tracklet->setTimingPolicy(timing_policy_);
 

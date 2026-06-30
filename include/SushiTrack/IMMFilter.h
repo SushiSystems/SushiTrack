@@ -95,6 +95,12 @@ namespace SushiTrack
             /** @brief Probability mass on the near-constant-position model. */
             float stationaryProbability() const override { return stationary_probability_; }
 
+            /** @brief Snapshots the full mode bank (states, covariances, probabilities) for ORU rollback. */
+            void saveCheckpoint() override;
+
+            /** @brief Restores the mode bank captured by the last saveCheckpoint(). */
+            void restoreCheckpoint() override;
+
         private:
             /**
              * @brief Mode indices into the model bank.
@@ -129,6 +135,27 @@ namespace SushiTrack
             KalmanTypes::StateMean last_combined_; ///< Last combined 8-D mean written out; anchor for the delta re-sync of Tracklet's external pokes.
 
             std::unique_ptr<KalmanFilter> gate_kf_; ///< Stateless helper used only for gating on the combined estimate.
+
+            /**
+             * @brief Full mode-bank snapshot for ORU rollback.
+             *
+             * The external 8-D mean/covariance is a lossy projection of the bank
+             * (the per-mode kinematics and the mode probabilities are dropped), so
+             * it cannot reconstruct the estimator. ORU rollback needs the complete
+             * internal state; this captures exactly the fields predict()/update()
+             * read and write.
+             */
+            struct Checkpoint
+            {
+                std::array<Vec11, kNumModes>       x;
+                std::array<Mat11, kNumModes>       P;
+                Eigen::Matrix<float, kNumModes, 1> mu;
+                Eigen::Matrix<float, kNumModes, 1> cbar;
+                KalmanTypes::StateMean             last_combined;
+                bool                               initialized = false;
+                bool                               valid       = false;
+            };
+            Checkpoint checkpoint_;
 
             MatH measurementMatrix() const;
             Mat4 measurementNoise(float height, float width) const;

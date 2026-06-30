@@ -87,6 +87,23 @@ namespace SushiTrack
              * near-constant-position model. Negative when unavailable.
              */
             virtual float stationaryProbability() const { return -1.0f; }
+
+            /**
+             * @brief Snapshots the estimator's internal state into a private buffer.
+             *
+             * Enables Observation-centric Re-Update (ORU): on recovery the caller
+             * rolls the estimator back to the posterior captured at the last real
+             * observation and replays the lost interval along a virtual trajectory.
+             * Single-model predictors are stateless — their full state is the
+             * external mean/covariance the caller already owns and snapshots — so
+             * the default is a no-op. Multi-model estimators (IMM) override to
+             * checkpoint their mode bank, which the external mean/covariance alone
+             * cannot reconstruct.
+             */
+            virtual void saveCheckpoint() {}
+
+            /** @brief Restores the internal state saved by the last saveCheckpoint(). */
+            virtual void restoreCheckpoint() {}
     };
 
 } // namespace SushiTrack
