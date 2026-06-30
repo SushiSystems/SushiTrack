@@ -183,7 +183,6 @@ void applyConfigToParams(const Json& doc, SushiTrack_Params& params)
     if (adv.contains("mahalanobis_gating") && adv["mahalanobis_gating"].is_object())
     {
         const Json& s = adv["mahalanobis_gating"];
-        params.proximity_thresh   = jsonGet<float>(s, "proximity_thresh",   params.proximity_thresh);
         params.gating_thresh      = jsonGet<float>(s, "gating_thresh",      params.gating_thresh);
         params.motion_cost_weight = jsonGet<float>(s, "motion_cost_weight", params.motion_cost_weight);
         params.max_area_ratio     = jsonGet<float>(s, "max_area_ratio",     params.max_area_ratio);
@@ -376,7 +375,6 @@ TEST_F(ConfigLoaderAdvancedFieldsTest, TentativeLogicTiersAreApplied)
 TEST_F(ConfigLoaderAdvancedFieldsTest, MahalanobisGatingFieldsAreApplied)
 {
     const Json& s = doc_["sushitrack"]["advanced"]["mahalanobis_gating"];
-    EXPECT_FLOAT_EQ(params_.proximity_thresh,   s["proximity_thresh"].get<float>());
     EXPECT_FLOAT_EQ(params_.gating_thresh,      s["gating_thresh"].get<float>());
     EXPECT_FLOAT_EQ(params_.motion_cost_weight, s["motion_cost_weight"].get<float>());
     EXPECT_FLOAT_EQ(params_.max_area_ratio,     s["max_area_ratio"].get<float>());

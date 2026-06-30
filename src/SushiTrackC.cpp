@@ -57,7 +57,6 @@ extern "C"
 
         params->enable_mahalanobis = 0;
         params->gating_thresh      = 9.4877f;
-        params->proximity_thresh   = 0.7f;
         params->max_area_ratio     = 50.0f;
         params->motion_cost_weight = 0.15f;
 
@@ -97,11 +96,12 @@ extern "C"
         params->fuse_score           = 1;
 
         params->enable_ocm      = 0;
+        params->enable_oru      = 0;
         params->ocm_vdc_weight  = 0.1f;
         params->ocm_delta_t     = 3;
         params->ocm_min_velocity = 1.0f;
         params->ocm_max_age     = 1;
-        params->ocm_maneuver_weight_scale = 0.0f;
+        params->ocm_maneuver_weight_scale = 0.15f;
     }
 
     /**
@@ -159,7 +159,6 @@ extern "C"
 
             config.enable_mahalanobis = (params->enable_mahalanobis != 0);
             config.gating_thresh      = params->gating_thresh;
-            config.proximity_thresh   = params->proximity_thresh;
             config.max_area_ratio     = params->max_area_ratio;
             config.motion_cost_weight = params->motion_cost_weight;
 
@@ -196,6 +195,7 @@ extern "C"
             config.fuse_score           = (params->fuse_score != 0);
 
             config.enable_ocm       = (params->enable_ocm != 0);
+            config.enable_oru       = (params->enable_oru != 0);
             config.ocm_vdc_weight   = params->ocm_vdc_weight;
             config.ocm_delta_t      = params->ocm_delta_t;
             config.ocm_min_velocity = params->ocm_min_velocity;
@@ -279,8 +279,7 @@ extern "C"
                     config.gating_thresh,
                     active_gate_validator,
                     iou_calc,
-                    config.motion_cost_weight,
-                    config.proximity_thresh);
+                    config.motion_cost_weight);
 
                 if (config.enable_reid)
                 {
@@ -298,14 +297,12 @@ extern "C"
                         config.reid_high_iou_weight,
                         config.reid_high_thresh, config.gating_thresh,
                         active_gate_validator,
-                        gated_iou, cosine_calc, config.reid_direct_assignment_weight,
-                        config.proximity_thresh);
+                        gated_iou, cosine_calc, config.reid_direct_assignment_weight);
                     low_conf_metric      = std::make_shared<SushiTrack::FusedCostCalculator>(
                         config.reid_low_iou_weight,
                         config.reid_low_thresh, config.gating_thresh,
                         active_gate_validator,
-                        gated_iou, cosine_calc, config.reid_direct_assignment_weight,
-                        config.proximity_thresh);
+                        gated_iou, cosine_calc, config.reid_direct_assignment_weight);
                     lost_recovery_metric = std::make_shared<SushiTrack::PureReIDCostCalculator>(
                         config.reid_recovery_thresh, config.gating_thresh, active_gate_validator);
                 }

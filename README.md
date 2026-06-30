@@ -10,7 +10,7 @@ tentative validation, Kalman prediction, lost-track buffering, LAPJV
 assignment). The following extensions are optional and **disabled by default**:
 four IoU variants, appearance ReID fusion, Mahalanobis gating, a
 Noise-Scale-Adaptive Kalman filter, a per-track kinematic finite state machine,
-real-time (`time_aware`) operation, and the `proximity_thresh` pre-filter.
+real-time (`time_aware`) operation.
 
 A stable C API, a Python CLI (`sushitrack`/`ds`), a MOTChallenge and DanceTrack
 regression harness, a GTest unit suite, and a YOLOX-driven video inference
@@ -94,6 +94,9 @@ Track lifecycle is governed by `TrackState` (`New`, `Tracked`, `Lost`, `Removed`
 Visual features are L2-normalised and exponentially smoothed (`feature_momentum`, default 0.9). A per-tracklet feature history holds up to `max_feature_history` (default 100) vectors and `getMaxFeatureSimilarity` returns the max cosine similarity against the history.
 
 **Mahalanobis gating** — `enable_mahalanobis=1` filters association candidates via a chi-squared test on the projected state distribution. `gating_thresh` defaults to 9.4877 (95 % CI for 4 DoF). `GatedIoUCostCalculator` combines IoU with the gate; `motion_cost_weight` blends the squared distance into the cost.
+
+> **Why the gate only uses the box (`xyah`), not velocity — in plain English.**
+> The Kalman state carries eight numbers: the four box numbers (`[cx, cy, a, h]`, or `[x, y, w, h]`) plus their four velocities. A detector, however, only ever reports a box — it never reports a velocity. So the only thing we can actually *compare* a track against is its predicted box. The Mahalanobis gate therefore projects the 8-D state down to the 4-D box it would produce, and measures the distance purely in that 4-D box space: "given how uncertain I am about where this box should be, how surprising is this detection's box?" The velocities are used to *predict* where the box goes, but they are never part of the distance, because there is no measured velocity to compare them to. This is why the chi-squared test has **4** degrees of freedom (hence the 9.4877 default = 95 % for 4 DoF) and not 8 — feeding in the velocity dimensions would be comparing against numbers no detection contains, which would distort the gate. This holds identically for the IMM estimator (`kalman_type=2`): its internal model bank is collapsed to the same 4-D box estimate before gating, so the gate sees `xyah` only, exactly as the plain Kalman path does. This 4-D-measurement convention is the standard one shared by SORT, DeepSORT, ByteTrack and OC-SORT.
 
 **NSA Kalman filter** — `kalman_type=1` selects `NSAKalmanFilter`, a variant that scales measurement noise by detection confidence in both `initiate` and `project`.
 
@@ -460,13 +463,9 @@ Launches the YOLOX-driven video inference pipeline (`tests/regression/inference/
 Examples:
 
 ```bash
-sushitrack project test inference \
-    -n yolox-x -c 3rdparty/weight/mot17x.pth.tar \
-    --source 3rdparty/video/MOT17-04.mp4 \
-    --num-classes 1 --legacy
+sushitrack project test inference -n yolox-x -c 3rdparty/weight/mot17x.pth.tar --source 3rdparty/video/MOT17-04.mp4 --num-classes 1 --legacy
 
-sushitrack project test inference \
-    --source 0 --tracker SushiTrack --no-save --no-screen --stress
+sushitrack project test inference --source 0 --tracker SushiTrack --no-save --no-screen --stress
 ```
 
 If the YOLOX checkpoint filename contains `mot17` and `--tsize` is omitted/640, the pipeline overrides `tsize` to `(800, 1440)` to match the MOT17 training resolution.
@@ -812,7 +811,6 @@ All knobs are exposed both on `SushiTrack_Params` (C API, `include/SushiTrackC.h
 | `iou_type` | 1 | 0=IoU, 1=DIoU, 2=GIoU, 3=SIoU |
 | `enable_mahalanobis` | 0 | Apply Mahalanobis gating |
 | `gating_thresh` | 9.4877 | Chi-squared threshold (95 % CI, 4 DoF) |
-| `proximity_thresh` | 0.7 | Broad spatial filter before gating |
 | `motion_cost_weight` | 0.15 | Weight of squared Mahalanobis distance in gated IoU |
 | `max_area_ratio` | 50.0 | Suppress pairs with extreme area disparity |
 

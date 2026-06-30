@@ -56,8 +56,6 @@ protected:
         params_.enable_mahalanobis     = 1;
         params_.primary_assoc_mode     = 1;
         params_.time_aware             = 1;
-        // Disable spatial proximity pre-filter so we can test ReID discrimination at a slightly larger distance within the Mahalanobis gate.
-        params_.proximity_thresh       = 0.0f;
         params_.match_thresh           = 0.9f;
 
         hdl_ = SushiTrack_Create(&params_);

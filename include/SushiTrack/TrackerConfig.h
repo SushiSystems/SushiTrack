@@ -110,6 +110,17 @@ namespace SushiTrack
         bool  enable_ocm = false;
 
         /**
+         * @brief Flag to enable Observation-centric Re-Update (ORU) on lost-track recovery.
+         *
+         * When a track is recovered after an unobserved gap, ORU rolls the
+         * estimator back to the posterior captured at its last real observation
+         * and replays the gap along a straight-line virtual trajectory to the
+         * recovery detection, repairing the velocity that drifted during
+         * coasting. Off by default (recovery does a single update).
+         */
+        bool  enable_oru = false;
+
+        /**
          * @brief Strength of the momentum re-ranking term.
          *
          * The decorator subtracts ocm_vdc_weight * cos(theta) from each primary
@@ -142,7 +153,7 @@ namespace SushiTrack
          * their stored direction is meaningless. Default 0 keeps the prior
          * Cruising-only behaviour bit-identical.
          */
-        float ocm_maneuver_weight_scale = 0.0f;
+        float ocm_maneuver_weight_scale = 0.15f;
 
         // Tentative Logic
 
@@ -183,9 +194,6 @@ namespace SushiTrack
         float tentative_init_suppress_iou = 0.7f;
 
         // Mahalanobis Gating
-
-        /** @brief Proximity threshold for initial broad spatial filtering before statistical gating. */
-        float proximity_thresh = 0.7f;
 
         /** @brief Chi-squared statistical distance threshold utilized for Mahalanobis gating. */
         float gating_thresh = 9.4877f;

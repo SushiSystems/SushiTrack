@@ -186,6 +186,9 @@ extern "C"
         /** @brief Flag to enable the observation-centric momentum re-ranking term in primary association. */
         int   enable_ocm;
 
+        /** @brief Flag to enable Observation-centric Re-Update (ORU) on lost-track recovery. */
+        int   enable_oru;
+
         /** @brief Strength of the momentum re-ranking term; subtracted (clamped) from each primary cost cell as a bounded tie-breaker. Keep small relative to the ~1.0 primary cost scale. */
         float ocm_vdc_weight;
 
@@ -230,9 +233,6 @@ extern "C"
         float tentative_init_suppress_iou;
 
         // Mahalanobis Gating
-
-        /** @brief Proximity threshold for initial broad spatial filtering before statistical gating. */
-        float proximity_thresh;
 
         /** @brief Chi-squared statistical distance threshold utilized for Mahalanobis gating. */
         float gating_thresh;

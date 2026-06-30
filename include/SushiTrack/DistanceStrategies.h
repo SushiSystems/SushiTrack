@@ -334,7 +334,7 @@ namespace SushiTrack
         public:
             /**
              * @brief Initializes the fused cost calculator.
-             * 
+             *
              * @param iou_weight Weighting factor for spatial overlap.
              * @param reid_thresh Visual similarity threshold.
              * @param gating_thresh Motion-based validation threshold.
@@ -342,18 +342,13 @@ namespace SushiTrack
              * @param iou_calc Implementation for spatial overlap calculation.
              * @param cosine_calc Implementation for visual similarity calculation.
              * @param reid_direct_assignment_weight Scaling factor for high-confidence direct visual matches.
-             * @param proximity_thresh Minimum raw IoU a pair must satisfy before the
-             *        statistical gate is consulted. Pairs whose overlap falls below
-             *        this value are rejected outright with a sentinel cost. A value
-             *        of zero disables the filter, preserving the legacy behaviour.
              */
             FusedCostCalculator(float iou_weight,
                                 float reid_thresh, float gating_thresh,
                                 std::shared_ptr<IGateValidator> gate_validator,
                                 std::shared_ptr<ICostCalculator> iou_calc,
                                 std::shared_ptr<ICostCalculator> cosine_calc,
-                                float reid_direct_assignment_weight = 0.0f,
-                                float proximity_thresh = 0.0f);
+                                float reid_direct_assignment_weight = 0.0f);
 
             /**
              * @brief Populates the cost matrix by aggregating multiple metrics.
@@ -382,7 +377,6 @@ namespace SushiTrack
             std::shared_ptr<ICostCalculator> iou_calc_;
             std::shared_ptr<ICostCalculator> cosine_calc_;
             float reid_direct_assignment_weight_;
-            float proximity_thresh_; ///< Raw-IoU pre-filter applied before statistical gating; zero disables it.
 
             KalmanTypes::DetectBoxVector meas_workspace_; ///< Pre-allocated buffer for measurement vectors to reduce heap churn.
             std::vector<float>           score_workspace_; ///< Pre-allocated buffer for per-detection scores (NSA gating).
@@ -546,21 +540,16 @@ namespace SushiTrack
         public:
             /**
              * @brief Initializes the gated IoU calculator.
-             * 
+             *
              * @param gating_thresh Statistical threshold for the Mahalanobis gate.
              * @param gate_validator Implementation for motion-based gating.
              * @param iou_calc Implementation for spatial overlap calculation.
              * @param motion_cost_weight Weighting factor for motion-based distance penalty.
-             * @param proximity_thresh Minimum raw IoU a pair must satisfy before the
-             *        statistical gate is consulted. Pairs whose overlap falls below
-             *        this value are rejected outright with a sentinel cost. A value
-             *        of zero disables the filter, preserving the legacy behaviour.
              */
             GatedIoUCostCalculator(float gating_thresh,
                                 std::shared_ptr<IGateValidator> gate_validator,
                                 std::shared_ptr<ICostCalculator> iou_calc,
-                                float motion_cost_weight = 0.0f,
-                                float proximity_thresh = 0.0f);
+                                float motion_cost_weight = 0.0f);
 
             /**
              * @brief Populates the cost matrix with spatial overlap and motion constraints.
@@ -584,7 +573,6 @@ namespace SushiTrack
         private:
             float gating_thresh_;
             float motion_cost_weight_;
-            float proximity_thresh_; ///< Raw-IoU pre-filter applied before statistical gating; zero disables it.
             std::shared_ptr<IGateValidator> gate_validator_;
             std::shared_ptr<ICostCalculator> iou_calc_;
 

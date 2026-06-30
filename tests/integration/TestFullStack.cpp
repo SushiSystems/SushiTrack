@@ -58,9 +58,6 @@ protected:
         // Confirm quickly on strong detections so the scenario stays short.
         params_.tentative_fast_thresh                 = 0.85f;
         params_.tentative_fast_hits                   = 1;
-        // Disable the aggressive raw-IoU pre-filter: with Mahalanobis on, the 0.7 default can drop legitimate matches across a displacement gap (see docs/RELEASE_READINESS.md, gap 4). The gate still governs here.
-        params_.proximity_thresh                      = 0.0f;
-
         hdl_ = SushiTrack_Create(&params_);
         ASSERT_NE(hdl_, nullptr);
 

@@ -8,23 +8,24 @@
             "high_thresh": 0.5,
             "match_thresh": 0.7,
             "enable_ocm": 1,
+            "enable_oru": 1,
             "enable_reid": 0,
             "enable_tentative": 1,
             "enable_mahalanobis": 0
         },
         "advanced": {
+            "coordinate_system": {
+                "enable_xyah": 0,
+                "iou_type": 0,
+                "iou_plus_one": 0,
+                "kalman_type": 0
+            },
             "association": {
                 "fuse_score": 1,
                 "primary_assoc_mode": 1,
                 "iou_match_thresh": 0.5,
                 "unconfirmed_iou_thresh": 0.7,
                 "duplicate_iou_thresh": 0.15
-            },
-            "coordinate_system": {
-                "enable_xyah": 0,
-                "iou_type": 0,
-                "iou_plus_one": 0,
-                "kalman_type": 2
             },
             "reid_params": {
                 "feature_momentum": 0.9,
@@ -49,17 +50,16 @@
                 "tentative_vslow_hits_offset": 4
             },
             "mahalanobis_gating": {
-                "proximity_thresh": 0.7,
                 "gating_thresh": 9.4877,
                 "motion_cost_weight": 0.15,
                 "max_area_ratio": 50.0
             },
             "ocm": {
                 "ocm_vdc_weight": 0.1,
-                "ocm_delta_t": 3,
-                "ocm_min_velocity": 2.0,
-                "ocm_max_age": 3,
-                "ocm_maneuver_weight_scale": 0
+                "ocm_delta_t": 1,
+                "ocm_min_velocity": 3.0,
+                "ocm_max_age": 2,
+                "ocm_maneuver_weight_scale": 0.15
             }
         }
     }

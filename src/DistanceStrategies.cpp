@@ -53,26 +53,6 @@ namespace SushiTrack
             }
         }
 
-        /**
-         * @brief Computes the plain Intersection-over-Union of two tracklet
-         *        bounding boxes in the closed range [0, 1].
-         *
-         * This deliberately bypasses the injected ICostCalculator: the gated
-         * calculators may wrap a DIoU/GIoU/SIoU variant (or even another gated
-         * calculator) whose calculate_single returns a centroid-penalised cost
-         * rather than the raw overlap. The proximity pre-filter is specified
-         * against the unmodified IoU, so it is computed directly here to keep
-         * the threshold semantics stable regardless of the primary IoU variant.
-         *
-         * @param a Source tracklet.
-         * @param b Candidate tracklet.
-         * @return Raw IoU overlap in [0, 1]; zero when the boxes are disjoint.
-         */
-        inline float rawIoU(const ICostCalculator::TrackletPtr& a,
-                            const ICostCalculator::TrackletPtr& b)
-        {
-            return SushiTrack::iou(a->getRect(), b->getRect());
-        }
     }
 
     /**
@@ -845,16 +825,14 @@ namespace SushiTrack
                                             std::shared_ptr<IGateValidator> gate_validator,
                                             std::shared_ptr<ICostCalculator> iou_calc,
                                             std::shared_ptr<ICostCalculator> cosine_calc,
-                                            float reid_direct_assignment_weight,
-                                            float proximity_thresh)
+                                            float reid_direct_assignment_weight)
         : iou_weight_(iou_weight),
         reid_thresh_(reid_thresh),
         gating_thresh_(gating_thresh),
         gate_validator_(std::move(gate_validator)),
         iou_calc_(std::move(iou_calc)),
         cosine_calc_(std::move(cosine_calc)),
-        reid_direct_assignment_weight_(reid_direct_assignment_weight),
-        proximity_thresh_(proximity_thresh)
+        reid_direct_assignment_weight_(reid_direct_assignment_weight)
     {
     }
 
@@ -903,13 +881,6 @@ namespace SushiTrack
 
             for (size_t j = 0; j < b.size(); ++j)
             {
-                // Proximity pre-filter on raw IoU (threshold stays meaningful across IoU variants); reject implausible pairs before the gate. No-op when proximity_thresh_ is 0.
-                if (proximity_thresh_ > 0.0f && rawIoU(a[i], b[j]) < proximity_thresh_)
-                {
-                    out_matrix(i, j) = 1e4f;
-                    continue;
-                }
-
                 // Validation gate: Mahalanobis distance past the chi-squared threshold gets a sentinel cost penalty.
                 if (!in_gate[j])
                 {
@@ -961,11 +932,6 @@ namespace SushiTrack
      */
     float FusedCostCalculator::calculate_single(const TrackletPtr& a, const TrackletPtr& b) const
     {
-        if (proximity_thresh_ > 0.0f && rawIoU(a, b) < proximity_thresh_)
-        {
-            return 1e4f;
-        }
-
         KalmanTypes::DetectBoxVector meas_workspace = { b->getMeasurement() };
         std::vector<float>           score_workspace = { b->getScore() };
         std::vector<bool> in_gate = gate_validator_->getGateFlags(
@@ -1160,11 +1126,9 @@ namespace SushiTrack
     GatedIoUCostCalculator::GatedIoUCostCalculator(float gating_thresh,
                                                 std::shared_ptr<IGateValidator> gate_validator,
                                                 std::shared_ptr<ICostCalculator> iou_calc,
-                                                float motion_cost_weight,
-                                                float proximity_thresh)
+                                                float motion_cost_weight)
         : gating_thresh_(gating_thresh),
         motion_cost_weight_(std::max(0.0f, std::min(0.999f, motion_cost_weight))),
-        proximity_thresh_(proximity_thresh),
         gate_validator_(std::move(gate_validator)),
         iou_calc_(std::move(iou_calc))
     {
@@ -1217,13 +1181,6 @@ namespace SushiTrack
 
             for (size_t j = 0; j < b.size(); ++j)
             {
-                // Proximity pre-filter on raw IoU (threshold stays meaningful across IoU variants); reject implausible pairs before the gate. No-op when proximity_thresh_ is 0.
-                if (proximity_thresh_ > 0.0f && rawIoU(a[i], b[j]) < proximity_thresh_)
-                {
-                    out_matrix(i, j) = 1e4f;
-                    continue;
-                }
-
                 // Validation gate: Mahalanobis distance past the chi-squared threshold gets a sentinel cost penalty.
                 if (!in_gate[j])
                 {
@@ -1260,11 +1217,6 @@ namespace SushiTrack
      */
     float GatedIoUCostCalculator::calculate_single(const TrackletPtr& a, const TrackletPtr& b) const
     {
-        if (proximity_thresh_ > 0.0f && rawIoU(a, b) < proximity_thresh_)
-        {
-            return 1e4f;
-        }
-
         KalmanTypes::DetectBoxVector meas_workspace = { b->getMeasurement() };
         std::vector<float>           score_workspace = { b->getScore() };
         std::vector<bool> in_gate = gate_validator_->getGateFlags(

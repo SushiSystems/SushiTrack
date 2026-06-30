@@ -137,6 +137,7 @@ namespace
             p.enable_reid                = getInt(b, "enable_reid",                p.enable_reid);
             p.enable_mahalanobis         = getInt(b, "enable_mahalanobis",         p.enable_mahalanobis);
             p.enable_ocm                 = getInt(b, "enable_ocm",                 p.enable_ocm);
+            p.enable_oru                 = getInt(b, "enable_oru",                 p.enable_oru);
         }
 
         if (!ds.contains("advanced")) return;
@@ -202,7 +203,6 @@ namespace
         if (adv.contains("mahalanobis_gating"))
         {
             const auto& s = adv.at("mahalanobis_gating");
-            p.proximity_thresh   = getFloat(s, "proximity_thresh",   p.proximity_thresh);
             p.gating_thresh      = getFloat(s, "gating_thresh",      p.gating_thresh);
             p.motion_cost_weight = getFloat(s, "motion_cost_weight", p.motion_cost_weight);
             p.max_area_ratio     = getFloat(s, "max_area_ratio",     p.max_area_ratio);
