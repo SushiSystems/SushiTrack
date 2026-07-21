@@ -3,7 +3,7 @@
  * @brief     Interacting Multiple Model (IMM) state estimator (kalman_type = 2).
  * @author    Mustafa Garip (mustafagarip@sushisystems.io)
  * @date      29.06.2026
- * @version   v0.1.0
+ * @version   v1.0.0
  * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
  */
 
@@ -42,7 +42,7 @@ namespace SushiTrack
      * unscented (sigma-point) time update; the measurement model is linear in
      * all modes, so the correction step is a standard Kalman update throughout.
      * Gating runs on the combined estimate via an internal stateless
-     * KalmanFilter helper. See docs/IMM_DESIGN.md.
+     * KalmanFilter helper. See docs/ARCHITECTURE.md.
      */
     class IMMFilter : public IKalmanFilter
     {

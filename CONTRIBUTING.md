@@ -146,7 +146,7 @@ When adding or removing a parameter:
 1. Add the field to `TrackerConfig` with a default value and a `///<` doc comment.
 2. Add the corresponding field to `SushiTrack_Params` in `SushiTrackC.h` with a `/** @brief */` comment.
 3. Propagate the value in `src/SushiTrackC.cpp` (the `SushiTrack_GetDefaultParams` function and the `SushiTrack_Create` → `TrackerConfig` mapping).
-4. Add the key to `sushitrack.json` under the correct section (`basic`, `advanced.*`, or `extended`).
+4. Add the key to `sushitrack.json` under the correct section (`basic` or `advanced.*`).
 5. Handle the key in `src/ConfigLoader.cpp`.
 6. Mirror the field in `bindings/python/sushitrack.py` → `SushiTrackParams._fields_` in exact declaration order (field order determines memory layout).
 7. Add a unit test in `tests/unit/TestConfiguration.cpp` verifying that the JSON key loads correctly.

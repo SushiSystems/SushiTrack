@@ -10,7 +10,7 @@
 #
 # Run directly:
 #   ./unit_test
-#   ./unit_test --gtest_filter="IMMFilterTest.*"
+#   ./unit_test --gtest_filter="TrackletTest.*"
 # ==============================================================================
 
 find_package(GTest REQUIRED)

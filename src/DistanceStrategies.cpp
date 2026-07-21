@@ -682,6 +682,11 @@ namespace SushiTrack
      */
     float ReIDFirstCostCalculator::calculate_single(const TrackletPtr& a, const TrackletPtr& b) const
     {
+        // Mirror the batch calculate() row policy so the single-pair path is
+        // regime-consistent (identity for Cruising / no-IMM).
+        const StateAssocMods sm = stateAssocMods(a->getLastSeenState());
+        const float row_iou_weight = std::clamp(iou_weight_ - sm.reid_shift, 0.0f, 1.0f);
+
         if (a->hasFeature() && b->hasFeature())
         {
             float reid_sim = a->getMaxFeatureSimilarity(b->getCurrFeat());
@@ -697,7 +702,12 @@ namespace SushiTrack
             {
                 return 1e4f;
             }
-            return (1.0f - iou_weight_) * reid_dist + iou_weight_ * iou_d;
+            return (1.0f - row_iou_weight) * reid_dist + row_iou_weight * iou_d;
+        }
+
+        if (sm.require_reid)
+        {
+            return 1e4f;
         }
 
         if (iou_calc_)
@@ -872,17 +882,16 @@ namespace SushiTrack
             const float row_appear_w    = 1.0f - row_motion_w;
             const float gate            = row_gate_thresh;
 
-            std::vector<bool> in_gate = gate_validator_->getGateFlags(
-                a[i]->getMean(), a[i]->getCovariance(), meas_workspace_,
-                row_gate_thresh, score_workspace_);
-
+            // Single projection pass: the gate flags are derived from the squared
+            // distances rather than a second getGateFlags projection (identical
+            // result, half the per-row gating work).
             std::vector<float> sq_dists = gate_validator_->getGateSqDistances(
                 a[i]->getMean(), a[i]->getCovariance(), meas_workspace_, score_workspace_);
 
             for (size_t j = 0; j < b.size(); ++j)
             {
                 // Validation gate: Mahalanobis distance past the chi-squared threshold gets a sentinel cost penalty.
-                if (!in_gate[j])
+                if (sq_dists[j] > row_gate_thresh)
                 {
                     SUSHITRACK_LOG_DEBUG("[Distance] Gating: Track %llu gated out detection %zu (Mahalanobis).", (unsigned long long)a[i]->getTrackId(), j);
                     out_matrix(i, j) = 1e4f;
@@ -932,39 +941,47 @@ namespace SushiTrack
      */
     float FusedCostCalculator::calculate_single(const TrackletPtr& a, const TrackletPtr& b) const
     {
+        // Mirror the batch calculate() row policy (per-regime gate scale and
+        // appearance/geometry blend); identity for Cruising / no-IMM.
+        const StateAssocMods sm = stateAssocMods(a->getLastSeenState());
+        const float row_gate_thresh = std::max(1e-3f, gating_thresh_ * sm.gate_scale);
+        const float row_motion_w    = std::clamp(iou_weight_ - sm.reid_shift, 0.0f, 1.0f);
+        const float row_appear_w    = 1.0f - row_motion_w;
+
         KalmanTypes::DetectBoxVector meas_workspace = { b->getMeasurement() };
         std::vector<float>           score_workspace = { b->getScore() };
-        std::vector<bool> in_gate = gate_validator_->getGateFlags(
-            a->getMean(), a->getCovariance(), meas_workspace,
-            gating_thresh_, score_workspace);
+        std::vector<float> sq_dists = gate_validator_->getGateSqDistances(
+            a->getMean(), a->getCovariance(), meas_workspace, score_workspace);
 
-        if (!in_gate[0])
+        if (sq_dists[0] > row_gate_thresh)
         {
             return 1e4f;
         }
 
-        std::vector<float> sq_dists = gate_validator_->getGateSqDistances(
-            a->getMean(), a->getCovariance(), meas_workspace, score_workspace);
-        const float gate = std::max(1e-3f, gating_thresh_);
-        float motion_d = sq_dists[0] / gate;
+        float motion_d = sq_dists[0] / row_gate_thresh;
 
         if (a->hasFeature() && b->hasFeature())
         {
             float max_sim = a->getMaxFeatureSimilarity(b->getCurrFeat());
             float cos_d = std::max(0.0f, 1.0f - max_sim);
-            
+
             if (reid_direct_assignment_weight_ > 0.0f && cos_d < reid_thresh_)
             {
                 return cos_d * reid_direct_assignment_weight_;
             }
-            
+
             if (cos_d > reid_thresh_)
             {
                 cos_d = 1.0f;
             }
-            return iou_weight_ * motion_d + (1.0f - iou_weight_) * cos_d;
+            return row_motion_w * motion_d + row_appear_w * cos_d;
         }
-        
+
+        if (sm.require_reid)
+        {
+            return 1e4f;
+        }
+
         return motion_d;
     }
 
@@ -1170,19 +1187,16 @@ namespace SushiTrack
             const float row_gate_thresh = std::max(1e-3f, gating_thresh_ * sm.gate_scale);
             const float gate            = row_gate_thresh;
 
-            std::vector<bool> in_gate = gate_validator_->getGateFlags(
-                a[i]->getMean(), a[i]->getCovariance(), meas_workspace_,
-                row_gate_thresh, score_workspace_);
-
-            std::vector<float> sq_dists;
-            if (fuse_motion)
-                sq_dists = gate_validator_->getGateSqDistances(
-                    a[i]->getMean(), a[i]->getCovariance(), meas_workspace_, score_workspace_);
+            // Single projection pass: the gate flags are derived from the squared
+            // distances (identical result, and no separate getGateFlags
+            // projection when the motion term is fused).
+            std::vector<float> sq_dists = gate_validator_->getGateSqDistances(
+                a[i]->getMean(), a[i]->getCovariance(), meas_workspace_, score_workspace_);
 
             for (size_t j = 0; j < b.size(); ++j)
             {
                 // Validation gate: Mahalanobis distance past the chi-squared threshold gets a sentinel cost penalty.
-                if (!in_gate[j])
+                if (sq_dists[j] > row_gate_thresh)
                 {
                     SUSHITRACK_LOG_DEBUG("[Distance] Gating: Track %llu gated out detection %zu (Mahalanobis).", (unsigned long long)a[i]->getTrackId(), j);
                     out_matrix(i, j) = 1e4f;
@@ -1217,13 +1231,18 @@ namespace SushiTrack
      */
     float GatedIoUCostCalculator::calculate_single(const TrackletPtr& a, const TrackletPtr& b) const
     {
+        // Mirror the batch calculate() row policy (per-regime gate scale);
+        // identity for Cruising / no-IMM. Single projection pass, flags derived
+        // from the squared distance.
+        const StateAssocMods sm = stateAssocMods(a->getLastSeenState());
+        const float row_gate_thresh = std::max(1e-3f, gating_thresh_ * sm.gate_scale);
+
         KalmanTypes::DetectBoxVector meas_workspace = { b->getMeasurement() };
         std::vector<float>           score_workspace = { b->getScore() };
-        std::vector<bool> in_gate = gate_validator_->getGateFlags(
-            a->getMean(), a->getCovariance(), meas_workspace,
-            gating_thresh_, score_workspace);
+        std::vector<float> sq_dists = gate_validator_->getGateSqDistances(
+            a->getMean(), a->getCovariance(), meas_workspace, score_workspace);
 
-        if (!in_gate[0])
+        if (sq_dists[0] > row_gate_thresh)
         {
             return 1e4f;
         }
@@ -1233,11 +1252,7 @@ namespace SushiTrack
         const bool fuse_motion = (motion_cost_weight_ > 1e-6f);
         if (fuse_motion)
         {
-            std::vector<float> sq_dists = gate_validator_->getGateSqDistances(
-                a->getMean(), a->getCovariance(), meas_workspace, score_workspace);
-            
-            const float gate = std::max(1e-3f, gating_thresh_);
-            float motion = sq_dists[0] / gate;
+            float motion = sq_dists[0] / row_gate_thresh;
             if (motion > 1.0f) motion = 1.0f;
 
             float motion_penalty = motion_cost_weight_ * motion;

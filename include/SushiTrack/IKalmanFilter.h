@@ -3,7 +3,7 @@
  * @brief     Unified interface for Kalman filter variants.
  * @author    Mustafa Garip (mustafagarip@sushisystems.io)
  * @date      30.04.2026
- * @version   v1.1.0
+ * @version   v1.0.0
  * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
  */
 

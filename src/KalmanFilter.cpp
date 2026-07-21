@@ -590,14 +590,9 @@ namespace SushiTrack
     }
 
     /**
-     * @brief Initializes the generic Kalman factory with baseline noise parameters.
+     * @brief Initializes the generic Kalman factory.
      *
      * @param kalman_type Identifier for the Kalman filter implementation.
-     * @param std_weight_pos Baseline standard deviation weight for position.
-     * @param std_weight_vel Baseline standard deviation weight for velocity.
-     * @param kf_pos_weight Multiplier applied to position-related uncertainty.
-     * @param kf_size_weight Multiplier applied to size-related uncertainty.
-     * @param kf_vel_weight Multiplier applied to velocity-related uncertainty.
      * @param enable_xyah Flag selecting the xyah coordinate parameterization.
      */
     GenericKalmanFactory::GenericKalmanFactory(int kalman_type, bool enable_xyah)

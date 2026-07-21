@@ -155,7 +155,7 @@ extern "C"
         /** @brief Flag to add a +1 offset in bounding box dimension calculations (inclusive). */
         int   iou_plus_one;
 
-        /** @brief Defines the type of Kalman Filter utilized (0: Linear, 1: Noise Scale Adaptive). */
+        /** @brief Defines the motion estimator utilized (0: Linear Kalman, 1: Noise Scale Adaptive, 2: IMM multi-model). */
         int   kalman_type;
 
         // ReID Params

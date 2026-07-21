@@ -219,12 +219,12 @@ namespace SushiTrack
         int   tentative_fast_hits         = 1;
 
         /**
-         * @brief Score threshold below which an extra confirmation hit is required.
+         * @brief Lower score-band boundary for tentative confirmation hits.
          *
-         * When the matched score is below this value but above the floor
-         * (score < tentative_slow_thresh), tentative_slow_hits_offset additional
-         * hits are added to tentative_confirm_hits. Below the floor,
-         * tentative_vslow_hits_offset is added instead.
+         * A matched score in [tentative_slow_thresh, high_thresh) adds
+         * tentative_slow_hits_offset to tentative_confirm_hits; a score below
+         * tentative_slow_thresh adds tentative_vslow_hits_offset instead. Lower
+         * confidence therefore requires more consecutive hits to confirm.
          */
         float tentative_slow_thresh       = 0.40f;
 
@@ -235,22 +235,16 @@ namespace SushiTrack
         int   tentative_vslow_hits_offset = 2;
 
         /**
-         * @note Score-history independence of the confirmation threshold.
+         * @note The confirmation threshold tracks the smoothed score.
          *
-         * The required hit count is evaluated against the score of the most
-         * recently matched detection (t->getScore()), not the score at birth.
-         * This means the threshold that applies at confirm time is determined
-         * by the last observation, regardless of what earlier matches scored.
-         *
-         * Consequence: a track that accumulated hits against low-confidence
-         * detections and then matches a high-confidence detection on a later
-         * frame will be confirmed immediately if hits_ >= tentative_fast_hits,
-         * because the new score drives the required-hits lookup. This is
-         * intentional: the final high-confidence observation is treated as
-         * the authoritative signal that the track is real. If the desired
-         * behaviour is to gate confirmation on the score at birth, the
-         * threshold lookup should be moved to activateTentative() and the
-         * result stored as a per-track field.
+         * The required hit count is evaluated against the EMA-smoothed track
+         * score (t->getSmoothScore(), momentum kScoreSmoothingMomentum), not the
+         * raw last detection score and not the score at birth. Because the
+         * smoothed score lags a one-frame spike, a single high-confidence frame
+         * does not immediately collapse the required-hit count: a track that
+         * accumulated hits against low-confidence detections is confirmed only
+         * once its smoothed score has risen past the relevant band. This resists
+         * confirmation on a transient score spike.
          */
         /** @brief Scaling factor for high-confidence direct visual matches. */
         float reid_direct_assignment_weight = 0.2f;

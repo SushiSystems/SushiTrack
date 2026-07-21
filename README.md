@@ -9,8 +9,9 @@ The default configuration runs the core path (IoU/DIoU two-stage association,
 tentative validation, Kalman prediction, lost-track buffering, LAPJV
 assignment). The following extensions are optional and **disabled by default**:
 four IoU variants, appearance ReID fusion, Mahalanobis gating, a
-Noise-Scale-Adaptive Kalman filter, a per-track kinematic finite state machine,
-real-time (`time_aware`) operation.
+Noise-Scale-Adaptive Kalman filter, a four-model IMM motion estimator
+(`kalman_type=2`), observation-centric momentum and re-update, real-time
+(`time_aware`) operation.
 
 A stable C API, a Python CLI (`sushitrack`/`ds`), a MOTChallenge and DanceTrack
 regression harness, a GTest unit suite, and a YOLOX-driven video inference
@@ -80,7 +81,7 @@ Track lifecycle is governed by `TrackState` (`New`, `Tracked`, `Lost`, `Removed`
 
 **Two-stage ByteTrack association** — high-confidence detections (`score >= track_thresh`) match first; remaining tracks then attempt to absorb low-confidence detections.
 
-**Tentative validation** — when `enable_tentative=1`, new tracks must accumulate `tentative_confirm_hits` consecutive matches before promotion. Confirmation hits are adaptive: `tentative_fast_thresh` (default 0.85) allows single-hit confirmation; `tentative_slow_thresh` (default 0.40) adds `tentative_slow_hits_offset` extra hits; below the slow threshold adds `tentative_vslow_hits_offset` hits. A separate `tentative_match_thresh` and `tentative_max_age_seconds` govern tentative-pass cost and expiry.
+**Tentative validation** — when `enable_tentative=1`, new tracks must accumulate `tentative_confirm_hits` consecutive matches before promotion. Confirmation hits are adaptive: `tentative_fast_thresh` (default 0.85) allows single-hit confirmation; `tentative_slow_thresh` (default 0.40) adds `tentative_slow_hits_offset` extra hits; below the slow threshold adds `tentative_vslow_hits_offset` hits. `tentative_match_thresh` governs tentative-pass cost. Expiry uses `tentative_max_miss_frames` in frame mode (`time_aware=0`) or `tentative_max_age_seconds` in wall-clock mode (`time_aware=1`), and `tentative_init_suppress_iou` drops a new-track detection overlapping a confirmed track.
 
 **IoU variants** — `iou_type` selects `IoUCostCalculator` (0), `DIoUCostCalculator` (1, default), `GIoUCostCalculator` (2), or `SIoUCostCalculator` (3) for the primary/secondary stages. Tentative and duplicate stages are pinned to plain IoU so their thresholds keep their calibration.
 
@@ -95,18 +96,22 @@ Visual features are L2-normalised and exponentially smoothed (`feature_momentum`
 
 **Mahalanobis gating** — `enable_mahalanobis=1` filters association candidates via a chi-squared test on the projected state distribution. `gating_thresh` defaults to 9.4877 (95 % CI for 4 DoF). `GatedIoUCostCalculator` combines IoU with the gate; `motion_cost_weight` blends the squared distance into the cost.
 
-> **Why the gate only uses the box (`xyah`), not velocity — in plain English.**
-> The Kalman state carries eight numbers: the four box numbers (`[cx, cy, a, h]`, or `[x, y, w, h]`) plus their four velocities. A detector, however, only ever reports a box — it never reports a velocity. So the only thing we can actually *compare* a track against is its predicted box. The Mahalanobis gate therefore projects the 8-D state down to the 4-D box it would produce, and measures the distance purely in that 4-D box space: "given how uncertain I am about where this box should be, how surprising is this detection's box?" The velocities are used to *predict* where the box goes, but they are never part of the distance, because there is no measured velocity to compare them to. This is why the chi-squared test has **4** degrees of freedom (hence the 9.4877 default = 95 % for 4 DoF) and not 8 — feeding in the velocity dimensions would be comparing against numbers no detection contains, which would distort the gate. This holds identically for the IMM estimator (`kalman_type=2`): its internal model bank is collapsed to the same 4-D box estimate before gating, so the gate sees `xyah` only, exactly as the plain Kalman path does. This 4-D-measurement convention is the standard one shared by SORT, DeepSORT, ByteTrack and OC-SORT.
+> **Why the gate uses only the box (`xyah`), not velocity.**
+> The Kalman state carries eight numbers: the four box numbers (`[cx, cy, a, h]`, or `[x, y, w, h]`) plus their four velocities. A detector only ever reports a box, never a velocity, so the only quantity a track can be compared against is its predicted box. The Mahalanobis gate therefore projects the 8-D state down to the 4-D box it would produce and measures the distance in that 4-D box space, scaling the box residual by the predicted box uncertainty. The velocities are used to *predict* where the box goes, but are never part of the distance, because there is no measured velocity to compare them to. This is why the chi-squared test has **4** degrees of freedom (hence the 9.4877 default = 95 % for 4 DoF) and not 8 — feeding in the velocity dimensions would be comparing against numbers no detection contains, which would distort the gate. This holds identically for the IMM estimator (`kalman_type=2`): its internal model bank is collapsed to the same 4-D box estimate before gating, so the gate sees `xyah` only, exactly as the plain Kalman path does. This 4-D-measurement convention is the standard one shared by SORT, DeepSORT, ByteTrack and OC-SORT.
 
 **NSA Kalman filter** — `kalman_type=1` selects `NSAKalmanFilter`, a variant that scales measurement noise by detection confidence in both `initiate` and `project`.
 
-**IMM motion estimator** — `kalman_type=2`. A four-model Interacting Multiple Model filter (constant velocity, constant acceleration, near-constant-position, and a nonlinear coordinated-turn mode handled with an unscented update) replaces the single Kalman model. Its mode probabilities yield a continuous `maneuver_probability` (mass on the manoeuvring models) and a discrete `kinematic_state` (`Stationary`/`Cruising`/`Maneuvering`, or `Coasting` while Lost), consumed by association cost shaping, lost-buffer scaling and OCM weighting. See [docs/IMM_DESIGN.md](docs/IMM_DESIGN.md).
+**IMM motion estimator** — `kalman_type=2`. A four-model Interacting Multiple Model filter (constant velocity, constant acceleration, near-constant-position, and a nonlinear coordinated-turn mode handled with an unscented update) replaces the single Kalman model. Its mode probabilities yield a continuous `maneuver_probability` (mass on the manoeuvring models) and a discrete `kinematic_state` (`Stationary`/`Cruising`/`Maneuvering`, or `Coasting` while Lost), consumed by association cost shaping, lost-buffer scaling and OCM weighting. See the IMM section of [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 **Coordinate representations** — `enable_xyah=0` (default) uses TLWH state (`[x, y, w, h, vx, vy, vw, vh]`); `enable_xyah=1` uses centroid + aspect ratio + height (`[cx, cy, a, h, …]`). `iou_plus_one=1` (default) uses inclusive box dimensions consistent with the ByteTrack reference.
 
 **Primary association mode** — `primary_assoc_mode=1` (default) runs a single global LAPJV solve over the high-confidence pool. `primary_assoc_mode=0` retains a legacy age-cascade path.
 
 **Duplicate suppression** — `duplicate_iou_thresh` (default 0.15, i.e. IoU > 0.85) removes redundant tracklets after each frame using a plain-IoU calculator.
+
+**Observation-centric momentum (OCM)** — `enable_ocm=1` re-ranks the primary cost with a bounded velocity-direction term (OC-SORT VDC). For a track with a fresh, fast-enough, eligible-regime observed direction, it subtracts `clamp(ocm_vdc_weight * cos(theta), -ocm_vdc_weight, +ocm_vdc_weight)` from each in-gate primary cost cell, where `theta` is the angle between the track's observed direction of travel (measured over `ocm_delta_t` observed frames, not from Kalman velocity) and the direction from the last observation to the candidate. The term is bounded, so it only re-ranks candidates already inside the gate. `ocm_min_velocity`, `ocm_max_age`, and `ocm_maneuver_weight_scale` gate and scale the term by observed speed, staleness, and motion regime (Cruising full weight, Maneuvering scaled, Stationary/Coasting skipped).
+
+**Observation-centric re-update (ORU)** — `enable_oru=1` repairs the velocity that drifts while a track coasts through an unobserved gap. At each observation the estimator state is checkpointed; on recovery after a gap of at least two frames the estimator is rolled back to the checkpoint and the gap is replayed as predict/update steps along a straight-line virtual trajectory from the pre-loss observation to the recovery detection.
 
 **LAPJV solver** — `LAPJVSolver` runs the Jonker–Volgenant algorithm with active-row/column reduction. Workspace buffers are reused across frames to remove per-frame heap pressure.
 
@@ -161,6 +166,7 @@ sushitrack/
 │       ├── NSAKalmanFilter.h     # Noise-Scale Adaptive variant
 │       ├── KalmanFilterRegistry.h# Plug-in registry
 │       ├── KalmanTypes.h         # Eigen matrix typedefs
+│       ├── KinematicState.h      # Motion-regime enum (Stationary/Cruising/Maneuvering/Coasting)
 │       ├── IKalmanFilter.h       # IStatePredictor + IGateValidator
 │       ├── IKalmanFactory.h      # Predictor factory
 │       ├── IStatePredictor.h     # Predict/update interface
@@ -227,7 +233,11 @@ sushitrack/
 │   │   ├── TestMultiObject.cpp
 │   │   ├── TestConfigVariations.cpp
 │   │   ├── TestAdvancedPath.cpp
-│   │   └── TestFullStack.cpp
+│   │   ├── TestFullStack.cpp
+│   │   ├── TestKinematicState.cpp
+│   │   ├── TestObservationMomentum.cpp
+│   │   ├── TestDuplicateSuppression.cpp
+│   │   └── TestTimeAware.cpp
 │   │
 │   └── regression/
 │       ├── CMakeLists.txt        # regression_test executable + tracker_bridge shared lib
@@ -254,6 +264,7 @@ sushitrack/
 │           └── tracker_bridge.py # SushiTrack -> public binding; ByteTrack/OCSORT -> shim
 │
 ├── docs/
+│   ├── ARCHITECTURE.md           # Feature and internal-structure reference
 │   ├── CHANGELOG.md
 │   └── benchmarks/PRIVATE.md     # Internal benchmark log
 │
@@ -400,7 +411,7 @@ Runs the compiled `unit_test` GTest binary.
 
 ```bash
 sushitrack project test unit
-sushitrack project test unit --filter "IMMFilterTest.*" --verbose
+sushitrack project test unit --filter "TrackletTest.*" --verbose
 ```
 
 ### `project test integration`
@@ -785,7 +796,9 @@ All knobs are exposed both on `SushiTrack_Params` (C API, `include/SushiTrackC.h
 | `enable_tentative` | 0 | Enables tentative state |
 | `tentative_match_thresh` | 0.3 | Cost cutoff for tentative association |
 | `tentative_confirm_hits` | 3 | Consecutive matches required to confirm |
-| `tentative_max_age_seconds` | 0.08 | Wall-clock or frame-count budget for tentative expiry (≈ 2 frames at 25 fps) |
+| `tentative_max_age_seconds` | 0.08 | Wall-clock tentative expiry budget, used only when `time_aware=1` (≈ 2 frames at 25 fps) |
+| `tentative_max_miss_frames` | 2 | Frame-counted tentative expiry budget, used when `time_aware=0` |
+| `tentative_init_suppress_iou` | 0.7 | IoU above which a new-track detection overlapping a confirmed track is suppressed |
 | `tentative_fast_thresh` | 0.85 | Above this score, `tentative_fast_hits` hits are enough |
 | `tentative_fast_hits` | 1 | Hit count for fast-confirmation regime |
 | `tentative_slow_thresh` | 0.40 | Below this score, extra hits are required |
@@ -796,9 +809,10 @@ All knobs are exposed both on `SushiTrack_Params` (C API, `include/SushiTrackC.h
 
 | Key | Default | Description |
 |---|---|---|
-| `kalman_type` | 0 | 0 = Linear KF, 1 = NSA KF |
 | `enable_xyah` | 0 | 0 = TLWH state, 1 = centroid+aspect+height state |
 | `iou_plus_one` | 1 | Inclusive bounding-box dimensions |
+
+`kalman_type` is documented under [Motion estimator](#motion-estimator) below.
 
 `KalmanFilter` baseline constants (compile-time, see `include/SushiTrack/KalmanFilter.h`): `kStdWeightPosition=1/20`, `kStdWeightVelocity=1/160`, `kInitPositionMult=2.0`, `kInitVelocityMult=10.0`. These replace earlier configurable hyper-parameters and match the ByteTrack reference tuning.
 
@@ -813,6 +827,18 @@ All knobs are exposed both on `SushiTrack_Params` (C API, `include/SushiTrackC.h
 | `gating_thresh` | 9.4877 | Chi-squared threshold (95 % CI, 4 DoF) |
 | `motion_cost_weight` | 0.15 | Weight of squared Mahalanobis distance in gated IoU |
 | `max_area_ratio` | 50.0 | Suppress pairs with extreme area disparity |
+
+### Observation-centric momentum (OCM / ORU)
+
+| Key | Default | Description |
+|---|---|---|
+| `enable_ocm` | 0 | Enable the observation-centric momentum re-ranking term on the primary stage |
+| `enable_oru` | 0 | Enable observation-centric re-update (rollback and replay) on lost-track recovery |
+| `ocm_vdc_weight` | 0.1 | Bound on the momentum term subtracted from each in-gate primary cost cell |
+| `ocm_delta_t` | 3 | Observed-frame window over which the direction of travel is measured |
+| `ocm_min_velocity` | 1.0 | Minimum observed speed (px per observed frame) below which momentum is suppressed |
+| `ocm_max_age` | 1 | Maximum frames since the last observation for which momentum is applied |
+| `ocm_maneuver_weight_scale` | 0.15 | Fraction of `ocm_vdc_weight` applied to Maneuvering tracks (0 restricts momentum to Cruising) |
 
 ### ReID
 
@@ -832,7 +858,7 @@ All knobs are exposed both on `SushiTrack_Params` (C API, `include/SushiTrackC.h
 
 | Key | Default | Description |
 |---|---|---|
-| `kalman_type` | 0 | Motion estimator: `0` linear Kalman, `1` NSA, `2` IMM multi-model. With `2` each track reports a `kinematic_state` and continuous `maneuver_probability`; the IMM noise/transition parameters are built-in (see [docs/IMM_DESIGN.md](docs/IMM_DESIGN.md)). |
+| `kalman_type` | 0 | Motion estimator: `0` linear Kalman, `1` NSA, `2` IMM multi-model. With `2` each track reports a `kinematic_state` and continuous `maneuver_probability`; the IMM noise/transition parameters are built-in (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)). |
 
 ### Timing
 
@@ -848,7 +874,6 @@ All knobs are exposed both on `SushiTrack_Params` (C API, `include/SushiTrackC.h
 
 GTest-based, deterministic, no external data. Targets compiled when `-DBUILD_UNIT_TEST=ON`. Cover:
 
-- `TestKinematicState` — IMM-derived regime reported end-to-end (Stationary/Cruising/Maneuvering/Coasting)
 - `TestKalmanFilter` — initiate/predict/update, Mahalanobis distance, gate flags, LLT cache
 - `TestTracklet` — lifecycle transitions, feature EMA
 - `TestRect` — TLWH/TLBR/XYWH conversions
@@ -869,7 +894,7 @@ Direct invocation:
 
 ```bash
 ./build/bin/Release/unit_test
-./build/bin/Release/unit_test --gtest_filter="IMMFilterTest.*"
+./build/bin/Release/unit_test --gtest_filter="TrackletTest.*"
 ctest -R unit --output-on-failure
 ```
 
@@ -902,6 +927,10 @@ GTest binary that drives the tracker end-to-end exclusively through the C API, a
 - `TestConfigVariations` — IoU variant sweep, XYAH coordinates, NSA Kalman
 - `TestAdvancedPath` — ReID + Mahalanobis gating
 - `TestFullStack` — full advanced stack enabled at once
+- `TestKinematicState` — IMM-derived regime reported end-to-end (Stationary/Cruising/Maneuvering/Coasting)
+- `TestObservationMomentum` — observation-centric momentum re-ranking and ORU recovery
+- `TestDuplicateSuppression` — cross-pool duplicate removal by track lifetime
+- `TestTimeAware` — wall-clock (`time_aware`) stepping and expiry
 
 Direct invocation:
 
@@ -978,7 +1007,8 @@ place of `BYTETracker`. That is the single seam SushiTrack plugs into.
 ### Step 1 — Get the library and binding into your project
 
 You have two options. For an Ultralytics project living **outside** this
-repository, the deploy package is the cleaner path because it is self-contained.
+repository, the deploy package is self-contained: it needs no build tree or
+environment variables on the consumer side.
 
 **Option A — deploy package (recommended for external projects).** Produce a
 portable Python package and copy it next to your Ultralytics code:
@@ -1151,38 +1181,48 @@ code and is the recommended path.)
 
 ## Benchmark Results
 
-Evaluated on MOT17 / MOT20 train sets with public detectors. SushiTrack compared against the bundled ByteTrack reference at matched parameters. Metrics from TrackEval.
+Evaluated on the MOT17 and MOT20 train sets and DanceTrack, comparing SushiTrack
+against the bundled ByteTrack and OC-SORT references at matched parameters.
+Metrics are from TrackEval. The per-tracker aggregates below summarise the
+internal run recorded in [docs/benchmarks/PRIVATE.md](docs/benchmarks/PRIVATE.md),
+which also holds the per-sequence breakdown. SushiTrack ran on the default
+linear-Kalman path (`kalman_type=0`) with the tentative lifecycle, OCM, and ORU
+enabled and appearance ReID off; the full config is in that file. Latency is the
+mean per-frame `update()` time, single-threaded, excluding I/O. PRIVATE.md also
+records the `kalman_type=2` IMM ablation: 45.8 % overall HOTA against 45.7 % here,
+at roughly four times the per-frame latency.
 
-**MOT17 train**
+**MOT17**
 
 | Tracker | HOTA | DetA | AssA | MOTA | IDF1 | IDSW | FP | FN | Lat (µs/frame) |
 |---|---|---|---|---|---|---|---|---|---|
-| SushiTrack | 41.5 % | 40.8 % | 43.4 % | 46.7 % | 50.2 % | 1734 | 6448 | 168570 | 46 |
-| ByteTrack | 39.1 % | 40.9 % | 38.7 % | 46.5 % | 47.1 % | 2763 | 8827 | 165486 | 71 |
+| SushiTrack | 47.2 % | 48.2 % | 47.5 % | 55.0 % | 55.5 % | 2849 | 7092 | 185931 | 37 |
+| ByteTrack | 44.7 % | 48.5 % | 42.4 % | 55.1 % | 52.5 % | 4773 | 12806 | 177427 | 87 |
+| OC-SORT | 44.1 % | 46.4 % | 43.2 % | 53.0 % | 52.2 % | 2836 | 9172 | 191275 | 167 |
 
-**MOT20 train**
+**MOT20**
 
 | Tracker | HOTA | DetA | AssA | MOTA | IDF1 | IDSW | FP | FN | Lat (µs/frame) |
 |---|---|---|---|---|---|---|---|---|---|
-| SushiTrack | 24.9 % | 16.9 % | 42.2 % | 17.7 % | 24.2 % | 189 | 235 | 1037435 | 67 |
-| ByteTrack | 23.0 % | 15.6 % | 40.5 % | 16.6 % | 21.6 % | 200 | 243 | 1045728 | 124 |
+| SushiTrack | 44.9 % | 43.9 % | 50.9 % | 50.6 % | 50.1 % | 2904 | 13740 | 1185170 | 318 |
+| ByteTrack | 41.9 % | 42.7 % | 46.9 % | 49.9 % | 46.3 % | 3680 | 26843 | 1184486 | 506 |
+| OC-SORT | 38.7 % | 39.0 % | 41.5 % | 45.1 % | 44.0 % | 2972 | 29224 | 1254585 | 1181 |
+
+**DanceTrack**
+
+| Tracker | HOTA | DetA | AssA | MOTA | IDF1 | IDSW | FP | FN | Lat (µs/frame) |
+|---|---|---|---|---|---|---|---|---|---|
+| SushiTrack | 44.9 % | 72.0 % | 29.3 % | 85.1 % | 46.5 % | 3568 | 7215 | 42428 | 18 |
+| ByteTrack | 37.9 % | 65.2 % | 23.3 % | 82.0 % | 42.8 % | 3863 | 15913 | 43195 | 34 |
+| OC-SORT | 45.6 % | 69.7 % | 31.1 % | 80.2 % | 48.5 % | 2949 | 15976 | 50485 | 71 |
 
 **Overall**
 
 | Tracker | HOTA | DetA | AssA | MOTA | IDF1 | IDSW | FP | FN | Lat (µs/frame) |
 |---|---|---|---|---|---|---|---|---|---|
-| SushiTrack | 38.8 % | 37.0 % | 43.2 % | 42.0 % | 46.0 % | 1923 | 6683 | 1206005 | 50 |
-| ByteTrack | 36.5 % | 36.8 % | 39.0 % | 41.7 % | 43.0 % | 2963 | 9070 | 1211214 | 80 |
-
-Latency is mean per-frame `update()` time, single-threaded, excluding I/O.
-
-Internal private-detection benchmark (see `docs/benchmarks/PRIVATE.md`):
-
-| Tracker | HOTA | DetA | AssA | MOTA | IDF1 | IDSW | FP | FN | Lat (µs) |
-|---|---|---|---|---|---|---|---|---|---|
-| SushiTrack | 64.8 % | 71.8 % | 59.0 % | 83.0 % | 74.5 % | 3215 | 15287 | 161629 | 455 |
-| ByteTrack | 60.6 % | 71.0 % | 52.5 % | 82.2 % | 68.7 % | 5133 | 30837 | 150356 | 606 |
-| OC-SORT | 62.2 % | 70.3 % | 55.6 % | 80.6 % | 71.1 % | 3665 | 33487 | 169143 | 1729 |
+| SushiTrack | 45.7 % | 60.3 % | 38.3 % | 70.4 % | 50.2 % | 9321 | 28047 | 1413529 | 57 |
+| ByteTrack | 40.8 % | 56.7 % | 32.8 % | 68.7 % | 46.8 % | 12316 | 55562 | 1405108 | 103 |
+| OC-SORT | 44.3 % | 57.9 % | 36.7 % | 66.5 % | 49.4 % | 8757 | 54372 | 1496345 | 223 |
 
 ---
 

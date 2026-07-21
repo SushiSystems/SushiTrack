@@ -14,12 +14,12 @@ namespace SushiTrack
     /**
      * @brief Discrete motion regime of a track.
      *
-     * Derived from the IMM mode probabilities (see IMMFilter): the
-     * near-constant-position mass maps to Stationary, the constant-acceleration
-     * and coordinated-turn mass to Maneuvering, the remainder to Cruising, and a
-     * track without an observation reports Coasting. Consumed by the
-     * association cost shaping, lost-buffer scaling and the C API output as a
-     * single regime contract.
+     * Derived from the IMM mode probabilities (see IMMFilter): a dominant
+     * near-constant-position mass or a near-zero combined speed maps to
+     * Stationary, the constant-acceleration and coordinated-turn mass to
+     * Maneuvering, the remainder to Cruising, and a track without an observation
+     * reports Coasting. Consumed by the association cost shaping, lost-buffer
+     * scaling and the C API output as a single regime contract.
      */
     enum class KinematicState
     {

@@ -357,6 +357,7 @@ namespace SushiTrack
 
             static constexpr float kRegimeStationaryProb = 0.5f; ///< Near-constant-position mass above which the regime reads Stationary.
             static constexpr float kRegimeManeuverProb   = 0.5f; ///< CA+CT mass above which the regime reads Maneuvering.
+            static constexpr float kRegimeStationarySpeedFrac = 0.02f; ///< Combined speed below this fraction of box height per step also reads Stationary; the CV mode subsumes a motionless target so the NCP mode mass alone under-triggers.
 
             /**
              * @brief Refreshes the IMM-derived regime from the predictor's mode

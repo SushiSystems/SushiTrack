@@ -359,7 +359,9 @@ namespace SushiTrack
      *
      * Reports the regime semantics (Stationary / Cruising / Maneuvering /
      * Coasting) from the IMM mode probabilities so downstream consumers read a
-     * single regime contract.
+     * single regime contract. Stationary is reported when the near-constant-
+     * position mode mass is dominant or the combined estimated speed is
+     * near-zero relative to the box height; a Lost track reports Coasting.
      *
      * @param is_lost True when the track currently has no observation.
      */
@@ -381,7 +383,17 @@ namespace SushiTrack
             return;
         }
 
-        if (stationary_prob_ > kRegimeStationaryProb)
+        // A motionless target is explained by the CV mode (velocity -> 0) just as
+        // well as by NCP, and the CV-weighted prior keeps CV mass on top, so the
+        // NCP mode mass alone under-triggers Stationary. Fall back to the combined
+        // estimated speed, taken relative to box height so the test is scale-robust:
+        // a near-zero speed reads Stationary regardless of the mode split.
+        const float vx = mean_(4);
+        const float vy = mean_(5);
+        const float height = std::max(1e-2f, mean_(3));
+        const float speed_frac = std::sqrt(vx * vx + vy * vy) / height;
+
+        if (stationary_prob_ > kRegimeStationaryProb || speed_frac < kRegimeStationarySpeedFrac)
             imm_state_ = KinematicState::Stationary;
         else if (maneuver_prob_ > kRegimeManeuverProb)
             imm_state_ = KinematicState::Maneuvering;

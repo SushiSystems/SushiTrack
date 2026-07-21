@@ -710,8 +710,12 @@ namespace SushiTrack
             {
                 t->markAsRemoved();
                 removed_tentative_curr.push_back(t);
-                SUSHITRACK_LOG_DEBUG("[Tracker] Tentative track %llu aged out (misses=%d, limit=%d).",
-                    (unsigned long long)t->getTrackId(), t->getFramesSinceObservation(), config_.tentative_max_miss_frames);
+                if (config_.time_aware)
+                    SUSHITRACK_LOG_DEBUG("[Tracker] Tentative track %llu aged out (lost=%.3fs, limit=%.3fs).",
+                        (unsigned long long)t->getTrackId(), t->getAccumulatedLostTime(), config_.tentative_max_age_seconds);
+                else
+                    SUSHITRACK_LOG_DEBUG("[Tracker] Tentative track %llu aged out (misses=%d, limit=%d).",
+                        (unsigned long long)t->getTrackId(), t->getFramesSinceObservation(), config_.tentative_max_miss_frames);
             }
             else
             {

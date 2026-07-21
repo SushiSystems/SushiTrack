@@ -489,7 +489,7 @@ def project_test_unit(gtest_filter: str | None, verbose: bool) -> bool:
     """
     @brief Runs the unit_test GTest binary.
 
-    @param gtest_filter  Optional --gtest_filter string (e.g. "IMMFilterTest.*").
+    @param gtest_filter  Optional --gtest_filter string (e.g. "TrackletTest.*").
     @param verbose       Forward --gtest_print_time=1 and colour output.
     @return True if all tests pass.
     """

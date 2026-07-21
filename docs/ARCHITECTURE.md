@@ -1,0 +1,641 @@
+# SushiTrack Architecture
+
+This document describes the internal structure and features of SushiTrack: the
+per-frame processing pipeline, the interfaces that compose it, the motion
+estimators, the association stages, the track lifecycle, and the configuration
+and integration surfaces. It is a reference for engineers reading or extending
+the code. Parameter names, defaults, and enum values match the code as of
+v1.0.0; the compiled defaults are those set by `SushiTrack_GetDefaultParams`
+(`src/SushiTrackC.cpp`) and mirrored in `TrackerConfig` (`include/SushiTrack/TrackerConfig.h`).
+
+## Contents
+
+- [Scope](#scope)
+- [Per-frame pipeline](#per-frame-pipeline)
+- [Interfaces and wiring](#interfaces-and-wiring)
+- [Data model](#data-model)
+- [Coordinate systems](#coordinate-systems)
+- [Motion estimators](#motion-estimators)
+  - [Linear Kalman filter](#linear-kalman-filter)
+  - [NSA Kalman filter](#nsa-kalman-filter)
+  - [IMM estimator](#imm-estimator)
+- [Kinematic regime](#kinematic-regime)
+- [Association](#association)
+  - [Two-stage BYTE association](#two-stage-byte-association)
+  - [Primary association mode](#primary-association-mode)
+  - [Cost calculators](#cost-calculators)
+  - [Score fusion](#score-fusion)
+  - [Mahalanobis gating](#mahalanobis-gating)
+  - [Appearance / ReID](#appearance--reid)
+  - [Observation-centric momentum](#observation-centric-momentum)
+- [Assignment solver](#assignment-solver)
+- [Track lifecycle](#track-lifecycle)
+  - [States](#states)
+  - [Tentative confirmation](#tentative-confirmation)
+  - [Lost buffer and expiry](#lost-buffer-and-expiry)
+  - [Duplicate suppression](#duplicate-suppression)
+  - [Initialization suppression](#initialization-suppression)
+  - [Observation-centric re-update](#observation-centric-re-update)
+- [Timing policies](#timing-policies)
+- [Configuration system](#configuration-system)
+- [C API and bindings](#c-api-and-bindings)
+- [Logging](#logging)
+- [Thread safety](#thread-safety)
+- [Testing and evaluation](#testing-and-evaluation)
+- [Future work](#future-work)
+
+---
+
+## Scope
+
+SushiTrack is a C++17 multi-object tracking library. It consumes per-frame
+bounding-box detections (optionally with an appearance embedding) and produces
+persistent track identities. The pipeline follows the ByteTrack two-stage
+association design and extends it with optional appearance matching, statistical
+gating, alternative motion models, and observation-centric re-ranking and
+re-update terms.
+
+The library builds as a shared object and exposes a stable C ABI
+(`include/SushiTrackC.h`). A Python `ctypes` binding, a MOTChallenge/DanceTrack
+regression harness, a GoogleTest unit and integration suite, and a YOLOX video
+inference pipeline are included.
+
+Algorithm components are selected at runtime through configuration flags. The
+default (compiled) configuration runs the core path: two-stage IoU/DIoU
+association, Kalman prediction, lost-track buffering, and LAPJV assignment. The
+following are optional and off in the compiled defaults: the tentative
+lifecycle, appearance ReID, Mahalanobis gating, the NSA and IMM estimators,
+observation-centric momentum (OCM), observation-centric re-update (ORU),
+wall-clock timing. The shipped `sushitrack.json` enables the tentative
+lifecycle, OCM, and ORU; a caller that constructs `SushiTrack_Params`
+programmatically gets the compiled defaults instead.
+
+---
+
+## Per-frame pipeline
+
+`SushiTrackTracker::update(objects, dt)` (`src/SushiTrackTracker.cpp`) runs one
+frame. The steps are:
+
+1. **Timestep resolution.** In frame mode (`time_aware=0`) the internal step is
+   `1 / frame_rate` regardless of the passed `dt`. In wall-clock mode
+   (`time_aware=1`) the passed `dt` is used as elapsed seconds.
+2. **Detection split.** Each detection becomes a `Tracklet`. Detections with
+   `score >= track_thresh` go to the high pool; the rest go to the low pool.
+3. **Prediction.** Every confirmed track and every lost track is propagated to
+   the current timestamp via its predictor. Tentative tracks are predicted
+   separately.
+4. **Lost/active split.** When a lost-recovery metric is configured, `Tracked`
+   tracks and `Lost` tracks are separated so recovery runs on the lost set only.
+5. **High-confidence association.** Confirmed/active tracks match against the
+   high pool ([primary stage](#two-stage-byte-association)).
+6. **Low-confidence association.** Tracks unmatched in step 5 match against the
+   low pool. Tracks that remain unmatched are marked `Lost`.
+7. **Lost recovery** (when enabled). Lost tracks match against the
+   high-confidence detections still unclaimed, using the recovery metric.
+8. **Tentative stage** (when `enable_tentative=1`). Tentative tracks match the
+   remaining detections; matched tentatives accumulate hits and confirm when
+   the [dynamic hit threshold](#tentative-confirmation) is met; unmatched
+   high-confidence detections seed new tentative tracks after
+   [initialization suppression](#initialization-suppression). When
+   `enable_tentative=0`, an unconfirmed-track path runs instead.
+9. **Lost cleanup.** Lost tracks past their [scaled buffer](#lost-buffer-and-expiry)
+   are removed.
+10. **List finalization.** The tracked, lost, and removed pools are rebuilt and
+    cross-pool [duplicates](#duplicate-suppression) are removed.
+
+`update` returns all tracklets across states (Tracked, Lost, Tentative, Removed
+for the current frame). The C API layer (`SushiTrack_Update`) sorts them by
+lifecycle priority (Tracked < Tentative < Lost < Removed), truncates to the
+caller's buffer, and copies them into the output struct.
+
+---
+
+## Interfaces and wiring
+
+The tracker depends on abstract interfaces; concrete implementations are
+constructed by the C-API entry point (`SushiTrack_CreateEx` in
+`src/SushiTrackC.cpp`) from the resolved `SushiTrack_Params` and injected into
+`SushiTrackTracker`. The orchestrator references only the interfaces.
+
+| Interface | Responsibility | Implementations |
+|---|---|---|
+| `IStatePredictor` | Propagate/update motion state | `KalmanFilter`, `NSAKalmanFilter`, `IMMFilter` |
+| `IGateValidator` | Mahalanobis gating | `KalmanFilter`, `NSAKalmanFilter`, `IMMFilter`, `NullGateValidator` |
+| `IKalmanFilter` | Predictor + validator union | `KalmanFilter`, `NSAKalmanFilter`, `IMMFilter` |
+| `IKalmanFactory` | Per-tracklet predictor factory | `GenericKalmanFactory` (registry-backed) |
+| `ICostCalculator` | Pairwise association cost | IoU/DIoU/GIoU/SIoU, Cosine, ReIDFirst, PureReID, Fused, GatedIoU, and the FuseScore and ObservationMomentum decorators |
+| `IAssignmentSolver` | Bipartite assignment | `LAPJVSolver` |
+| `ITimingPolicy` | `dt` normalization and expiry | `FrameTimingPolicy`, `WallClockTimingPolicy` |
+
+`KalmanFilterRegistry` is a singleton registry keyed by the integer
+`kalman_type`. Each predictor registers itself with a `KalmanFilterRegistrar<T>`
+static: `KalmanFilter` at 0, `NSAKalmanFilter` at 1, `IMMFilter` at 2. The
+factory and the gating path both resolve predictors through the registry, so a
+new estimator becomes selectable by registering a new type id without editing
+the factory.
+
+---
+
+## Data model
+
+**`Object`** (`include/SushiTrack/Object.h`) is one input detection: a `Rect`
+box, a class `label`, a confidence `score`, and an optional appearance feature
+vector.
+
+**`Rect<T>`** (`include/SushiTrack/Rect.h`) is a bounding box templated on the
+scalar type. It stores top-left `x, y` plus `width, height` and converts among
+TLWH, TLBR, and XYWH (centroid) forms.
+
+**`Tracklet`** (`include/SushiTrack/Tracklet.h`) holds one track: the estimator
+state mean/covariance, the current box, lifecycle flags, score (raw and
+EMA-smoothed), identifiers, feature history, the IMM-derived regime, the
+observation-centric direction estimate, and the ORU checkpoint. Detections are
+also wrapped in `Tracklet` instances so the association stages operate on a
+single type. State accessors (`getMean`/`getCovariance`/`getMeasurement`) are
+mutex-protected.
+
+**`SushiTrack_Track`** (`include/SushiTrackC.h`) is the C output record:
+identifier, box, score, label, lifecycle `state`, `kinematic_state`, `age`,
+`hits`, `lost_time`, `frames_since_last_update`, `maneuver_probability`, the
+feature pointer, and activation/confirmation flags. `maneuver_probability` is
+`-1` when the active predictor is not an IMM, distinguishing "no estimate" from
+"confidently not manoeuvring". The feature pointer aliases tracker-owned memory
+and is valid only until the next `update`/`destroy`.
+
+---
+
+## Coordinate systems
+
+Two state parameterizations are supported, selected by `enable_xyah`:
+
+- `enable_xyah=0` (default): TLWH state `[x, y, w, h, vx, vy, vw, vh]`.
+- `enable_xyah=1`: centroid/aspect/height state `[cx, cy, a, h, ...]`.
+
+The measurement handed to the estimator is 4-D in both cases. `iou_plus_one=1`
+(default) uses inclusive box dimensions (`+1` on width/height and on
+intersection extents), consistent with the ByteTrack reference; `iou_plus_one=0`
+uses exclusive dimensions.
+
+---
+
+## Motion estimators
+
+All estimators expose an 8-D state to the tracklet and a 4-D measurement map.
+The predictor is created per tracklet by the factory so each track owns its
+estimator instance and any internal state.
+
+### Linear Kalman filter
+
+`KalmanFilter` (`src/KalmanFilter.cpp`) is a constant-velocity filter over the
+8-D state. Process and measurement noise scale with the dominant box dimension,
+using the ByteTrack-calibrated compile-time constants
+`kStdWeightPosition = 1/20`, `kStdWeightVelocity = 1/160`,
+`kInitPositionMult = 2.0`, `kInitVelocityMult = 10.0`
+(`include/SushiTrack/KalmanFilter.h`). Process-noise standard deviations scale
+linearly with `dt` (variance proportional to `dt^2`). `initiate` seeds the
+position/size block from the measurement and zeroes velocity, with the initial
+covariance widened by the init multipliers. `project` maps the state to
+measurement space and adds measurement noise; the projected LLT decomposition is
+cached (mutex-protected) and reused for gating within a frame. `predict` and
+`update` invalidate the cache. `mahalanobisDistance` computes the squared
+distance in 4-D measurement space; `isInGate`/`getGateFlags`/`getGateSqDistances`
+apply the chi-squared threshold.
+
+Optional per-step process-noise multipliers exist (`setNoiseMultipliers`) and
+reset to 1.0 after each `predict`.
+
+### NSA Kalman filter
+
+`NSAKalmanFilter` (Noise-Scale-Adaptive, `kalman_type=1`) overrides `initiate`
+and `project` to scale the position/size measurement-noise standard deviations
+by `sqrt(max(1 - score, 1e-2))`. Higher-confidence detections therefore get
+smaller measurement noise and a larger Kalman gain. Velocity components are not
+scaled. All other behaviour is inherited from `KalmanFilter`.
+
+### IMM estimator
+
+`IMMFilter` (`src/IMMFilter.cpp`, `kalman_type=2`) runs an Interacting Multiple
+Model filter over a bank of four motion models. It presents the standard 8-D
+`IKalmanFilter` interface outward while carrying wider mode-specific sub-states
+internally.
+
+**Model bank** (`enum Mode`):
+
+- **CV** — constant velocity (the ByteTrack baseline dynamics).
+- **CA** — constant acceleration (carries an acceleration pair).
+- **NCP** — near-constant position (position random walk, damped velocity).
+- **CT** — coordinated turn (nonlinear; carries a turn-rate state).
+
+**Shared state layout.** Every mode lives in a fixed 11-D working space
+`[cx, cy, w, h, vx, vy, vw, vh, ax, ay, omega]` with consistent slot semantics.
+The size block `[w, h, vw, vh]` is a common constant-velocity sub-model in all
+modes; only the centre kinematics differ. A mode pins the slots it does not own
+to zero (CV/NCP: acceleration and turn rate; CA: turn rate; CT: acceleration),
+so the mixing and combination math is model-agnostic — no per-mode masking.
+
+**IMM cycle** (per `predict`/`update`):
+
+1. **Mixing.** Predicted mode probabilities `cbar_j = sum_i Pi(i,j) * mu_i`;
+   mixing weights `mu_{i|j} = Pi(i,j) * mu_i / cbar_j`; mixed mean/covariance per
+   mode including the mode-spread term.
+2. **Mode-matched predict.** Each mode propagates its mixed estimate with its
+   own transition and process noise. Linear modes use their transition matrix;
+   CT uses an unscented (sigma-point) time update — the measurement model is
+   linear in all modes, so the correction is a standard Kalman update.
+3. **Likelihood and probability update** (on an observation). Each mode produces
+   a Gaussian innovation likelihood `N(nu; 0, S)` (evaluated in log space with
+   the log-determinant and constant terms); the mode probabilities update to
+   `mu_j ∝ cbar_j * Lambda_j` and normalize. On an unobserved frame the update
+   is skipped and the probabilities relax to the predicted `cbar`.
+4. **Combination.** The bank collapses to a single 8-D mean/covariance
+   (probability-weighted, with the mode-spread term) written back to the
+   tracklet.
+
+**Transition prior.** The Markov transition matrix `Pi` keeps `kPStay = 0.90`
+probability of remaining in the current mode; the off-diagonal mass is weighted
+toward CV so the stationary distribution is CV-heavy and the bank behaves like
+the CV baseline until a manoeuvre likelihood spikes.
+
+**Coordinated turn.** `ctTransition` rotates the centre velocity by
+`omega * dt` and integrates the curved path, degenerating to a straight line as
+`|omega| -> 0` (avoiding the `1/omega` singularity). `ukfPredict` uses the
+symmetric sigma-point set with `lambda = 0` (`alpha = 1`, `kappa = 0`,
+`beta = 2`).
+
+**Delta re-anchor.** The tracklet may mutate the shared 8-D mean between calls
+(the ByteTrack size-velocity freeze on unobserved tracks). Before each
+`predict`, the IMM compares the incoming mean against the last combined mean it
+wrote and applies the difference uniformly to every mode, keeping the bank
+consistent with the tracklet's view without any tracklet-side change.
+
+**Gating.** Gating runs on the combined estimate through an internal stateless
+`KalmanFilter` helper, so the gate sees the same 4-D box projection as the
+single-model path.
+
+**Checkpoint.** `saveCheckpoint`/`restoreCheckpoint` snapshot and restore the
+full mode bank (states, covariances, probabilities) for
+[ORU rollback](#observation-centric-re-update); the external 8-D projection is
+lossy and cannot reconstruct the bank.
+
+The IMM outputs a continuous `maneuver_probability` (mass on CA + CT), a
+`stationary_probability` (mass on NCP), and a derived
+[kinematic regime](#kinematic-regime).
+
+---
+
+## Kinematic regime
+
+`KinematicState` (`include/SushiTrack/KinematicState.h`) is a discrete
+per-track regime: `Stationary`, `Cruising`, `Maneuvering`, `Coasting`. When an
+IMM predictor drives the track, the regime is derived from the mode
+probabilities: NCP mass above 0.5 reads Stationary, CA+CT mass above 0.5 reads
+Maneuvering, otherwise Cruising; a track without a current observation reads
+Coasting, and the pre-Coasting regime is retained for restoration on recovery.
+
+When the predictor is not an IMM, `maneuverProbability()` returns a negative
+sentinel; the tracklet's regime getters then fall back to Cruising, which makes
+every regime-aware policy degrade to identity behaviour. The regime and the
+continuous `maneuver_probability` feed:
+
+- association cost shaping (per-row gate scale and appearance/geometry blend,
+  `stateAssocMods` in `src/DistanceStrategies.cpp`),
+- the lost-buffer scale (`cleanupLost`: Stationary 1.5×, Maneuvering 1.2×,
+  others 1.0×),
+- the OCM weight (Cruising full weight, Maneuvering scaled, Stationary/Coasting
+  skipped),
+- the C API output (`kinematic_state`, `maneuver_probability`).
+
+---
+
+## Association
+
+### Two-stage BYTE association
+
+The primary stage matches confirmed tracks against high-confidence detections
+under the `match_thresh` cost limit. The secondary stage matches tracks left
+unmatched by the primary stage against the low-confidence detection pool under
+`iou_match_thresh`. A track unmatched after both stages is marked `Lost`. This
+is the ByteTrack two-stage design: low-confidence detections can sustain an
+existing track but do not seed new ones.
+
+### Primary association mode
+
+`primary_assoc_mode` selects the primary-stage solve:
+
+- `1` (default) — a single global LAPJV over the union of candidate tracks and
+  high-confidence detections, matching the reference BYTETracker assignment.
+- `0` — a legacy age-cascade: tracks are bucketed by frames-since-last-seen and
+  each bucket is solved independently, favouring the freshest tracks in
+  contested matches.
+
+Lost recovery uses an age-cascade over the lost set regardless of this flag.
+
+### Cost calculators
+
+Cost calculators implement `ICostCalculator` and populate a `CostMatrix`
+(contiguous 2-D storage, workspace reused across frames). Cells that violate a
+constraint are set to a sentinel (`>= 1e3`) so the solver rejects them; the
+`max_area_ratio` constraint sets `1e4` for pairs with extreme area disparity.
+
+Geometry metrics, selected by `iou_type` for the primary and secondary stages:
+
+- **IoU** (`0`): cost `1 - IoU`.
+- **DIoU** (`1`, default): cost `1 - IoU + d^2 / c^2`, where `d` is the
+  centroid distance and `c` the diagonal of the smallest enclosing box.
+- **GIoU** (`2`): cost `1 - GIoU`, `GIoU = IoU - (area_enclosing - area_union) /
+  area_enclosing`.
+- **SIoU** (`3`): cost `1 - SIoU`, combining the IoU with an angle-aware
+  distance cost and a shape cost.
+
+The tentative and duplicate stages are pinned to plain IoU regardless of
+`iou_type`, because their thresholds are calibrated against the plain
+`1 - IoU` scale and the DIoU centroid penalty would skew them.
+
+Appearance and fused metrics (see [Appearance / ReID](#appearance--reid)):
+`CosineCostCalculator`, `ReIDFirstCostCalculator`, `PureReIDCostCalculator`,
+`FusedCostCalculator`, `GatedIoUCostCalculator`. Two decorators wrap the primary
+metric: `FuseScoreDecorator` and `ObservationMomentumDecorator`.
+
+### Score fusion
+
+`FuseScoreDecorator` (`fuse_score=1`, default) rescales each valid primary-cost
+cell by the detection score: `cost' = 1 - (1 - cost) * score`. Sentinel cells
+are left untouched. It is applied to the primary stage only, matching the
+ByteTrack reference; wrapping the low-confidence, tentative, duplicate, or
+recovery stages would double-penalize pairs that are low-score by construction
+or operate on a different cost scale.
+
+### Mahalanobis gating
+
+With `enable_mahalanobis=1`, association candidates are filtered by a chi-squared
+test on the predicted box distribution. `gating_thresh` defaults to `9.4877`
+(95% for 4 degrees of freedom). The gate is measured in 4-D box space: the 8-D
+state is projected to the box it would produce and the distance is taken there,
+because a detection reports a box but never a velocity. This holds for the IMM
+path too — its bank collapses to the same 4-D box estimate before gating. This
+is the 4-D-measurement convention shared by SORT, DeepSORT, ByteTrack, and
+OC-SORT.
+
+`GatedIoUCostCalculator` combines the gate with IoU; `motion_cost_weight`
+(default 0.15) blends the normalized squared distance into the cost. Regime-aware
+row policies (`stateAssocMods`) tighten the gate for Stationary tracks and widen
+it for Maneuvering/Coasting.
+
+### Appearance / ReID
+
+`enable_reid=1` activates appearance matching. Detections carry an external
+appearance embedding as a 7th tuple element (the library does not compute
+embeddings). Features are L2-normalized and exponentially smoothed
+(`feature_momentum`, default 0.9); a per-tracklet gallery holds up to
+`max_feature_history` (default 100) vectors, and `getMaxFeatureSimilarity`
+returns the maximum cosine similarity against the gallery.
+
+The active path depends on `enable_mahalanobis`:
+
+- **ReID-first** (default): `ReIDFirstCostCalculator` for the primary/secondary
+  stages — a direct appearance match below `reid_high_thresh`/`reid_low_thresh`
+  wins immediately (scaled by `reid_direct_assignment_weight`), otherwise the
+  cost blends appearance distance with an IoU fallback weighted by
+  `reid_high_iou_weight`/`reid_low_iou_weight`.
+- **Fused** (with `enable_mahalanobis=1`): `FusedCostCalculator` combines gated
+  motion distance and cosine appearance distance under regime-aware weights.
+- **Lost recovery** (both paths): `PureReIDCostCalculator` recovers lost tracks
+  from appearance alone under `reid_recovery_thresh`, gated when a validator is
+  present.
+
+### Observation-centric momentum
+
+`ObservationMomentumDecorator` (`enable_ocm=1`) is the outermost primary-stage
+decorator (applied after score fusion). It re-ranks the primary cost with a
+bounded directional term inspired by OC-SORT's velocity-direction consistency.
+
+For a track with a fresh, fast-enough, eligible-regime observed direction, and
+each candidate detection, it subtracts `clamp(weight * cos(theta), -weight,
++weight)` from the cost cell, where `theta` is the angle between the track's
+observed direction of travel (a unit vector computed from raw observations over
+`ocm_delta_t` frames — not from Kalman velocity) and the direction from the
+track's last observation to the candidate. The term is bounded by
+`ocm_vdc_weight` (default 0.1), so it can only re-rank candidates already inside
+the gate; it cannot rescue a gated-out pair or overpower geometry. Sentinel
+cells are skipped.
+
+Eligibility (per `effectiveWeight`): the observed speed must exceed
+`ocm_min_velocity`; the track must have been observed within `ocm_max_age`
+frames; the regime must be Cruising (full weight) or Maneuvering (weight scaled
+by `ocm_maneuver_weight_scale`, default 0.15). Stationary and Coasting tracks
+are skipped because their stored direction is meaningless.
+
+---
+
+## Assignment solver
+
+`LAPJVSolver` (`src/AssignmentSolvers.cpp`, `src/LAPJV.cpp`) solves the linear
+assignment with the Jonker–Volgenant algorithm (column reduction,
+reduction-transfer, augmenting-path search with dual updates). Pairs at or above
+the stage cost limit are treated as non-edges, so the solver returns matches
+plus the unmatched rows and columns. Workspace buffers are retained across
+frames to avoid per-frame heap allocation.
+
+---
+
+## Track lifecycle
+
+### States
+
+`TrackState` (`include/SushiTrack/Tracklet.h`): `New (0)`, `Tracked (1)`,
+`Lost (2)`, `Removed (3)`, `Tentative (4)`. A detection begins as `New`; it
+becomes `Tentative` (when the tentative lifecycle is on) or directly `Tracked`.
+A confirmed track that misses observations becomes `Lost`, is recoverable within
+the buffer, and is `Removed` on expiry.
+
+### Tentative confirmation
+
+With `enable_tentative=1`, a new high-confidence detection starts a tentative
+track that must accumulate a required number of consecutive matches before
+promotion. The required count is adaptive to the smoothed score of the matched
+detection (`get_dynamic_hits` in `matchTentative`):
+
+- `score >= tentative_fast_thresh` → `tentative_fast_hits` (single-hit
+  confirmation),
+- `score >= high_thresh` → `tentative_confirm_hits`,
+- `score >= tentative_slow_thresh` → `tentative_confirm_hits +
+  tentative_slow_hits_offset`,
+- below `tentative_slow_thresh` → `tentative_confirm_hits +
+  tentative_vslow_hits_offset`.
+
+Two counters guard promotion: a monotonic lifetime `hits_` and a
+`consecutive_hits_` streak that resets whenever the track survives a frame with
+no observation. Confirmation is gated on the streak, so a strobing false
+positive that matches on alternate frames never accumulates enough streak. The
+confirmation score is EMA-smoothed (momentum 0.7) so a one-frame spike cannot
+collapse the required-hit count. The required count is evaluated against the
+last matched detection's score, so a late high-confidence observation confirms a
+track that had accumulated low-confidence hits.
+
+### Lost buffer and expiry
+
+A lost track is retained for `track_buffer` (default 30) before removal. The
+buffer is scaled by the pre-Coasting regime under an IMM: Stationary 1.5×,
+Maneuvering 1.2×, others 1.0× (1.0× with no IMM regime). Expiry is evaluated by
+the timing policy: frame mode compares frames-since-last-seen against the scaled
+buffer; wall-clock mode compares accumulated lost seconds against
+`scaled_buffer / frame_rate`.
+
+Tentative tracks age out on a separate, tighter budget:
+`tentative_max_miss_frames` (default 2) in frame mode, or
+`tentative_max_age_seconds` (default 0.08 s ≈ 2 frames at 25 fps) in wall-clock
+mode.
+
+### Duplicate suppression
+
+After each frame, cross-pool tracklet pairs with `1 - IoU < duplicate_iou_thresh`
+(default 0.15, i.e. IoU > 0.85) are treated as duplicates and the shorter-lived
+track is dropped. Track lifetime is the span from the start frame to the current
+observation frame (matching the ByteTrack policy), not a freshness measure, so a
+just-recovered long-lived track is not displaced by a young overlapping one.
+
+### Initialization suppression
+
+Before seeding new tentative tracks, `suppressOverlappingInits` drops any
+init-candidate detection whose IoU with a track confirmed this frame exceeds
+`tentative_init_suppress_iou` (default 0.7). This prevents a freshly initialized
+tentative from duplicating an already-tracked target and splitting its identity
+when it later confirms.
+
+### Observation-centric re-update
+
+`enable_oru=1` repairs the velocity that drifts while a track coasts through an
+unobserved gap. At each real observation the estimator state is checkpointed. On
+recovery after a gap of at least two frames, the estimator is rolled back to the
+checkpoint and the gap is replayed as predict/update steps along a straight-line
+virtual trajectory interpolated from the pre-loss observation to the recovery
+detection. Routing the replay through the predictor's standard predict/update
+applies the repair to every IMM mode without mode-specific code. When no
+checkpoint exists or the gap is too small, recovery falls back to a single
+update.
+
+---
+
+## Timing policies
+
+`ITimingPolicy` normalizes the timestep and defines expiry:
+
+- **`FrameTimingPolicy`** (`time_aware=0`): each `update` is one step; expiry is
+  by frame count.
+- **`WallClockTimingPolicy`** (`time_aware=1`): `dt` is real seconds, multiplied
+  by `frame_rate` to obtain a Kalman step (capped at 5.0). Expiry compares
+  accumulated wall time against `track_buffer / frame_rate` seconds (strict `>`
+  with a `1e-4` epsilon for symmetry with the frame-counted path).
+
+The marking frame is counted in the lost-time budget (`markAsLost` seeds the
+accumulator with that frame's `dt`) so the two modes expire a track on the same
+frame.
+
+---
+
+## Configuration system
+
+Every tunable parameter has three synchronized representations
+(`CONTRIBUTING.md`): the C++ struct `TrackerConfig`
+(`include/SushiTrack/TrackerConfig.h`), the C ABI struct `SushiTrack_Params`
+(`include/SushiTrackC.h`), and the JSON schema (`sushitrack.json`). The Python
+binding's `SushiTrackParams` mirrors the C struct field-for-field in declaration
+order; a missing or reordered field silently corrupts every field after it.
+
+`ConfigLoader.cpp` overlays a JSON file onto a seeded `SushiTrack_Params`. The
+schema is layered `basic` / `advanced.<section>`; the outer `"sushitrack"`
+wrapper is optional. Any key absent from the file keeps the compiled default. A
+missing file is non-fatal; a malformed file leaves the parameters untouched and
+returns an error status. Resolution order: the `SUSHITRACK_CONFIG` environment
+variable, then an upward search for `sushitrack.json` from the working directory.
+Because the library parses the file itself, a compiled build is retuned by
+editing `sushitrack.json` with no recompilation.
+
+`SushiTrack_Create(NULL)` builds from the resolved config file; passing an
+explicit `SushiTrack_Params*` bypasses file loading entirely for programmatic
+control.
+
+---
+
+## C API and bindings
+
+`include/SushiTrackC.h` exposes an opaque `SushiTrackHdl` and the entry points
+`SushiTrack_GetDefaultParams`, `SushiTrack_Create`, `SushiTrack_CreateEx`
+(status-returning), `SushiTrack_CreateFromConfig`, `SushiTrack_LoadParamsFromJson`,
+`SushiTrack_Update`, `SushiTrack_Destroy`, and `SushiTrack_SetLogCallback`. The ABI
+is dependency-free (no Eigen or C++ headers leak through), so a C consumer needs
+only `SushiTrackC.h` and `SushiTrackTypes.h`. Status codes are `SushiTrack_Status`
+(`SushiTrackTypes.h`).
+
+`bindings/python/sushitrack.py` is a dependency-free `ctypes` binding that mirrors
+the three structs and the entry points and wraps them in a `SushiTrack` class.
+The shared library is located via an explicit path, the `SUSHITRACK_LIB`
+environment variable, the directory next to the binding module (for deploy
+packages), or the `build/` output tree.
+
+`sushitrack project build --deploy {cpp,python}` assembles a self-contained
+`package/` with the compiled library, the headers or binding, a default config,
+and a runnable example. The deploy is platform-specific (it copies the artefacts
+for the host OS).
+
+The library also integrates as a drop-in tracker behind an Ultralytics YOLO
+model through a `ctypes` adapter over the C API; the recipe is documented in the
+README.
+
+---
+
+## Logging
+
+`Logger` (`src/Logger.cpp`) routes `SUSHITRACK_LOG_DEBUG/INFO/WARN/ERROR` to a
+single global callback registered via `SushiTrack_SetLogCallback`. The callback
+pointer is stored atomically; setting or clearing it is thread-safe. Passing
+`NULL` unregisters.
+
+---
+
+## Thread safety
+
+`Tracklet` state accessors (`getMean`, `getCovariance`, `getMeasurement`) are
+mutex-protected. The `KalmanFilter` projected-LLT cache is mutex-protected. The
+log callback is atomic. A single tracker instance is not designed for concurrent
+`update` calls; construct one instance per stream.
+
+---
+
+## Testing and evaluation
+
+- **Unit tests** (`tests/unit/`, `-DBUILD_UNIT_TEST=ON`): deterministic
+  GoogleTest coverage of the estimators, cost calculators, LAPJV, timing
+  policies, tracklet lifecycle, tentative logic, configuration round-trips, the
+  C API surface, and boundary conditions.
+- **Integration tests** (`tests/integration/`, `-DBUILD_INTEGRATION_TEST=ON`):
+  end-to-end coverage driven exclusively through the C API, as an FFI consumer
+  would use it.
+- **Regression tests** (`tests/regression/`, `-DBUILD_REGRESSION_TEST=ON`): a
+  parameterized harness over `(scenario × tracker)` that reads MOT-format
+  detections, drives SushiTrack/ByteTrack/OC-SORT through a common adapter,
+  writes predictions, and reports per-frame timing. The Python evaluator wraps
+  TrackEval to produce HOTA/CLEAR/Identity metrics; the CLI chains the binary
+  and the evaluator (`sushitrack project test label`).
+- **Inference pipeline** (`tests/regression/inference/`): a YOLOX-driven video
+  pipeline that drives SushiTrack through the public Python binding.
+
+---
+
+## Future work
+
+The following changes alter tracking output or the IMM internals and were
+deferred past v1.0.0 because they require a benchmark re-run to validate; they
+are recorded here rather than implemented.
+
+- **Within-pool duplicate suppression.** `removeDuplicateTracklets` deduplicates
+  the tracked pool against the lost pool only. Extending it to the tracked pool
+  against itself would drop the rare same-object duplicate identities that occur
+  in dense scenes.
+- **IMM mixture-covariance gating.** IMM gating runs on the collapsed 8-D estimate
+  through a stateless `KalmanFilter` helper. Gating on the mode-probability-weighted
+  mixture innovation covariance would tighten the gate under a manoeuvre.
+- **Lazy coordinated-turn update.** The IMM runs the sigma-point (UKF) CT time
+  update every frame. Gating it on the CT (or combined manoeuvre) probability would
+  cut the dominant IMM cost when no track is turning.

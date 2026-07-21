@@ -3,7 +3,7 @@
  * @brief     Implementation of the IMM state estimator (kalman_type = 2).
  * @author    Mustafa Garip (mustafagarip@sushisystems.io)
  * @date      29.06.2026
- * @version   v0.3.0
+ * @version   v1.0.0
  * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
  */
 

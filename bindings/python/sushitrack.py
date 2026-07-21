@@ -169,6 +169,7 @@ class SushiTrackParams(Structure):
         ("max_feature_history", c_int),
         # --- Observation-Centric Momentum (OCM) ---
         ("enable_ocm", c_int),
+        ("enable_oru", c_int),
         ("ocm_vdc_weight", c_float),
         ("ocm_delta_t", c_int),
         ("ocm_min_velocity", c_float),
