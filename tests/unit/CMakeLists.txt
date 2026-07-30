@@ -2,15 +2,13 @@
 # unit_test — GTest-based deterministic unit tests for SushiTrack components.
 #
 # Build:
-#   cmake -DBUILD_UNIT_TEST=ON ..
-#   cmake --build . --target unit_test
+#   ds build                    (or: cmake -DBUILD_UNIT_TEST=ON .. && cmake --build . --target unit_test)
 #
-# Run via CTest:
-#   ctest -R unit --output-on-failure
+# Run via CTest (registered under the "unit" label):
+#   ds test --suite unit        (or: ctest --test-dir build -L '^unit$' --output-on-failure)
 #
 # Run directly:
-#   ./unit_test
-#   ./unit_test --gtest_filter="TrackletTest.*"
+#   ds run unit_test -- --gtest_filter="TrackletTest.*"
 # ==============================================================================
 
 find_package(GTest REQUIRED)

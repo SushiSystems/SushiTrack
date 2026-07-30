@@ -2,10 +2,10 @@
 # integration_test — GTest-based end-to-end integration tests.
 #
 # Build:
-#   sushitrack project build --integration
+#   ds build
 #
 # Run via CLI:
-#   sushitrack project test integration
+#   ds test --suite integration
 # ==============================================================================
 
 find_package(GTest REQUIRED)

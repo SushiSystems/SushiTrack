@@ -13,7 +13,7 @@ Noise-Scale-Adaptive Kalman filter, a four-model IMM motion estimator
 (`kalman_type=2`), observation-centric momentum and re-update, real-time
 (`time_aware`) operation.
 
-A stable C API, a Python CLI (`sushitrack`/`ds`), a MOTChallenge and DanceTrack
+A stable C API, a dependency-free Python CLI (`ds`), a MOTChallenge and DanceTrack
 regression harness, a GTest unit suite, and a YOLOX-driven video inference
 pipeline are included.
 
@@ -152,7 +152,6 @@ sushitrack/
 ├── Dockerfile                    # CUDA 12.1 base, system deps, Python wheels, alias setup
 ├── environment.yml               # Conda env: python 3.11, cmake, gtest, ninja, pip wheels
 ├── sushitrack.json                # Runtime config loaded by the library (see Tracker config files)
-├── README.md
 │
 ├── include/
 │   ├── SushiTrackC.h              # C-compatible public API
@@ -264,6 +263,8 @@ sushitrack/
 │           └── tracker_bridge.py # SushiTrack -> public binding; ByteTrack/OCSORT -> shim
 │
 ├── docs/
+│   ├── README.md                 # This document
+│   ├── CONTRIBUTING.md           # Engineering standards
 │   ├── ARCHITECTURE.md           # Feature and internal-structure reference
 │   ├── CHANGELOG.md
 │   └── benchmarks/PRIVATE.md     # Internal benchmark log
@@ -963,9 +964,9 @@ GTest-based, deterministic, no external data. Targets compiled when `-DBUILD_UNI
 Direct invocation:
 
 ```bash
-./build/bin/Release/unit_test
-./build/bin/Release/unit_test --gtest_filter="TrackletTest.*"
-ctest -R unit --output-on-failure
+ds run unit_test
+ds run unit_test -- --gtest_filter="TrackletTest.*"
+ds test --suite unit                    # ctest --test-dir build -L '^unit$'
 ```
 
 ### Regression tests (`regression_test`)
@@ -1005,8 +1006,8 @@ GTest binary that drives the tracker end-to-end exclusively through the C API, a
 Direct invocation:
 
 ```bash
-./build/bin/Release/integration_test
-ctest -R integration --output-on-failure
+ds run integration_test
+ds test --suite integration             # ctest --test-dir build -L '^integration$'
 ```
 
 ---

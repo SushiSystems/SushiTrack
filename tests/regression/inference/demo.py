@@ -17,18 +17,8 @@ from loguru import logger
 # Ensure we can import from the local directory and the project root
 _THIS_DIR = Path(__file__).parent
 _PROJECT_ROOT = _THIS_DIR.parent.parent.parent
-_TOOLS_DIR = _PROJECT_ROOT / "cli"
-
-if str(_TOOLS_DIR) not in sys.path:
-    sys.path.insert(0, str(_TOOLS_DIR))
-
-try:
-    from paths_manager import DIR_3RDPARTY, DIR_BUILD
-    _YOLOX_DIR = DIR_3RDPARTY / "yolox"
-    _BUILD_DIR = DIR_BUILD
-except ImportError:
-    _YOLOX_DIR = _PROJECT_ROOT / "3rdparty" / "yolox"
-    _BUILD_DIR = _PROJECT_ROOT / "build"
+_YOLOX_DIR = _PROJECT_ROOT / "3rdparty" / "yolox"
+_BUILD_DIR = _PROJECT_ROOT / "build"
 
 sys.path.append(str(_THIS_DIR))
 sys.path.append(str(_YOLOX_DIR))

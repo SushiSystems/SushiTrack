@@ -12,9 +12,12 @@
 #                    ByteTrack/OC-SORT third-party libraries.
 #                    Enable: -DBUILD_REGRESSION_TEST=ON
 #
-# Both targets register with CTest. Run selectively:
-#   ctest -R unit              -- unit tests only
-#   ctest -R RegressionTest    -- regression tests only
+# Every target registers with CTest under a single label (unit / integration /
+# regression), set on its gtest_discover_tests call. Select by label:
+#   ctest --test-dir build -L '^unit$'                 -- unit tests only
+#   ctest --test-dir build -L '^(unit|integration)$'   -- an umbrella
+#   ctest --test-dir build --print-labels              -- what is registered
+# Or through the CLI: `ds test --suite unit|integration|regression|functional|all`.
 # ==============================================================================
 
 option(BUILD_UNIT_TEST       "Build deterministic GTest unit tests"          OFF)

@@ -5,11 +5,10 @@ setlocal enabledelayedexpansion
 set "TOOLS_DIR=%~dp0.."
 set "ROOT_DIR=%~dp0..\.."
 
-:: Parse paths.env
-for /f "usebackq eol=# delims== tokens=1,2" %%A in ("%TOOLS_DIR%\paths.env") do set "%%A=%%B"
-if not defined DIR_EVALUATOR set "DIR_EVALUATOR=tests\regression\evaluator"
-
-set "TEST_DATA_DIR=%ROOT_DIR%\%DIR_EVALUATOR%\data"
+:: Relocated data roots are configured in cli\config.json; `ds paths` prints the
+:: resolved value, which can be passed as the first argument here.
+set "TEST_DATA_DIR=%~1"
+if not defined TEST_DATA_DIR set "TEST_DATA_DIR=%ROOT_DIR%\tests\regression\evaluator\data"
 
 echo [INFO] Cleaning prediction directories in %TEST_DATA_DIR%...
 

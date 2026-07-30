@@ -55,14 +55,10 @@ def resolve_data_dir(args) -> Path:
     if args.data_dir:
         return Path(args.data_dir)
 
-    try:
-        from paths_manager import DIR_EVALUATOR, DIR_DATA
-        candidates = [DIR_EVALUATOR / "data", DIR_DATA]
-    except ImportError:
-        candidates = [
-            _PROJECT_ROOT / "tests" / "regression" / "evaluator" / "data",
-            _PROJECT_ROOT / "data",
-        ]
+    candidates = [
+        _PROJECT_ROOT / "tests" / "regression" / "evaluator" / "data",
+        _PROJECT_ROOT / "data",
+    ]
     for c in candidates:
         if c.exists():
             return c.resolve()

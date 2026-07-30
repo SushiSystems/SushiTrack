@@ -217,19 +217,33 @@ tests/
   regression/   # MOT benchmark evaluation against ground truth.
 ```
 
-### Build flags
+### Building and running tests
+
+Through the CLI (`ds` requires nothing but python3 — see the README):
 
 ```bash
-# Unit tests only
-cmake -DBUILD_UNIT_TEST=ON ..
-
-# Integration tests only
-cmake -DBUILD_UNIT_TEST=ON -DBUILD_INTEGRATION_TEST=ON ..
-
-# Run via CTest
-ctest -R unit --output-on-failure
-ctest -R integration --output-on-failure
+ds build                       # library + every test target (the default)
+ds test                        # functional: unit + integration + regression
+ds test --suite unit
+ds test --suite integration -f 'TrackerBuffers'   # ctest -R over Suite.Case
+ds test --suite unit --repeat 3                   # flaky-test hunting
+ds eval --scenario MOT17-04-DPM                   # MOT metrics (not a CTest suite)
 ```
+
+Directly, if you prefer cmake/ctest. Each target carries one CTest label, so a
+suite is selected by label rather than by executable name:
+
+```bash
+cmake -B build -S . -DBUILD_UNIT_TEST=ON -DBUILD_INTEGRATION_TEST=ON
+cmake --build build --config Release
+
+ctest --test-dir build -L '^unit$' --output-on-failure
+ctest --test-dir build -L '^integration$' --output-on-failure
+```
+
+A new test file needs no build-system change beyond its source entry; a new test
+*target* must set `PROPERTIES LABELS "<suite>"` on its `gtest_discover_tests`
+call, otherwise no suite selects it.
 
 ### Expectations
 

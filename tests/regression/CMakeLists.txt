@@ -6,7 +6,8 @@
 #   cmake --build . --target regression_test
 #
 # Run via CTest:
-#   ctest -R RegressionTest --output-on-failure
+#   ds test --suite regression  (pass/fail; or: ctest --test-dir build -L '^regression$')
+#   ds eval                     (the same binary, plus TrackEval metrics)
 #
 # Run directly (all sequences):
 #   ./regression_test

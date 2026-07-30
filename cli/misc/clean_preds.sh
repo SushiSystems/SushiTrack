@@ -9,11 +9,9 @@ RESET='\033[0m'
 TOOLS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
 ROOT_DIR="$( cd "$TOOLS_DIR/.." && pwd )"
 
-if [ -f "$TOOLS_DIR/paths.env" ]; then
-    export $(grep -v '^#' "$TOOLS_DIR/paths.env" | xargs)
-fi
-
-TEST_DATA_DIR="$ROOT_DIR/${DIR_EVALUATOR:-tests/regression/evaluator}/data"
+# Relocated data roots are configured in cli/config.json; `ds paths` prints the
+# resolved value, which can be passed as the first argument here.
+TEST_DATA_DIR="${1:-$ROOT_DIR/tests/regression/evaluator/data}"
 
 echo -e "${BLUE}[INFO]${RESET} Cleaning prediction directories in $TEST_DATA_DIR..."
 
