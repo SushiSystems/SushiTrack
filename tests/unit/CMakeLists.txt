@@ -54,6 +54,10 @@ set_target_properties(unit_test PROPERTIES
 
 enable_testing()
 include(GoogleTest)
+# The "unit" label is what `ds test --suite unit` selects (ctest -L). One label
+# per target: the CLI expresses umbrellas as a label regex instead, so nothing
+# here has to change when a suite grouping changes.
 gtest_discover_tests(unit_test
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    PROPERTIES LABELS "unit"
 )

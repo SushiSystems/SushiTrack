@@ -1,0 +1,26 @@
+# Proof that the CLI needs nothing but python3.
+#
+# This image contains no compiler, no pip packages and no shell utilities beyond
+# the slim base — only the interpreter and cli/. Every command that does not
+# shell out to an external tool (help, config, paths, status, doctor) works here;
+# `doctor` is the point of the exercise, since it reports the missing toolchain
+# instead of crashing.
+#
+#   docker build -f cli/Dockerfile.cli -t sushitrack-cli .
+#   docker run --rm sushitrack-cli doctor
+#   docker run --rm -v "$PWD:/workspace/sushitrack" sushitrack-cli status
+FROM python:3-slim
+
+WORKDIR /workspace/sushitrack
+COPY cli /workspace/sushitrack/cli
+
+# Only cli/ is copied, so there is no CMakeLists.txt for the root search to find;
+# pinning the root explicitly keeps the diagnostics commands runnable. Mount the
+# real checkout over /workspace/sushitrack to work against actual sources.
+ENV DS_PROJECT_ROOT=/workspace/sushitrack
+
+RUN ln -sf /workspace/sushitrack/cli/ds.py /usr/local/bin/ds && \
+    chmod +x /workspace/sushitrack/cli/ds.py
+
+ENTRYPOINT ["python3", "/workspace/sushitrack/cli/ds.py"]
+CMD ["--help"]

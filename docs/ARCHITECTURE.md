@@ -574,7 +574,7 @@ The shared library is located via an explicit path, the `SUSHITRACK_LIB`
 environment variable, the directory next to the binding module (for deploy
 packages), or the `build/` output tree.
 
-`sushitrack project build --deploy {cpp,python}` assembles a self-contained
+`ds build --deploy {cpp,python}` assembles a self-contained
 `package/` with the compiled library, the headers or binding, a default config,
 and a runnable example. The deploy is platform-specific (it copies the artefacts
 for the host OS).
@@ -617,7 +617,7 @@ log callback is atomic. A single tracker instance is not designed for concurrent
   detections, drives SushiTrack/ByteTrack/OC-SORT through a common adapter,
   writes predictions, and reports per-frame timing. The Python evaluator wraps
   TrackEval to produce HOTA/CLEAR/Identity metrics; the CLI chains the binary
-  and the evaluator (`sushitrack project test label`).
+  and the evaluator (`ds eval`).
 - **Inference pipeline** (`tests/regression/inference/`): a YOLOX-driven video
   pipeline that drives SushiTrack through the public Python binding.
 

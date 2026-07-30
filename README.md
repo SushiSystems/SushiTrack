@@ -268,28 +268,27 @@ sushitrack/
 │   ├── CHANGELOG.md
 │   └── benchmarks/PRIVATE.md     # Internal benchmark log
 │
-└── cli/
-    ├── sushitrack.py              # CLI entry point (argparse, subcommand dispatcher)
-    ├── sushitrack.sh              # Shell wrapper (bash/zsh)
-    ├── sushitrack.bat             # Shell wrapper (Windows)
-    ├── ds.sh                     # Short alias (bash/zsh)
-    ├── ds.bat                    # Short alias (Windows)
+└── cli/                          # `ds` CLI — stdlib only, no third-party deps
+    ├── ds.py                     # Launcher (python3 cli/ds.py ...)
+    ├── ds.sh                     # Wrapper (sh)
+    ├── ds.bat                    # Wrapper (cmd/PowerShell)
     ├── install.sh                # Session installer (bash/zsh)
     ├── install.ps1               # Session installer (PowerShell)
-    ├── paths_manager.py          # Loads cli/paths.env overrides
-    ├── paths.env                 # Optional path overrides (not tracked)
-    ├── docker/
-    │   ├── build.sh              # docker build wrapper (bash)
-    │   ├── build.bat             # docker build wrapper (Windows)
-    │   ├── run.sh                # Bind-mounted container launcher (bash)
-    │   └── run.bat               # Bind-mounted container launcher (Windows)
-    ├── project/
-    │   ├── build.sh              # CMake configure + build (bash)
-    │   ├── build.bat             # CMake configure + build (Windows)
-    │   ├── run.sh                # Forwards to sushitrack.py project run (bash)
-    │   ├── run.bat               # Forwards to sushitrack.py project run (Windows)
-    │   ├── clean.sh              # Removes build/ (bash)
-    │   └── clean.bat             # Removes build/ (Windows)
+    ├── config.json               # Tracked CLI defaults (paths, build, docker)
+    ├── config.local.json         # Per-machine overrides (not tracked)
+    ├── Dockerfile.cli            # Bare python3 image proving the zero-dep claim
+    ├── sushitrack_cli/
+    │   ├── cli.py                # Command declarations (one thin layer)
+    │   ├── app.py                # Declarative argparse layer
+    │   ├── config.py             # Layered JSON config + path resolution
+    │   ├── env.py                # MSVC (vcvars) environment snapshotting
+    │   ├── proc.py               # Subprocess helpers
+    │   ├── console.py            # Semantic output facade
+    │   ├── theme.py              # Colors
+    │   ├── icons.py              # Glyphs
+    │   ├── renderer.py           # ANSI backend (tables, rules, panels)
+    │   └── services/             # build, tests, evaluate, deploy, docker,
+    │                             #   diag, discovery, runner
     └── misc/
         ├── clean_preds.sh        # Wipes pred/ directories under evaluator/data
         ├── clean_preds.bat       # Wipes pred/ directories under evaluator/data (Windows)
@@ -302,7 +301,14 @@ sushitrack/
 
 ### CLI installer (PowerShell / Bash)
 
-The installer registers `sushitrack` and `ds` as aliases that invoke `cli/sushitrack.py` and prepends `cli/` to `PATH` for the current session.
+The CLI requires **nothing but `python3`** — no Typer, no Rich, no loguru, and no
+pip install. It can always be run directly:
+
+```bash
+python3 cli/ds.py --help
+```
+
+The installer registers `ds` for the current session and prepends `cli/` to `PATH`.
 
 PowerShell:
 
@@ -332,11 +338,18 @@ conda activate sushitrack
 ### Docker
 
 ```bash
-sushitrack docker build      # builds image from ./Dockerfile (CUDA 12.1, Ubuntu 22.04)
-sushitrack docker run        # docker run -it --rm -v $(pwd):/workspace/sushitrack sushitrack bash
+ds docker build      # builds image from ./Dockerfile (CUDA 12.1, Ubuntu 22.04)
+ds docker run        # docker run -it --rm -v $(pwd):/workspace/sushitrack sushitrack bash
 ```
 
-The Dockerfile pins the same wheel versions as `environment.yml`. The project root is bind-mounted at `/workspace/sushitrack`; output files written inside the container are immediately visible on the host. `ds` and `sushitrack` aliases are pre-registered in the container shell.
+The Dockerfile pins the same wheel versions as `environment.yml`. The project root is bind-mounted at `/workspace/sushitrack`; output files written inside the container are immediately visible on the host. `ds` is symlinked into `/usr/local/bin`, so it works interactively and as `docker run ... ds build` alike.
+
+`cli/Dockerfile.cli` builds the CLI alone on a bare `python:3-slim` — no compiler, no pip packages — which is how the zero-dependency claim is verified:
+
+```bash
+docker build -f cli/Dockerfile.cli -t sushitrack-cli .
+docker run --rm -v "$PWD:/workspace/sushitrack" sushitrack-cli doctor
+```
 
 ---
 
@@ -357,18 +370,35 @@ cmake -B build -S . -G Ninja -DBUILD_UNIT_TEST=ON -DBUILD_REGRESSION_TEST=ON -DB
 cmake --build build --config Release
 ```
 
-Through the CLI (preferred):
+Each test target registers with CTest under a single label — `unit`,
+`integration`, `regression` — set on its `gtest_discover_tests` call, and
+`enable_testing()` at the top level makes the root `CTestTestfile.cmake` recurse
+into the test directories. So `ctest` works from the build root:
 
 ```bash
-sushitrack project build                      # library only
-sushitrack project build --unit               # library + unit_test
-sushitrack project build --regression         # library + regression_test + tracker_bridge
-sushitrack project build --integration        # library + integration_test
-sushitrack project build --test               # all targets: unit + regression + integration
-sushitrack project build --clean              # wipe build/ first; combinable with the above
-sushitrack project build --deploy cpp         # build, then assemble package/ for C/C++ consumers
-sushitrack project build --deploy python      # build, then assemble package/ for Python consumers
+ctest --test-dir build -L '^unit$' --output-on-failure     # what `ds test --suite unit` runs
+ctest --test-dir build --print-labels
 ```
+
+Through the CLI (preferred). Test targets are built **by default**; there is no
+per-suite build flag — what to *run* is selected at test time by CTest label:
+
+```bash
+ds build                      # library + every test target (default)
+ds build --no-test            # library only
+ds build --type debug         # release (default) | debug | relwithdebinfo | minsizerel
+ds build --clean              # wipe build/ first; combinable with the above
+ds build -j 8                 # parallel jobs (default: CPU count)
+ds build -D CMAKE_UNITY_BUILD=ON   # extra -D passed straight to cmake
+ds build --deploy cpp         # build, then assemble package/ for C/C++ consumers
+ds build --deploy python      # build, then assemble package/ for Python consumers
+```
+
+cmake configure runs only when the requested configuration (build type,
+tests on/off, generator, extra defines) differs from what the tree was configured
+with — recorded in `build/.sushitrack_config`. A configuration change reconfigures
+from scratch, because a single-config generator bakes the build type into its
+cache and would otherwise silently hand back the previous one.
 
 Artefacts: `build/bin/{Release,Debug}/sushitrack.{dll,so}`, `build/bin/.../unit_test{,.exe}`, `build/bin/.../regression_test{,.exe}`, `build/bin/.../integration_test{,.exe}`, `build/bin/.../tracker_bridge.{dll,so}`.
 
@@ -379,82 +409,120 @@ directory at the repository root — see [Deploy Packages](#deploy-packages).
 
 ## CLI Reference
 
-All commands take the form `sushitrack <command> <action> [flags]`. `ds` is a shorthand alias.
+Commands are flat: `ds <command> [flags]`, with `ds docker <action>` the only
+subgroup. Arguments after a bare `--` are forwarded to the underlying binary.
 
-### `project build`
+| Command | Purpose |
+|---|---|
+| `ds build` | Configure + build; test targets built by default (`--no-test` to skip) |
+| `ds test` | Run a CTest label group: `--suite unit / integration / regression / functional / all` |
+| `ds eval` | MOT label benchmark + TrackEval metrics (not a CTest suite) |
+| `ds infer` | YOLOX video inference pipeline through `tracker_bridge` |
+| `ds run` | Run a built executable, by name or from a picker |
+| `ds clean` | Remove `build/` and `package/` |
+| `ds deploy {cpp,python}` | Assemble `package/` from the current build |
+| `ds status` | What is built, what is missing, which data sets are present |
+| `ds doctor` | Verify the toolchain; non-zero exit when a requirement is missing |
+| `ds config` | Resolved configuration and the origin of every value |
+| `ds paths` | Resolved project directories |
+| `ds env` | Environment cmake and the test binaries execute under |
+| `ds docker build` / `ds docker run` | Image build / bind-mounted container |
+
+Configuration is layered: built-in defaults → `cli/config.json` → `cli/config.local.json`
+→ `DS_*` environment variables (`DS_BUILD_DIR`, `DS_BUILD_TYPE`, `DS_GENERATOR`,
+`DS_CMAKE`, `DS_DOCKER_IMAGE`, `DS_TRACKER`, `DS_PROJECT_ROOT`, …). `ds config`
+prints which layer each value came from.
+
+### `ds build`
 
 | Flag | Effect |
 |---|---|
+| `--type, -t <type>` | `release` (default) / `debug` / `relwithdebinfo` / `minsizerel` |
+| `--no-test` | Build the library only; test targets are built by default |
 | `--clean` | Remove the build directory before configuring |
-| `--unit` | Add `unit_test` target |
-| `--regression` | Add `regression_test` + `tracker_bridge` |
-| `--integration` | Add `integration_test` target |
-| `--test` | Build all test targets: `--unit --regression --integration` |
+| `--jobs, -j <n>` | Parallel build jobs (default: CPU count) |
+| `-D VAR=VALUE` | Extra `-D` option forwarded to cmake (repeatable) |
 | `--deploy {cpp,python}` | After a successful build, assemble a redistributable `package/` for the chosen consumer ([details](#deploy-packages)) |
 
-### `project test all`
+### `ds test`
 
-Default when `test_type` is omitted. Runs the unit suite, then the integration suite, then the label regression suite. Fail-fast: each stage is skipped if a prior stage fails.
+Runs tests through CTest labels. Each test target carries one label, assigned in
+`tests/*/CMakeLists.txt` on its `gtest_discover_tests` call, so a new test file —
+or a whole target — is picked up with no CLI change.
 
-```bash
-sushitrack project test                # equivalent to 'project test all'
-```
-
-### `project test unit`
-
-Runs the compiled `unit_test` GTest binary.
+| Suite | Label selection | Contents |
+|---|---|---|
+| `unit` | `-L '^unit$'` | `unit_test` — deterministic component tests, no external data |
+| `integration` | `-L '^integration$'` | `integration_test` — end-to-end coverage through the C API |
+| `regression` | `-L '^regression$'` | `regression_test` — MOT scenarios, pass/fail only (metrics: `ds eval`) |
+| `functional` | `-L '^(unit\|integration\|regression)$'` | all three; **the default** |
+| `all` | no `-L` | every registered test |
 
 | Flag | Effect |
 |---|---|
-| `--filter <expr>` | Passes through as `--gtest_filter=<expr>` |
-| `--verbose` | Adds `--gtest_print_time=1` |
+| `--suite, -s <name>` | Label group to run (default `functional`) |
+| `--filter, -f <regex>` | `ctest -R` over `Suite.Case` test names |
+| `--repeat, -r <n>` | `ctest --repeat until-fail:<n>` — re-run each test until it fails; flaky-test hunting |
+| `--jobs, -j <n>` | Run up to N tests concurrently (`ctest --parallel`) |
 
 ```bash
-sushitrack project test unit
-sushitrack project test unit --filter "TrackletTest.*" --verbose
+ds test                              # functional: unit + integration + regression
+ds test --suite unit
+ds test --suite unit -f 'RectTest'
+ds test --suite integration --repeat 3
+ds test --suite all -j 8
 ```
 
-### `project test integration`
-
-Runs the compiled `integration_test` GTest binary (end-to-end coverage driven through the C API). Requires `--integration` build.
+For GTest-level knobs (shuffle, break-on-failure) run the binary directly instead:
 
 ```bash
-sushitrack project test integration
+ds run unit_test -- --gtest_shuffle --gtest_break_on_failure
 ```
 
-### `project test label`
+### `ds eval`
 
-Runs `regression_test` on det.txt-backed MOT/DanceTrack scenarios, parses per-sequence `[ PERF ]` lines from the binary output, then runs TrackEval and prints a metrics table (HOTA / DetA / AssA / MOTA / IDF1 / IDSW / FP / FN / Lat).
+The MOT label benchmark. Not a CTest suite: it runs `regression_test` over
+det.txt-backed scenarios, parses the per-sequence `[ PERF ]` timings out of its
+output, then runs TrackEval and prints a metrics table (HOTA / DetA / AssA /
+MOTA / IDF1 / IDSW / FP / FN / Lat). `ds test --suite regression` answers only
+pass/fail for the same binary.
 
 | Flag | Effect |
 |---|---|
 | `--scenario <name>` | Sequence filter (exact match or case-insensitive substring) |
-| `--tracker <name>` | `SushiTrack` (default), `ByteTrack`, or `OCSORT` |
+| `--tracker <name>` | `sushitrack` (default), `bytetrack`, or `ocsort` |
 | `--compare` | Run all three trackers side-by-side |
-| `--eval-only` | Skip the binary; re-evaluate existing `pred/*.txt` files |
+| `--eval-only` | Skip the binary; re-score existing `pred/*.txt` files |
 | `--trackeval` | Use the official `3rdparty/TrackEval/scripts/run_mot_challenge.py` instead of the internal runner |
 | `--export <dir>` | Export TrackEval JSON/CSV to `<dir>` |
-| `--private` | Run only `*-YOLOX` sequences (MOT only) |
-| `--public` | Run all sequences except `*-YOLOX` (MOT only) |
+| `--private` | Only `*-YOLOX` sequences (MOT only) |
+| `--public` | All sequences except `*-YOLOX` (MOT only) |
 
 ```bash
-sushitrack project test label
-sushitrack project test label --compare
-sushitrack project test label --scenario MOT17-04-DPM --compare
-sushitrack project test label --eval-only --export ./results
-sushitrack project test label --trackeval --private
+ds eval
+ds eval --compare
+ds eval --scenario MOT17-04-DPM --compare
+ds eval --eval-only --export ./results
+ds eval --trackeval --private
 ```
 
-Scenarios registered in `ScenarioList.h`: full MOT17 train set (21 sequences across DPM/FRCNN/SDP detectors plus `-YOLOX` variants for each), MOT20 (`-01/-02/-03/-05` with `-YOLOX` variants), and DanceTrack sequences (`dancetrack0001`, `0002`, `0006`, `0008`, `0012`, `0015`, …).
+The internal runner needs the evaluator's own dependencies (numpy, scipy, loguru,
+TrackEval) from `environment.yml`; `--trackeval` bypasses it. Scenarios registered
+in `ScenarioList.h`: full MOT17 train set (21 sequences across DPM/FRCNN/SDP
+detectors plus `-YOLOX` variants for each), MOT20 (`-01/-02/-03/-05` with `-YOLOX`
+variants), and DanceTrack sequences (`dancetrack0001`, `0002`, `0006`, `0008`,
+`0012`, `0015`, …).
 
-### `project test inference`
+### `ds infer`
 
-Launches the YOLOX-driven video inference pipeline (`tests/regression/inference/demo.py`) which loads `tracker_bridge.{dll,so}` via ctypes. Requires `--regression` build.
+Launches the YOLOX-driven video inference pipeline
+(`tests/regression/inference/demo.py`), which loads `tracker_bridge.{dll,so}` via
+ctypes. Arguments after `--` are forwarded to `demo.py` untouched.
 
 | Flag | Default | Effect |
 |---|---|---|
 | `--source <path>` | required | Video file path or camera index |
-| `--tracker <name>` | `SushiTrack` | Tracker selector (`SushiTrack` / `ByteTrack` / `OCSORT`) |
+| `--tracker <name>` | `sushitrack` | Tracker selector (`sushitrack` / `bytetrack` / `ocsort`) |
 | `-n, --name <name>` | `yolox-s` | YOLOX architecture |
 | `-c, --ckpt <path>` | – | Pre-trained YOLOX weights |
 | `--device {cpu,gpu}` | `gpu` | Inference device |
@@ -471,31 +539,33 @@ Launches the YOLOX-driven video inference pipeline (`tests/regression/inference/
 | `--reid` | off | Enable OSNet ReID embedding extraction (fills `feat` per detection) |
 | `--reid-model <path>` | `osnet_x1_0.onnx` | Path to the ReID ONNX model |
 
-Examples:
-
 ```bash
-sushitrack project test inference -n yolox-x -c 3rdparty/weight/mot17x.pth.tar --source 3rdparty/video/MOT17-04.mp4 --num-classes 1 --legacy
+ds infer -n yolox-x -c 3rdparty/weight/mot17x.pth.tar --source 3rdparty/video/MOT17-04.mp4 --num-classes 1 --legacy
 
-sushitrack project test inference --source 0 --tracker SushiTrack --no-save --no-screen --stress
+ds infer --source 0 --tracker sushitrack --no-save --no-screen --stress
 ```
 
-If the YOLOX checkpoint filename contains `mot17` and `--tsize` is omitted/640, the pipeline overrides `tsize` to `(800, 1440)` to match the MOT17 training resolution.
+If the YOLOX checkpoint filename contains `mot17` and `--tsize` is omitted/640,
+the pipeline overrides `tsize` to `(800, 1440)` to match the MOT17 training
+resolution.
 
-### `project clean`
+### `ds clean`
 
-Removes the build directory (`build/` by default; overridable via `cli/paths.env`).
+Removes the build directory and the assembled package directory (`build/` and
+`package/` by default; both overridable in the `paths` section of `cli/config.json`).
 
 ```bash
-sushitrack project clean
+ds clean
 ```
 
-### `docker build` / `docker run`
+### `ds docker build` / `ds docker run`
 
-Wrappers around `cli/docker/build.sh` and `cli/docker/run.sh`. The run script issues `docker run -it --rm -v "$(pwd):/workspace/sushitrack" sushitrack bash`.
+`docker build` / `docker run` are issued directly — there are no shell wrappers left. `run` mounts the repo at the configured `docker.workdir` and passes `--gpus all` unless `--no-gpu` is given:
+`docker run -it --rm --gpus all -v "<root>:/workspace/sushitrack" -w /workspace/sushitrack sushitrack bash`.
 
 ```bash
-sushitrack docker build
-sushitrack docker run
+ds docker build
+ds docker run
 ```
 
 ---
@@ -592,7 +662,7 @@ lifecycle priority. `Status`, `TrackState`, and `KinematicState` are exposed as
 
 ## Deploy Packages
 
-`sushitrack project build --deploy {cpp,python}` builds the library and then
+`ds build --deploy {cpp,python}` builds the library and then
 assembles a **self-contained, copy-and-run package** under `package/` at the
 repository root. The package bundles everything a downstream project needs — the
 compiled library, the headers or binding, a default config, and a working
@@ -606,9 +676,9 @@ get a Linux package (`.so`). There is no cross-compilation — to ship both
 platforms, run the deploy once on each.
 
 ```bash
-sushitrack project build --deploy cpp        # C/C++ package
-sushitrack project build --deploy python     # Python package
-sushitrack project build --clean --deploy cpp   # clean rebuild, then deploy
+ds build --deploy cpp        # C/C++ package
+ds build --deploy python     # Python package
+ds build --clean --deploy cpp   # clean rebuild, then deploy
 ```
 
 Deploy reuses the same artefacts a plain `project build` produces; it never needs
@@ -905,7 +975,7 @@ Parameterised GTest binary that iterates over `Scenario × tracker_factory`. For
 1. Reads `det.txt` frames via `MOTRunner`.
 2. Drives the tracker through `ITrackerAdapter` (`SushiTrackAdapter`, `ByteTrackAdapter`, `OCSORTAdapter`).
 3. Writes predictions to `<sequence>/pred/<tracker>/<sequence>.txt`.
-4. Emits a `[ PERF <tracker> ] <sequence>: <us/frame> us/frame` line read back by `sushitrack.py`.
+4. Emits a `[ PERF <tracker> ] <sequence>: <us/frame> us/frame` line read back by the CLI (`cli/sushitrack_cli/services/tests.py`).
 
 Config resolution: SushiTrack loads `sushitrack.json` through the library (`$SUSHITRACK_CONFIG`, then an upward search); ByteTrack and OCSORT read `tests/bytetrack.json` and `tests/ocsort.json`.
 
@@ -949,7 +1019,7 @@ ctest -R integration --output-on-failure
 - **`report_generator.py`** — `print_trackeval_table(results, compare)` formats the per-tracker × per-sequence table; `export_trackeval_results(results, dir)` writes JSON/CSV.
 - **`run_eval.py`** — standalone CLI for `TrackEvalRunner` (independent of the compiled binary).
 
-`sushitrack project test label` automatically chains regression_test → TrackEval; pass `--eval-only` to skip the C++ binary and re-evaluate cached predictions, or `--trackeval` to invoke the upstream `3rdparty/TrackEval/scripts/run_mot_challenge.py` script.
+`ds eval` automatically chains regression_test → TrackEval; pass `--eval-only` to skip the C++ binary and re-evaluate cached predictions, or `--trackeval` to invoke the upstream `3rdparty/TrackEval/scripts/run_mot_challenge.py` script.
 
 ---
 
@@ -959,13 +1029,13 @@ ctest -R integration --output-on-failure
 
 - **`tracker_bridge.py`** — `TrackerBridge` dispatches per tracker. `SushiTrack` is driven through the public-API binding ([`bindings/python/sushitrack.py`](#python-binding)), so the C API is consumed in one place and the binding is exercised on every inference frame. The reference trackers (`ByteTrack`, `OCSORT`) have no public C API and stay on the `TrackerRegistry` shim (`create_tracker` / `tracker_process_c` / `delete_tracker` in `tracker_bridge.{dll,so}`, built from `tests/regression/TrackerRegistry.cpp` when `-DBUILD_REGRESSION_TEST=ON`). Both paths return the same `{track_id, bbox, score}` shape.
 - **`pipeline.py`** — defines `IDetector`, `YOLOXDetector` (loads weights via `yolox.exp.get_exp`, preprocesses with optional legacy normalisation, runs inference, postprocesses with NMS), and `VideoPipeline` (frame loop, detection→tracker hand-off, drawing, optional MOT-format detection logging, stress/no-screen modes).
-- **`demo.py`** — argparse front-end exposing the full YOLOX + tracker flag set. Invoked through `sushitrack project test inference`.
+- **`demo.py`** — argparse front-end exposing the full YOLOX + tracker flag set. Invoked through `ds infer`.
 
 Example end-to-end run:
 
 ```bash
-sushitrack project build --regression
-sushitrack project test inference \
+ds build
+ds infer \
     -n yolox-x -c 3rdparty/weight/mot17x.pth.tar \
     --source 3rdparty/video/MOT17-04.mp4 \
     --tracker SushiTrack --num-classes 1 --legacy
@@ -1014,7 +1084,7 @@ environment variables on the consumer side.
 portable Python package and copy it next to your Ultralytics code:
 
 ```bash
-sushitrack project build --deploy python      # builds + assembles package/
+ds build --deploy python      # builds + assembles package/
 # then, in your Ultralytics project:
 cp -r /path/to/sushitrack/package/sushitrack   ./sushitrack      # bundles the .py + native lib
 ```
@@ -1028,7 +1098,7 @@ and no `SUSHITRACK_LIB` variable on the consumer side. See
 library and import the binding directly:
 
 ```bash
-sushitrack project build           # produces build/bin/<cfg>/sushitrack.{dll,so}
+ds build           # produces build/bin/<cfg>/sushitrack.{dll,so}
 # bindings/python/sushitrack.py then finds the library under build/ automatically
 ```
 
@@ -1161,21 +1231,21 @@ code and is the recommended path.)
 
 | File | Purpose |
 |---|---|
-| `cli/sushitrack.py` | argparse-based CLI; subcommand dispatcher; binary discovery; TrackEval orchestration |
-| `cli/paths_manager.py` | Loads `paths.env` overrides for `DIR_TOOLS`, `DIR_BUILD`, `DIR_DATA`, `DIR_3RDPARTY`, `DIR_TESTS`, `DIR_REGRESSION`, `DIR_EVALUATOR`, `DIR_INFERENCE` |
-| `cli/install.sh` | Bash/Zsh aliases and PATH setup; prints permanent-install lines |
-| `cli/install.ps1` | PowerShell session functions for `ds` / `sushitrack` |
-| `cli/sushitrack.sh` / `cli/ds.sh` | Unix shell wrappers — `python3 sushitrack.py "$@"` |
-| `cli/sushitrack.bat` / `cli/ds.bat` | Windows batch wrappers — `python sushitrack.py %*` |
-| `cli/project/build.sh` / `cli/project/build.bat` | CMake configure + build; parses `paths.env`, handles VS dev environment on Windows |
-| `cli/project/run.sh` / `cli/project/run.bat` | Forwards to `sushitrack.py project run` |
-| `cli/project/clean.sh` / `cli/project/clean.bat` | Removes the build directory honouring `DIR_BUILD` from `paths.env` |
-| `cli/docker/build.sh` / `cli/docker/build.bat` | Builds the Docker image from `./Dockerfile` |
-| `cli/docker/run.sh` / `cli/docker/run.bat` | `docker run -it --rm -v $(pwd):/workspace/sushitrack sushitrack bash` |
+| `cli/ds.py` | CLI launcher; sets up `sys.path` and calls `sushitrack_cli.cli.entry` |
+| `cli/sushitrack_cli/cli.py` | Flat command declarations delegating to the service layer |
+| `cli/sushitrack_cli/app.py` | Declarative argparse layer (command registry, grouped help, `--` passthrough) |
+| `cli/sushitrack_cli/config.py` | Layered JSON config, `DS_*` overrides, project-root and path resolution |
+| `cli/sushitrack_cli/env.py` | vcvars discovery and build-environment snapshotting on Windows |
+| `cli/sushitrack_cli/services/` | build, tests (ctest), label (`ds eval`), infer, evaluate (TrackEval), deploy, docker, diag, discovery, runner |
+| `cli/config.json` | Tracked CLI defaults (`cli`, `paths`, `build`, `docker`, `test` sections) |
+| `cli/install.sh` | Bash/Zsh alias and PATH setup; prints permanent-install lines |
+| `cli/install.ps1` | PowerShell session function for `ds` |
+| `cli/ds.sh` / `cli/ds.bat` | Thin wrappers — `python3 ds.py "$@"` / `python ds.py %*` |
+| `cli/Dockerfile.cli` | Bare `python:3-slim` image containing only `cli/`, used to verify the CLI needs no third-party packages |
 | `cli/misc/clean_preds.sh` / `cli/misc/clean_preds.bat` | Recursively removes `pred/` directories under the evaluator data root |
 | `cli/misc/construct_trackeval_data.ps1` | Creates the official TrackEval directory tree by symlinking GT (MOT17-SDP as representative for each sequence) and copying per-tracker predictions for `sushitrack`/`bytetrack`/`ocsort` |
 
-`Dockerfile`: CUDA 12.1 devel base, installs `build-essential`, `cmake`, `git`, `python3`, `python3-pip`, `libgtest-dev`, `libgl1-mesa-glx`, `libglib2.0-0`, then pip-installs the pinned wheel set, copies the project, and registers `ds`/`sushitrack` aliases in `.bashrc`.
+`Dockerfile`: CUDA 12.1 devel base, installs `build-essential`, `cmake`, `git`, `python3`, `python3-pip`, `libgtest-dev`, `libgl1-mesa-glx`, `libglib2.0-0`, then pip-installs the pinned wheel set, copies the project, and symlinks `ds` into `/usr/local/bin`.
 
 ---
 

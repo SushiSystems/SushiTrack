@@ -44,4 +44,5 @@ enable_testing()
 include(GoogleTest)
 gtest_discover_tests(integration_test
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    PROPERTIES LABELS "integration"
 )

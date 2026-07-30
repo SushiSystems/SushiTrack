@@ -136,4 +136,11 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/ocsort
 # ============================================================
 option(BUILD_MOT_TEST "Deprecated alias for BUILD_REGRESSION_TEST" OFF)
 
+# Testing must be enabled here, at the top level: enable_testing() only makes the
+# CTestTestfile of the directory it runs in, so calling it solely inside
+# tests/*/CMakeLists.txt left the root CTestTestfile empty and `ctest` from the
+# build root reported "No tests were found". With it here, the root file recurses
+# into the test subdirectories and `ds test` (ctest -L <label>) sees every test.
+enable_testing()
+
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tests)

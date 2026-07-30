@@ -1,18 +1,13 @@
-#!/bin/bash
+#!/bin/sh
+# Registers `ds` for the current shell session. Source it, do not execute it:
+#   . cli/install.sh
+CLI_DIR="$(cd "$(dirname "${BASH_SOURCE:-$0}")" && pwd)"
 
-# Get the directory of the current script
-TOOLS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PATH="$CLI_DIR:$PATH"
+export PATH
+alias ds="python3 $CLI_DIR/ds.py"
 
-# Add to PATH for current session
-export PATH="$TOOLS_DIR:$PATH"
-
-# Create aliases
-alias ds="python3 $TOOLS_DIR/sushitrack.py"
-alias sushitrack="python3 $TOOLS_DIR/sushitrack.py"
-
-echo -e "\033[0;32mSushiTrack Tools installed in current session.\033[0m"
-echo -e "\033[0;36mCommands available: ds, sushitrack\033[0m"
-echo ""
-echo -e "\033[0;33mTo make this permanent, add the following to your ~/.bashrc or ~/.zshrc:\033[0m"
-echo -e "alias ds='python3 $TOOLS_DIR/sushitrack.py'"
-echo -e "alias sushitrack='python3 $TOOLS_DIR/sushitrack.py'"
+printf '\033[0;32mSushiTrack CLI registered for this session.\033[0m\n'
+printf '\033[0;36mds build | ds test | ds status | ds doctor | ds --help\033[0m\n\n'
+printf '\033[0;33mTo make it permanent, add this to ~/.bashrc or ~/.zshrc:\033[0m\n'
+printf "alias ds='python3 %s/ds.py'\n" "$CLI_DIR"

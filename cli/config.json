@@ -1,0 +1,51 @@
+{
+  "_comment": [
+    "SushiTrack CLI configuration. Tracked defaults; copy any key into",
+    "config.local.json to override it per machine (that file is git-ignored).",
+    "Precedence: defaults -> config.json -> config.local.json -> DS_* env vars.",
+    "Run `ds config` to see the resolved values and where each came from."
+  ],
+
+  "cli": {
+    "theme": "default",
+    "icons": "text",
+    "color": "auto"
+  },
+
+  "paths": {
+    "build": "build",
+    "data": "data",
+    "third_party": "3rdparty",
+    "tests": "tests",
+    "regression": "tests/regression",
+    "evaluator": "tests/regression/evaluator",
+    "inference": "tests/regression/inference",
+    "package": "package"
+  },
+
+  "build": {
+    "type": "Release",
+    "generator": "",
+    "jobs": 0,
+    "cmake": "cmake",
+    "ctest": "ctest"
+  },
+
+  "docker": {
+    "image": "sushitrack",
+    "workdir": "/workspace/sushitrack",
+    "gpus": true
+  },
+
+  "test": {
+    "tracker": "sushitrack"
+  },
+
+  "platform": {
+    "windows": {
+      "build": {
+        "generator": "Ninja"
+      }
+    }
+  }
+}

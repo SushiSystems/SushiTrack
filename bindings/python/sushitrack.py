@@ -240,7 +240,7 @@ def find_library(explicit: Optional[str] = None) -> str:
     lib_name = "sushitrack.dll" if platform.system() == "Windows" else "libsushitrack.so"
 
     # Self-contained deploy: the shared library sits next to this module
-    # (see `sushitrack project build --deploy python`).
+    # (see `ds build --deploy python`).
     here = Path(__file__).resolve().parent
     candidates.append(str(here / lib_name))
 
@@ -254,7 +254,7 @@ def find_library(explicit: Optional[str] = None) -> str:
             return os.path.abspath(path)
 
     raise FileNotFoundError(
-        f"Could not locate {lib_name}. Build it with `sushitrack project build`, "
+        f"Could not locate {lib_name}. Build it with `ds build`, "
         f"or set SUSHITRACK_LIB / pass lib_path explicitly. Tried: {candidates}"
     )
 

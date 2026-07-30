@@ -34,9 +34,10 @@ RUN pip3 install --no-cache-dir \
 
 COPY . /workspace/sushitrack/
 
-# Aliaslar
-RUN echo "alias ds='/workspace/sushitrack/cli/sushitrack.sh'" >> ~/.bashrc && \
-    echo "alias sushitrack='/workspace/sushitrack/cli/sushitrack.sh'" >> ~/.bashrc
+# `ds` CLI. A symlink rather than a shell alias so it also works from a
+# non-interactive `docker run ... ds build`, which never reads ~/.bashrc.
+RUN chmod +x /workspace/sushitrack/cli/ds.sh && \
+    ln -sf /workspace/sushitrack/cli/ds.sh /usr/local/bin/ds
 
 CMD ["/bin/bash"]
 
