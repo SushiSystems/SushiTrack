@@ -1,0 +1,25 @@
+# Normalize line endings regardless of a contributor's local core.autocrlf,
+# so scripts that must run on Linux (shebang-interpreted) never get CRLF
+# baked into the committed blob.
+* text=auto eol=lf
+
+*.sh   text eol=lf
+*.py   text eol=lf
+*.cpp  text eol=lf
+*.h    text eol=lf
+*.hpp  text eol=lf
+*.cmake text eol=lf
+CMakeLists.txt text eol=lf
+
+# Windows-only entry points keep CRLF, matching cmd.exe/PowerShell conventions.
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets: no EOL conversion.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.pth binary

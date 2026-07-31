@@ -64,7 +64,7 @@ def load_gt_file(filepath: str) -> dict:
     distractors = (DISTRACTOR_CLASSES_MOT20 if benchmark == "MOT20"
                    else DISTRACTOR_CLASSES_MOT17)
 
-    with open(filepath, "r") as f:
+    with open(filepath, "r", encoding="utf-8") as f:
         for line in f:
             parts = line.strip().split(",")
             if len(parts) < 6:
@@ -106,7 +106,7 @@ def load_pred_file(filepath: str) -> dict:
     if not os.path.exists(filepath):
         return data
 
-    with open(filepath, "r") as f:
+    with open(filepath, "r", encoding="utf-8") as f:
         for line in f:
             parts = line.strip().split(",")
             if len(parts) < 6:

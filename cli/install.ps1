@@ -3,7 +3,12 @@
 $CliDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 
 $env:PATH = "$CliDir;" + $env:PATH
-function global:ds { python "$CliDir\ds.py" @args }
+
+# GetNewClosure() bakes the current $CliDir value into the function so it keeps
+# working even when this script is run directly (not dot-sourced): without it,
+# the global function looks up $CliDir at call time, finds nothing once this
+# script's scope is gone, and silently runs "python \ds.py" instead.
+${function:global:ds} = { python "$CliDir\ds.py" @args }.GetNewClosure()
 
 Write-Host "SushiTrack CLI registered for this session." -ForegroundColor Green
 Write-Host "ds build | ds test | ds status | ds doctor | ds --help" -ForegroundColor Cyan

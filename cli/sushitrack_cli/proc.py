@@ -5,6 +5,8 @@ and the "tool is missing" message are identical everywhere, and so no service
 has to care that a Windows PATH lookup needs help.
 """
 
+import os
+import shlex
 import shutil
 import subprocess
 
@@ -38,7 +40,10 @@ def _resolve(cmd, env):
 def format_command(cmd):
     if isinstance(cmd, str):
         return cmd
-    return subprocess.list2cmdline([str(c) for c in cmd])
+    parts = [str(c) for c in cmd]
+    if os.name == "nt":
+        return subprocess.list2cmdline(parts)
+    return shlex.join(parts)
 
 
 def run(cmd, cwd=None, env=None, echo=True):

@@ -49,10 +49,10 @@ def _make_seqinfo(seq_dir: Path, seq_name: str, frame_rate: int = 30) -> None:
     gt_path = seq_dir / "gt" / "gt.txt"
     seq_len = 0
     if gt_path.exists():
-        with open(gt_path) as f:
+        with open(gt_path, encoding="utf-8") as f:
             frames = {int(line.split(",")[0]) for line in f if line.strip()}
         seq_len = max(frames) if frames else 0
-    with open(seqinfo_path, "w") as f:
+    with open(seqinfo_path, "w", encoding="utf-8") as f:
         f.write("[Sequence]\n")
         f.write(f"name={seq_name}\n")
         f.write(f"imDir=img1\n")
@@ -86,7 +86,7 @@ def _sanitize_pred_file(src: Path, dst: Path) -> tuple:
     dst.parent.mkdir(parents=True, exist_ok=True)
     rows_written = skipped_id0 = skipped_dup = 0
 
-    with open(src) as fin, open(dst, "w") as fout:
+    with open(src, encoding="utf-8") as fin, open(dst, "w", encoding="utf-8") as fout:
         for line in fin:
             line = line.strip()
             if not line:
@@ -274,7 +274,7 @@ class TrackEvalRunner:
             logger.info(f"Benchmark inferred: {benchmark}")
             seqmap_dir = tmp / "seqmaps"
             seqmap_dir.mkdir(parents=True, exist_ok=True)
-            with open(seqmap_dir / f"{benchmark}-{self.split}.txt", "w") as f:
+            with open(seqmap_dir / f"{benchmark}-{self.split}.txt", "w", encoding="utf-8") as f:
                 f.write("name\n")
                 for seq in submitted_seqs:
                     f.write(f"{seq}\n")

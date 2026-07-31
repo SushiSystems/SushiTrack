@@ -1,5 +1,5 @@
 /**
- * @file      lapjv.h
+ * @file      LAPJV.h
  * @brief     Jonker-Volgenant (LAPJV) algorithm implementation for linear assignment.
  * @author    Mustafa Garip (mustafagarip@sushisystems.io)
  * @date      28.04.2026

@@ -10,7 +10,7 @@
 #pragma once
 
 #include "SushiTrack/IAssignmentSolver.h"
-#include "SushiTrack/lapjv.h"
+#include "SushiTrack/LAPJV.h"
 #include <limits>
 #include <vector>
 #include <cstdint>

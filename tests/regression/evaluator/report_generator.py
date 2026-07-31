@@ -303,7 +303,7 @@ def export_trackeval_results(results: dict, out_dir: str) -> None:
     out.mkdir(parents=True, exist_ok=True)
 
     json_path = out / "mot_results.json"
-    with open(json_path, "w") as f:
+    with open(json_path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2)
     logger.success(f"JSON export: {json_path}")
 
@@ -315,7 +315,7 @@ def export_trackeval_results(results: dict, out_dir: str) -> None:
         "IDSW", "FP", "FN", "MT", "ML", "Frag",
         "num_objects", "num_frames", "FPS", "Latency_us",
     ]
-    with open(csv_path, "w", newline="") as f:
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()
         for tracker, seqs in results.items():

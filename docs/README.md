@@ -543,8 +543,16 @@ ctypes. Arguments after `--` are forwarded to `demo.py` untouched.
 ```bash
 ds infer -n yolox-x -c 3rdparty/weight/mot17x.pth.tar --source 3rdparty/video/MOT17-04.mp4 --num-classes 1 --legacy
 
+ds infer -n yolox-x -c 3rdparty/weight/mot17x.pth.tar --source tests/regression/evaluator/data/MOT20-01/img1 --num-classes 1 --legacy
+
 ds infer --source 0 --tracker sushitrack --no-save --no-screen --stress
 ```
+
+`--source` also accepts an image-sequence directory (`<path>/img1`), not just a video
+file or camera index. `tests/regression/evaluator/data/` already holds 76 real
+tracker benchmark sequences (MOT17, MOT20, DanceTrack) used by the regression
+suite — any of their names works, e.g. `tests/regression/evaluator/data/MOT20-01/img1`
+or `tests/regression/evaluator/data/dancetrack0001/img1`.
 
 If the YOLOX checkpoint filename contains `mot17` and `--tsize` is omitted/640,
 the pipeline overrides `tsize` to `(800, 1440)` to match the MOT17 training

@@ -280,7 +280,7 @@ class VideoPipeline:
             else:
                 det_filename = f"det_{str(video_path)}.txt"
                 
-            self.det_file = open(os.path.join("output", det_filename), "w")
+            self.det_file = open(os.path.join("output", det_filename), "w", encoding="utf-8")
         
         self.is_image_seq = False
         self.image_files = []
