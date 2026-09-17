@@ -93,7 +93,10 @@ def run_drained(cmd, cwd=None, env=None, echo=True):
         return 127
     try:
         for line in child.stdout:
-            console.plain(line.rstrip("\n"))
+            # markup=False: a child's own output routinely contains a literal
+            # "[...]" (gtest's "[ RUN ]", ctest's "[100%]"), which Rich would
+            # otherwise try to interpret as a style tag.
+            console.console.print(line.rstrip("\n"), markup=False)
         return child.wait()
     except KeyboardInterrupt:
         child.terminate()

@@ -153,12 +153,14 @@ tests/
 Execute all operations exclusively through the repository CLI:
 
 ```bash
-python cli/st.py build                       # library + test targets
-python cli/st.py test                        # runs all test suites
-python cli/st.py test --suite unit
-python cli/st.py test --suite integration
-python cli/st.py test --suite regression
+st build                       # library + test targets
+st test                        # runs all test suites
+st test --suite unit
+st test --suite integration
+st test --suite regression
 ```
+
+`st` is installed with pipx from `cli/` (see `docs/README.md`'s Installation section); it is not run as a bare script.
 
 Do not invoke raw `cmake`, `ninja`, or `ctest` directly.
 

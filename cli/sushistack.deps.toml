@@ -1,0 +1,28 @@
+# SushiTrack dependency fragment -- the third-party ports this repository
+# needs beyond what it vendors itself. `hub` aggregates this with the
+# SushiStack base fragment when SushiTrack is part of the workspace.
+#
+# SushiTrack has no [module] table: it depends on no other stack module. It
+# is a standalone C++17 tracking library with its own vendored third_party/
+# (Eigen, nlohmann-json), so unlike SushiAI, SushiEngine or SushiBLAS it
+# consumes none of the shared SYCL toolchain or vcpkg tree `hub install`
+# provisions -- it only needs GoogleTest, and only when its own test targets
+# are turned on.
+#
+# Eigen and nlohmann-json are deliberately absent below, for the same reason
+# SushiAI's fragment omits ports it vendors: both are vendored, header-only,
+# under third_party/, and adding a manifest entry for either would ask `hub
+# install` to provision something the checkout already carries.
+#
+# Field reference:
+#   description    Human-readable purpose (shown by `hub doctor`).
+#   required       false => a missing one warns but does not stop the build.
+#   linux_apt      apt package names; empty list = not an apt/vcpkg package.
+#   windows_vcpkg  vcpkg port names; empty list = not an apt/vcpkg package.
+#   check_cmd      Optional command; exit 0 means "already installed".
+
+[googletest]
+description   = "GTest/GMock, for the unit/integration/regression test targets. Off the build by default (BUILD_UNIT_TEST=OFF and friends), so a missing install only warns -- see docs/README.md's Requirements table."
+required      = false
+linux_apt     = ["libgtest-dev", "libgmock-dev"]
+windows_vcpkg = ["gtest"]

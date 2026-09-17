@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sushitrack-cli"
+version = "0.1.0"
+description = "SushiTrack developer CLI (build / test / eval / infer / run)"
+authors = [{ name = "Mustafa Garip", email = "garipm@mef.edu.tr" }]
+requires-python = ">=3.10"
+dependencies = [
+    # No Typer: the command layer here is its own thin argparse wrapper
+    # (see sushitrack_cli/app.py), not shared with the Typer-based sibling
+    # CLIs. Rich IS declared directly, even though sushicore.console is the
+    # only thing that imports it: pipx resolves this project's own
+    # dependency list, but sushicore's (an unpublished, editable-installed
+    # package - see the note below) never enters that resolution, so its
+    # transitive need for Rich has to be stated here or it goes unmet.
+    "rich>=13.0",
+    "tomli>=2.0; python_version < '3.11'",
+]
+
+# sushicore (shared CLI presentation layer, see D:/Projects/sushistack/sushicore) is
+# intentionally NOT listed above: it isn't published to any index, so a bare
+# "sushicore>=0.1.0" dependency can't be resolved by pip/pipx from a clean
+# environment. `pip install -e cli` expects it already installed once in the
+# same environment (`pip install -e ../../sushistack/sushicore`).
+
+[project.scripts]
+st = "sushitrack_cli.cli:entry"
+sushitrack = "sushitrack_cli.cli:entry"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sushitrack_cli*"]
+
+[tool.setuptools.package-data]
+sushitrack_cli = ["py.typed"]

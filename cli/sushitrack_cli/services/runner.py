@@ -16,12 +16,9 @@ def _select(paths):
         console.error("No executables found. Run `st build` first.")
         return None
 
-    table = console.new_table("#", "Name", "Path", title="Available executables")
-    table.column_style(0, console.theme.cmd)
-    table.column_style(2, console.theme.muted)
-    for index, exe in enumerate(executables, 1):
-        table.add_row(index, exe.name, exe.relative_to(paths.root))
-    console.table(table)
+    rows = [[f"[cmd]{index}[/cmd]", exe.name, f"[dim]{exe.relative_to(paths.root)}[/dim]"]
+            for index, exe in enumerate(executables, 1)]
+    console.table(["#", "Name", "Path"], rows, title="Available executables")
 
     try:
         raw = input("Select a number: ").strip()

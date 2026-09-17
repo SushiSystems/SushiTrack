@@ -18,16 +18,18 @@ class Opt:
 
 
 class _Help(argparse.RawDescriptionHelpFormatter):
-    """argparse's layout with colored section headings and usage prefix."""
+    """argparse's plain layout.
 
-    def start_section(self, heading):
-        super().start_section(console.paint(console.theme.header, heading)
-                              if heading else heading)
-
-    def add_usage(self, usage, actions, groups, prefix=None):
-        if prefix is None:
-            prefix = console.paint(console.theme.header, "usage:") + " "
-        super().add_usage(usage, actions, groups, prefix)
+    Sections and the usage prefix are uncolored here: argparse writes its
+    formatted help straight to a file handle, and sushicore's Console exposes
+    only semantic print calls (``info``, ``header``, ...), not a "paint this
+    string and hand it back" primitive — coloring a string argparse itself
+    goes on to ``write()`` would need one. Typer-based sibling CLIs (`sa`,
+    `sb`, ...) sidestep this by leaning on Click's own Rich integration
+    instead of argparse; ``st``'s own colored output (``info``/``success``/
+    ``header``/tables/command echo) is unaffected — only these raw --help
+    section headings lose their amber accent.
+    """
 
 
 class _Command:
@@ -62,7 +64,7 @@ class _Registry:
 
 
 class Group(_Registry):
-    """A namespace of subcommands, e.g. ``ds docker build``."""
+    """A namespace of subcommands, e.g. ``st docker build``."""
 
     def __init__(self, name, help_text):
         super().__init__()
@@ -124,11 +126,16 @@ class App(_Registry):
                             _action=cmd.name if group else None)
 
     def print_help(self):
-        def accent(text):
-            return console.paint(console.theme.header, text)
+        # Printed through the raw Rich console sushicore builds (console.console),
+        # rather than the builtin print(): only Rich interprets the [header]/[dim]
+        # markup below against the theme it registered.
+        out = console.console
 
-        print(f"{accent(self.description)}\n")
-        print(f"{accent('usage:')} {self.prog} <command> [options]\n")
+        def accent(text):
+            return f"[header]{text}[/header]"
+
+        out.print(f"{accent(self.description)}\n")
+        out.print(f"{accent('usage:')} {self.prog} <command> [options]\n")
 
         listed = {name for _, names in self.sections for name in names}
         by_name = {c.name: c for c in self.commands}
@@ -140,23 +147,23 @@ class App(_Registry):
         width = max([len(n) for n in by_name] + [len(g.name) for g in self.groups]
                     + [8])
         for title, names in sections:
-            print(accent(title))
+            out.print(accent(title))
             for name in names:
                 cmd = by_name.get(name)
                 if cmd is None:
                     continue
                 summary = cmd.help.splitlines()[0] if cmd.help else ""
-                print(f"  {name.ljust(width)}  {summary}")
-            print()
+                out.print(f"  {name.ljust(width)}  {summary}", markup=False)
+            out.print()
         if self.groups:
-            print(accent("Command groups"))
+            out.print(accent("Command groups"))
             for grp in self.groups:
                 actions = ", ".join(c.name for c in grp.commands)
-                print(f"  {grp.name.ljust(width)}  {grp.help} [{actions}]")
-            print()
-        print(console.paint(console.theme.muted,
-                            f"Run `{self.prog} <command> --help` for a "
-                            f"command's options."))
+                out.print(f"  {grp.name.ljust(width)}  {grp.help} [{actions}]",
+                         markup=False)
+            out.print()
+        out.print(f"[dim]Run `{self.prog} <command> --help` for a "
+                 f"command's options.[/dim]")
 
     def run(self, argv=None):
         argv = list(sys.argv[1:] if argv is None else argv)

@@ -45,7 +45,7 @@ State what was verified and what was not. When blocked or uncertain about public
 
 ### Building and toolchain
 
-Never invoke CMake or CTest directly. Run builds and tests through `python cli/st.py build` and `python cli/st.py test`. The CLI sets the necessary compiler flags and dynamic library paths.
+Never invoke CMake or CTest directly. All builds, tests, and tool invocations must run through the `st` CLI (`st build`, `st test`, `st eval`, `st infer`, `st run`), installed with pipx from `cli/` (see `docs/README.md`'s Installation section). Only the CLI sets the necessary compiler flags and dynamic library paths.
 
 ### Task tracking
 

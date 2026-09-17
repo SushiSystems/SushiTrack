@@ -1,15 +1,48 @@
-"""Layered configuration and path resolution."""
+"""Layered configuration and path resolution.
 
-import json
+Root and config-directory resolution — the walk from the invocation directory
+up to a marker file, then the layered ``config.toml`` / ``config.local.toml``
+lookup — is :class:`sushicore.module_config.ModuleConfig`'s job, shared with
+every other Sushi* CLI. ``use_workspace_config=False`` because SushiTrack
+provisions nothing from the shared SushiStack dependency tree: its own Eigen
+and nlohmann-json are vendored under ``third_party/``, and GoogleTest comes
+from conda or the system package manager, not the bundled toolchain.
+
+What stays here is genuinely SushiTrack's own: a config schema shaped by
+section (``paths``, ``build``, ``docker``, ``test``) rather than the flat
+``[tool]`` table :class:`sushicore.config_base.ToolConfig` assumes, so the
+layering and environment-override logic below reads those sections directly
+instead of going through that shared, single-section loader.
+"""
+
+from __future__ import annotations
+
 import os
 import platform
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
-# Files that identify the repo root. CMakeLists.txt alone is too weak — any enclos
-_ROOT_MARKERS = ("CMakeLists.txt", "include/SushiTrack/sushitrack_c.h")
+from sushicore.module_config import ModuleConfig
+from sushicore.profile import ModuleProfile
+from sushicore.workspace import read_toml
 
-CONFIG_NAMES = ("config.json", "config.local.json")
+#: How SushiTrack describes itself to the shared machinery. The C API header is
+#: the distinctive marker: a bare CMakeLists.txt exists in any enclosing
+#: checkout, but this path only ever sits at the SushiTrack root.
+PROFILE = ModuleProfile(
+    name="SushiTrack",
+    program="st",
+    env_prefix="ST",
+    root_marker="include/SushiTrack/sushitrack_c.h",
+    env_of_interest=("EIGEN", "SUSHITRACK"),
+)
+
+_MODULE = ModuleConfig(PROFILE, use_workspace_config=False)
+
+find_project_root = _MODULE.find_project_root
+config_dir = _MODULE.config_dir
+
+CONFIG_NAMES = ("config.toml", "config.local.toml")
 
 IS_WINDOWS = platform.system() == "Windows"
 
@@ -28,7 +61,7 @@ class Appearance:
 @dataclass
 class Config:
     """Resolved configuration. Field names are ``<section>_<key>``, which is how
-    :func:`_apply_document` maps a nested JSON document onto this flat record
+    :func:`_apply_document` maps a nested TOML document onto this flat record
     without a per-key table to maintain."""
 
     cli_theme: str = "default"
@@ -71,7 +104,10 @@ class Config:
         return self.build_jobs if self.build_jobs > 0 else (os.cpu_count() or 2)
 
 
-# Config field -> environment variable that overrides it.
+# Config field -> environment variable that overrides it. Sectioned rather
+# than flat (unlike sushicore.profile.ModuleProfile.env_overrides(), which
+# assumes one ToolConfig field per override), so it stays local rather than
+# derived from the shared profile.
 ENV_OVERRIDES = {
     "cli_theme": "ST_THEME",
     "cli_icons": "ST_ICONS",
@@ -91,61 +127,6 @@ ENV_OVERRIDES = {
     "docker_gpus": "ST_DOCKER_GPUS",
     "test_tracker": "ST_TRACKER",
 }
-
-
-def _has_markers(directory):
-    if not (directory / "CMakeLists.txt").is_file():
-        return False
-    candidates = (
-        directory / "include" / "SushiTrack" / "sushitrack_c.h",
-        directory / "include" / "SushiTrack",
-        directory / "sushitrack.json",
-    )
-    return any(c.exists() for c in candidates)
-
-
-def find_project_root(start=None):
-    """Locate the repo root by walking up from the invocation directory.
-
-    The CLI may be invoked through a wrapper on PATH from anywhere inside the
-    checkout, so the caller's directory is what identifies the project — not the
-    location of this file, which also works but breaks the moment the CLI is
-    copied or installed elsewhere. ``ST_PROJECT_ROOT`` overrides the search,
-    which is what makes the CLI usable when it ships without the sources next to
-    it (a bare-python container, a mounted volume).
-    """
-    override = os.environ.get("ST_PROJECT_ROOT") or os.environ.get("DS_PROJECT_ROOT")
-    if override:
-        return Path(os.path.expandvars(os.path.expanduser(override))).resolve()
-
-    here = Path(start or Path.cwd()).resolve()
-    for candidate in (here, *here.parents):
-        if _has_markers(candidate):
-            return candidate
-    # Fall back to the checkout this file lives in (cli/sushitrack_cli/config.py).
-    packaged = Path(__file__).resolve().parents[2]
-    if _has_markers(packaged):
-        return packaged
-    raise SystemExit(
-        "Not inside a SushiTrack project: no CMakeLists.txt + include/SushiTrack/ "
-        "found in the current directory or any parent. cd into the repo, or set "
-        "ST_PROJECT_ROOT to point at it."
-    )
-
-
-def config_dir(root=None):
-    """Directory holding config.json / config.local.json (the repo's cli/)."""
-    return (root or find_project_root()) / "cli"
-
-
-def _read_json(path):
-    try:
-        with open(path, "r", encoding="utf-8") as handle:
-            return json.load(handle)
-    except FileNotFoundError:
-        return {}
-    except (json.JSONDecodeError, OSError) as exc:
-        raise SystemExit(f"Cannot read {path}: {exc}")
 
 
 def _merge_platform(document):
@@ -189,11 +170,6 @@ def _apply_document(cfg, document, origin):
 def _apply_env(cfg):
     for name, var in ENV_OVERRIDES.items():
         raw = os.environ.get(var)
-        if raw is None or raw == "":
-            legacy_var = var.replace("ST_", "DS_")
-            raw = os.environ.get(legacy_var)
-            if raw is not None and raw != "":
-                var = legacy_var
         if raw is not None and raw != "":
             setattr(cfg, name, _coerce(getattr(cfg, name), raw))
             cfg.sources[name] = f"env:{var}"
@@ -209,7 +185,7 @@ def load_config(root=None):
         _apply_env(cfg)  # still usable outside a checkout (e.g. `st doctor`)
         return cfg
     for name in CONFIG_NAMES:
-        _apply_document(cfg, _read_json(cfg_dir / name), name)
+        _apply_document(cfg, read_toml(cfg_dir / name), name)
     _apply_env(cfg)
     return cfg
 
@@ -228,7 +204,7 @@ def load_appearance(root=None):
         cfg_dir = None
     if cfg_dir is not None:
         for name in CONFIG_NAMES:
-            section = _merge_platform(_read_json(cfg_dir / name)).get("cli") or {}
+            section = _merge_platform(read_toml(cfg_dir / name)).get("cli") or {}
             document.update(section)
     return Appearance(
         theme=cfg.cli_theme,

@@ -13,7 +13,7 @@ Noise-Scale-Adaptive Kalman filter, a four-model IMM motion estimator
 (`kalman_type=2`), observation-centric momentum and re-update, real-time
 (`time_aware`) operation.
 
-A stable C API, a dependency-free Python CLI (`ds`), a MOTChallenge and DanceTrack
+A stable C API, a `sushicore`-backed Python CLI (`st`), a MOTChallenge and DanceTrack
 regression harness, a GTest unit suite, and a YOLOX-driven video inference
 pipeline are included.
 
@@ -269,25 +269,18 @@ sushitrack/
 │   ├── CHANGELOG.md
 │   └── benchmarks/PRIVATE.md     # Internal benchmark log
 │
-└── cli/                          # `ds` CLI — stdlib only, no third-party deps
-    ├── ds.py                     # Launcher (python3 cli/ds.py ...)
-    ├── ds.sh                     # Wrapper (sh)
-    ├── ds.bat                    # Wrapper (cmd/PowerShell)
-    ├── install.sh                # Session installer (bash/zsh)
-    ├── install.ps1               # Session installer (PowerShell)
-    ├── config.json               # Tracked CLI defaults (paths, build, docker)
-    ├── config.local.json         # Per-machine overrides (not tracked)
-    ├── Dockerfile.cli            # Bare python3 image proving the zero-dep claim
+└── cli/                          # `st` CLI, installed with pipx
+    ├── pyproject.toml            # Package metadata; `st` / `sushitrack` entry points
+    ├── config.toml               # Tracked CLI defaults (paths, build, docker)
+    ├── config.local.toml         # Per-machine overrides (not tracked)
+    ├── sushistack.deps.toml      # SushiStack dependency fragment (GoogleTest only)
     ├── sushitrack_cli/
     │   ├── cli.py                # Command declarations (one thin layer)
     │   ├── app.py                # Declarative argparse layer
-    │   ├── config.py             # Layered JSON config + path resolution
+    │   ├── config.py             # Layered TOML config + sushicore root resolution
     │   ├── env.py                # MSVC (vcvars) environment snapshotting
     │   ├── proc.py               # Subprocess helpers
-    │   ├── console.py            # Semantic output facade
-    │   ├── theme.py              # Colors
-    │   ├── icons.py              # Glyphs
-    │   ├── renderer.py           # ANSI backend (tables, rules, panels)
+    │   ├── console.py            # sushicore console, wired in lazily
     │   └── services/             # build, tests, evaluate, deploy, docker,
     │                             #   diag, discovery, runner
     └── misc/
@@ -300,32 +293,22 @@ sushitrack/
 
 ## Installation
 
-### CLI installer (PowerShell / Bash)
+### CLI (pipx)
 
-The CLI requires **nothing but `python3`** — no Typer, no Rich, no loguru, and no
-pip install. It can always be run directly:
-
-```bash
-python3 cli/ds.py --help
-```
-
-The installer registers `ds` for the current session and prepends `cli/` to `PATH`.
-
-PowerShell:
-
-```powershell
-Unblock-File ./cli/install.ps1
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-. ./cli/install.ps1
-```
-
-Bash/Zsh:
+The CLI is a small pipx-installed package, built on `sushicore` — the console,
+theme and config-layering foundation shared with every other Sushi* developer
+CLI (`sr`, `se`, `sa`, `sb`, `sd`, `hub`). Inside a SushiStack workspace,
+`hub add sushitrack` installs it automatically; standalone, install it by hand:
 
 ```bash
-source cli/install.sh
+pipx install cli/
+pipx inject sushitrack-cli --editable /path/to/sushistack/sushicore
 ```
 
-To make permanent, append the printed lines to `$PROFILE` (PowerShell) or `~/.bashrc` / `~/.zshrc` (Unix).
+`sushicore` is not published to any index — it ships inside the `sushistack`
+repository — so the second step is required outside a workspace `hub` would
+otherwise handle. Once installed, `st --help` (or its full-name alias,
+`sushitrack --help`) lists every command.
 
 ### Conda environment
 
@@ -339,18 +322,11 @@ conda activate sushitrack
 ### Docker
 
 ```bash
-ds docker build      # builds image from ./Dockerfile (CUDA 12.1, Ubuntu 22.04)
-ds docker run        # docker run -it --rm -v $(pwd):/workspace/sushitrack sushitrack bash
+st docker build      # builds image from ./Dockerfile (CUDA 12.1, Ubuntu 22.04)
+st docker run        # docker run -it --rm -v $(pwd):/workspace/sushitrack sushitrack bash
 ```
 
-The Dockerfile pins the same wheel versions as `environment.yml`. The project root is bind-mounted at `/workspace/sushitrack`; output files written inside the container are immediately visible on the host. `ds` is symlinked into `/usr/local/bin`, so it works interactively and as `docker run ... ds build` alike.
-
-`cli/Dockerfile.cli` builds the CLI alone on a bare `python:3-slim` — no compiler, no pip packages — which is how the zero-dependency claim is verified:
-
-```bash
-docker build -f cli/Dockerfile.cli -t sushitrack-cli .
-docker run --rm -v "$PWD:/workspace/sushitrack" sushitrack-cli doctor
-```
+The Dockerfile pins the same wheel versions as `environment.yml`. The project root is bind-mounted at `/workspace/sushitrack`; output files written inside the container are immediately visible on the host. `st` is symlinked into `/usr/local/bin`, so it works interactively and as `docker run ... st build` alike.
 
 ---
 
@@ -377,7 +353,7 @@ Each test target registers with CTest under a single label — `unit`,
 into the test directories. So `ctest` works from the build root:
 
 ```bash
-ctest --test-dir build -L '^unit$' --output-on-failure     # what `ds test --suite unit` runs
+ctest --test-dir build -L '^unit$' --output-on-failure     # what `st test --suite unit` runs
 ctest --test-dir build --print-labels
 ```
 
@@ -385,14 +361,14 @@ Through the CLI (preferred). Test targets are built **by default**; there is no
 per-suite build flag — what to *run* is selected at test time by CTest label:
 
 ```bash
-ds build                      # library + every test target (default)
-ds build --no-test            # library only
-ds build --type debug         # release (default) | debug | relwithdebinfo | minsizerel
-ds build --clean              # wipe build/ first; combinable with the above
-ds build -j 8                 # parallel jobs (default: CPU count)
-ds build -D CMAKE_UNITY_BUILD=ON   # extra -D passed straight to cmake
-ds build --deploy cpp         # build, then assemble package/ for C/C++ consumers
-ds build --deploy python      # build, then assemble package/ for Python consumers
+st build                      # library + every test target (default)
+st build --no-test            # library only
+st build --type debug         # release (default) | debug | relwithdebinfo | minsizerel
+st build --clean              # wipe build/ first; combinable with the above
+st build -j 8                 # parallel jobs (default: CPU count)
+st build -D CMAKE_UNITY_BUILD=ON   # extra -D passed straight to cmake
+st build --deploy cpp         # build, then assemble package/ for C/C++ consumers
+st build --deploy python      # build, then assemble package/ for Python consumers
 ```
 
 cmake configure runs only when the requested configuration (build type,
@@ -410,31 +386,31 @@ directory at the repository root — see [Deploy Packages](#deploy-packages).
 
 ## CLI Reference
 
-Commands are flat: `ds <command> [flags]`, with `ds docker <action>` the only
+Commands are flat: `st <command> [flags]`, with `st docker <action>` the only
 subgroup. Arguments after a bare `--` are forwarded to the underlying binary.
 
 | Command | Purpose |
 |---|---|
-| `ds build` | Configure + build; test targets built by default (`--no-test` to skip) |
-| `ds test` | Run a CTest label group: `--suite unit / integration / regression / functional / all` |
-| `ds eval` | MOT label benchmark + TrackEval metrics (not a CTest suite) |
-| `ds infer` | YOLOX video inference pipeline through `tracker_bridge` |
-| `ds run` | Run a built executable, by name or from a picker |
-| `ds clean` | Remove `build/` and `package/` |
-| `ds deploy {cpp,python}` | Assemble `package/` from the current build |
-| `ds status` | What is built, what is missing, which data sets are present |
-| `ds doctor` | Verify the toolchain; non-zero exit when a requirement is missing |
-| `ds config` | Resolved configuration and the origin of every value |
-| `ds paths` | Resolved project directories |
-| `ds env` | Environment cmake and the test binaries execute under |
-| `ds docker build` / `ds docker run` | Image build / bind-mounted container |
+| `st build` | Configure + build; test targets built by default (`--no-test` to skip) |
+| `st test` | Run a CTest label group: `--suite unit / integration / regression / functional / all` |
+| `st eval` | MOT label benchmark + TrackEval metrics (not a CTest suite) |
+| `st infer` | YOLOX video inference pipeline through `tracker_bridge` |
+| `st run` | Run a built executable, by name or from a picker |
+| `st clean` | Remove `build/` and `package/` |
+| `st deploy {cpp,python}` | Assemble `package/` from the current build |
+| `st status` | What is built, what is missing, which data sets are present |
+| `st doctor` | Verify the toolchain; non-zero exit when a requirement is missing |
+| `st config` | Resolved configuration and the origin of every value |
+| `st paths` | Resolved project directories |
+| `st env` | Environment cmake and the test binaries execute under |
+| `st docker build` / `st docker run` | Image build / bind-mounted container |
 
-Configuration is layered: built-in defaults → `cli/config.json` → `cli/config.local.json`
-→ `DS_*` environment variables (`DS_BUILD_DIR`, `DS_BUILD_TYPE`, `DS_GENERATOR`,
-`DS_CMAKE`, `DS_DOCKER_IMAGE`, `DS_TRACKER`, `DS_PROJECT_ROOT`, …). `ds config`
+Configuration is layered: built-in defaults → `cli/config.toml` → `cli/config.local.toml`
+→ `ST_*` environment variables (`ST_BUILD_DIR`, `ST_BUILD_TYPE`, `ST_GENERATOR`,
+`ST_CMAKE`, `ST_DOCKER_IMAGE`, `ST_TRACKER`, `ST_PROJECT_ROOT`, …). `st config`
 prints which layer each value came from.
 
-### `ds build`
+### `st build`
 
 | Flag | Effect |
 |---|---|
@@ -445,7 +421,7 @@ prints which layer each value came from.
 | `-D VAR=VALUE` | Extra `-D` option forwarded to cmake (repeatable) |
 | `--deploy {cpp,python}` | After a successful build, assemble a redistributable `package/` for the chosen consumer ([details](#deploy-packages)) |
 
-### `ds test`
+### `st test`
 
 Runs tests through CTest labels. Each test target carries one label, assigned in
 `tests/*/CMakeLists.txt` on its `gtest_discover_tests` call, so a new test file —
@@ -455,7 +431,7 @@ or a whole target — is picked up with no CLI change.
 |---|---|---|
 | `unit` | `-L '^unit$'` | `unit_test` — deterministic component tests, no external data |
 | `integration` | `-L '^integration$'` | `integration_test` — end-to-end coverage through the C API |
-| `regression` | `-L '^regression$'` | `regression_test` — MOT scenarios, pass/fail only (metrics: `ds eval`) |
+| `regression` | `-L '^regression$'` | `regression_test` — MOT scenarios, pass/fail only (metrics: `st eval`) |
 | `functional` | `-L '^(unit\|integration\|regression)$'` | all three; **the default** |
 | `all` | no `-L` | every registered test |
 
@@ -467,25 +443,25 @@ or a whole target — is picked up with no CLI change.
 | `--jobs, -j <n>` | Run up to N tests concurrently (`ctest --parallel`) |
 
 ```bash
-ds test                              # functional: unit + integration + regression
-ds test --suite unit
-ds test --suite unit -f 'RectTest'
-ds test --suite integration --repeat 3
-ds test --suite all -j 8
+st test                              # functional: unit + integration + regression
+st test --suite unit
+st test --suite unit -f 'RectTest'
+st test --suite integration --repeat 3
+st test --suite all -j 8
 ```
 
 For GTest-level knobs (shuffle, break-on-failure) run the binary directly instead:
 
 ```bash
-ds run unit_test -- --gtest_shuffle --gtest_break_on_failure
+st run unit_test -- --gtest_shuffle --gtest_break_on_failure
 ```
 
-### `ds eval`
+### `st eval`
 
 The MOT label benchmark. Not a CTest suite: it runs `regression_test` over
 det.txt-backed scenarios, parses the per-sequence `[ PERF ]` timings out of its
 output, then runs TrackEval and prints a metrics table (HOTA / DetA / AssA /
-MOTA / IDF1 / IDSW / FP / FN / Lat). `ds test --suite regression` answers only
+MOTA / IDF1 / IDSW / FP / FN / Lat). `st test --suite regression` answers only
 pass/fail for the same binary.
 
 | Flag | Effect |
@@ -500,11 +476,11 @@ pass/fail for the same binary.
 | `--public` | All sequences except `*-YOLOX` (MOT only) |
 
 ```bash
-ds eval
-ds eval --compare
-ds eval --scenario MOT17-04-DPM --compare
-ds eval --eval-only --export ./results
-ds eval --trackeval --private
+st eval
+st eval --compare
+st eval --scenario MOT17-04-DPM --compare
+st eval --eval-only --export ./results
+st eval --trackeval --private
 ```
 
 The internal runner needs the evaluator's own dependencies (numpy, scipy, loguru,
@@ -514,7 +490,7 @@ detectors plus `-YOLOX` variants for each), MOT20 (`-01/-02/-03/-05` with `-YOLO
 variants), and DanceTrack sequences (`dancetrack0001`, `0002`, `0006`, `0008`,
 `0012`, `0015`, …).
 
-### `ds infer`
+### `st infer`
 
 Launches the YOLOX-driven video inference pipeline
 (`tests/regression/inference/demo.py`), which loads `tracker_bridge.{dll,so}` via
@@ -541,11 +517,11 @@ ctypes. Arguments after `--` are forwarded to `demo.py` untouched.
 | `--reid-model <path>` | `osnet_x1_0.onnx` | Path to the ReID ONNX model |
 
 ```bash
-ds infer -n yolox-x -c third_party/weight/mot17x.pth.tar --source third_party/video/MOT17-04.mp4 --num-classes 1 --legacy
+st infer -n yolox-x -c third_party/weight/mot17x.pth.tar --source third_party/video/MOT17-04.mp4 --num-classes 1 --legacy
 
-ds infer -n yolox-x -c third_party/weight/mot17x.pth.tar --source tests/regression/evaluator/data/MOT20-01/img1 --num-classes 1 --legacy
+st infer -n yolox-x -c third_party/weight/mot17x.pth.tar --source tests/regression/evaluator/data/MOT20-01/img1 --num-classes 1 --legacy
 
-ds infer --source 0 --tracker sushitrack --no-save --no-screen --stress
+st infer --source 0 --tracker sushitrack --no-save --no-screen --stress
 ```
 
 `--source` also accepts an image-sequence directory (`<path>/img1`), not just a video
@@ -558,23 +534,23 @@ If the YOLOX checkpoint filename contains `mot17` and `--tsize` is omitted/640,
 the pipeline overrides `tsize` to `(800, 1440)` to match the MOT17 training
 resolution.
 
-### `ds clean`
+### `st clean`
 
 Removes the build directory and the assembled package directory (`build/` and
-`package/` by default; both overridable in the `paths` section of `cli/config.json`).
+`package/` by default; both overridable in the `paths` section of `cli/config.toml`).
 
 ```bash
-ds clean
+st clean
 ```
 
-### `ds docker build` / `ds docker run`
+### `st docker build` / `st docker run`
 
 `docker build` / `docker run` are issued directly — there are no shell wrappers left. `run` mounts the repo at the configured `docker.workdir` and passes `--gpus all` unless `--no-gpu` is given:
 `docker run -it --rm --gpus all -v "<root>:/workspace/sushitrack" -w /workspace/sushitrack sushitrack bash`.
 
 ```bash
-ds docker build
-ds docker run
+st docker build
+st docker run
 ```
 
 ---
@@ -671,7 +647,7 @@ lifecycle priority. `Status`, `TrackState`, and `KinematicState` are exposed as
 
 ## Deploy Packages
 
-`ds build --deploy {cpp,python}` builds the library and then
+`st build --deploy {cpp,python}` builds the library and then
 assembles a **self-contained, copy-and-run package** under `package/` at the
 repository root. The package bundles everything a downstream project needs — the
 compiled library, the headers or binding, a default config, and a working
@@ -685,9 +661,9 @@ get a Linux package (`.so`). There is no cross-compilation — to ship both
 platforms, run the deploy once on each.
 
 ```bash
-ds build --deploy cpp        # C/C++ package
-ds build --deploy python     # Python package
-ds build --clean --deploy cpp   # clean rebuild, then deploy
+st build --deploy cpp        # C/C++ package
+st build --deploy python     # Python package
+st build --clean --deploy cpp   # clean rebuild, then deploy
 ```
 
 Deploy reuses the same artefacts a plain `project build` produces; it never needs
@@ -972,9 +948,9 @@ GTest-based, deterministic, no external data. Targets compiled when `-DBUILD_UNI
 Direct invocation:
 
 ```bash
-ds run unit_test
-ds run unit_test -- --gtest_filter="TrackletTest.*"
-ds test --suite unit                    # ctest --test-dir build -L '^unit$'
+st run unit_test
+st run unit_test -- --gtest_filter="TrackletTest.*"
+st test --suite unit                    # ctest --test-dir build -L '^unit$'
 ```
 
 ### Regression tests (`regression_test`)
@@ -1014,8 +990,8 @@ GTest binary that drives the tracker end-to-end exclusively through the C API, a
 Direct invocation:
 
 ```bash
-ds run integration_test
-ds test --suite integration             # ctest --test-dir build -L '^integration$'
+st run integration_test
+st test --suite integration             # ctest --test-dir build -L '^integration$'
 ```
 
 ---
@@ -1028,7 +1004,7 @@ ds test --suite integration             # ctest --test-dir build -L '^integratio
 - **`report_generator.py`** — `print_trackeval_table(results, compare)` formats the per-tracker × per-sequence table; `export_trackeval_results(results, dir)` writes JSON/CSV.
 - **`run_eval.py`** — standalone CLI for `TrackEvalRunner` (independent of the compiled binary).
 
-`ds eval` automatically chains regression_test → TrackEval; pass `--eval-only` to skip the C++ binary and re-evaluate cached predictions, or `--trackeval` to invoke the upstream `third_party/TrackEval/scripts/run_mot_challenge.py` script.
+`st eval` automatically chains regression_test → TrackEval; pass `--eval-only` to skip the C++ binary and re-evaluate cached predictions, or `--trackeval` to invoke the upstream `third_party/TrackEval/scripts/run_mot_challenge.py` script.
 
 ---
 
@@ -1038,13 +1014,13 @@ ds test --suite integration             # ctest --test-dir build -L '^integratio
 
 - **`tracker_bridge.py`** — `TrackerBridge` dispatches per tracker. `SushiTrack` is driven through the public-API binding ([`bindings/python/sushitrack.py`](#python-binding)), so the C API is consumed in one place and the binding is exercised on every inference frame. The reference trackers (`ByteTrack`, `OCSORT`) have no public C API and stay on the `TrackerRegistry` shim (`create_tracker` / `tracker_process_c` / `delete_tracker` in `tracker_bridge.{dll,so}`, built from `tests/regression/TrackerRegistry.cpp` when `-DBUILD_REGRESSION_TEST=ON`). Both paths return the same `{track_id, bbox, score}` shape.
 - **`pipeline.py`** — defines `IDetector`, `YOLOXDetector` (loads weights via `yolox.exp.get_exp`, preprocesses with optional legacy normalisation, runs inference, postprocesses with NMS), and `VideoPipeline` (frame loop, detection→tracker hand-off, drawing, optional MOT-format detection logging, stress/no-screen modes).
-- **`demo.py`** — argparse front-end exposing the full YOLOX + tracker flag set. Invoked through `ds infer`.
+- **`demo.py`** — argparse front-end exposing the full YOLOX + tracker flag set. Invoked through `st infer`.
 
 Example end-to-end run:
 
 ```bash
-ds build
-ds infer \
+st build
+st infer \
     -n yolox-x -c third_party/weight/mot17x.pth.tar \
     --source third_party/video/MOT17-04.mp4 \
     --tracker SushiTrack --num-classes 1 --legacy
@@ -1093,7 +1069,7 @@ environment variables on the consumer side.
 portable Python package and copy it next to your Ultralytics code:
 
 ```bash
-ds build --deploy python      # builds + assembles package/
+st build --deploy python      # builds + assembles package/
 # then, in your Ultralytics project:
 cp -r /path/to/sushitrack/package/sushitrack   ./sushitrack      # bundles the .py + native lib
 ```
@@ -1107,7 +1083,7 @@ and no `SUSHITRACK_LIB` variable on the consumer side. See
 library and import the binding directly:
 
 ```bash
-ds build           # produces build/bin/<cfg>/sushitrack.{dll,so}
+st build           # produces build/bin/<cfg>/sushitrack.{dll,so}
 # bindings/python/sushitrack.py then finds the library under build/ automatically
 ```
 
@@ -1240,21 +1216,19 @@ code and is the recommended path.)
 
 | File | Purpose |
 |---|---|
-| `cli/ds.py` | CLI launcher; sets up `sys.path` and calls `sushitrack_cli.cli.entry` |
+| `cli/pyproject.toml` | Package metadata; installed with pipx, provides the `st` and `sushitrack` entry points |
 | `cli/sushitrack_cli/cli.py` | Flat command declarations delegating to the service layer |
 | `cli/sushitrack_cli/app.py` | Declarative argparse layer (command registry, grouped help, `--` passthrough) |
-| `cli/sushitrack_cli/config.py` | Layered JSON config, `DS_*` overrides, project-root and path resolution |
+| `cli/sushitrack_cli/config.py` | Layered TOML config, `ST_*` overrides, project-root and path resolution via `sushicore.module_config` |
+| `cli/sushitrack_cli/console.py` | `sushicore`'s console, theme and icon set, wired in lazily |
 | `cli/sushitrack_cli/env.py` | vcvars discovery and build-environment snapshotting on Windows |
-| `cli/sushitrack_cli/services/` | build, tests (ctest), label (`ds eval`), infer, evaluate (TrackEval), deploy, docker, diag, discovery, runner |
-| `cli/config.json` | Tracked CLI defaults (`cli`, `paths`, `build`, `docker`, `test` sections) |
-| `cli/install.sh` | Bash/Zsh alias and PATH setup; prints permanent-install lines |
-| `cli/install.ps1` | PowerShell session function for `ds` |
-| `cli/ds.sh` / `cli/ds.bat` | Thin wrappers — `python3 ds.py "$@"` / `python ds.py %*` |
-| `cli/Dockerfile.cli` | Bare `python:3-slim` image containing only `cli/`, used to verify the CLI needs no third-party packages |
+| `cli/sushitrack_cli/services/` | build, tests (ctest), label (`st eval`), infer, evaluate (TrackEval), deploy, docker, diag, discovery, runner |
+| `cli/config.toml` | Tracked CLI defaults (`cli`, `paths`, `build`, `docker`, `test` sections) |
+| `cli/sushistack.deps.toml` | SushiStack dependency fragment: GoogleTest, the only port SushiTrack does not vendor |
 | `cli/misc/clean_preds.sh` / `cli/misc/clean_preds.bat` | Recursively removes `pred/` directories under the evaluator data root |
 | `cli/misc/construct_trackeval_data.ps1` | Creates the official TrackEval directory tree by symlinking GT (MOT17-SDP as representative for each sequence) and copying per-tracker predictions for `sushitrack`/`bytetrack`/`ocsort` |
 
-`Dockerfile`: CUDA 12.1 devel base, installs `build-essential`, `cmake`, `git`, `python3`, `python3-pip`, `libgtest-dev`, `libgl1-mesa-glx`, `libglib2.0-0`, then pip-installs the pinned wheel set, copies the project, and symlinks `ds` into `/usr/local/bin`.
+`Dockerfile`: CUDA 12.1 devel base, installs `build-essential`, `cmake`, `git`, `python3`, `python3-pip`, `libgtest-dev`, `libgl1-mesa-glx`, `libglib2.0-0`, then pip-installs the pinned wheel set, copies the project, and installs the CLI with pipx, symlinking `st` into `/usr/local/bin`.
 
 ---
 

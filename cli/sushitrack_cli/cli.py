@@ -24,7 +24,7 @@ app = App(
     prog="st",
     description="SushiTrack developer CLI — build, test, evaluate, run and Docker.",
     version=__version__,
-    epilog="Only python3 is required; the CLI has no third-party dependencies.",
+    epilog="Built on sushicore, the console/config layer shared with sr/se/sa/sb/sd/hub.",
 )
 
 docker = app.group("docker", "Docker image and container management.")

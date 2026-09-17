@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 2026-09-17 — cli: Rewired `st` onto `sushicore`'s console/config layer, adding `cli/pyproject.toml`, `cli/config.toml`, and `cli/sushistack.deps.toml`.
+
 ## v1.0.0 — 2026-09-17
 
 - 2026-09-17 — core: Released initial Apache-2.0 open-source version of SushiTrack tracking engine.
