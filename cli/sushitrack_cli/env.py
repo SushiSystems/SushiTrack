@@ -1,14 +1,4 @@
-"""Build-environment snapshotting (Windows MSVC).
-
-A parent process cannot ``call vcvars64.bat`` and inherit the result, so the
-script is run in a child ``cmd``, the resulting environment is dumped, and that
-dictionary is reused for every cmake/ctest subprocess. This replaces the vswhere
-block that used to live in ``cli/project/build.bat``.
-
-Linux needs none of this — gcc/clang are already on PATH — so ``load_build_env``
-returns ``os.environ`` unchanged there. The snapshot is cached inside the build
-tree because spawning cmd and sourcing vcvars costs a noticeable second.
-"""
+"""Build-environment snapshotting (Windows MSVC)."""
 
 import json
 import os
@@ -85,9 +75,7 @@ def _snapshot_windows():
                      "assuming the compiler is already on PATH.")
         return None
     console.info(f"Loading Visual Studio environment from {vcvars}")
-    # Passed as one string, not a list: subprocess would re-quote the elements
-    # and mangle the quotes around the space-containing vcvars path, leaving
-    # cmd.exe with an unrecognised token and silently no VS environment.
+    # Passed as one string, not a list: subprocess would re-quote the elements and man
     code, out, _ = proc.capture(f'cmd /c call "{vcvars}" >nul && set')
     if code != 0:
         console.warn("vcvars64.bat returned non-zero; using the current env.")

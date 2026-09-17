@@ -9,7 +9,7 @@ RESET='\033[0m'
 TOOLS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
 ROOT_DIR="$( cd "$TOOLS_DIR/.." && pwd )"
 
-# Relocated data roots are configured in cli/config.json; `ds paths` prints the
+# Relocated data roots are configured in cli/config.json; `st paths` prints the
 # resolved value, which can be passed as the first argument here.
 TEST_DATA_DIR="${1:-$ROOT_DIR/tests/regression/evaluator/data}"
 

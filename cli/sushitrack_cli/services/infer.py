@@ -1,7 +1,7 @@
-"""The YOLOX video inference pipeline behind `ds infer`.
+"""The YOLOX video inference pipeline behind `st infer`.
 
 A front-end for tests/regression/inference/demo.py: this only translates flags and
-launches it. The pipeline needs tracker_bridge from a `ds build` plus its own
+launches it. The pipeline needs tracker_bridge from a `st build` plus its own
 Python dependencies (torch, opencv) — those belong to the demo, not to this CLI.
 """
 

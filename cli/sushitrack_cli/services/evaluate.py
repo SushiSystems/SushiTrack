@@ -1,18 +1,11 @@
-"""TrackEval metric evaluation, internal wrapper or the official script.
-
-The internal path imports the repo's evaluator package (tests/regression/
-evaluator), which needs numpy/scipy — the only place in this CLI where a
-third-party package is involved, and it stays an optional import so every other
-command keeps working in a bare python3 environment.
-"""
+"""TrackEval metric evaluation, internal wrapper or the official script."""
 
 import shutil
 import sys
 
 from .. import console, proc
 
-# MOT20 sequences are scored against the MOT20 benchmark definition, everything
-# else against MOT17; the official script needs the split up front.
+# MOT20 sequences are scored against the MOT20 benchmark definition, everything el
 _BENCHMARKS = ("MOT17", "MOT20")
 
 
@@ -26,15 +19,13 @@ def _load_evaluator(paths):
         from report_generator import (export_trackeval_results,
                                       print_trackeval_table)
     except ImportError as exc:
-        # The evaluator has its own dependency set (numpy, scipy, loguru,
-        # TrackEval); name the module that actually failed rather than listing
-        # all of them, since only one is usually missing.
+        # The evaluator has its own dependency set (numpy, scipy, loguru, TrackEval); name
         console.error(
             f"Internal evaluator unavailable: {exc}.\n"
             f"Its dependencies come from environment.yml "
             f"(conda env create -f environment.yml), or install the missing "
             f"package directly.\n"
-            f"To score without it, run `ds eval --trackeval` and use the "
+            f"To score without it, run `st eval --trackeval` and use the "
             f"official TrackEval script.")
         return None
     return TrackEvalRunner, print_trackeval_table, export_trackeval_results
@@ -126,7 +117,7 @@ def run_official(paths, sequences, trackers):
     console.header("TrackEval (official)")
     staged = _stage_official_data(paths, sequences, trackers, trackeval_dir)
     if not staged:
-        console.error("No prediction files to evaluate. Run `ds eval` "
+        console.error("No prediction files to evaluate. Run `st eval` "
                       "without --eval-only first.")
         return 1
 

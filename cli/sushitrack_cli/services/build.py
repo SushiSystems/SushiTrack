@@ -1,14 +1,4 @@
-"""Configure, build and clean the project.
-
-Replaces cli/project/build.{sh,bat} and cli/project/clean.{sh,bat}: cmake is
-invoked directly with the snapshotted build environment, so the same code path
-serves Windows and Linux and no shell is required.
-
-Test targets are built by default and turned off as a group with ``--no-test``
-(there is no per-suite build flag): which suites exist is a property of
-tests/CMakeLists.txt, and the CLI has no business enumerating them. Selecting
-what to *run* is `ds test --suite`, via CTest labels.
-"""
+"""Configure, build and clean the project."""
 
 import os
 import shutil
@@ -21,18 +11,14 @@ from ..env import load_build_env
 BUILD_TYPES = ("Release", "Debug", "RelWithDebInfo", "MinSizeRel")
 
 LIBRARY_TARGET = "sushitrack"
-# Every target the test build produces. Listed explicitly (rather than building
-# the `all` target) so a build failure names the target that failed and so the
-# library-only build stays genuinely library-only.
+# Every target the test build produces. Listed explicitly (rather than building th
 TEST_TARGETS = ("unit_test", "integration_test", "regression_test",
                 "tracker_bridge")
 # The CMake options those targets are gated behind.
 TEST_OPTIONS = ("BUILD_UNIT_TEST", "BUILD_REGRESSION_TEST",
                 "BUILD_INTEGRATION_TEST")
 
-# Records the configuration a build tree was configured with. A single-config
-# generator bakes the build type into the cache, so without this `--type debug`
-# after a Release build would silently reuse the Release tree.
+# Records the configuration a build tree was configured with. A single-config gene
 STAMP_NAME = ".sushitrack_config"
 
 
@@ -53,9 +39,7 @@ def generator(cfg):
     configured = cfg.expand(cfg.build_generator)
     if configured:
         return configured
-    # Windows has no default single-config generator worth using here: the old
-    # build.bat pinned Ninja, and the artifact layout the deploy step expects
-    # (bin/ with no config level) depends on it.
+    # Windows has no default single-config generator worth using here: the old build.b
     return "Ninja" if IS_WINDOWS else ""
 
 
@@ -111,8 +95,7 @@ def _needs_configure(build_dir, generator_name, stamp_key, root):
     stamp = build_dir / STAMP_NAME
     if stamp.is_file():
         return stamp.read_text(encoding="utf-8").strip() != stamp_key
-    # No stamp (a pre-upgrade tree, or a hand-run cmake): reconfigure once so the
-    # tree is known to match what was asked for.
+    # No stamp (a pre-upgrade tree, or a hand-run cmake): reconfigure once so the tree
     return True
 
 
@@ -137,9 +120,7 @@ def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
     stamp_key = _stamp_key(build_type, tests, generator_name, defines)
 
     if _needs_configure(build_dir, generator_name, stamp_key, paths.root):
-        # Reconfigured from an empty tree: a cached option flip (tests ON->OFF,
-        # or a different build type on a single-config generator) is not reliably
-        # picked up by re-running cmake over the existing cache.
+        # Reconfigured from an empty tree: a cached option flip (tests ON->OFF, or a diffe
         if build_dir.exists():
             shutil.rmtree(build_dir, ignore_errors=True)
         build_dir.mkdir(parents=True, exist_ok=True)

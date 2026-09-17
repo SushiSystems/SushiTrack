@@ -1,9 +1,12 @@
-"""The SushiTrack developer CLI (`ds`).
+"""The SushiTrack developer CLI (`st` / `sushitrack`).
 
 Thin command layer: each command parses arguments and delegates to
 :mod:`sushitrack_cli.services`. Nothing here does real work, so the surface stays
 readable as one file and the behaviour stays testable without argparse.
 """
+
+import sys
+from pathlib import Path
 
 from . import __version__
 from .app import App, Opt, main
@@ -18,7 +21,7 @@ from .services import runner as run_svc
 from .services import tests as test_svc
 
 app = App(
-    prog="ds",
+    prog="st",
     description="SushiTrack developer CLI — build, test, evaluate, run and Docker.",
     version=__version__,
     epilog="Only python3 is required; the CLI has no third-party dependencies.",
@@ -82,10 +85,10 @@ def test(args):
     """Run the test suites via CTest labels.
 
     For GTest-level knobs (shuffle, break-on-failure) run the binary directly:
-    ds run unit_test -- --gtest_shuffle --gtest_break_on_failure
+    st run unit_test -- --gtest_shuffle --gtest_break_on_failure
 
-    Metric evaluation and video inference are not CTest suites — see `ds eval`
-    and `ds infer`.
+    Metric evaluation and video inference are not CTest suites — see `st eval`
+    and `st infer`.
     """
     cfg, paths = context()
     return test_svc.test(cfg, paths, suite=args.suite, filter=args.filter,
@@ -158,7 +161,7 @@ def evaluate(args):
 def infer(args):
     """Run the YOLOX video inference pipeline through tracker_bridge.
 
-    Example: ds infer --source clip.mp4 -c weights/mot17x.pth.tar --tsize 800 1440
+    Example: st infer --source clip.mp4 -c weights/mot17x.pth.tar --tsize 800 1440
     """
     cfg, paths = context()
     return infer_svc.run(cfg, paths, args)
@@ -174,7 +177,7 @@ def infer(args):
 def run(args):
     """Run a built executable.
 
-    Example: ds run unit_test -- --gtest_filter='TrackletTest.*'
+    Example: st run unit_test -- --gtest_filter='TrackletTest.*'
     """
     cfg, paths = context()
     return run_svc.run(cfg, paths, target=args.target, select=args.select,
@@ -256,6 +259,12 @@ def docker_run(args):
                           forwarded=args.forwarded)
 
 
-def entry(argv=None):
+def entry(argv=None, prog=None):
     """Process entry point: returns an exit code, never raises for user error."""
+    if prog:
+        app.prog = prog
+    elif sys.argv:
+        stem = Path(sys.argv[0]).stem.lower()
+        if stem in ("sushitrack", "st"):
+            app.prog = stem
     return main(app, argv)

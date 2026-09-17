@@ -17,10 +17,11 @@ COPY cli /workspace/sushitrack/cli
 # Only cli/ is copied, so there is no CMakeLists.txt for the root search to find;
 # pinning the root explicitly keeps the diagnostics commands runnable. Mount the
 # real checkout over /workspace/sushitrack to work against actual sources.
-ENV DS_PROJECT_ROOT=/workspace/sushitrack
+ENV ST_PROJECT_ROOT=/workspace/sushitrack
 
-RUN ln -sf /workspace/sushitrack/cli/ds.py /usr/local/bin/ds && \
-    chmod +x /workspace/sushitrack/cli/ds.py
+RUN ln -sf /workspace/sushitrack/cli/st.py /usr/local/bin/st && \
+    ln -sf /workspace/sushitrack/cli/sushitrack.py /usr/local/bin/sushitrack && \
+    chmod +x /workspace/sushitrack/cli/st.py /workspace/sushitrack/cli/sushitrack.py
 
-ENTRYPOINT ["python3", "/workspace/sushitrack/cli/ds.py"]
+ENTRYPOINT ["python3", "/workspace/sushitrack/cli/st.py"]
 CMD ["--help"]

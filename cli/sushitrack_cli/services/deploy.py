@@ -18,28 +18,23 @@ _CPP_EXAMPLE = """\
 /*
  * Minimal SushiTrack C-API usage example.
  *
- * Build (after `ds deploy cpp`):
+ * Build (after `st deploy cpp`):
  *   cd example && cmake -B build && cmake --build build
  *   ./build/sushitrack_example        (Windows: copy ../bin/sushitrack.dll next to the exe)
  */
-#include <stdio.h>
-#include "SushiTrackC.h"
+# include <stdio.h> include "SushiTrack/sushitrack_c.h"
 
 int main(void)
 {
-    SushiTrack_Params params;
-    SushiTrack_GetDefaultParams(&params);
-    params.frame_rate = 30;
-
-    SushiTrackHdl tracker = SushiTrack_Create(&params);
+    sushitrack_tracker_t tracker = sushitrack_create_tracker("sushitrack.json");
     if (!tracker) { fprintf(stderr, "failed to create tracker\\n"); return 1; }
 
-    SushiTrack_Object dets[1] = { { 100.f, 100.f, 50.f, 80.f, 0.9f, 0, NULL, 0 } };
-    SushiTrack_Track  out[64];
+    sushitrack_object_t dets[1] = { { 100.f, 100.f, 50.f, 80.f, 0.9f, 0 } };
+    sushitrack_track_t  out[64];
 
     for (int frame = 0; frame < 5; ++frame) {
         dets[0].x += 5.f;  /* move the box */
-        int n = SushiTrack_Update(tracker, dets, 1, out, 64, 1.0f / 30.0f);
+        int n = sushitrack_update(tracker, dets, 1, out, 64, 1.0f / 30.0f);
         printf("frame %d: %d track(s)\\n", frame, n);
         for (int i = 0; i < n; ++i)
             printf("  id=%lld  (%.1f, %.1f, %.1f, %.1f)  state=%d\\n",
@@ -47,7 +42,7 @@ int main(void)
                    out[i].width, out[i].height, out[i].state);
     }
 
-    SushiTrack_Destroy(tracker);
+    sushitrack_destroy_tracker(tracker);
     return 0;
 }
 """
@@ -83,10 +78,10 @@ Self-contained, ready-to-link build of the SushiTrack tracker (C ABI).
 
 ## Contents
 ```
-include/         Public C headers (SushiTrackC.h + SushiTrack/SushiTrackTypes.h)
+include/         Public C headers (SushiTrack/sushitrack_c.h)
 lib/             Link library  ({import_lib})
 bin/             Runtime library ({runtime_lib})   [Windows only]
-sushitrack.json   Default runtime configuration (editable, no recompile needed)
+sushitrack.json  Default runtime configuration (editable, no recompile needed)
 example/         Minimal usage example + CMakeLists.txt
 ```
 
@@ -98,10 +93,10 @@ cmake --build build
 ```
 
 ## Integrating into your own project
-- Add `include/` to your include path and include `SushiTrackC.h`.
+- Add `include/` to your include path and include `SushiTrack/sushitrack_c.h`.
 - Link against `lib/{import_lib}`.
 - On Windows, ensure `bin/sushitrack.dll` is on the PATH or beside your executable.
-- Edit `sushitrack.json` and create the tracker with `SushiTrack_CreateFromConfig("sushitrack.json")`
+- Edit `sushitrack.json` and create the tracker with `sushitrack_create_tracker("sushitrack.json")`
   to retune the algorithm without recompiling.
 
 Platform: {platform}
@@ -110,14 +105,13 @@ Platform: {platform}
 _PY_EXAMPLE = """\
 \"\"\"Minimal SushiTrack Python usage example.
 
-Run (after `ds deploy python`):
+Run (after `st deploy python`):
     python example.py
 \"\"\"
-from sushitrack import SushiTrack, TrackState
+from sushitrack import Tracker
 
-# The shared library is bundled inside the sushitrack/ package directory and
-# discovered automatically.
-tracker = SushiTrack(frame_rate=30, kalman_type=2)
+# The shared library is bundled inside the sushitrack/ package directory and disco
+tracker = Tracker(config_path="sushitrack.json")
 
 x = 100.0
 for frame in range(5):
@@ -126,8 +120,7 @@ for frame in range(5):
     tracks = tracker.update(dets, dt=1.0 / 30.0)
     print(f"frame {frame}: {len(tracks)} track(s)")
     for t in tracks:
-        print(f"  id={t.track_id}  ({t.x:.1f}, {t.y:.1f}, {t.width:.1f}, {t.height:.1f})"
-              f"  state={TrackState(t.state).name}")
+        print(f"  id={t.track_id}  ({t.x:.1f}, {t.y:.1f}, {t.width:.1f}, {t.height:.1f})")
 
 tracker.close()
 """
@@ -135,15 +128,14 @@ tracker.close()
 _PY_README = """\
 # SushiTrack — Python Deployment Package
 
-Self-contained ctypes binding bundled with the native SushiTrack library.
+Self-contained binding bundled with the native SushiTrack library.
 
 ## Contents
 ```
 sushitrack/
     __init__.py
-    sushitrack.py     Pure-Python ctypes wrapper (no dependencies)
     {runtime_lib}    Bundled native library
-sushitrack.json       Default runtime configuration
+sushitrack.json      Default runtime configuration
 example.py           Minimal usage example
 ```
 
@@ -155,8 +147,8 @@ python example.py
 ## Integrating into your own project
 Copy the `sushitrack/` directory into your project (or add it to PYTHONPATH):
 ```python
-from sushitrack import SushiTrack
-tracker = SushiTrack(frame_rate=30, kalman_type=2)
+from sushitrack import Tracker
+tracker = Tracker()
 tracks = tracker.update([(x, y, w, h, score, label)], dt=1/30)
 ```
 The native library is loaded from inside the package automatically; no build
@@ -167,7 +159,7 @@ Platform: {platform}
 
 
 def _copy_config(paths, pkg_dir):
-    config = paths.root / "sushitrack.json"
+    config = getattr(paths, "config", paths.root / "sushitrack.json")
     if config.exists():
         shutil.copy2(config, pkg_dir / "sushitrack.json")
 
@@ -175,20 +167,21 @@ def _copy_config(paths, pkg_dir):
 def _deploy_cpp(paths, pkg_dir):
     runtime = discovery.find_artifact(paths.build, discovery.shared_lib_name())
     if not runtime:
-        console.error(f"{discovery.shared_lib_name()} not found. Run `ds build` first.")
+        console.error(f"{discovery.shared_lib_name()} not found. Run `st build` first.")
         return False
     import_lib = discovery.find_artifact(paths.build, discovery.import_lib_name())
     if not import_lib:
-        console.error(f"{discovery.import_lib_name()} not found. Run `ds build` first.")
+        console.error(f"{discovery.import_lib_name()} not found. Run `st build` first.")
         return False
 
-    # The C ABI is dependency-free, so only these two headers ship.
-    include_dst = pkg_dir / "include"
-    (include_dst / "SushiTrack").mkdir(parents=True, exist_ok=True)
-    shutil.copy2(paths.root / "include" / "SushiTrackC.h",
-                 include_dst / "SushiTrackC.h")
-    shutil.copy2(paths.root / "include" / "SushiTrack" / "SushiTrackTypes.h",
-                 include_dst / "SushiTrack" / "SushiTrackTypes.h")
+    include_dst = pkg_dir / "include" / "SushiTrack"
+    include_dst.mkdir(parents=True, exist_ok=True)
+    src_include = getattr(paths, "include", paths.root / "include" / "SushiTrack")
+    if src_include.is_dir():
+        for hdr in src_include.glob("*.h"):
+            shutil.copy2(hdr, include_dst / hdr.name)
+        for hdr in src_include.glob("*.hpp"):
+            shutil.copy2(hdr, include_dst / hdr.name)
 
     (pkg_dir / "lib").mkdir(parents=True, exist_ok=True)
     shutil.copy2(import_lib, pkg_dir / "lib" / discovery.import_lib_name())
@@ -211,22 +204,21 @@ def _deploy_cpp(paths, pkg_dir):
 def _deploy_python(paths, pkg_dir):
     runtime = discovery.find_artifact(paths.build, discovery.shared_lib_name())
     if not runtime:
-        console.error(f"{discovery.shared_lib_name()} not found. Run `ds build` first.")
+        console.error(f"{discovery.shared_lib_name()} not found. Run `st build` first.")
         return False
 
     binding = paths.root / "bindings" / "python" / "sushitrack.py"
     if not binding.exists():
-        console.error(f"Python binding not found at {binding}")
+        console.error(f"Python binding not found under {paths.root / 'bindings' / 'python'}")
         return False
 
     module_dir = pkg_dir / "sushitrack"
     module_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(binding, module_dir / "sushitrack.py")
-    # Bundled beside the module because the binding's find_library() looks there
-    # first, which is what makes the package work with no env var set.
+    shutil.copy2(binding, module_dir / binding.name)
+    # Bundled beside the module because the binding's find_library() looks there first
     shutil.copy2(runtime, module_dir / discovery.shared_lib_name())
     (module_dir / "__init__.py").write_text(
-        "from .sushitrack import *  # noqa: F401,F403\n", encoding="utf-8")
+        f"from .{binding.stem} import *  # noqa: F401,F403\n", encoding="utf-8")
 
     _copy_config(paths, pkg_dir)
     (pkg_dir / "example.py").write_text(_PY_EXAMPLE, encoding="utf-8")

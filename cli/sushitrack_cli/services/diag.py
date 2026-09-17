@@ -1,10 +1,4 @@
-"""Read-only diagnostics: status, doctor, config, env, paths.
-
-``status`` answers "what state is this checkout in" (built artifacts, test
-binaries, data sets), ``doctor`` answers "can this machine build and test the
-project" and returns non-zero when something required is missing, and the other
-three explain where the CLI's own numbers came from.
-"""
+"""Read-only diagnostics: status, doctor, config, env, paths."""
 
 import os
 import platform
@@ -20,12 +14,9 @@ from . import build as build_svc
 from . import discovery
 from . import tests as test_svc
 
-# Variable-name prefixes worth surfacing by default in `ds env`: the ones that
-# actually steer a build. Matched as prefixes rather than substrings, so an
-# unrelated variable merely containing "PATH" is not pulled in. --all shows
-# everything.
+# Variable-name prefixes worth surfacing by default in `st env`: the ones that act
 _ENV_OF_INTEREST = ("PATH", "CC", "CXX", "CMAKE", "NINJA", "INCLUDE", "LIB",
-                    "LD_LIBRARY_PATH", "VCPKG", "CUDA", "DS_", "PYTHON",
+                    "LD_LIBRARY_PATH", "VCPKG", "CUDA", "ST_", "DS_", "PYTHON",
                     "VIRTUAL_ENV", "CONDA", "VSINSTALLDIR", "VSCMD",
                     "VCINSTALLDIR", "VCTOOLS", "WINDOWSSDK")
 
@@ -132,9 +123,7 @@ def doctor(cfg, paths):
     checks.append(_check("python", sys.version_info >= (3, 8),
                          f"{platform.python_version()} at {sys.executable}"))
 
-    # Checked against the same environment the build runs under, not the current
-    # shell: on Windows vcvars contributes ninja and the compiler, so a bare PATH
-    # lookup would report a perfectly working toolchain as missing.
+    # Checked against the same environment the build runs under, not the current shell
     build_env = load_build_env(paths.build)
 
     cmake = build_svc.cmake_exe(cfg)
@@ -151,10 +140,7 @@ def doctor(cfg, paths):
     generator = cfg.expand(cfg.build_generator) or ("Ninja" if IS_WINDOWS else "")
     if generator.lower().startswith("ninja"):
         ninja = proc.tool_version("ninja", env=build_env)
-        # An already-configured tree pins its make program in the cache, so a
-        # build keeps working from a shell where ninja is not on PATH (e.g. it
-        # lives in the conda env the tree was configured from). Report that
-        # instead of a failure the user cannot act on.
+        # An already-configured tree pins its make program in the cache, so a build keeps 
         cached = build_svc.cache_value(paths.build, "CMAKE_MAKE_PROGRAM")
         from_cache = cached and Path(cached).is_file()
         checks.append(_check(
@@ -183,13 +169,13 @@ def doctor(cfg, paths):
 
     docker = proc.tool_version("docker")
     checks.append(_check("docker", docker is not None,
-                         docker or "not on PATH — only `ds docker` needs it",
+                         docker or "not on PATH — only `st docker` needs it",
                          required=False))
 
     trackeval = paths.third_party / "TrackEval" / "scripts" / "run_mot_challenge.py"
     checks.append(_check("TrackEval submodule", trackeval.is_file(),
                          str(trackeval if trackeval.is_file()
-                             else "missing — needed by `ds eval --trackeval`"),
+                             else "missing — needed by `st eval --trackeval`"),
                          required=False))
 
     data_root = paths.data_root()
@@ -205,7 +191,7 @@ def doctor(cfg, paths):
     checks.append(_check("evaluator deps", not missing,
                          "numpy, scipy available" if not missing
                          else f"missing: {', '.join(missing)} — only "
-                              f"`ds eval` needs them",
+                              f"`st eval` needs them",
                          required=False))
 
     table = console.new_table("Check", "Result", "Detail")
@@ -224,7 +210,7 @@ def doctor(cfg, paths):
 
     if failures:
         console.error(f"{failures} required check(s) failed; "
-                      f"`ds build` will not work until they are fixed.")
+                      f"`st build` will not work until they are fixed.")
         return 1
     console.success("All required checks passed.")
     return 0

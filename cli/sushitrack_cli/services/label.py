@@ -1,10 +1,4 @@
-"""The MOT label-based benchmark pipeline behind `ds eval`.
-
-Not a CTest suite: it runs the regression binary over det.txt-backed sequences,
-parses the per-sequence ``[ PERF ]`` timings out of its output, and feeds them to
-TrackEval to print a metric table (HOTA / DetA / AssA / MOTA / IDF1 / IDSW / …).
-`ds test --suite regression` only answers pass/fail for the same binary.
-"""
+"""The MOT label-based benchmark pipeline behind `st eval`."""
 
 import sys
 
@@ -24,8 +18,9 @@ def resolve_tracker(name):
     """Normalise a tracker name to its registry key, or exit with the choices."""
     key = (name or "sushitrack").lower()
     if key not in TRACKERS:
+        unique_names = sorted(set(TRACKERS.values()))
         raise SystemExit(f"Unknown tracker '{name}'. "
-                         f"Available: {', '.join(TRACKERS.values())}.")
+                         f"Available: {', '.join(unique_names)}.")
     return key
 
 
@@ -92,12 +87,11 @@ def _parse_perf(stdout):
 def _run_regression(paths, gtest_filter):
     binary = discovery.find_binary(paths.build, "regression_test")
     if not binary:
-        console.error("regression_test binary not found. Run `ds build` first.")
+        console.error("regression_test binary not found. Run `st build` first.")
         return 1, {}
 
     console.command(f"{binary} --gtest_filter={gtest_filter}")
-    # Captured rather than streamed because the PERF lines have to be parsed; the
-    # output is echoed on failure so nothing is lost when it matters.
+    # Captured rather than streamed because the PERF lines have to be parsed; the outp
     code, out, err = proc.capture([str(binary), f"--gtest_filter={gtest_filter}"],
                                   cwd=paths.root,
                                   env=load_build_env(paths.build))

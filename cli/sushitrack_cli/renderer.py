@@ -1,14 +1,4 @@
-"""Rendering backends — the only modules that emit escape codes.
-
-``Renderer`` is the seam the rest of the package depends on: the
-:class:`~sushitrack_cli.console.Console` facade talks to this interface and never
-formats output itself, so a plain-text or JSON backend is a drop-in replacement.
-
-Everything here is standard library only. Rich's job (style parsing, tables,
-panels, rules) is covered by :func:`ansi` plus the small layout helpers below;
-the style vocabulary is deliberately a subset of Rich's so themes remain
-interchangeable with the Sushi CLIs.
-"""
+"""Rendering backends — the only modules that emit escape codes."""
 
 import os
 import re
@@ -32,8 +22,7 @@ _COLORS = {
     "bright_black": 90, "bright_red": 91, "bright_green": 92,
     "bright_yellow": 93, "bright_blue": 94, "bright_magenta": 95,
     "bright_cyan": 96, "bright_white": 97,
-    # "default" means the terminal's own foreground rather than a fixed color,
-    # so it stays readable on both dark and light backgrounds.
+    # "default" means the terminal's own foreground rather than a fixed color, so it s
     "default": 39,
 }
 
@@ -95,9 +84,7 @@ def _enable_windows_vt():
 
 
 def _force_utf8_streams():
-    # A legacy Windows console defaults to cp1252, which cannot encode the box
-    # characters used by tables; without this the first table raises
-    # UnicodeEncodeError and turns rendering into a traceback.
+    # A legacy Windows console defaults to cp1252, which cannot encode the box charact
     for stream in (sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure is not None:
@@ -160,9 +147,7 @@ class AnsiRenderer:
         return f"{prefix}{text}{RESET}" if prefix else text
 
     def _write(self, text=""):
-        # Flushed on every line: a child process writes straight to the same
-        # terminal, so anything left in our buffer would surface after the
-        # subprocess output it was supposed to introduce.
+        # Flushed on every line: a child process writes straight to the same terminal, so 
         print(text, file=self._stream, flush=True)
 
     def line(self, style, prefix, message):
@@ -273,8 +258,7 @@ def _wrap(text, width):
         elif remaining[cut] in "/\\;,":
             cut += 1  # keep the separator on the line it belongs to
         lines.append(remaining[:cut].rstrip())
-        # Drop the whitespace we broke on; keeping it would indent the
-        # continuation line by one column.
+        # Drop the whitespace we broke on; keeping it would indent the continuation line b
         remaining = remaining[cut:].lstrip(" ")
     if remaining:
         lines.append(remaining)

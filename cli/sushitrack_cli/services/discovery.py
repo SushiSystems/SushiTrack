@@ -1,11 +1,4 @@
-"""Locate built binaries and libraries under the build tree.
-
-Replaces the `find`/`dir` searches the old run.sh / run.bat scripts did, and the
-duplicated candidate lists in the previous single-file CLI: single-config
-generators put artifacts in ``bin/``, multi-config ones (MSBuild) add a
-``Release/``/``Debug/`` level, so both shapes are probed before falling back to a
-recursive walk.
-"""
+"""Locate built binaries and libraries under the build tree."""
 
 import os
 from pathlib import Path
@@ -26,8 +19,7 @@ def shared_lib_name():
 
 
 def import_lib_name():
-    # On Windows the runtime DLL and its import library are distinct files; on
-    # Linux the single .so serves both roles.
+    # On Windows the runtime DLL and its import library are distinct files; on Linux t
     return "sushitrack.lib" if IS_WINDOWS else "libsushitrack.so"
 
 

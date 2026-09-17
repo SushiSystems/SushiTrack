@@ -1,16 +1,4 @@
-"""The public-facing console facade.
-
-``Console`` only translates semantic calls (``info``, ``success``, ...) into
-renderer calls using a theme and an icon set — it never picks colors or lays out
-output itself. It is assembled by :func:`build_console` via dependency
-injection, so a test can hand it any renderer without subclassing.
-
-The module-level console is built lazily (PEP 562 ``__getattr__``): constructing
-it reads the repo's ``cli/config.json``, and locating that walks up for the
-project root, which fails outside a checkout. Deferring the work means
-``ds --help`` and ``ds doctor`` still run from anywhere, and even then a missing
-config degrades to the default theme rather than aborting.
-"""
+"""The public-facing console facade."""
 
 import os
 import sys
@@ -87,8 +75,7 @@ class Console:
 
 
 def _use_color(mode):
-    # NO_COLOR is honoured before the configured mode: it is the user's
-    # environment-wide opt-out and a repo config should not override it.
+    # NO_COLOR is honoured before the configured mode: it is the user's environment-wi
     if os.environ.get("NO_COLOR"):
         return False
     if mode == "always":

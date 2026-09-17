@@ -1,18 +1,4 @@
-"""A tiny declarative command layer over :mod:`argparse`.
-
-This is the Typer replacement. It exists so ``cli.py`` can stay a flat list of
-declarations — command name, options, handler — instead of a hand-rolled
-subparser tree with a dispatch ``if`` chain, while the only import is stdlib.
-
-What it provides beyond bare argparse:
-  * ``@app.command`` / ``@group.command`` registration with the handler attached,
-    so there is no separate dispatch table to keep in sync;
-  * a themed top-level help that lists commands with one-line summaries, grouped
-    the way the CLI is meant to be read rather than alphabetically;
-  * ``--`` passthrough: everything after a bare ``--`` reaches the handler as
-    ``args.forwarded`` instead of being parsed;
-  * exit codes as return values — a handler returns an int, never calls sys.exit.
-"""
+"""A tiny declarative command layer over :mod:`argparse`."""
 
 import argparse
 import sys
@@ -188,8 +174,7 @@ class App(_Registry):
 
         handler = getattr(args, "_handler", None)
         if handler is None:
-            # A group invoked with no action: show that group's own help rather
-            # than the top-level one, which would not list its actions.
+            # A group invoked with no action: show that group's own help rather than the top-l
             group_parser = getattr(args, "_group_parser", None)
             (group_parser or parser).print_help()
             return 0

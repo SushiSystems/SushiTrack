@@ -9,11 +9,11 @@ def _select(paths):
     """List the build tree's executables and prompt for one.
 
     Falls back to an error rather than a prompt when stdin is not a terminal, so
-    a scripted `ds run --select` fails loudly instead of hanging.
+    a scripted `st run --select` fails loudly instead of hanging.
     """
     executables = discovery.list_executables(paths.build)
     if not executables:
-        console.error("No executables found. Run `ds build` first.")
+        console.error("No executables found. Run `st build` first.")
         return None
 
     table = console.new_table("#", "Name", "Path", title="Available executables")
@@ -44,7 +44,7 @@ def run(cfg, paths, target=None, select=False, forwarded=()):
         binary = discovery.match_by_name(paths.build, target)
         if binary is None:
             console.error(f"No executable matching '{target}' under {paths.build}. "
-                          f"Run `ds run` with no target to list what is available.")
+                          f"Run `st run` with no target to list what is available.")
             return 1
 
     console.header(f"Run {binary.name}")

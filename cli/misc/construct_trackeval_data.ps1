@@ -1,7 +1,8 @@
 $script_dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $base_dir = Resolve-Path "$script_dir/../.."
 $test_data = "$base_dir/tests/regression/evaluator/data"
-$te_data = "$base_dir/3rdparty/TrackEval/data"
+$te_base = "$base_dir/third_party/TrackEval"
+$te_data = "$te_base/data"
 
 Write-Host "Constructing TrackEval data structure..."
 

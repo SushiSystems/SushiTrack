@@ -1,13 +1,4 @@
-"""Color theme: the only piece of the presentation layer that knows about styles.
-
-A ``Theme`` is pure data — it has no idea how it gets rendered. New themes are
-added by registering a preset; nothing else has to change to support one.
-
-Style strings use a small subset of Rich's vocabulary ("bold", "dim", named
-colors, ``#rrggbb``) so a theme is fully describable in config.json with no
-code, and so the presets stay copy-pasteable between this CLI and the Sushi
-ones. :mod:`sushitrack_cli.renderer` compiles them to ANSI.
-"""
+"""Color theme: the only piece of the presentation layer that knows about styles."""
 
 from dataclasses import dataclass, fields, replace
 
@@ -33,9 +24,7 @@ class Theme:
                                 if k in known and v})
 
 
-# Near-monochrome greys plus a single amber accent (#f0a500), matching the
-# palette the Sushi CLIs took from sushiweb: semantic colors are desaturated so
-# they sit alongside the accent instead of competing with it.
+# Near-monochrome greys plus a single amber accent (#f0a500), matching the palette
 _SUSHIWEB = Theme(
     info="bold #9a9a94",
     success="bold #6bbf59",

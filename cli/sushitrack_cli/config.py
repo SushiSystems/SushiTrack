@@ -1,16 +1,4 @@
-"""Layered configuration and path resolution.
-
-Precedence (lowest to highest):
-    built-in defaults -> config.json -> config.local.json -> DS_* env vars
-
-Within a file, the active platform's ``platform.<name>`` table is merged over
-the top-level sections, so one file describes both Linux and Windows.
-
-JSON rather than TOML on purpose: ``tomllib`` only exists on Python 3.11+, and
-the whole point of this CLI is that a bare ``python3`` is the only requirement.
-This module replaces the old ``paths.env`` + ``paths_manager.py`` pair — the same
-overrides now live in the ``paths`` section, resolved relative to the repo root.
-"""
+"""Layered configuration and path resolution."""
 
 import json
 import os
@@ -18,9 +6,8 @@ import platform
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
-# Files that identify the repo root. CMakeLists.txt alone is too weak — any
-# enclosing C++ checkout would match — so the public header must be there too.
-_ROOT_MARKERS = ("CMakeLists.txt", "include/SushiTrackC.h")
+# Files that identify the repo root. CMakeLists.txt alone is too weak — any enclos
+_ROOT_MARKERS = ("CMakeLists.txt", "include/SushiTrack/sushitrack_c.h")
 
 CONFIG_NAMES = ("config.json", "config.local.json")
 
@@ -48,9 +35,12 @@ class Config:
     cli_icons: str = "text"
     cli_color: str = "auto"
 
+    paths_source: str = "source"
+    paths_include: str = "include/SushiTrack"
     paths_build: str = "build"
     paths_data: str = "data"
-    paths_third_party: str = "3rdparty"
+    paths_third_party: str = "third_party"
+    paths_config: str = "sushitrack.json"
     paths_tests: str = "tests"
     paths_regression: str = "tests/regression"
     paths_evaluator: str = "tests/regression/evaluator"
@@ -70,8 +60,7 @@ class Config:
 
     test_tracker: str = "sushitrack"
 
-    # Populated by the loader, not read from any file: field name -> origin
-    # ("default", "config.json", "config.local.json", "env:DS_...").
+    # Populated by the loader, not read from any file: field name -> origin ("default"
     sources: dict = field(default_factory=dict)
 
     def expand(self, value):
@@ -84,25 +73,35 @@ class Config:
 
 # Config field -> environment variable that overrides it.
 ENV_OVERRIDES = {
-    "cli_theme": "DS_THEME",
-    "cli_icons": "DS_ICONS",
-    "cli_color": "DS_COLOR",
-    "paths_build": "DS_BUILD_DIR",
-    "paths_data": "DS_DATA_DIR",
-    "paths_third_party": "DS_3RDPARTY_DIR",
-    "build_type": "DS_BUILD_TYPE",
-    "build_generator": "DS_GENERATOR",
-    "build_jobs": "DS_JOBS",
-    "build_cmake": "DS_CMAKE",
-    "build_ctest": "DS_CTEST",
-    "docker_image": "DS_DOCKER_IMAGE",
-    "docker_gpus": "DS_DOCKER_GPUS",
-    "test_tracker": "DS_TRACKER",
+    "cli_theme": "ST_THEME",
+    "cli_icons": "ST_ICONS",
+    "cli_color": "ST_COLOR",
+    "paths_source": "ST_SOURCE_DIR",
+    "paths_include": "ST_INCLUDE_DIR",
+    "paths_build": "ST_BUILD_DIR",
+    "paths_data": "ST_DATA_DIR",
+    "paths_third_party": "ST_3RDPARTY_DIR",
+    "paths_config": "ST_CONFIG_FILE",
+    "build_type": "ST_BUILD_TYPE",
+    "build_generator": "ST_GENERATOR",
+    "build_jobs": "ST_JOBS",
+    "build_cmake": "ST_CMAKE",
+    "build_ctest": "ST_CTEST",
+    "docker_image": "ST_DOCKER_IMAGE",
+    "docker_gpus": "ST_DOCKER_GPUS",
+    "test_tracker": "ST_TRACKER",
 }
 
 
 def _has_markers(directory):
-    return all((directory / marker).exists() for marker in _ROOT_MARKERS)
+    if not (directory / "CMakeLists.txt").is_file():
+        return False
+    candidates = (
+        directory / "include" / "SushiTrack" / "sushitrack_c.h",
+        directory / "include" / "SushiTrack",
+        directory / "sushitrack.json",
+    )
+    return any(c.exists() for c in candidates)
 
 
 def find_project_root(start=None):
@@ -111,11 +110,11 @@ def find_project_root(start=None):
     The CLI may be invoked through a wrapper on PATH from anywhere inside the
     checkout, so the caller's directory is what identifies the project — not the
     location of this file, which also works but breaks the moment the CLI is
-    copied or installed elsewhere. ``DS_PROJECT_ROOT`` overrides the search,
+    copied or installed elsewhere. ``ST_PROJECT_ROOT`` overrides the search,
     which is what makes the CLI usable when it ships without the sources next to
     it (a bare-python container, a mounted volume).
     """
-    override = os.environ.get("DS_PROJECT_ROOT")
+    override = os.environ.get("ST_PROJECT_ROOT") or os.environ.get("DS_PROJECT_ROOT")
     if override:
         return Path(os.path.expandvars(os.path.expanduser(override))).resolve()
 
@@ -128,9 +127,9 @@ def find_project_root(start=None):
     if _has_markers(packaged):
         return packaged
     raise SystemExit(
-        "Not inside a SushiTrack project: no CMakeLists.txt + include/SushiTrackC.h "
+        "Not inside a SushiTrack project: no CMakeLists.txt + include/SushiTrack/ "
         "found in the current directory or any parent. cd into the repo, or set "
-        "DS_PROJECT_ROOT to point at it."
+        "ST_PROJECT_ROOT to point at it."
     )
 
 
@@ -190,6 +189,11 @@ def _apply_document(cfg, document, origin):
 def _apply_env(cfg):
     for name, var in ENV_OVERRIDES.items():
         raw = os.environ.get(var)
+        if raw is None or raw == "":
+            legacy_var = var.replace("ST_", "DS_")
+            raw = os.environ.get(legacy_var)
+            if raw is not None and raw != "":
+                var = legacy_var
         if raw is not None and raw != "":
             setattr(cfg, name, _coerce(getattr(cfg, name), raw))
             cfg.sources[name] = f"env:{var}"
@@ -202,7 +206,7 @@ def load_config(root=None):
     try:
         cfg_dir = config_dir(root)
     except SystemExit:
-        _apply_env(cfg)  # still usable outside a checkout (e.g. `ds doctor`)
+        _apply_env(cfg)  # still usable outside a checkout (e.g. `st doctor`)
         return cfg
     for name in CONFIG_NAMES:
         _apply_document(cfg, _read_json(cfg_dir / name), name)
@@ -245,9 +249,12 @@ class Paths:
     def __init__(self, cfg, root):
         self.root = root
         self.cli = root / "cli"
+        self.source = self._resolve(cfg, cfg.paths_source)
+        self.include = self._resolve(cfg, cfg.paths_include)
         self.build = self._resolve(cfg, cfg.paths_build)
         self.data = self._resolve(cfg, cfg.paths_data)
         self.third_party = self._resolve(cfg, cfg.paths_third_party)
+        self.config = self._resolve(cfg, cfg.paths_config)
         self.tests = self._resolve(cfg, cfg.paths_tests)
         self.regression = self._resolve(cfg, cfg.paths_regression)
         self.evaluator = self._resolve(cfg, cfg.paths_evaluator)
@@ -268,10 +275,13 @@ class Paths:
         return {
             "root": self.root,
             "cli": self.cli,
+            "source": self.source,
+            "include": self.include,
             "build": self.build,
             "data": self.data,
             "data_root": self.data_root(),
             "third_party": self.third_party,
+            "config": self.config,
             "tests": self.tests,
             "regression": self.regression,
             "evaluator": self.evaluator,

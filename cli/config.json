@@ -2,8 +2,8 @@
   "_comment": [
     "SushiTrack CLI configuration. Tracked defaults; copy any key into",
     "config.local.json to override it per machine (that file is git-ignored).",
-    "Precedence: defaults -> config.json -> config.local.json -> DS_* env vars.",
-    "Run `ds config` to see the resolved values and where each came from."
+    "Precedence: defaults -> config.json -> config.local.json -> ST_* env vars.",
+    "Run `st config` to see the resolved values and where each came from."
   ],
 
   "cli": {
@@ -13,9 +13,12 @@
   },
 
   "paths": {
+    "source": "source",
+    "include": "include/SushiTrack",
     "build": "build",
     "data": "data",
-    "third_party": "3rdparty",
+    "third_party": "third_party",
+    "config": "sushitrack.json",
     "tests": "tests",
     "regression": "tests/regression",
     "evaluator": "tests/regression/evaluator",
