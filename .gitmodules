@@ -1,9 +1,9 @@
 [submodule "3rdparty/TrackEval"]
-	path = 3rdparty/TrackEval
+	path = third_party/TrackEval
 	url = https://github.com/JonathonLuiten/TrackEval.git
 [submodule "3rdparty/eigen"]
-	path = 3rdparty/eigen
+	path = third_party/eigen
 	url = https://gitlab.com/libeigen/eigen.git
 [submodule "3rdparty/yolox"]
-	path = 3rdparty/yolox
+	path = third_party/yolox
 	url = https://github.com/Megvii-BaseDetection/YOLOX.git

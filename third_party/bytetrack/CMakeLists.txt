@@ -14,7 +14,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Use local Eigen from root 3rdparty
 if(NOT TARGET Eigen3::Eigen)
-  set(EIGEN3_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../3rdparty/eigen")
+  set(EIGEN3_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/eigen")
   if(EXISTS "${EIGEN3_INCLUDE_DIR}/Eigen/Dense")
     message(STATUS "ByteTrack using local Eigen at: ${EIGEN3_INCLUDE_DIR}")
     add_library(Eigen3::Eigen INTERFACE IMPORTED)
