@@ -1,27 +1,9 @@
-"""
-sushitrack.py — Python ctypes binding for the SushiTrack C API.
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+"""Python ctypes bindings for the SushiTrack C ABI.
 
-A complete, dependency-free wrapper around the public C interface declared in
-``include/SushiTrackC.h``. It mirrors the three C structs and the five entry
-points exactly, then exposes a small Pythonic facade (the ``SushiTrack`` class)
-so callers never touch ctypes directly.
-
-    from sushitrack import SushiTrack
-
-    tracker = SushiTrack(frame_rate=30, enable_tentative=1, iou_type=1)
-    for frame in stream:
-        dets = [(x, y, w, h, score, label), ...]     # top-left x, y, w, h
-        tracks = tracker.update(dets, dt=1.0 / 30.0)
-        for t in tracks:
-            print(t.track_id, t.x, t.y, t.width, t.height, t.state)
-    tracker.close()
-
-The shared library (``sushitrack.dll`` / ``libsushitrack.so``) is located
-automatically under the project ``build`` tree, or via the ``SUSHITRACK_LIB``
-environment variable, or by passing ``lib_path`` explicitly.
-
-Author:    Mustafa Garip (mustafagarip@sushisystems.io)
-Copyright: (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
+Wraps the native library interface declared in include/SushiTrack/sushitrack_c.h.
+Exposes Tracker, Track, and lifecycle states for multi-object tracking.
 """
 
 from __future__ import annotations
@@ -29,17 +11,23 @@ from __future__ import annotations
 import ctypes as C
 import os
 import platform
-from collections import namedtuple
+from collections.abc import Callable, Iterable, Sequence
 from ctypes import POINTER, Structure, c_char_p, c_float, c_int, c_int64, c_void_p
+from dataclasses import dataclass
 from enum import IntEnum
 from pathlib import Path
-from typing import Iterable, List, Optional, Sequence
+from typing import Any
+
+__version__ = "1.0.0"
 
 __all__ = [
+    "__version__",
+    "Tracker",
     "SushiTrack",
     "Track",
     "TrackState",
     "KinematicState",
+    "LogLevel",
     "Status",
     "SushiTrackError",
     "SushiTrackObject",
@@ -49,12 +37,9 @@ __all__ = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Enumerations (mirror SushiTrackTypes.h and the track output fields)
-# ---------------------------------------------------------------------------
-
 class Status(IntEnum):
-    """Return codes from ``SushiTrack_CreateEx`` (mirror ``SushiTrack_Status``)."""
+    """Return codes from tracker initialization and configuration calls."""
+
     SUCCESS = 0
     INVALID_ARGUMENT = -1
     INITIALIZATION_FAILURE = -2
@@ -64,7 +49,8 @@ class Status(IntEnum):
 
 
 class TrackState(IntEnum):
-    """Lifecycle state reported in ``SushiTrack_Track::state``."""
+    """Lifecycle state reported in track output records."""
+
     NEW = 0
     TRACKED = 1
     LOST = 2
@@ -73,7 +59,8 @@ class TrackState(IntEnum):
 
 
 class KinematicState(IntEnum):
-    """Kinematic regime reported in ``SushiTrack_Track::kinematic_state``."""
+    """Kinematic regime reported in track output records."""
+
     STATIONARY = 0
     CRUISING = 1
     MANEUVERING = 2
@@ -82,6 +69,7 @@ class KinematicState(IntEnum):
 
 class LogLevel(IntEnum):
     """Logging levels passed to a registered log callback."""
+
     DEBUG = 0
     INFO = 1
     WARN = 2
@@ -89,15 +77,12 @@ class LogLevel(IntEnum):
 
 
 class SushiTrackError(RuntimeError):
-    """Raised when a C-API call fails (non-success status or null handle)."""
+    """Raised when a SushiTrack C ABI call fails."""
 
-
-# ---------------------------------------------------------------------------
-# ctypes structs — field order and types must match include/SushiTrackC.h exactly
-# ---------------------------------------------------------------------------
 
 class SushiTrackObject(Structure):
-    """Mirror of ``SushiTrack_Object`` (one input detection)."""
+    """Input detection bounding box and optional appearance feature."""
+
     _fields_ = [
         ("x", c_float),
         ("y", c_float),
@@ -111,7 +96,8 @@ class SushiTrackObject(Structure):
 
 
 class SushiTrackTrack(Structure):
-    """Mirror of ``SushiTrack_Track`` (one output track)."""
+    """Output tracking state for a single entity from the C ABI."""
+
     _fields_ = [
         ("track_id", c_int64),
         ("age", c_int64),
@@ -136,9 +122,9 @@ class SushiTrackTrack(Structure):
 
 
 class SushiTrackParams(Structure):
-    """Mirror of ``SushiTrack_Params`` — every field in declared header order."""
+    """Configuration parameters for the tracking algorithm in C ABI order."""
+
     _fields_ = [
-        # --- Basic ---
         ("time_aware", c_int),
         ("frame_rate", c_int),
         ("track_buffer", c_int),
@@ -148,18 +134,15 @@ class SushiTrackParams(Structure):
         ("enable_tentative", c_int),
         ("enable_reid", c_int),
         ("enable_mahalanobis", c_int),
-        # --- Advanced: association ---
         ("primary_assoc_mode", c_int),
         ("fuse_score", c_int),
         ("iou_match_thresh", c_float),
         ("unconfirmed_iou_thresh", c_float),
         ("duplicate_iou_thresh", c_float),
-        # --- Advanced: coordinate system ---
         ("enable_xyah", c_int),
         ("iou_type", c_int),
         ("iou_plus_one", c_int),
         ("kalman_type", c_int),
-        # --- ReID params ---
         ("feature_momentum", c_float),
         ("reid_high_thresh", c_float),
         ("reid_high_iou_weight", c_float),
@@ -167,7 +150,6 @@ class SushiTrackParams(Structure):
         ("reid_low_iou_weight", c_float),
         ("reid_recovery_thresh", c_float),
         ("max_feature_history", c_int),
-        # --- Observation-Centric Momentum (OCM) ---
         ("enable_ocm", c_int),
         ("enable_oru", c_int),
         ("ocm_vdc_weight", c_float),
@@ -175,17 +157,14 @@ class SushiTrackParams(Structure):
         ("ocm_min_velocity", c_float),
         ("ocm_max_age", c_int),
         ("ocm_maneuver_weight_scale", c_float),
-        # --- Tentative logic ---
         ("tentative_match_thresh", c_float),
         ("tentative_confirm_hits", c_int),
         ("tentative_max_age_seconds", c_float),
         ("tentative_max_miss_frames", c_int),
         ("tentative_init_suppress_iou", c_float),
-        # --- Mahalanobis gating ---
         ("gating_thresh", c_float),
         ("motion_cost_weight", c_float),
         ("max_area_ratio", c_float),
-        # --- Extended ---
         ("tentative_fast_thresh", c_float),
         ("tentative_fast_hits", c_int),
         ("tentative_slow_thresh", c_float),
@@ -195,234 +174,297 @@ class SushiTrackParams(Structure):
     ]
 
 
-# C log-callback signature: void(SushiTrack_LogLevel, const char*)
 LOG_CALLBACK = C.CFUNCTYPE(None, c_int, c_char_p)
 
 
-# ---------------------------------------------------------------------------
-# Output record
-# ---------------------------------------------------------------------------
+@dataclass(frozen=True, slots=True)
+class Track:
+    """Holds the output state for a single active track."""
 
-Track = namedtuple(
-    "Track",
-    [
-        "track_id", "x", "y", "width", "height", "score", "label",
-        "state", "kinematic_state", "age", "last_seen_frame", "lost_time",
-        "is_activated", "is_confirmed", "hits", "frames_since_last_update",
-        "maneuver_probability", "feat",
-    ],
-)
-Track.__doc__ = "A single output track. Coordinates are top-left x, y plus width, height."
+    track_id: int
+    x: float
+    y: float
+    width: float
+    height: float
+    score: float
+    label: int
+    state: TrackState
+    kinematic_state: KinematicState
+    age: int
+    last_seen_frame: int
+    lost_time: float
+    is_activated: bool
+    is_confirmed: bool
+    hits: int
+    frames_since_last_update: int
+    maneuver_probability: float
+    feat: list[float] | None = None
 
 
-# ---------------------------------------------------------------------------
-# Library discovery
-# ---------------------------------------------------------------------------
-
-def find_library(explicit: Optional[str] = None) -> str:
-    """Locate the SushiTrack shared library.
-
-    Resolution order: an explicit path, the ``SUSHITRACK_LIB`` environment
-    variable, then the standard CMake output locations under the project's
-    ``build`` tree (this file lives at ``bindings/python/`` relative to root).
-
-    :param explicit: An explicit path to the shared library, or None.
-    :returns: An absolute path to the located library.
-    :raises FileNotFoundError: If no library can be found.
-    """
-    candidates: List[str] = []
+def find_library(explicit: str | None = None) -> str:
+    """Locates the SushiTrack shared library binary on disk."""
+    candidates: list[str] = []
     if explicit:
         candidates.append(explicit)
-    env = os.environ.get("SUSHITRACK_LIB")
-    if env:
-        candidates.append(env)
+    val = os.environ.get("SUSHITRACK_LIB")
+    if val:
+        candidates.append(val)
 
-    lib_name = "sushitrack.dll" if platform.system() == "Windows" else "libsushitrack.so"
+    suffixes = [".dll"] if platform.system() == "Windows" else [".so", ".dylib"]
+    names = [f"sushitrack{s}" for s in suffixes] + [f"libsushitrack{s}" for s in suffixes]
 
-    # Self-contained deploy: the shared library sits next to this module
-    # (see `ds build --deploy python`).
     here = Path(__file__).resolve().parent
-    candidates.append(str(here / lib_name))
+    for name in names:
+        candidates.append(str(here / name))
 
-    root = Path(__file__).resolve().parents[2]   # bindings/python/ -> project root
+    root = Path(__file__).resolve().parents[2]
     build = root / "build"
     for sub in ("bin/Release", "bin/Debug", "bin", "lib", "Release", "Debug", ""):
-        candidates.append(str(build / sub / lib_name))
+        for name in names:
+            candidates.append(str(build / sub / name))
 
     for path in candidates:
         if path and os.path.exists(path):
             return os.path.abspath(path)
 
     raise FileNotFoundError(
-        f"Could not locate {lib_name}. Build it with `ds build`, "
-        f"or set SUSHITRACK_LIB / pass lib_path explicitly. Tried: {candidates}"
+        f"Could not locate SushiTrack shared library. Build with `st build` or set SUSHITRACK_LIB."
     )
 
 
-def _bind(lib: C.CDLL) -> C.CDLL:
-    """Declare argument and return types for the C entry points."""
-    lib.SushiTrack_GetDefaultParams.argtypes = [POINTER(SushiTrackParams)]
-    lib.SushiTrack_GetDefaultParams.restype = None
-
-    lib.SushiTrack_Create.argtypes = [POINTER(SushiTrackParams)]
-    lib.SushiTrack_Create.restype = c_void_p
-
-    lib.SushiTrack_CreateEx.argtypes = [POINTER(SushiTrackParams), POINTER(c_void_p)]
-    lib.SushiTrack_CreateEx.restype = c_int
-
-    lib.SushiTrack_LoadParamsFromJson.argtypes = [c_char_p, POINTER(SushiTrackParams)]
-    lib.SushiTrack_LoadParamsFromJson.restype = c_int
-
-    lib.SushiTrack_Update.argtypes = [
-        c_void_p, POINTER(SushiTrackObject), c_int,
-        POINTER(SushiTrackTrack), c_int, c_float,
-    ]
-    lib.SushiTrack_Update.restype = c_int
-
-    lib.SushiTrack_Destroy.argtypes = [c_void_p]
-    lib.SushiTrack_Destroy.restype = None
-
-    lib.SushiTrack_SetLogCallback.argtypes = [LOG_CALLBACK]
-    lib.SushiTrack_SetLogCallback.restype = None
-    return lib
+def _resolve_fn(lib: C.CDLL, *names: str) -> Any:
+    """Returns the first matching attribute on lib, or None if none exist."""
+    for name in names:
+        if hasattr(lib, name):
+            return getattr(lib, name)
+    return None
 
 
-# ---------------------------------------------------------------------------
-# Pythonic facade
-# ---------------------------------------------------------------------------
+class _NativeBindings:
+    """Wraps resolved native C function pointers for a loaded library."""
 
-class SushiTrack:
-    """A SushiTrack tracker instance bound to one shared-library handle.
+    def __init__(self, lib: C.CDLL) -> None:
+        self.lib = lib
+
+        self.get_default_params = _resolve_fn(
+            lib, "sushitrack_get_default_params", "sushitrack_GetDefaultParams"
+        )
+        if self.get_default_params:
+            self.get_default_params.argtypes = [POINTER(SushiTrackParams)]
+            self.get_default_params.restype = None
+
+        self.create = _resolve_fn(
+            lib, "sushitrack_create", "sushitrack_Create"
+        )
+        if self.create:
+            self.create.argtypes = [POINTER(SushiTrackParams)]
+            self.create.restype = c_void_p
+
+        self.create_ex = _resolve_fn(
+            lib, "sushitrack_create_ex", "sushitrack_CreateEx"
+        )
+        if self.create_ex:
+            self.create_ex.argtypes = [POINTER(SushiTrackParams), POINTER(c_void_p)]
+            self.create_ex.restype = c_int
+
+        self.create_tracker = _resolve_fn(
+            lib, "sushitrack_create_tracker", "sushitrack_CreateFromConfig"
+        )
+        if self.create_tracker:
+            self.create_tracker.argtypes = [c_char_p]
+            self.create_tracker.restype = c_void_p
+
+        self.load_params_from_json = _resolve_fn(
+            lib, "sushitrack_load_params_from_json", "sushitrack_LoadParamsFromJson"
+        )
+        if self.load_params_from_json:
+            self.load_params_from_json.argtypes = [c_char_p, POINTER(SushiTrackParams)]
+            self.load_params_from_json.restype = c_int
+
+        self.update = _resolve_fn(
+            lib, "sushitrack_update", "sushitrack_Update"
+        )
+        if self.update:
+            self.update.argtypes = [
+                c_void_p,
+                POINTER(SushiTrackObject),
+                c_int,
+                POINTER(SushiTrackTrack),
+                c_int,
+                c_float,
+            ]
+            self.update.restype = c_int
+
+        self.destroy = _resolve_fn(
+            lib, "sushitrack_destroy_tracker", "sushitrack_destroy", "sushitrack_Destroy"
+        )
+        if self.destroy:
+            self.destroy.argtypes = [c_void_p]
+            self.destroy.restype = None
+
+        self.set_log_callback = _resolve_fn(
+            lib, "sushitrack_set_log_callback", "sushitrack_SetLogCallback"
+        )
+        if self.set_log_callback:
+            self.set_log_callback.argtypes = [LOG_CALLBACK]
+            self.set_log_callback.restype = None
+
+
+class Tracker:
+    """Manages a SushiTrack tracking engine instance bound to a native handle.
 
     Construct once per video stream and feed detections frame by frame through
-    :meth:`update`. The instance owns a native handle; release it with
-    :meth:`close`, ``del``, or by using the object as a context manager.
-
-    :param lib_path: Explicit path to the shared library (else auto-discovered).
-    :param max_tracks: Capacity of the reusable output buffer.
-    :param config: Optional JSON configuration. ``None`` (default) uses the
-        compiled defaults only; ``"auto"`` lets the library resolve
-        ``sushitrack.json`` through its own search order (``SUSHITRACK_CONFIG``
-        env var, then an upward search); any other string is treated as an
-        explicit file path. Values are layered defaults → file → keyword
-        overrides, so explicit ``param_overrides`` always win.
-    :param param_overrides: Any ``SushiTrack_Params`` field, e.g.
-        ``kalman_type=2``, ``iou_type=1``, ``time_aware=1``. Unspecified fields
-        keep whatever the defaults/config established.
+    update(). Native resources release on close() or context manager exit.
     """
 
-    def __init__(self, lib_path: Optional[str] = None, max_tracks: int = 256,
-                 config: Optional[str] = None, **param_overrides):
-        self._lib = _bind(C.CDLL(find_library(lib_path)))
+    def __init__(
+        self,
+        lib_path: str | None = None,
+        max_tracks: int = 256,
+        config_path: str | None = None,
+        config: str | None = None,
+        **param_overrides: Any,
+    ) -> None:
+        self._hdl: c_void_p | None = None
+        self._log_cb: Any = None
+        resolved_lib = find_library(lib_path)
+        if platform.system() == "Windows" and hasattr(os, "add_dll_directory"):
+            lib_dir = os.path.dirname(os.path.abspath(resolved_lib))
+            if os.path.isdir(lib_dir):
+                os.add_dll_directory(lib_dir)
+        raw_lib = C.CDLL(resolved_lib)
+        self._bind = _NativeBindings(raw_lib)
 
-        params = SushiTrackParams()
-        self._lib.SushiTrack_GetDefaultParams(C.byref(params))
+        cfg = config_path if config_path is not None else config
+        if not param_overrides and cfg is not None and self._bind.create_tracker:
+            path_bytes = None if cfg == "auto" else cfg.encode("utf-8")
+            self._hdl = c_void_p(self._bind.create_tracker(path_bytes))
+            if not self._hdl or not self._hdl.value:
+                raise SushiTrackError(f"Failed to instantiate tracker from config: {cfg}")
+        else:
+            params = SushiTrackParams()
+            if self._bind.get_default_params:
+                self._bind.get_default_params(C.byref(params))
 
-        if config is not None:
-            json_path = None if config == "auto" else config.encode("utf-8")
-            status = self._lib.SushiTrack_LoadParamsFromJson(json_path, C.byref(params))
-            if status != Status.SUCCESS:
-                raise SushiTrackError(
-                    f"SushiTrack_LoadParamsFromJson failed: {Status(status).name}")
+            if cfg is not None and self._bind.load_params_from_json:
+                path_bytes = None if cfg == "auto" else cfg.encode("utf-8")
+                status = self._bind.load_params_from_json(path_bytes, C.byref(params))
+                if status != Status.SUCCESS:
+                    raise SushiTrackError(f"load_params_from_json failed: {Status(status).name}")
 
-        for key, value in param_overrides.items():
-            if not hasattr(params, key):
-                raise AttributeError(f"Unknown SushiTrack_Params field: {key!r}")
-            field_type = dict(SushiTrackParams._fields_)[key]
-            setattr(params, key, field_type(value).value)
-        self._params = params
+            for key, value in param_overrides.items():
+                if not hasattr(params, key):
+                    raise AttributeError(f"Unknown SushiTrack parameter: {key!r}")
+                field_type = dict(SushiTrackParams._fields_)[key]
+                setattr(params, key, field_type(value).value)
 
-        handle = c_void_p()
-        status = self._lib.SushiTrack_CreateEx(C.byref(params), C.byref(handle))
-        if status != Status.SUCCESS or not handle.value:
-            raise SushiTrackError(f"SushiTrack_CreateEx failed: {Status(status).name}")
-        self._hdl = handle
+            handle = c_void_p()
+            if self._bind.create_ex:
+                status = self._bind.create_ex(C.byref(params), C.byref(handle))
+                if status != Status.SUCCESS or not handle.value:
+                    raise SushiTrackError(f"Tracker creation failed: {Status(status).name}")
+                self._hdl = handle
+            elif self._bind.create:
+                self._hdl = c_void_p(self._bind.create(C.byref(params)))
+                if not self._hdl or not self._hdl.value:
+                    raise SushiTrackError("Tracker creation failed with null handle")
+            else:
+                raise SushiTrackError("No valid tracker constructor found in shared library")
 
         self._cap = int(max_tracks)
         self._out = (SushiTrackTrack * self._cap)()
 
-    def update(self, detections: Iterable[Sequence], dt: float = 1.0) -> List[Track]:
-        """Process one frame of detections and return the active tracks.
+    def update(self, detections: Iterable[Sequence[Any]], dt: float = 1.0) -> list[Track]:
+        """Processes one frame of detections and returns active tracks."""
+        if self._hdl is None or not self._hdl.value:
+            raise SushiTrackError("update() called on an uninitialized or closed tracker")
 
-        :param detections: Iterable of ``(x, y, w, h, score, label)`` or
-            ``(x, y, w, h, score, label, feat)`` where ``x, y`` are the
-            **top-left** corner and ``feat`` is an optional 1-D float sequence
-            (appearance embedding). The caller's ``feat`` buffers are only read
-            during this call.
-        :param dt: Time step. In frame mode (``time_aware=0``) the value is
-            ignored internally; in wall-clock mode (``time_aware=1``) it is the
-            elapsed seconds since the previous call.
-        :returns: A list of :class:`Track` records, sorted by lifecycle
-            priority (Tracked < Tentative < Lost < Removed).
-        """
         dets = list(detections)
         n = len(dets)
-        if self._hdl is None:
-            raise SushiTrackError("update() called on a closed tracker")
-
         arr = (SushiTrackObject * n)() if n else None
-        feat_refs = []  # keep feature buffers alive across the C call
+        feat_refs: list[Any] = []
+
         for i, d in enumerate(dets):
-            o = arr[i]
-            o.x, o.y, o.width, o.height = float(d[0]), float(d[1]), float(d[2]), float(d[3])
-            o.score = float(d[4])
-            o.label = int(d[5])
+            item = arr[i]
+            item.x = float(d[0])
+            item.y = float(d[1])
+            item.width = float(d[2])
+            item.height = float(d[3])
+            item.score = float(d[4])
+            item.label = int(d[5])
             feat = d[6] if len(d) > 6 else None
             if feat is not None and len(feat) > 0:
                 buf = (c_float * len(feat))(*[float(f) for f in feat])
                 feat_refs.append(buf)
-                o.feat = C.cast(buf, POINTER(c_float))
-                o.feat_dim = len(feat)
+                item.feat = C.cast(buf, POINTER(c_float))
+                item.feat_dim = len(feat)
             else:
-                o.feat = None
-                o.feat_dim = 0
+                item.feat = None
+                item.feat_dim = 0
 
-        written = self._lib.SushiTrack_Update(
+        written = self._bind.update(
             self._hdl, arr, n, self._out, self._cap, c_float(dt)
         )
         return [self._to_track(self._out[i]) for i in range(written)]
 
     @staticmethod
     def _to_track(t: SushiTrackTrack) -> Track:
+        """Converts a native C track record into a Python Track dataclass."""
         feat = None
         if t.feat and t.feat_dim > 0:
-            feat = [t.feat[i] for i in range(t.feat_dim)]   # copy; pointer is transient
+            feat = [t.feat[i] for i in range(t.feat_dim)]
         return Track(
-            track_id=int(t.track_id), x=t.x, y=t.y, width=t.width, height=t.height,
-            score=t.score, label=int(t.label),
-            state=TrackState(t.state), kinematic_state=KinematicState(t.kinematic_state),
-            age=int(t.age), last_seen_frame=int(t.last_seen_frame), lost_time=t.lost_time,
-            is_activated=bool(t.is_activated), is_confirmed=bool(t.is_confirmed),
-            hits=int(t.hits), frames_since_last_update=int(t.frames_since_last_update),
+            track_id=int(t.track_id),
+            x=float(t.x),
+            y=float(t.y),
+            width=float(t.width),
+            height=float(t.height),
+            score=float(t.score),
+            label=int(t.label),
+            state=TrackState(t.state),
+            kinematic_state=KinematicState(t.kinematic_state),
+            age=int(t.age),
+            last_seen_frame=int(t.last_seen_frame),
+            lost_time=float(t.lost_time),
+            is_activated=bool(t.is_activated),
+            is_confirmed=bool(t.is_confirmed),
+            hits=int(t.hits),
+            frames_since_last_update=int(t.frames_since_last_update),
             maneuver_probability=float(t.maneuver_probability),
             feat=feat,
         )
 
-    def set_log_callback(self, callback) -> None:
-        """Register a logging callback ``fn(level: LogLevel, message: str)``.
-
-        Pass ``None`` to unregister. The wrapper is retained so it is not
-        garbage-collected while the C side holds it.
-        """
+    def set_log_callback(self, callback: Callable[[LogLevel, str], None] | None) -> None:
+        """Registers a Python callback fn(level: LogLevel, message: str) for logging."""
+        if not self._bind.set_log_callback:
+            return
         if callback is None:
             self._log_cb = LOG_CALLBACK()
         else:
-            def _trampoline(level, message):
-                callback(LogLevel(level), message.decode("utf-8", "replace") if message else "")
+            def _trampoline(level: int, message: bytes | None) -> None:
+                text = message.decode("utf-8", "replace") if message else ""
+                callback(LogLevel(level), text)
+
             self._log_cb = LOG_CALLBACK(_trampoline)
-        self._lib.SushiTrack_SetLogCallback(self._log_cb)
+        self._bind.set_log_callback(self._log_cb)
 
     def close(self) -> None:
-        """Destroy the native handle. Safe to call more than once."""
-        if getattr(self, "_hdl", None):
-            self._lib.SushiTrack_Destroy(self._hdl)
+        """Destroys the native tracker instance. Safe to call multiple times."""
+        if self._hdl and self._hdl.value and self._bind.destroy:
+            self._bind.destroy(self._hdl)
             self._hdl = None
 
-    def __enter__(self) -> "SushiTrack":
+    def __enter__(self) -> Tracker:
+        """Enters the runtime context for the tracker."""
         return self
 
-    def __exit__(self, *exc) -> None:
+    def __exit__(self, *args: Any) -> None:
+        """Exits the runtime context and destroys native tracker resources."""
         self.close()
 
     def __del__(self) -> None:
+        """Releases native tracker resources on garbage collection."""
         self.close()
+
+
+SushiTrack = Tracker
