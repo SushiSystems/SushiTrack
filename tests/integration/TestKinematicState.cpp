@@ -1,21 +1,30 @@
+/**************************************************************************/
+/* TestKinematicState.cpp                                                 */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      TestKinematicState.cpp
- * @brief     End-to-end coverage of the IMM-derived kinematic regime output.
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      23.06.2026
- * @version   v1.0.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
- *
- * Scope
- * -----
- * The `kinematic_state` field is part of the public contract (consumers branch
- * on it). With the IMM estimator (kalman_type=2) it is derived from the mode
- * probabilities once the bank has been fed real Kalman-estimated motion via the
- * full update loop. This file drives each motion regime through actual
- * detections and reads the regime back off the track.
- *
- * Reported codes (SushiTrack_Track::kinematic_state):
- *   0 = Stationary, 1 = Cruising, 2 = Maneuvering, 3 = Coasting.
+ * @file TestKinematicState.cpp
+ * @brief Integration tests for kinematic state classification.
+ * @author Mustafa Garip
  */
 
 #include <gtest/gtest.h>
@@ -29,7 +38,7 @@ using namespace sushitrack_it;
 namespace
 {
 
-/** @brief Kinematic regime codes as reported in SushiTrack_Track::kinematic_state. */
+/** @brief Kinematic regime codes as reported in sushitrack_track_t::kinematic_state. */
 enum KinematicCode
 {
     kStationary  = 0,
@@ -48,12 +57,12 @@ enum KinematicCode
 class KinematicStateTest : public ::testing::Test
 {
 protected:
-    SushiTrackHdl     hdl_    = nullptr;
-    SushiTrack_Params params_ = {};
+    sushitrack_tracker_t     hdl_    = nullptr;
+    sushitrack_params_t params_ = {};
 
     void SetUp() override
     {
-        SushiTrack_GetDefaultParams(&params_);
+        sushitrack_get_default_params(&params_);
         params_.time_aware         = 0;
         params_.enable_tentative   = 0;
         params_.kalman_type        = 2;   // IMM multi-model estimator
@@ -64,11 +73,11 @@ protected:
         params_.high_thresh        = 0.5f;
         params_.match_thresh       = 0.9f;
 
-        hdl_ = SushiTrack_Create(&params_);
+        hdl_ = sushitrack_create(&params_);
         ASSERT_NE(hdl_, nullptr);
     }
 
-    void TearDown() override { if (hdl_) SushiTrack_Destroy(hdl_); }
+    void TearDown() override { if (hdl_) sushitrack_destroy(hdl_); }
 };
 
 /**
@@ -77,14 +86,14 @@ protected:
  */
 TEST_F(KinematicStateTest, StationaryObjectReportsStationary)
 {
-    std::vector<SushiTrack_Track> out(4);
+    std::vector<sushitrack_track_t> out(4);
 
     int64_t id = -1;
     int last_state = -1;
     for (int i = 0; i < 10; ++i)
     {
-        SushiTrack_Object d = makeDet(100.0f, 200.0f);  // never moves
-        int n = SushiTrack_Update(hdl_, &d, 1, out.data(), 4, 0.04f);
+        sushitrack_object_t d = makeDet(100.0f, 200.0f);  // never moves
+        int n = sushitrack_update(hdl_, &d, 1, out.data(), 4, 0.04f);
         ASSERT_GE(n, 1);
         id = out[0].track_id;
         last_state = out[0].kinematic_state;
@@ -100,15 +109,10 @@ TEST_F(KinematicStateTest, StationaryObjectReportsStationary)
  *        floor without ever crossing the maneuver ceiling.
  *
  * The velocity is ramped in small steps rather than applied as a single jump:
- * a step change latches the filter into Maneuvering (the Kalman velocity takes
- * many frames to catch up, keeping the estimated acceleration above the sustain
- * threshold), whereas a gentle ramp keeps acceleration under the maneuver
- * threshold throughout, so the regime passes straight from warmup into Cruising
- * and stays there once the velocity holds constant.
  */
 TEST_F(KinematicStateTest, SteadyMotionReportsCruising)
 {
-    std::vector<SushiTrack_Track> out(4);
+    std::vector<sushitrack_track_t> out(4);
 
     // Ramp up to 5 px/frame (125 px/s) at 0.25 px/frame per frame, then hold. The ramp acceleration (~156 px/s^2) stays below the 250 px/s^2 maneuver threshold; the hold speed sits well above the 40 px/s stationary floor.
     float x = 100.0f, v = 0.0f;
@@ -118,8 +122,8 @@ TEST_F(KinematicStateTest, SteadyMotionReportsCruising)
     {
         v = std::min(5.0f, v + 0.25f);
         x += v;
-        SushiTrack_Object d = makeDet(x, 200.0f);
-        int n = SushiTrack_Update(hdl_, &d, 1, out.data(), 4, 0.04f);
+        sushitrack_object_t d = makeDet(x, 200.0f);
+        int n = sushitrack_update(hdl_, &d, 1, out.data(), 4, 0.04f);
         ASSERT_GE(n, 1);
         id = out[0].track_id;
         last_state = out[0].kinematic_state;
@@ -135,24 +139,24 @@ TEST_F(KinematicStateTest, SteadyMotionReportsCruising)
  */
 TEST_F(KinematicStateTest, AbruptAccelerationReportsManeuvering)
 {
-    std::vector<SushiTrack_Track> out(4);
+    std::vector<sushitrack_track_t> out(4);
 
     // Settle stationary so the estimator has a zero-velocity baseline.
     for (int i = 0; i < 6; ++i)
     {
-        SushiTrack_Object d = makeDet(100.0f, 200.0f);
-        int n = SushiTrack_Update(hdl_, &d, 1, out.data(), 4, 0.04f);
+        sushitrack_object_t d = makeDet(100.0f, 200.0f);
+        int n = sushitrack_update(hdl_, &d, 1, out.data(), 4, 0.04f);
         ASSERT_GE(n, 1);
     }
 
-    // Sudden onset of motion at 15 px/frame (375 px/s). The step is small enough that the detection keeps overlapping the (previously stationary) predicted box, so the track stays associated rather than being dropped and reseeded; the Kalman velocity ramps up over several frames, sustaining an acceleration well above the 250 px/s^2 maneuver threshold long enough for the hysteresis window to commit the transition.
+    // Sudden onset of motion at 15 px/frame (375 px/s). The step is small enough that the detection keeps overlapping the (in past tests stationary) predicted box, so the track stays associated rather than being dropped and reseeded; the Kalman velocity ramps up over several frames, sustaining an acceleration well above the 250 px/s^2 maneuver threshold long enough for the hysteresis window to commit the transition.
     float x = 100.0f;
     bool saw_maneuver = false;
     for (int i = 0; i < 8; ++i)
     {
         x += 15.0f;
-        SushiTrack_Object d = makeDet(x, 200.0f);
-        int n = SushiTrack_Update(hdl_, &d, 1, out.data(), 4, 0.04f);
+        sushitrack_object_t d = makeDet(x, 200.0f);
+        int n = sushitrack_update(hdl_, &d, 1, out.data(), 4, 0.04f);
         ASSERT_GE(n, 1);
         if (out[0].kinematic_state == kManeuvering)
             saw_maneuver = true;
@@ -168,15 +172,15 @@ TEST_F(KinematicStateTest, AbruptAccelerationReportsManeuvering)
  */
 TEST_F(KinematicStateTest, OccludedTrackReportsCoasting)
 {
-    std::vector<SushiTrack_Track> out(8);
+    std::vector<sushitrack_track_t> out(8);
 
     // Confirm a moving object so the pre-coast regime is a genuine motion state.
     float x = 100.0f;
     int64_t id = -1;
     for (int i = 0; i < 8; ++i)
     {
-        SushiTrack_Object d = makeDet(x, 200.0f);
-        int n = SushiTrack_Update(hdl_, &d, 1, out.data(), 8, 0.04f);
+        sushitrack_object_t d = makeDet(x, 200.0f);
+        int n = sushitrack_update(hdl_, &d, 1, out.data(), 8, 0.04f);
         ASSERT_GE(n, 1);
         id = out[0].track_id;
         x += 4.0f;
@@ -187,8 +191,8 @@ TEST_F(KinematicStateTest, OccludedTrackReportsCoasting)
     int coasting_state = -1;
     for (int i = 0; i < 3; ++i)
     {
-        int n = SushiTrack_Update(hdl_, nullptr, 0, out.data(), 8, 0.04f);
-        const SushiTrack_Track* t = findById(out, n, id);
+        int n = sushitrack_update(hdl_, nullptr, 0, out.data(), 8, 0.04f);
+        const sushitrack_track_t* t = findById(out, n, id);
         ASSERT_NE(t, nullptr) << "Lost track dropped from output during occlusion.";
         coasting_state = t->kinematic_state;
     }

@@ -1,37 +1,35 @@
+/**************************************************************************/
+/* TestLogger.cpp                                                         */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      TestLogger.cpp
- * @brief     Unit tests for the SushiTrack Logger singleton utility.
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      13.05.2026
- * @version   v1.0.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
- *
- * Coverage
- * --------
- * LoggerCallbackTest
- *   - A registered callback receives every message emitted by Logger::log.
- *   - The level value delivered to the callback matches the level passed to log.
- *   - Replacing the callback with nullptr suppresses all output (no-op path).
- *   - Logger::throw_runtime_error throws std::runtime_error.
- *   - The thrown exception message contains the format string text.
- *
- * LoggerThreadSafetyTest
- *   - Concurrent calls from two threads both deliver messages to the callback
- *     without data races or missed invocations.
- *
- * LoggerLevelRoutingTest (production hardening — closes Verified Omission #4)
- *   - DEBUG, INFO, WARN and ERROR levels are each forwarded to the callback
- *     with the exact level argument unchanged.
- *   - An empty-format invocation does not crash the logger.
- *
- * LoggerCallbackHotSwapTest (production hardening — Verified Omission #4)
- *   - Replacing the callback mid-flight does not lose subsequent messages.
- *   - Concurrent setCallback / log invocations remain race-free.
+ * @file TestLogger.cpp
+ * @brief Unit tests for logging system and log callbacks.
+ * @author Mustafa Garip
  */
 
 #include <gtest/gtest.h>
-#include "SushiTrack/Logger.h"
-#include "SushiTrack/SushiTrackTypes.h"
+#include <SushiTrack/logger.hpp>
+#include <SushiTrack/types.hpp>
 #include <atomic>
 #include <string>
 #include <thread>
@@ -40,7 +38,7 @@ namespace
 {
 
 static std::atomic<int>   g_call_count{0};
-static SushiTrack_LogLevel g_last_level{SUSHITRACK_LOG_DEBUG};
+static sushitrack_log_level_t g_last_level{SUSHITRACK_LOG_DEBUG};
 static std::string        g_last_message;
 
 /**
@@ -48,7 +46,7 @@ static std::string        g_last_message;
  * @param level   Severity level forwarded from the logger.
  * @param message Formatted message string forwarded from the logger.
  */
-void recordingCallback(SushiTrack_LogLevel level, const char* message)
+void recordingCallback(sushitrack_log_level_t level, const char* message)
 {
     g_last_level   = level;
     g_last_message = message ? message : "";
@@ -188,14 +186,14 @@ protected:
  */
 TEST_F(LoggerLevelRoutingTest, AllFourLevelsArePassedThroughUnchanged)
 {
-    const SushiTrack_LogLevel levels[] = {
+    const sushitrack_log_level_t levels[] = {
         SUSHITRACK_LOG_DEBUG,
         SUSHITRACK_LOG_INFO,
         SUSHITRACK_LOG_WARN,
         SUSHITRACK_LOG_ERROR,
     };
 
-    for (SushiTrack_LogLevel lv : levels)
+    for (sushitrack_log_level_t lv : levels)
     {
         g_call_count = 0;
         g_last_level = SUSHITRACK_LOG_DEBUG; // poison value distinct from WARN/ERROR/INFO
@@ -232,10 +230,10 @@ TEST(LoggerCallbackHotSwapTest, ReplacementCallbackReceivesSubsequentMessages)
     static std::atomic<int> a_count{0};
     static std::atomic<int> b_count{0};
 
-    auto a_cb = [](SushiTrack_LogLevel, const char*) {
+    auto a_cb = [](sushitrack_log_level_t, const char*) {
         a_count.fetch_add(1, std::memory_order_relaxed);
     };
-    auto b_cb = [](SushiTrack_LogLevel, const char*) {
+    auto b_cb = [](sushitrack_log_level_t, const char*) {
         b_count.fetch_add(1, std::memory_order_relaxed);
     };
 
@@ -259,7 +257,7 @@ TEST(LoggerCallbackHotSwapTest, ReplacementCallbackReceivesSubsequentMessages)
 TEST(LoggerCallbackHotSwapTest, ConcurrentSetCallbackAndLogIsRaceFree)
 {
     static std::atomic<int> total{0};
-    auto cb = [](SushiTrack_LogLevel, const char*) {
+    auto cb = [](sushitrack_log_level_t, const char*) {
         total.fetch_add(1, std::memory_order_relaxed);
     };
 

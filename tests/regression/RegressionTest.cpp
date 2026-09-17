@@ -1,20 +1,30 @@
+/**************************************************************************/
+/* RegressionTest.cpp                                                     */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      RegressionTest.cpp
- * @brief     Entry point for the regression_test executable.
- *
- *            Runs the full MOT benchmark suite (label-based inference) across
- *            SushiTrack, ByteTrack, and OC-SORT on the sequences defined in
- *            ScenarioList.h. Each test verifies that the tracker processes all
- *            frames without error and writes prediction files to
- *            test/data/<sequence>/pred/<tracker>/.
- *
- *            Video inference is handled separately via the Python pipeline in
- *            tests/regression/inference/ using the tracker_bridge shared library.
- *
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      12.05.2026
- * @version   v1.0.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
+ * @file RegressionTest.cpp
+ * @brief Entry point and test fixtures for regression testing.
+ * @author Mustafa Garip
  */
 
 #include <gtest/gtest.h>
@@ -46,9 +56,6 @@ namespace fs = std::filesystem;
  * Each tracker now owns a dedicated file (sushitrack.json at the repository root,
  * bytetrack.json and ocsort.json under tests/). A binary launched from build/bin
  * still finds them by ascending through parent directories.
- *
- * @param rel Path relative to the directory that contains the file.
- * @return Absolute path to the file, or an empty string when not found.
  */
 static std::string resolveConfigUp(const std::string& rel)
 {

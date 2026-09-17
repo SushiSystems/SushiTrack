@@ -6,8 +6,8 @@
 #   cmake --build . --target regression_test
 #
 # Run via CTest:
-#   ds test --suite regression  (pass/fail; or: ctest --test-dir build -L '^regression$')
-#   ds eval                     (the same binary, plus TrackEval metrics)
+#   st test --suite regression  (pass/fail; or: ctest --test-dir build -L '^regression$')
+#   st eval                     (the same binary, plus TrackEval metrics)
 #
 # Run directly (all sequences):
 #   ./regression_test
@@ -29,10 +29,10 @@ add_executable(regression_test
 target_include_directories(regression_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/3rdparty/bytetrack/include
-    ${CMAKE_SOURCE_DIR}/3rdparty/ocsort/include
-    ${CMAKE_SOURCE_DIR}/3rdparty
-    ${CMAKE_SOURCE_DIR}/3rdparty/eigen
+    ${CMAKE_SOURCE_DIR}/third_party/bytetrack/include
+    ${CMAKE_SOURCE_DIR}/third_party/ocsort/include
+    ${CMAKE_SOURCE_DIR}/third_party
+    ${CMAKE_SOURCE_DIR}/third_party/eigen
 )
 
 target_link_libraries(regression_test PRIVATE
@@ -61,10 +61,10 @@ add_library(tracker_bridge SHARED
 target_include_directories(tracker_bridge PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/3rdparty/bytetrack/include
-    ${CMAKE_SOURCE_DIR}/3rdparty/ocsort/include
-    ${CMAKE_SOURCE_DIR}/3rdparty
-    ${CMAKE_SOURCE_DIR}/3rdparty/eigen
+    ${CMAKE_SOURCE_DIR}/third_party/bytetrack/include
+    ${CMAKE_SOURCE_DIR}/third_party/ocsort/include
+    ${CMAKE_SOURCE_DIR}/third_party
+    ${CMAKE_SOURCE_DIR}/third_party/eigen
 )
 
 target_link_libraries(tracker_bridge PRIVATE

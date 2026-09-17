@@ -1,30 +1,30 @@
+/**************************************************************************/
+/* TestTimeAware.cpp                                                      */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      TestTimeAware.cpp
- * @brief     End-to-end coverage of the wall-clock (time_aware) timing policy.
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      23.06.2026
- * @version   v1.0.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
- *
- * Scope
- * -----
- * Every other integration fixture drives the tracker at a fixed cadence, so the
- * real-time path (`time_aware=1`) — where `dt` is interpreted as elapsed seconds
- * rather than a single frame step — is exercised by no end-to-end test. That
- * path is a shipped feature and changes three behaviours that the frame-counted
- * path does not:
- *
- *   1. Lost-track expiry is measured in wall-clock seconds: a track is retired
- *      once its accumulated lost time exceeds `track_buffer / frame_rate`
- *      seconds, independent of how many `Update` calls elapsed.
- *   2. Irregular inter-frame intervals (jitter, dropped frames) must not
- *      destabilise identity — the Kalman step scales with the real `dt`.
- *   3. A pathologically large `dt` is capped (5 KF-steps) so a long stall cannot
- *      blow the filter up into non-finite geometry.
- *
- * Assertions are invariant-style: identity persistence across a sub-budget gap,
- * retirement past the budget, and finite geometry under irregular and capped
- * `dt`.
+ * @file TestTimeAware.cpp
+ * @brief Integration tests for time-aware real-time tracking.
+ * @author Mustafa Garip
  */
 
 #include <gtest/gtest.h>
@@ -47,14 +47,14 @@ namespace
 class TimeAwareTest : public ::testing::Test
 {
 protected:
-    SushiTrackHdl     hdl_    = nullptr;
-    SushiTrack_Params params_ = {};
+    sushitrack_tracker_t     hdl_    = nullptr;
+    sushitrack_params_t params_ = {};
 
     static constexpr float kBudgetSeconds = 30.0f / 25.0f; ///< 1.2 s expiry budget.
 
     void SetUp() override
     {
-        SushiTrack_GetDefaultParams(&params_);
+        sushitrack_get_default_params(&params_);
         params_.time_aware         = 1;          // wall-clock timing
         params_.enable_tentative   = 0;
         params_.primary_assoc_mode = 1;
@@ -64,24 +64,24 @@ protected:
         params_.high_thresh        = 0.5f;
         params_.match_thresh       = 0.9f;
 
-        hdl_ = SushiTrack_Create(&params_);
+        hdl_ = sushitrack_create(&params_);
         ASSERT_NE(hdl_, nullptr);
     }
 
-    void TearDown() override { if (hdl_) SushiTrack_Destroy(hdl_); }
+    void TearDown() override { if (hdl_) sushitrack_destroy(hdl_); }
 
     /**
      * @brief Confirms a stationary track at (x, y) over @p frames frames.
      * @return The confirmed track id.
      */
-    int64_t confirmStationary(std::vector<SushiTrack_Track>& out,
+    int64_t confirmStationary(std::vector<sushitrack_track_t>& out,
                               float x, float y, int frames, float dt)
     {
         int64_t id = -1;
         for (int i = 0; i < frames; ++i)
         {
-            SushiTrack_Object d = makeDet(x, y);
-            int n = SushiTrack_Update(hdl_, &d, 1, out.data(), 8, dt);
+            sushitrack_object_t d = makeDet(x, y);
+            int n = sushitrack_update(hdl_, &d, 1, out.data(), 8, dt);
             EXPECT_GE(n, 1);
             if (n >= 1) id = out[0].track_id;
         }
@@ -96,7 +96,7 @@ protected:
  */
 TEST_F(TimeAwareTest, SubBudgetRealTimeGapRecoversId)
 {
-    std::vector<SushiTrack_Track> out(8);
+    std::vector<sushitrack_track_t> out(8);
 
     const float x = 100.0f, y = 200.0f;
     const int64_t id = confirmStationary(out, x, y, /*frames=*/6, /*dt=*/0.04f);
@@ -104,13 +104,13 @@ TEST_F(TimeAwareTest, SubBudgetRealTimeGapRecoversId)
 
     // Three empty frames at 0.2 s each => 0.6 s of lost time, well under 1.2 s.
     for (int i = 0; i < 3; ++i)
-        SushiTrack_Update(hdl_, nullptr, 0, out.data(), 8, 0.2f);
+        sushitrack_update(hdl_, nullptr, 0, out.data(), 8, 0.2f);
 
-    SushiTrack_Object back = makeDet(x, y);
-    int n = SushiTrack_Update(hdl_, &back, 1, out.data(), 8, 0.2f);
+    sushitrack_object_t back = makeDet(x, y);
+    int n = sushitrack_update(hdl_, &back, 1, out.data(), 8, 0.2f);
     ASSERT_GE(n, 1);
 
-    const SushiTrack_Track* recovered = findById(out, n, id);
+    const sushitrack_track_t* recovered = findById(out, n, id);
     ASSERT_NE(recovered, nullptr)
         << "A sub-budget real-time occlusion (0.8 s < 1.2 s) lost the identity.";
     EXPECT_EQ(recovered->state, kTracked);
@@ -124,7 +124,7 @@ TEST_F(TimeAwareTest, SubBudgetRealTimeGapRecoversId)
  */
 TEST_F(TimeAwareTest, OverBudgetRealTimeGapRetiresTrack)
 {
-    std::vector<SushiTrack_Track> out(8);
+    std::vector<sushitrack_track_t> out(8);
 
     const float x = 100.0f, y = 200.0f;
     const int64_t id = confirmStationary(out, x, y, /*frames=*/6, /*dt=*/0.04f);
@@ -132,13 +132,13 @@ TEST_F(TimeAwareTest, OverBudgetRealTimeGapRetiresTrack)
 
     // Four empty frames at 0.5 s each => 2.0 s of lost time, past the 1.2 s budget.
     for (int i = 0; i < 4; ++i)
-        SushiTrack_Update(hdl_, nullptr, 0, out.data(), 8, 0.5f);
+        sushitrack_update(hdl_, nullptr, 0, out.data(), 8, 0.5f);
 
-    SushiTrack_Object back = makeDet(x, y);
-    int n = SushiTrack_Update(hdl_, &back, 1, out.data(), 8, 0.5f);
+    sushitrack_object_t back = makeDet(x, y);
+    int n = sushitrack_update(hdl_, &back, 1, out.data(), 8, 0.5f);
     ASSERT_GE(n, 1);
 
-    const SushiTrack_Track* stale = findById(out, n, id);
+    const sushitrack_track_t* stale = findById(out, n, id);
     EXPECT_EQ(stale, nullptr)
         << "A track lost for 2.0 s (> 1.2 s budget) was resurrected under its old id.";
 
@@ -159,10 +159,10 @@ TEST_F(TimeAwareTest, OverBudgetRealTimeGapRetiresTrack)
  */
 TEST_F(TimeAwareTest, IrregularFrameIntervalsKeepIdentityStable)
 {
-    std::vector<SushiTrack_Track> out(4);
+    std::vector<sushitrack_track_t> out(4);
 
-    SushiTrack_Object d0 = makeDet(100.0f, 200.0f);
-    int n0 = SushiTrack_Update(hdl_, &d0, 1, out.data(), 4, 0.04f);
+    sushitrack_object_t d0 = makeDet(100.0f, 200.0f);
+    int n0 = sushitrack_update(hdl_, &d0, 1, out.data(), 4, 0.04f);
     ASSERT_GE(n0, 1);
     int64_t id = out[0].track_id;
 
@@ -174,12 +174,12 @@ TEST_F(TimeAwareTest, IrregularFrameIntervalsKeepIdentityStable)
     for (float dt : dts)
     {
         x += vx * dt;
-        SushiTrack_Object d = makeDet(x, 200.0f);
-        int n = SushiTrack_Update(hdl_, &d, 1, out.data(), 4, dt);
+        sushitrack_object_t d = makeDet(x, 200.0f);
+        int n = sushitrack_update(hdl_, &d, 1, out.data(), 4, dt);
         ASSERT_GE(n, 1) << "Object dropped at irregular step " << k;
 
         if (out[0].state == kTracked) id = out[0].track_id;
-        const SushiTrack_Track* t = findById(out, n, id);
+        const sushitrack_track_t* t = findById(out, n, id);
         ASSERT_NE(t, nullptr) << "Identity churned at irregular step " << k
                               << " (dt=" << dt << ")";
         EXPECT_TRUE(geometryIsSane(*t)) << "Insane geometry at irregular step " << k;
@@ -194,27 +194,27 @@ TEST_F(TimeAwareTest, IrregularFrameIntervalsKeepIdentityStable)
  */
 TEST_F(TimeAwareTest, ExcessiveDtIsCappedAndGeometryStaysFinite)
 {
-    std::vector<SushiTrack_Track> out(4);
+    std::vector<sushitrack_track_t> out(4);
 
     const float x = 100.0f, y = 200.0f;
     const int64_t id = confirmStationary(out, x, y, /*frames=*/5, /*dt=*/0.04f);
     ASSERT_NE(id, -1);
 
     // One enormous interval with the object still present at the same spot. The 5-KF-step cap must keep the propagated covariance/state finite.
-    SushiTrack_Object stall = makeDet(x, y);
-    int n = SushiTrack_Update(hdl_, &stall, 1, out.data(), 4, 10.0f);
+    sushitrack_object_t stall = makeDet(x, y);
+    int n = sushitrack_update(hdl_, &stall, 1, out.data(), 4, 10.0f);
     ASSERT_GE(n, 1);
-    const SushiTrack_Track* t = findById(out, n, id);
+    const sushitrack_track_t* t = findById(out, n, id);
     ASSERT_NE(t, nullptr) << "Object lost across a capped large-dt frame.";
     EXPECT_TRUE(geometryIsSane(*t)) << "Large dt produced non-finite geometry.";
 
     // Normal cadence resumes cleanly.
     for (int i = 1; i <= 4; ++i)
     {
-        SushiTrack_Object d = makeDet(x, y);
-        int m = SushiTrack_Update(hdl_, &d, 1, out.data(), 4, 0.04f);
+        sushitrack_object_t d = makeDet(x, y);
+        int m = sushitrack_update(hdl_, &d, 1, out.data(), 4, 0.04f);
         ASSERT_GE(m, 1);
-        const SushiTrack_Track* tt = findById(out, m, id);
+        const sushitrack_track_t* tt = findById(out, m, id);
         ASSERT_NE(tt, nullptr) << "Identity lost after the capped stall, step " << i;
         EXPECT_TRUE(geometryIsSane(*tt));
     }

@@ -1,50 +1,43 @@
+/**************************************************************************/
+/* TestDistanceStrategies.cpp                                             */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      TestDistanceStrategies.cpp
- * @brief     Unit tests for IoU, DIoU, Cosine, FuseScoreDecorator, GatedIoU, Fused, ReIDFirst, and PureReID cost calculators.
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      12.05.2026
- * @version   v1.0.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
- *
- * Coverage
- * --------
- * IoUCostCalculator
- *   - Identical boxes produce cost ≈ 0 (IoU = 1.0).
- *   - Non-overlapping boxes produce cost = 1.0.
- *   - Partial overlap produces 0 < cost < 1.
- *   - Area-ratio violation produces sentinel cost (1e4f).
- *   - Empty tracklet collection produces empty matrix.
- *   - calculate_single agrees with the batch path.
- *
- * DIoUCostCalculator
- *   - Identical boxes produce cost ≈ 0.
- *   - Separated boxes produce cost > 0.
- *   - calculate_single agrees with the batch path.
- *
- * CosineCostCalculator
- *   - Identical unit features produce cost ≈ 0.
- *   - Orthogonal features produce cost ≈ 1.
- *   - Missing feature on either side produces cost = 1.
- *   - calculate_single agrees with the batch path.
- *
- * FuseScoreDecorator
- *   - High-score detection lowers the effective cost.
- *   - Score = 1 does not change the cost (neutral).
- *   - Sentinel cells (≥ 1e3) are preserved unchanged.
- *   - calculate_single applies the same fusion formula.
+ * @file TestDistanceStrategies.cpp
+ * @brief Unit tests for distance and association cost metrics.
+ * @author Mustafa Garip
  */
 
 #include <gtest/gtest.h>
-#include "SushiTrack/DistanceStrategies.h"
-#include "SushiTrack/Tracklet.h"
-#include "SushiTrack/KalmanFilter.h"
-#include "SushiTrack/Rect.h"
-#include "SushiTrack/CostMatrix.h"
+#include <SushiTrack/distance_strategies.hpp>
+#include <SushiTrack/tracklet.hpp>
+#include <SushiTrack/kalman_filter.hpp>
+#include <SushiTrack/rect.hpp>
+#include <SushiTrack/cost_matrix.hpp>
 
 #include <memory>
 #include <vector>
 #include <cmath>
-#include "SushiTrack/IGateValidator.h"
+#include <SushiTrack/i_gate_validator.hpp>
 
 using namespace SushiTrack;
 

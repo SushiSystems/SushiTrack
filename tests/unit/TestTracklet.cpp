@@ -1,43 +1,38 @@
+/**************************************************************************/
+/* TestTracklet.cpp                                                       */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      test_tracklet.cpp
- * @brief     Unit tests for Tracklet lifecycle, state transitions, ReID, and Tentative logic.
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      12.05.2026
- * @version   v1.0.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
- *
- * Coverage
- * --------
- * Lifecycle
- *   - New state on construction.
- *   - activate() transitions to Tracked; isActivated=true only on frame 1.
- *   - activateTentative() produces Tentative state, is_activated=false.
- *   - confirm() promotes Tentative to Tracked and assigns final track id.
- *   - markAsLost() transitions to Lost, resets is_activated.
- *   - markAsRemoved() transitions to Removed.
- *   - reActivate() recovers Lost track back to Tracked.
- *
- * Prediction
- *   - predict() increments accumulated_lost_time for Lost/Tentative tracks.
- *   - predict() does not modify accumulated_lost_time for Tracked tracks.
- *
- * ReID
- *   - updateFeatures() normalises the feature vector (unit length).
- *   - getMaxFeatureSimilarity() returns 1.0 for identical feature.
- *   - getMaxFeatureSimilarity() returns < 1.0 for orthogonal feature.
- *   - Feature history is capped at max_feature_history.
- *
- * Tentative fast-path
- *   - update() with keep_state=true does not change TrackState.
- *   - update() with keep_state=false promotes to Tracked.
+ * @file TestTracklet.cpp
+ * @brief Unit tests for tracklet lifecycle and state estimation.
+ * @author Mustafa Garip
  */
 
 #include <gtest/gtest.h>
 
-#include "SushiTrack/Tracklet.h"
-#include "SushiTrack/KalmanFilter.h"
-#include "SushiTrack/KalmanTypes.h"
-#include "SushiTrack/TrackerConfig.h"
+#include <SushiTrack/tracklet.hpp>
+#include <SushiTrack/kalman_filter.hpp>
+#include <SushiTrack/kalman_types.hpp>
+#include <SushiTrack/tracker_config.hpp>
 
 #include <memory>
 #include <vector>
@@ -59,9 +54,6 @@ static std::unique_ptr<IStatePredictor> makeKF()
  * @param x      Top-left x.
  * @param y      Top-left y.
  * @param w      Width.
- * @param h      Height.
- * @param label  Class label.
- * @param score  Detection confidence.
  */
 static std::unique_ptr<Tracklet> makeTracklet(
     float x = 100.f, float y = 200.f,

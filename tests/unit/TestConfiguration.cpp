@@ -1,62 +1,34 @@
+/**************************************************************************/
+/* TestConfiguration.cpp                                                  */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      TestConfiguration.cpp
- * @brief     Tests for configuration loading from sushitrack.json into SushiTrack_Params.
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      18.05.2026
- * @version   v1.0.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
- *
- * Scope
- * -----
- * Closes the configuration-system gap flagged in UNIT_TEST_VALIDATION_REPORT.md
- * Section 2.3.1 and the verified-report's Omission #2:
- *   - The canonical config file is sushitrack.json at the repository root.
- *   - The advanced.tentative_logic fast_/slow_/vslow_ tiers and
- *     reid_direct_assignment_weight have no existing tests.
- *
- * Approach
- * --------
- * The SushiTrack public C API now owns JSON parsing through
- * SushiTrack_LoadParamsFromJson (src/ConfigLoader.cpp). This file keeps an
- * independent reference parser (applyConfigToParams below, built on the
- * vendored nlohmann/json single-header) as an oracle, exercises a round-trip
- * from JSON to SushiTrack_Params, asserts the library loader agrees with the
- * oracle (ConfigLoaderLibraryApiTest), and validates:
- *   1. Every documented field is loaded with the right type.
- *   2. Defaults are honoured when sections are missing.
- *   3. Out-of-range values are at minimum tolerated (the loader should not
- *      assert/throw on values the C API would later refuse).
- *
- * Coverage
- * --------
- * ConfigLoaderBaselineTest
- *   - sushitrack.json parses successfully (preconditional smoke test).
- *   - The "sushitrack" root section is an object.
- *   - The basic section contains every documented switch field.
- *
- * ConfigLoaderBasicFieldsTest
- *   - frame_rate, track_buffer, track_thresh, high_thresh, match_thresh round-trip.
- *   - All five enable_* switches load with their documented integer types.
- *
- * ConfigLoaderAdvancedFieldsTest
- *   - association.* fields load into Params.
- *   - coordinate_system.* fields load into Params.
- *   - reid_params.* fields including reid_direct_assignment_weight load.
- *   - advanced numeric fields load.
- *   - tentative_logic.* including fast/slow/vslow tiers load.
- *   - mahalanobis_gating.* fields load.
- *
- * ConfigLoaderDefaultsTest
- *   - A missing section leaves the corresponding Params fields at the
- *     GetDefaultParams baseline.
- *
- * ConfigLoaderTrackerSmokeTest
- *   - Params produced by the loader build a tracker successfully.
- *   - Params produced by the loader survive a one-detection Update cycle.
+ * @file TestConfiguration.cpp
+ * @brief Unit tests for configuration loading and validation.
+ * @author Mustafa Garip
  */
 
 #include <gtest/gtest.h>
-#include "SushiTrackC.h"
+#include <SushiTrack/sushitrack_c.h>
 
 #include <nlohmann/json.hpp>
 
@@ -76,11 +48,6 @@ using Json = nlohmann::json;
  * GoogleTest's working directory is set to ${CMAKE_SOURCE_DIR} via the
  * gtest_discover_tests WORKING_DIRECTORY argument (see tests/unit/CMakeLists.txt
  * and tests/regression/CMakeLists.txt for precedent), so the relative path
- * "sushitrack.json" is the canonical location. We also honour
- * SUSHITRACK_CONFIG as an environment override to align with the regression
- * runner's documented pattern.
- *
- * @return Filesystem path that should be loadable via std::ifstream.
  */
 std::string configPath()
 {
@@ -102,15 +69,13 @@ T jsonGet(const Json& sec, const char* key, T def)
 }
 
 /**
- * @brief Applies a parsed JSON document to a SushiTrack_Params struct.
+ * @brief Applies a parsed JSON document to a sushitrack_params_t struct.
  *
  * Fields absent from the JSON are left untouched, so the caller is responsible
- * for invoking SushiTrack_GetDefaultParams first to establish a baseline.
+ * for invoking sushitrack_get_default_params first to establish a baseline.
  *
- * @param doc Parsed JSON document (expected to contain a "sushitrack" object).
- * @param params [in,out] Params struct to populate.
  */
-void applyConfigToParams(const Json& doc, SushiTrack_Params& params)
+void applyConfigToParams(const Json& doc, sushitrack_params_t& params)
 {
     if (!doc.is_object() || !doc.contains("sushitrack")) return;
     const Json& root = doc["sushitrack"];
@@ -258,8 +223,8 @@ TEST(ConfigLoaderBasicFieldsTest, BasicNumericFieldsRoundTripIntoParams)
     Json doc = loadConfigJson();
     ASSERT_FALSE(doc.empty());
 
-    SushiTrack_Params p{};
-    SushiTrack_GetDefaultParams(&p);
+    sushitrack_params_t p{};
+    sushitrack_get_default_params(&p);
     applyConfigToParams(doc, p);
 
     const Json& b = doc["sushitrack"]["basic"];
@@ -278,8 +243,8 @@ TEST(ConfigLoaderBasicFieldsTest, EnableFlagsRoundTripIntoParams)
     Json doc = loadConfigJson();
     ASSERT_FALSE(doc.empty());
 
-    SushiTrack_Params p{};
-    SushiTrack_GetDefaultParams(&p);
+    sushitrack_params_t p{};
+    sushitrack_get_default_params(&p);
     applyConfigToParams(doc, p);
 
     const Json& b = doc["sushitrack"]["basic"];
@@ -297,13 +262,13 @@ class ConfigLoaderAdvancedFieldsTest : public ::testing::Test
 {
 protected:
     Json             doc_;
-    SushiTrack_Params params_{};
+    sushitrack_params_t params_{};
 
     void SetUp() override
     {
         doc_ = loadConfigJson();
         ASSERT_FALSE(doc_.empty());
-        SushiTrack_GetDefaultParams(&params_);
+        sushitrack_get_default_params(&params_);
         applyConfigToParams(doc_, params_);
     }
 };
@@ -334,7 +299,7 @@ TEST_F(ConfigLoaderAdvancedFieldsTest, CoordinateSystemFieldsAreApplied)
 }
 
 /**
- * @brief ReID fields, including the documented but previously-untested
+ * @brief ReID fields, including the documented but in past tests-untested
  *        reid_direct_assignment_weight (Verified Omission #2), are applied.
  */
 TEST_F(ConfigLoaderAdvancedFieldsTest, ReIDFieldsIncludingDirectAssignmentWeightAreApplied)
@@ -351,7 +316,7 @@ TEST_F(ConfigLoaderAdvancedFieldsTest, ReIDFieldsIncludingDirectAssignmentWeight
 }
 
 /**
- * @brief Tentative-logic fast/slow/vslow tiers are applied — the previously
+ * @brief Tentative-logic fast/slow/vslow tiers are applied — the in past tests
  *        untested fields called out in Omission #2.
  */
 TEST_F(ConfigLoaderAdvancedFieldsTest, TentativeLogicTiersAreApplied)
@@ -391,8 +356,8 @@ TEST(ConfigLoaderDefaultsTest, MissingBasicSectionLeavesDefaults)
     Json doc = Json::object();
     doc["sushitrack"]["advanced"]["association"]["primary_assoc_mode"] = 0;
 
-    SushiTrack_Params p{};
-    SushiTrack_GetDefaultParams(&p);
+    sushitrack_params_t p{};
+    sushitrack_get_default_params(&p);
     const int default_frame_rate = p.frame_rate;
     applyConfigToParams(doc, p);
 
@@ -407,9 +372,9 @@ TEST(ConfigLoaderDefaultsTest, EmptyDocumentLeavesAllDefaults)
 {
     Json doc = Json::object();
 
-    SushiTrack_Params before{};
-    SushiTrack_GetDefaultParams(&before);
-    SushiTrack_Params after = before;
+    sushitrack_params_t before{};
+    sushitrack_get_default_params(&before);
+    sushitrack_params_t after = before;
     applyConfigToParams(doc, after);
 
     EXPECT_EQ(after.frame_rate,    before.frame_rate);
@@ -428,13 +393,13 @@ TEST(ConfigLoaderTrackerSmokeTest, LoadedParamsBuildTrackerSuccessfully)
     Json doc = loadConfigJson();
     ASSERT_FALSE(doc.empty());
 
-    SushiTrack_Params p{};
-    SushiTrack_GetDefaultParams(&p);
+    sushitrack_params_t p{};
+    sushitrack_get_default_params(&p);
     applyConfigToParams(doc, p);
 
-    SushiTrackHdl hdl = SushiTrack_Create(&p);
+    sushitrack_tracker_t hdl = sushitrack_create(&p);
     ASSERT_NE(hdl, nullptr);
-    SushiTrack_Destroy(hdl);
+    sushitrack_destroy(hdl);
 }
 
 /**
@@ -445,29 +410,29 @@ TEST(ConfigLoaderTrackerSmokeTest, LoadedParamsSurviveSingleDetectionUpdate)
     Json doc = loadConfigJson();
     ASSERT_FALSE(doc.empty());
 
-    SushiTrack_Params p{};
-    SushiTrack_GetDefaultParams(&p);
+    sushitrack_params_t p{};
+    sushitrack_get_default_params(&p);
     applyConfigToParams(doc, p);
     p.time_aware = 1; // ensure dt argument is honoured
 
-    SushiTrackHdl hdl = SushiTrack_Create(&p);
+    sushitrack_tracker_t hdl = sushitrack_create(&p);
     ASSERT_NE(hdl, nullptr);
 
-    SushiTrack_Object d{};
+    sushitrack_object_t d{};
     d.x = 100.0f; d.y = 200.0f;
     d.width = 50.0f; d.height = 100.0f;
     d.score = 0.9f; d.label = 1;
-    std::vector<SushiTrack_Track> out(4);
-    int n = SushiTrack_Update(hdl, &d, 1, out.data(), 4, 0.04f);
+    std::vector<sushitrack_track_t> out(4);
+    int n = sushitrack_update(hdl, &d, 1, out.data(), 4, 0.04f);
     EXPECT_GE(n, 0);
 
-    SushiTrack_Destroy(hdl);
+    sushitrack_destroy(hdl);
 }
 
 // ConfigLoaderLibraryApiTest
 
 /**
- * @brief The library-owned loader (SushiTrack_LoadParamsFromJson) must produce
+ * @brief The library-owned loader (sushitrack_load_params_from_json) must produce
  *        the same Params as the in-test reference parser for the shipped file.
  *
  * This is the parity guard for the production code path: sushitrack.json is now
@@ -479,13 +444,13 @@ TEST(ConfigLoaderLibraryApiTest, LibraryLoaderMatchesReferenceParser)
     Json doc = loadConfigJson();
     ASSERT_FALSE(doc.empty());
 
-    SushiTrack_Params reference{};
-    SushiTrack_GetDefaultParams(&reference);
+    sushitrack_params_t reference{};
+    sushitrack_get_default_params(&reference);
     applyConfigToParams(doc, reference);
 
-    SushiTrack_Params loaded{};
-    SushiTrack_GetDefaultParams(&loaded);
-    ASSERT_EQ(SushiTrack_LoadParamsFromJson(configPath().c_str(), &loaded),
+    sushitrack_params_t loaded{};
+    sushitrack_get_default_params(&loaded);
+    ASSERT_EQ(sushitrack_load_params_from_json(configPath().c_str(), &loaded),
               SUSHITRACK_SUCCESS);
 
     EXPECT_EQ      (loaded.enable_reid,                reference.enable_reid);
@@ -500,7 +465,7 @@ TEST(ConfigLoaderLibraryApiTest, LibraryLoaderMatchesReferenceParser)
  */
 TEST(ConfigLoaderLibraryApiTest, NullParamsAreRejected)
 {
-    EXPECT_EQ(SushiTrack_LoadParamsFromJson(configPath().c_str(), nullptr),
+    EXPECT_EQ(sushitrack_load_params_from_json(configPath().c_str(), nullptr),
               SUSHITRACK_INVALID_ARGUMENT);
 }
 
@@ -510,11 +475,11 @@ TEST(ConfigLoaderLibraryApiTest, NullParamsAreRejected)
  */
 TEST(ConfigLoaderLibraryApiTest, MissingFileLeavesDefaultsAndSucceeds)
 {
-    SushiTrack_Params before{};
-    SushiTrack_GetDefaultParams(&before);
-    SushiTrack_Params after = before;
+    sushitrack_params_t before{};
+    sushitrack_get_default_params(&before);
+    sushitrack_params_t after = before;
 
-    EXPECT_EQ(SushiTrack_LoadParamsFromJson("this/path/does/not/exist.json", &after),
+    EXPECT_EQ(sushitrack_load_params_from_json("this/path/does/not/exist.json", &after),
               SUSHITRACK_SUCCESS);
     EXPECT_EQ(after.frame_rate,  before.frame_rate);
     EXPECT_EQ(after.enable_reid,  before.enable_reid);

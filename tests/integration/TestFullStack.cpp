@@ -1,24 +1,30 @@
+/**************************************************************************/
+/* TestFullStack.cpp                                                      */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      TestFullStack.cpp
- * @brief     End-to-end coverage with every advanced feature enabled at once.
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      15.06.2026
- * @version   v1.0.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
- *
- * Scope
- * -----
- * Every advanced subsystem is unit-tested alone and several are paired in the
- * unit-level integration suite, but no test drives the *entire* advanced stack
- * simultaneously: ReID + Mahalanobis gating + IMM regime + tentative
- * lifecycle + NSA Kalman. Feature interactions (e.g. IMM regime gate scaling feeding
- * the fused cost while ReID also competes for lost-recovery) only surface when
- * they run together. This file is that composition test.
- *
- * Assertions are invariant-style: with so many interacting policies the exact
- * trajectory is not the contract — identity stability for continuously observed
- * objects, ReID-driven recovery of a briefly occluded object, and never-NaN
- * geometry are.
+ * @file TestFullStack.cpp
+ * @brief Integration tests for full tracking stack execution.
+ * @author Mustafa Garip
  */
 
 #include <gtest/gtest.h>
@@ -34,15 +40,15 @@ namespace
 class FullStackTest : public ::testing::Test
 {
 protected:
-    SushiTrackHdl     hdl_    = nullptr;
-    SushiTrack_Params params_ = {};
+    sushitrack_tracker_t     hdl_    = nullptr;
+    sushitrack_params_t params_ = {};
     static constexpr int kDim = 128;
     std::vector<float> feat_a_;
     std::vector<float> feat_b_;
 
     void SetUp() override
     {
-        SushiTrack_GetDefaultParams(&params_);
+        sushitrack_get_default_params(&params_);
         // Everything on.
         params_.time_aware                            = 1;
         params_.enable_reid                           = 1;
@@ -58,14 +64,14 @@ protected:
         // Confirm quickly on strong detections so the scenario stays short.
         params_.tentative_fast_thresh                 = 0.85f;
         params_.tentative_fast_hits                   = 1;
-        hdl_ = SushiTrack_Create(&params_);
+        hdl_ = sushitrack_create(&params_);
         ASSERT_NE(hdl_, nullptr);
 
         feat_a_ = oneHotFeature(kDim, /*axis=*/0);
         feat_b_ = oneHotFeature(kDim, /*axis=*/1); // orthogonal to A
     }
 
-    void TearDown() override { if (hdl_) SushiTrack_Destroy(hdl_); }
+    void TearDown() override { if (hdl_) sushitrack_destroy(hdl_); }
 };
 
 /**
@@ -76,13 +82,13 @@ protected:
  */
 TEST_F(FullStackTest, AdvancedStackTracksConfirmsAndRecovers)
 {
-    std::vector<SushiTrack_Track> out(8);
+    std::vector<sushitrack_track_t> out(8);
 
     auto step = [&](float ax, float ay, float bx, float by) -> int {
-        SushiTrack_Object a = makeDetWithFeat(ax, ay, feat_a_.data(), kDim, 0.9f);
-        SushiTrack_Object b = makeDetWithFeat(bx, by, feat_b_.data(), kDim, 0.9f);
-        SushiTrack_Object dets[2] = { a, b };
-        return SushiTrack_Update(hdl_, dets, 2, out.data(), 8, 0.04f);
+        sushitrack_object_t a = makeDetWithFeat(ax, ay, feat_a_.data(), kDim, 0.9f);
+        sushitrack_object_t b = makeDetWithFeat(bx, by, feat_b_.data(), kDim, 0.9f);
+        sushitrack_object_t dets[2] = { a, b };
+        return sushitrack_update(hdl_, dets, 2, out.data(), 8, 0.04f);
     };
 
     // Confirmation + sustained tracking over several frames
@@ -97,7 +103,7 @@ TEST_F(FullStackTest, AdvancedStackTracksConfirmsAndRecovers)
         ASSERT_GE(n, 2);
         for (int k = 0; k < n; ++k)
         {
-            const SushiTrack_Track& t = out[static_cast<std::size_t>(k)];
+            const sushitrack_track_t& t = out[static_cast<std::size_t>(k)];
             EXPECT_TRUE(geometryIsSane(t)) << "Insane geometry during tracking, frame " << i;
             if (t.y < 275.0f) id_a = t.track_id;
             else              id_b = t.track_id;
@@ -113,8 +119,8 @@ TEST_F(FullStackTest, AdvancedStackTracksConfirmsAndRecovers)
     {
         int n = step(ax, ay, bx, by);
         ASSERT_GE(n, 2);
-        const SushiTrack_Track* a = findById(out, n, id_a);
-        const SushiTrack_Track* b = findById(out, n, id_b);
+        const sushitrack_track_t* a = findById(out, n, id_a);
+        const sushitrack_track_t* b = findById(out, n, id_b);
         ASSERT_NE(a, nullptr);
         ASSERT_NE(b, nullptr);
         EXPECT_EQ(a->state, kTracked);
@@ -126,10 +132,10 @@ TEST_F(FullStackTest, AdvancedStackTracksConfirmsAndRecovers)
     constexpr int kGap = 3;
     for (int i = 0; i < kGap; ++i)
     {
-        SushiTrack_Object b = makeDetWithFeat(bx, by, feat_b_.data(), kDim, 0.9f);
-        int n = SushiTrack_Update(hdl_, &b, 1, out.data(), 8, 0.04f);
+        sushitrack_object_t b = makeDetWithFeat(bx, by, feat_b_.data(), kDim, 0.9f);
+        int n = sushitrack_update(hdl_, &b, 1, out.data(), 8, 0.04f);
         ASSERT_GE(n, 1);
-        const SushiTrack_Track* tb = findById(out, n, id_b);
+        const sushitrack_track_t* tb = findById(out, n, id_b);
         ASSERT_NE(tb, nullptr) << "Visible object B lost identity during A's occlusion.";
         EXPECT_EQ(tb->state, kTracked);
         bx += vx;
@@ -140,8 +146,8 @@ TEST_F(FullStackTest, AdvancedStackTracksConfirmsAndRecovers)
     int n = step(ax, ay, bx, by);
     ASSERT_GE(n, 1);
 
-    const SushiTrack_Track* a_rec = findById(out, n, id_a);
-    const SushiTrack_Track* b_now = findById(out, n, id_b);
+    const sushitrack_track_t* a_rec = findById(out, n, id_a);
+    const sushitrack_track_t* b_now = findById(out, n, id_b);
     ASSERT_NE(b_now, nullptr) << "Object B lost its identity at reappearance frame.";
     ASSERT_NE(a_rec, nullptr)
         << "ReID + Mahalanobis recovery failed to restore object A's identity "
@@ -158,10 +164,10 @@ TEST_F(FullStackTest, AdvancedStackTracksConfirmsAndRecovers)
  */
 TEST_F(FullStackTest, LongRunUnderFullStackStaysStable)
 {
-    std::vector<SushiTrack_Track> out(4);
+    std::vector<sushitrack_track_t> out(4);
 
-    SushiTrack_Object d0 = makeDetWithFeat(100.0f, 200.0f, feat_a_.data(), kDim, 0.95f);
-    int n0 = SushiTrack_Update(hdl_, &d0, 1, out.data(), 4, 0.04f);
+    sushitrack_object_t d0 = makeDetWithFeat(100.0f, 200.0f, feat_a_.data(), kDim, 0.95f);
+    int n0 = sushitrack_update(hdl_, &d0, 1, out.data(), 4, 0.04f);
     ASSERT_GE(n0, 1);
     int64_t id = out[0].track_id;
 
@@ -172,15 +178,15 @@ TEST_F(FullStackTest, LongRunUnderFullStackStaysStable)
         x += 2.0f + 0.02f * k;            // accelerating
         y += 4.0f * std::sin(0.1f * k);   // weaving
         const float score = 0.4f + 0.5f * std::abs(std::sin(0.3f * k)); // fluctuates
-        SushiTrack_Object d = makeDetWithFeat(x, y, feat_a_.data(), kDim, score);
-        int n = SushiTrack_Update(hdl_, &d, 1, out.data(), 4, 0.04f);
+        sushitrack_object_t d = makeDetWithFeat(x, y, feat_a_.data(), kDim, score);
+        int n = sushitrack_update(hdl_, &d, 1, out.data(), 4, 0.04f);
         ASSERT_GE(n, 1) << "Full-stack tracker dropped the object at frame " << k;
 
         // Re-anchor the id when confirmed (handles the tentative->Tracked transition without assuming the frame it occurs on).
         if (out[0].state == kTracked && out[0].is_confirmed)
             id = out[0].track_id;
 
-        const SushiTrack_Track* t = findById(out, n, id);
+        const sushitrack_track_t* t = findById(out, n, id);
         ASSERT_NE(t, nullptr) << "Full-stack id churned at frame " << k;
         EXPECT_TRUE(geometryIsSane(*t)) << "Insane geometry at frame " << k;
     }

@@ -26,7 +26,7 @@ add_executable(unit_test
     TestTrackerBuffers.cpp
     TestLogger.cpp
     TestSushiTrackC.cpp
-    TestSushiTrackTracker.cpp
+    TestTracker.cpp
     TestCAPIErrors.cpp
     TestIntegration.cpp
     TestBoundaryConditions.cpp
@@ -36,8 +36,8 @@ add_executable(unit_test
 
 target_include_directories(unit_test PRIVATE
     ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/3rdparty
-    ${CMAKE_SOURCE_DIR}/3rdparty/eigen
+    ${CMAKE_SOURCE_DIR}/third_party
+    ${CMAKE_SOURCE_DIR}/third_party/eigen
 )
 
 target_link_libraries(unit_test PRIVATE

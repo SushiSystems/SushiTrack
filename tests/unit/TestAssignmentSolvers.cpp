@@ -1,27 +1,35 @@
+/**************************************************************************/
+/* TestAssignmentSolvers.cpp                                              */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      TestAssignmentSolvers.cpp
- * @brief     Unit tests for LAPJVSolver: match correctness, unmatched reporting, and edge cases.
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      12.05.2026
- * @version   v1.0.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
- *
- * Coverage
- * --------
- * - Empty matrix (0×0) reports all rows and cols as unmatched.
- * - 1×1 matrix below threshold produces exactly one match.
- * - 1×1 matrix above threshold produces no matches, unmatched on both sides.
- * - Identity cost matrix (diagonal = 0, off-diagonal = 1) matches each row to its column.
- * - Rectangular matrix (more rows than cols) correctly unmatches surplus rows.
- * - Rectangular matrix (more cols than rows) correctly unmatches surplus columns.
- * - Threshold controls which assignments are accepted.
- * - No double-assignments: each row and column appears at most once in matches.
- * - solve() is stable across repeated calls on the same solver instance.
+ * @file TestAssignmentSolvers.cpp
+ * @brief Unit tests for assignment solver implementations.
+ * @author Mustafa Garip
  */
 
 #include <gtest/gtest.h>
-#include "SushiTrack/AssignmentSolvers.h"
-#include "SushiTrack/CostMatrix.h"
+#include <SushiTrack/assignment_solvers.hpp>
+#include <SushiTrack/cost_matrix.hpp>
 
 #include <algorithm>
 #include <vector>

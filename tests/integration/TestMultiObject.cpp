@@ -1,20 +1,30 @@
+/**************************************************************************/
+/* TestMultiObject.cpp                                                    */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      TestMultiObject.cpp
- * @brief     End-to-end coverage of multi-object identity, scale, and output capacity.
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      15.06.2026
- * @version   v1.0.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
- *
- * Scope
- * -----
- *   - Identity separation: many simultaneous, well-separated objects each keep
- *     a stable, distinct id over a full sequence (no churn, no collisions).
- *   - Counter-moving pass: two separable objects crossing in x while held apart
- *     in y do not swap identities — the motion/geometry path alone suffices
- *     when the boxes never overlap.
- *   - Output-capacity contract: SushiTrack_Update never writes more than
- *     max_tracks entries and prioritises Tracked tracks when truncating.
+ * @file TestMultiObject.cpp
+ * @brief Integration tests for multi-object tracking stability.
+ * @author Mustafa Garip
  */
 
 #include <gtest/gtest.h>
@@ -31,12 +41,12 @@ namespace
 class MultiObjectTest : public ::testing::Test
 {
 protected:
-    SushiTrackHdl     hdl_    = nullptr;
-    SushiTrack_Params params_ = {};
+    sushitrack_tracker_t     hdl_    = nullptr;
+    sushitrack_params_t params_ = {};
 
     void SetUp() override
     {
-        SushiTrack_GetDefaultParams(&params_);
+        sushitrack_get_default_params(&params_);
         params_.time_aware         = 0;
         params_.enable_tentative   = 0;
         params_.primary_assoc_mode = 1;
@@ -46,11 +56,11 @@ protected:
         params_.high_thresh        = 0.5f;
         params_.match_thresh       = 0.9f;
 
-        hdl_ = SushiTrack_Create(&params_);
+        hdl_ = sushitrack_create(&params_);
         ASSERT_NE(hdl_, nullptr);
     }
 
-    void TearDown() override { if (hdl_) SushiTrack_Destroy(hdl_); }
+    void TearDown() override { if (hdl_) sushitrack_destroy(hdl_); }
 };
 
 /**
@@ -66,10 +76,10 @@ TEST_F(MultiObjectTest, CrowdedSceneKeepsDistinctStableIdentities)
     constexpr int kFrames = 20;
     constexpr float kSpacing = 200.0f; // wide separation -> unambiguous association
 
-    std::vector<SushiTrack_Track> out(static_cast<std::size_t>(kCount) + 8);
+    std::vector<sushitrack_track_t> out(static_cast<std::size_t>(kCount) + 8);
 
     auto buildFrame = [&](int frame) {
-        std::vector<SushiTrack_Object> dets;
+        std::vector<sushitrack_object_t> dets;
         dets.reserve(kCount);
         for (int r = 0; r < kRows; ++r)
             for (int c = 0; c < kCols; ++c)
@@ -83,7 +93,7 @@ TEST_F(MultiObjectTest, CrowdedSceneKeepsDistinctStableIdentities)
 
     // Frame 0: seed.
     auto f0 = buildFrame(0);
-    int n0 = SushiTrack_Update(hdl_, f0.data(), kCount, out.data(),
+    int n0 = sushitrack_update(hdl_, f0.data(), kCount, out.data(),
                               static_cast<int>(out.size()), 0.04f);
     ASSERT_EQ(n0, kCount) << "Not every object produced a track on seed frame.";
 
@@ -97,14 +107,14 @@ TEST_F(MultiObjectTest, CrowdedSceneKeepsDistinctStableIdentities)
     for (int frame = 1; frame < kFrames; ++frame)
     {
         auto f = buildFrame(frame);
-        int n = SushiTrack_Update(hdl_, f.data(), kCount, out.data(),
+        int n = sushitrack_update(hdl_, f.data(), kCount, out.data(),
                                  static_cast<int>(out.size()), 0.04f);
         ASSERT_EQ(n, kCount) << "Object count changed at frame " << frame;
 
         std::set<int64_t> ids;
         for (int i = 0; i < n; ++i)
         {
-            const SushiTrack_Track& t = out[static_cast<std::size_t>(i)];
+            const sushitrack_track_t& t = out[static_cast<std::size_t>(i)];
             EXPECT_TRUE(geometryIsSane(t)) << "Insane geometry at frame " << frame;
             ids.insert(t.track_id);
         }
@@ -121,7 +131,7 @@ TEST_F(MultiObjectTest, CrowdedSceneKeepsDistinctStableIdentities)
  */
 TEST_F(MultiObjectTest, CounterMovingSeparableObjectsDoNotSwapIds)
 {
-    std::vector<SushiTrack_Track> out(8);
+    std::vector<sushitrack_track_t> out(8);
 
     // Lane separation 150 px, box height 100 -> no vertical overlap at any time.
     const float y_left  = 150.0f;
@@ -129,16 +139,16 @@ TEST_F(MultiObjectTest, CounterMovingSeparableObjectsDoNotSwapIds)
     float lx = 100.0f, rx = 500.0f;
     const float speed = 40.0f;
 
-    SushiTrack_Object l0 = makeDet(lx, y_left);
-    SushiTrack_Object r0 = makeDet(rx, y_right);
-    SushiTrack_Object d0[2] = { l0, r0 };
-    int n0 = SushiTrack_Update(hdl_, d0, 2, out.data(), 8, 0.04f);
+    sushitrack_object_t l0 = makeDet(lx, y_left);
+    sushitrack_object_t r0 = makeDet(rx, y_right);
+    sushitrack_object_t d0[2] = { l0, r0 };
+    int n0 = sushitrack_update(hdl_, d0, 2, out.data(), 8, 0.04f);
     ASSERT_GE(n0, 2);
 
     int64_t id_left = -1, id_right = -1;
     for (int i = 0; i < n0; ++i)
     {
-        const SushiTrack_Track& t = out[static_cast<std::size_t>(i)];
+        const sushitrack_track_t& t = out[static_cast<std::size_t>(i)];
         if (t.y < 225.0f) id_left = t.track_id;
         else              id_right = t.track_id;
     }
@@ -151,14 +161,14 @@ TEST_F(MultiObjectTest, CounterMovingSeparableObjectsDoNotSwapIds)
     {
         lx += speed;
         rx -= speed;
-        SushiTrack_Object l = makeDet(lx, y_left);
-        SushiTrack_Object r = makeDet(rx, y_right);
-        SushiTrack_Object d[2] = { l, r };
-        int n = SushiTrack_Update(hdl_, d, 2, out.data(), 8, 0.04f);
+        sushitrack_object_t l = makeDet(lx, y_left);
+        sushitrack_object_t r = makeDet(rx, y_right);
+        sushitrack_object_t d[2] = { l, r };
+        int n = sushitrack_update(hdl_, d, 2, out.data(), 8, 0.04f);
         ASSERT_GE(n, 2);
 
-        const SushiTrack_Track* tl = findById(out, n, id_left);
-        const SushiTrack_Track* tr = findById(out, n, id_right);
+        const sushitrack_track_t* tl = findById(out, n, id_left);
+        const sushitrack_track_t* tr = findById(out, n, id_right);
         ASSERT_NE(tl, nullptr) << "Left-lane id vanished at step " << k;
         ASSERT_NE(tr, nullptr) << "Right-lane id vanished at step " << k;
         // Each id must stay anchored to its own lane.
@@ -175,10 +185,10 @@ TEST_F(MultiObjectTest, CounterMovingSeparableObjectsDoNotSwapIds)
 TEST_F(MultiObjectTest, OutputRespectsMaxTracksCapacityAndPriority)
 {
     constexpr int kObjects = 6;
-    std::vector<SushiTrack_Track> out(kObjects);
+    std::vector<sushitrack_track_t> out(kObjects);
 
     auto frame = [&](int f) {
-        std::vector<SushiTrack_Object> dets;
+        std::vector<sushitrack_object_t> dets;
         for (int i = 0; i < kObjects; ++i)
             dets.push_back(makeDet(100.0f + i * 200.0f + 2.0f * f, 200.0f));
         return dets;
@@ -188,14 +198,14 @@ TEST_F(MultiObjectTest, OutputRespectsMaxTracksCapacityAndPriority)
     for (int f = 0; f < 3; ++f)
     {
         auto d = frame(f);
-        int n = SushiTrack_Update(hdl_, d.data(), kObjects, out.data(), kObjects, 0.04f);
+        int n = sushitrack_update(hdl_, d.data(), kObjects, out.data(), kObjects, 0.04f);
         ASSERT_GE(n, 1);
     }
 
     // Now request the same frame but only allow room for half the tracks.
     constexpr int kCap = 3;
     auto d = frame(3);
-    int n = SushiTrack_Update(hdl_, d.data(), kObjects, out.data(), kCap, 0.04f);
+    int n = sushitrack_update(hdl_, d.data(), kObjects, out.data(), kCap, 0.04f);
 
     EXPECT_LE(n, kCap) << "Update wrote more tracks than max_tracks permitted.";
     EXPECT_EQ(n, kCap) << "With six active tracks and capacity three, exactly "

@@ -2,9 +2,8 @@
 @file      demo.py
 @brief     CLI Entry point for the video tracking test pipeline.
 @author    Mustafa Garip (mustafagarip@sushisystems.io)
-@date      12.05.2026
 @version   v1.0.0
-@copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
+@copyright Copyright (c) 2026-present Mustafa Garip & Sushi Systems. All rights reserved.
 """
 
 import argparse
@@ -17,7 +16,7 @@ from loguru import logger
 # Ensure we can import from the local directory and the project root
 _THIS_DIR = Path(__file__).parent
 _PROJECT_ROOT = _THIS_DIR.parent.parent.parent
-_YOLOX_DIR = _PROJECT_ROOT / "3rdparty" / "yolox"
+_YOLOX_DIR = _PROJECT_ROOT / "third_party" / "yolox"
 _BUILD_DIR = _PROJECT_ROOT / "build"
 
 sys.path.append(str(_THIS_DIR))
@@ -32,7 +31,7 @@ def make_parser() -> argparse.ArgumentParser:
     
     @return Configured ArgumentParser instance.
     """
-    parser = argparse.ArgumentParser(description="SushiTrack Moduler Video Test Pipeline")
+    parser = argparse.ArgumentParser(description="SushiTrack Modular Video Test Pipeline")
     
     # Generic Arguments
     parser.add_argument("--tracker", type=str, default="SushiTrack", help="Name of the tracker to use (e.g., SushiTrack, ByteTrack, OCSORT)")

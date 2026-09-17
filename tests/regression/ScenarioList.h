@@ -1,12 +1,32 @@
+/**************************************************************************/
+/* ScenarioList.h                                                         */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      ScenarioList.h
- * @brief     Registry of benchmark sequences; defines the dataset scenarios (MOT17/MOT20) used for automated tracking evaluation.
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      30.04.2026
- * @version   v1.0.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
+ * @file ScenarioList.h
+ * @brief Enumerates benchmark sequences for regression testing.
+ * @author Mustafa Garip
  */
- 
+
 #pragma once
 
 #include <string>

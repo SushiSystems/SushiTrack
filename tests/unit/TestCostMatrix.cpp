@@ -1,25 +1,34 @@
+/**************************************************************************/
+/* TestCostMatrix.cpp                                                     */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      TestCostMatrix.cpp
- * @brief     Unit tests for CostMatrix: resize, element access, sentinel init, and buffer reuse.
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      12.05.2026
- * @version   v1.0.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
- *
- * Coverage
- * --------
- * - Default-constructed matrix is empty (0×0).
- * - resize() updates rows/cols and fills every cell with initial_val.
- * - Default initial_val is the sentinel 1e4f.
- * - operator() reads and writes arbitrary elements correctly.
- * - empty() returns false after resize(), true before.
- * - Shrink resize reuses the internal buffer without heap reallocation.
- * - Grow resize allocates and fills the larger buffer correctly.
- * - data() pointer is non-null after resize().
+ * @file TestCostMatrix.cpp
+ * @brief Unit tests for cost matrix calculations and operations.
+ * @author Mustafa Garip
  */
 
 #include <gtest/gtest.h>
-#include "SushiTrack/CostMatrix.h"
+#include <SushiTrack/cost_matrix.hpp>
 
 using namespace SushiTrack;
 

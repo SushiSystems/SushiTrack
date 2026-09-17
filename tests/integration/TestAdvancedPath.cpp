@@ -1,18 +1,47 @@
+/**************************************************************************/
+/* TestAdvancedPath.cpp                                                   */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
+/**
+ * @file TestAdvancedPath.cpp
+ * @brief Integration tests for advanced tracking pathways.
+ * @author Mustafa Garip
+ */
+
 #include <gtest/gtest.h>
-#include "SushiTrackC.h"
+#include <SushiTrack/sushitrack_c.h>
 #include <vector>
 #include <cmath>
 
 namespace
 {
 
-SushiTrack_Object makeDetWithFeat(float          x,
+sushitrack_object_t makeDetWithFeat(float          x,
                                  float          y,
                                  const float*   feat,
                                  int            feat_dim,
                                  float          score = 0.9f)
 {
-    SushiTrack_Object o{};
+    sushitrack_object_t o{};
     o.x        = x;
     o.y        = y;
     o.width    = 50.0f;
@@ -24,7 +53,7 @@ SushiTrack_Object makeDetWithFeat(float          x,
     return o;
 }
 
-const SushiTrack_Track* findById(const std::vector<SushiTrack_Track>& out,
+const sushitrack_track_t* findById(const std::vector<sushitrack_track_t>& out,
                                 int                                  n,
                                 int64_t                              id)
 {
@@ -44,21 +73,21 @@ const SushiTrack_Track* findById(const std::vector<SushiTrack_Track>& out,
 class AdvancedPathIntegrationTest : public ::testing::Test
 {
 protected:
-    SushiTrackHdl     hdl_    = nullptr;
-    SushiTrack_Params params_ = {};
+    sushitrack_tracker_t     hdl_    = nullptr;
+    sushitrack_params_t params_ = {};
     std::vector<float> target_feat_;
     std::vector<float> decoy_feat_;
 
     void SetUp() override
     {
-        SushiTrack_GetDefaultParams(&params_);
+        sushitrack_get_default_params(&params_);
         params_.enable_reid            = 1;
         params_.enable_mahalanobis     = 1;
         params_.primary_assoc_mode     = 1;
         params_.time_aware             = 1;
         params_.match_thresh           = 0.9f;
 
-        hdl_ = SushiTrack_Create(&params_);
+        hdl_ = sushitrack_create(&params_);
         ASSERT_NE(hdl_, nullptr);
 
         target_feat_.assign(512, 0.1f);
@@ -68,18 +97,18 @@ protected:
         decoy_feat_[0] = -1.0f;
     }
 
-    void TearDown() override { SushiTrack_Destroy(hdl_); }
+    void TearDown() override { sushitrack_destroy(hdl_); }
 };
 
 TEST_F(AdvancedPathIntegrationTest, ReIDAndMahalanobisEndToEnd)
 {
-    std::vector<SushiTrack_Track> out(8);
+    std::vector<sushitrack_track_t> out(8);
 
     // Frame 1 to 3: Detect target to confirm the tracklet
     int64_t target_id = -1;
     for (int i = 0; i < 3; ++i) {
-        SushiTrack_Object d = makeDetWithFeat(100.0f, 100.0f + i * 5.0f, target_feat_.data(), 512, 0.9f);
-        int n = SushiTrack_Update(hdl_, &d, 1, out.data(), 8, 0.04f);
+        sushitrack_object_t d = makeDetWithFeat(100.0f, 100.0f + i * 5.0f, target_feat_.data(), 512, 0.9f);
+        int n = sushitrack_update(hdl_, &d, 1, out.data(), 8, 0.04f);
         ASSERT_GE(n, 1);
         if (i == 2) {
             target_id = out[0].track_id;
@@ -90,17 +119,17 @@ TEST_F(AdvancedPathIntegrationTest, ReIDAndMahalanobisEndToEnd)
     // Frame 4: An object appears at the exact same location, but with a different feature (Decoy) And our true target object appears a bit further away (Mahalanobis gate should catch it, and ReID should match it)
     
     // Decoy object at the predicted location (IoU is high, but ReID feature is very different)
-    SushiTrack_Object decoy = makeDetWithFeat(100.0f, 115.0f, decoy_feat_.data(), 512, 0.9f);
+    sushitrack_object_t decoy = makeDetWithFeat(100.0f, 115.0f, decoy_feat_.data(), 512, 0.9f);
     
     // True object further away (IoU is lower, but ReID feature matches perfectly) Placed at 110, so it's still well within the Mahalanobis gate.
-    SushiTrack_Object target = makeDetWithFeat(110.0f, 115.0f, target_feat_.data(), 512, 0.9f);
+    sushitrack_object_t target = makeDetWithFeat(110.0f, 115.0f, target_feat_.data(), 512, 0.9f);
 
-    SushiTrack_Object dets_f4[2] = { decoy, target };
-    int n4 = SushiTrack_Update(hdl_, dets_f4, 2, out.data(), 8, 0.04f);
+    sushitrack_object_t dets_f4[2] = { decoy, target };
+    int n4 = sushitrack_update(hdl_, dets_f4, 2, out.data(), 8, 0.04f);
     ASSERT_GE(n4, 1);
     
     // Check if the true object retained the target_id
-    const SushiTrack_Track* t = findById(out, n4, target_id);
+    const sushitrack_track_t* t = findById(out, n4, target_id);
     ASSERT_NE(t, nullptr) << "The tracker failed to associate the target using ReID and Mahalanobis gating.";
     
     // The decoy sits at the predicted location (x~=100); the ReID-matched target is at x=110. The Kalman output is the filtered estimate, not the raw detection: it blends prediction and measurement as x = 100 + K*(110-100), which lands near 107.6 for this covariance. Asserting equality with the raw 110 would test "did the KF ignore its own prediction", not the ReID association. Instead assert the track moved decisively toward the target (x>105) rather than staying at the decoy (x~=100), which is the property this test actually validates and is robust to the Kalman gain.

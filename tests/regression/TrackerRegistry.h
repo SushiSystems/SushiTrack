@@ -1,10 +1,30 @@
+/**************************************************************************/
+/* TrackerRegistry.h                                                      */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      TrackerRegistry.h
- * @brief     Dynamic registry and C-API bridge for tracker adapters.
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      12.05.2026
- * @version   v1.0.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
+ * @file TrackerRegistry.h
+ * @brief Declares the registry of available tracker adapters.
+ * @author Mustafa Garip
  */
 
 #pragma once
@@ -162,9 +182,6 @@ extern "C"
      * @param tracker        Opaque pointer to the ITrackerAdapter instance.
      * @param detections     Pointer to an array of CDetection inputs.
      * @param num_detections Number of items in the detections array.
-     * @param results        Pointer to an allocated array for storing CTrackResult outputs.
-     * @param num_results    Pointer to an integer receiving the number of populated results.
-     * @param max_results    Capacity of the results array.
      */
     EXPORT_API void tracker_process_c(ITrackerAdapter* tracker, const CDetection* detections, int num_detections, CTrackResult* results, int* num_results, int max_results);
 }

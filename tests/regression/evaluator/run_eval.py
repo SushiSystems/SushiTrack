@@ -1,11 +1,6 @@
-"""
-@file      run_eval.py
-@brief     Command-line entry point for MOT Challenge evaluation.
-@author    Mustafa Garip (mustafagarip@sushisystems.io)
-@date      28.04.2026
-@version   v1.0.0
-@copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
-"""
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+"""Command-line entry point for MOT Challenge evaluation."""
 
 import sys
 import argparse

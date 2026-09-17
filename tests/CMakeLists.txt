@@ -17,7 +17,7 @@
 #   ctest --test-dir build -L '^unit$'                 -- unit tests only
 #   ctest --test-dir build -L '^(unit|integration)$'   -- an umbrella
 #   ctest --test-dir build --print-labels              -- what is registered
-# Or through the CLI: `ds test --suite unit|integration|regression|functional|all`.
+# Or through the CLI: `st test --suite unit|integration|regression|all`.
 # ==============================================================================
 
 option(BUILD_UNIT_TEST       "Build deterministic GTest unit tests"          OFF)

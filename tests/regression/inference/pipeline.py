@@ -2,9 +2,8 @@
 @file      pipeline.py
 @brief     Core video processing pipeline abstracting detection and tracking.
 @author    Mustafa Garip (mustafagarip@sushisystems.io)
-@date      12.05.2026
 @version   v1.0.0
-@copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
+@copyright Copyright (c) 2026-present Mustafa Garip & Sushi Systems. All rights reserved.
 """
 
 import os
@@ -415,8 +414,7 @@ class VideoPipeline:
                     x, y, w, h, score, label = det
                     self.det_file.write(f"{frame_id},-1,{x:.2f},{y:.2f},{w:.2f},{h:.2f},{score:.4f},-1,-1,-1\n")
             
-            # 2. Tracking
-            # Check if tracker supports embeddings in the python bridge
+            # 2. Tracking with optional appearance embeddings
             try:
                 if embeddings is not None:
                     tracks = tracker.update(detections, embeddings=embeddings)

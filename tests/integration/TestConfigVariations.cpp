@@ -1,21 +1,30 @@
+/**************************************************************************/
+/* TestConfigVariations.cpp                                               */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      TestConfigVariations.cpp
- * @brief     End-to-end robustness across interchangeable algorithm components.
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      15.06.2026
- * @version   v1.0.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
- *
- * Scope
- * -----
- * The tracker exposes several swappable strategies via configuration: four IoU
- * cost variants (IoU / DIoU / GIoU / SIoU), two coordinate parameterisations
- * (XYWH / XYAH), and two Kalman filters (linear / NSA confidence-adaptive).
- * Each is unit-tested in isolation; this file proves every one of them drives a
- * full multi-frame tracking run through the C API without destabilising
- * identity or producing degenerate geometry. These are the substitutions a
- * downstream integrator is most likely to flip, so each must be exercised
- * end-to-end.
+ * @file TestConfigVariations.cpp
+ * @brief Integration tests for varying tracker configurations.
+ * @author Mustafa Garip
  */
 
 #include <gtest/gtest.h>
@@ -35,15 +44,15 @@ namespace
  * Shared by every variation below so the differences between configs are the
  * only moving part.
  */
-void runSingleObjectStable(SushiTrack_Params params, const char* label)
+void runSingleObjectStable(sushitrack_params_t params, const char* label)
 {
-    SushiTrackHdl hdl = SushiTrack_Create(&params);
+    sushitrack_tracker_t hdl = sushitrack_create(&params);
     ASSERT_NE(hdl, nullptr) << "[" << label << "] tracker creation failed.";
 
-    std::vector<SushiTrack_Track> out(4);
+    std::vector<sushitrack_track_t> out(4);
 
-    SushiTrack_Object d0 = makeDet(100.0f, 200.0f);
-    int n0 = SushiTrack_Update(hdl, &d0, 1, out.data(), 4, 0.04f);
+    sushitrack_object_t d0 = makeDet(100.0f, 200.0f);
+    int n0 = sushitrack_update(hdl, &d0, 1, out.data(), 4, 0.04f);
     ASSERT_GE(n0, 1) << "[" << label << "] failed to seed a track.";
     const int64_t id = out[0].track_id;
 
@@ -52,23 +61,23 @@ void runSingleObjectStable(SushiTrack_Params params, const char* label)
         // Gentle curve: accelerating in x, sinusoidal-ish drift in y.
         const float x = 100.0f + 3.0f * k + 0.05f * k * k;
         const float y = 200.0f + 8.0f * std::sin(0.2f * k);
-        SushiTrack_Object d = makeDet(x, y);
-        int n = SushiTrack_Update(hdl, &d, 1, out.data(), 4, 0.04f);
+        sushitrack_object_t d = makeDet(x, y);
+        int n = sushitrack_update(hdl, &d, 1, out.data(), 4, 0.04f);
         ASSERT_GE(n, 1) << "[" << label << "] dropped the object at step " << k;
 
-        const SushiTrack_Track* t = findById(out, n, id);
+        const sushitrack_track_t* t = findById(out, n, id);
         ASSERT_NE(t, nullptr) << "[" << label << "] id churned at step " << k;
         EXPECT_EQ(t->state, kTracked) << "[" << label << "] left Tracked at step " << k;
         EXPECT_TRUE(geometryIsSane(*t)) << "[" << label << "] insane geometry at step " << k;
     }
 
-    SushiTrack_Destroy(hdl);
+    sushitrack_destroy(hdl);
 }
 
-SushiTrack_Params baseParams()
+sushitrack_params_t baseParams()
 {
-    SushiTrack_Params p{};
-    SushiTrack_GetDefaultParams(&p);
+    sushitrack_params_t p{};
+    sushitrack_get_default_params(&p);
     p.time_aware         = 0;
     p.enable_tentative   = 0;
     p.primary_assoc_mode = 1;
@@ -87,7 +96,7 @@ class IoUVariantTest : public ::testing::TestWithParam<int> {};
 
 TEST_P(IoUVariantTest, EachIoUVariantTracksSingleObjectStably)
 {
-    SushiTrack_Params p = baseParams();
+    sushitrack_params_t p = baseParams();
     p.iou_type = GetParam();
     runSingleObjectStable(p, "iou_type");
 }
@@ -103,15 +112,15 @@ INSTANTIATE_TEST_SUITE_P(AllVariants, IoUVariantTest,
  */
 TEST(CoordinateSystemTest, XyahModeHandlesAspectChange)
 {
-    SushiTrack_Params p = baseParams();
+    sushitrack_params_t p = baseParams();
     p.enable_xyah = 1;
 
-    SushiTrackHdl hdl = SushiTrack_Create(&p);
+    sushitrack_tracker_t hdl = sushitrack_create(&p);
     ASSERT_NE(hdl, nullptr);
 
-    std::vector<SushiTrack_Track> out(4);
-    SushiTrack_Object d0 = makeDet(100.0f, 200.0f, 0.9f, 50.0f, 100.0f);
-    int n0 = SushiTrack_Update(hdl, &d0, 1, out.data(), 4, 0.04f);
+    std::vector<sushitrack_track_t> out(4);
+    sushitrack_object_t d0 = makeDet(100.0f, 200.0f, 0.9f, 50.0f, 100.0f);
+    int n0 = sushitrack_update(hdl, &d0, 1, out.data(), 4, 0.04f);
     ASSERT_GE(n0, 1);
     const int64_t id = out[0].track_id;
 
@@ -120,15 +129,15 @@ TEST(CoordinateSystemTest, XyahModeHandlesAspectChange)
     {
         const float w = 50.0f + 1.5f * k;
         const float h = 100.0f + 2.0f * k;
-        SushiTrack_Object d = makeDet(100.0f + 3.0f * k, 200.0f, 0.9f, w, h);
-        int n = SushiTrack_Update(hdl, &d, 1, out.data(), 4, 0.04f);
+        sushitrack_object_t d = makeDet(100.0f + 3.0f * k, 200.0f, 0.9f, w, h);
+        int n = sushitrack_update(hdl, &d, 1, out.data(), 4, 0.04f);
         ASSERT_GE(n, 1);
-        const SushiTrack_Track* t = findById(out, n, id);
+        const sushitrack_track_t* t = findById(out, n, id);
         ASSERT_NE(t, nullptr) << "XYAH track churned at step " << k;
         EXPECT_TRUE(geometryIsSane(*t));
     }
 
-    SushiTrack_Destroy(hdl);
+    sushitrack_destroy(hdl);
 }
 
 // Kalman filter variant
@@ -140,16 +149,16 @@ TEST(CoordinateSystemTest, XyahModeHandlesAspectChange)
  */
 TEST(KalmanVariantTest, NsaFilterHandlesFluctuatingConfidence)
 {
-    SushiTrack_Params p = baseParams();
+    sushitrack_params_t p = baseParams();
     p.kalman_type  = 1;     // NSA
     p.track_thresh = 0.1f;  // keep mid/low scores in the primary pool
 
-    SushiTrackHdl hdl = SushiTrack_Create(&p);
+    sushitrack_tracker_t hdl = sushitrack_create(&p);
     ASSERT_NE(hdl, nullptr);
 
-    std::vector<SushiTrack_Track> out(4);
-    SushiTrack_Object d0 = makeDet(100.0f, 200.0f, 0.95f);
-    int n0 = SushiTrack_Update(hdl, &d0, 1, out.data(), 4, 0.04f);
+    std::vector<sushitrack_track_t> out(4);
+    sushitrack_object_t d0 = makeDet(100.0f, 200.0f, 0.95f);
+    int n0 = sushitrack_update(hdl, &d0, 1, out.data(), 4, 0.04f);
     ASSERT_GE(n0, 1);
     const int64_t id = out[0].track_id;
 
@@ -157,16 +166,16 @@ TEST(KalmanVariantTest, NsaFilterHandlesFluctuatingConfidence)
     int k = 1;
     for (float s : scores)
     {
-        SushiTrack_Object d = makeDet(100.0f + 4.0f * k, 200.0f + 1.0f * k, s);
-        int n = SushiTrack_Update(hdl, &d, 1, out.data(), 4, 0.04f);
+        sushitrack_object_t d = makeDet(100.0f + 4.0f * k, 200.0f + 1.0f * k, s);
+        int n = sushitrack_update(hdl, &d, 1, out.data(), 4, 0.04f);
         ASSERT_GE(n, 1);
-        const SushiTrack_Track* t = findById(out, n, id);
+        const sushitrack_track_t* t = findById(out, n, id);
         ASSERT_NE(t, nullptr) << "NSA track churned at step " << k << " (score " << s << ")";
         EXPECT_TRUE(geometryIsSane(*t));
         ++k;
     }
 
-    SushiTrack_Destroy(hdl);
+    sushitrack_destroy(hdl);
 }
 
 } // namespace

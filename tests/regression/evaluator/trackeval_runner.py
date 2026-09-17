@@ -1,11 +1,6 @@
-"""
-@file      trackeval_runner.py
-@brief     Programmatic interface to the official MOT Challenge evaluator (TrackEval).
-@author    Mustafa Garip (mustafagarip@sushisystems.io)
-@date      28.04.2026
-@version   v1.0.0
-@copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
-"""
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+"""Programmatic interface to the official MOT Challenge evaluator (TrackEval)."""
 
 import tempfile
 import shutil
@@ -14,7 +9,7 @@ from typing import Optional
 import sys
 
 _PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
-_3RDPARTY_TRACKEVAL = _PROJECT_ROOT / "3rdparty" / "TrackEval"
+_3RDPARTY_TRACKEVAL = _PROJECT_ROOT / "third_party" / "TrackEval"
 
 if _3RDPARTY_TRACKEVAL.exists() and str(_3RDPARTY_TRACKEVAL) not in sys.path:
     sys.path.insert(0, str(_3RDPARTY_TRACKEVAL))

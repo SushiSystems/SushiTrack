@@ -1,25 +1,30 @@
+/**************************************************************************/
+/* TestDuplicateSuppression.cpp                                           */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      TestDuplicateSuppression.cpp
- * @brief     End-to-end coverage of redundant-tracklet (duplicate) suppression.
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      23.06.2026
- * @version   v1.0.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
- *
- * Scope
- * -----
- * After every frame the tracker runs `removeDuplicateTracklets`, dropping a
- * track whose box nearly coincides (IoU > 1 - duplicate_iou_thresh, i.e. > 0.85
- * by default) with another, keeping the longer-lived one. This guards against
- * one physical object carrying two identities — the classic failure when a
- * second detection momentarily splits off, or a buffered Lost track lingers as a
- * ghost beside the live one. No end-to-end test exercises it; this file does,
- * purely through the C API.
- *
- * The contract is observable: a transient duplicate detection must not leave a
- * permanently duplicated identity. The track set converges back to a single
- * track, and at no point are two heavily overlapping tracks both reported as
- * Tracked once the suppressor has run.
+ * @file TestDuplicateSuppression.cpp
+ * @brief Integration tests for duplicate track suppression.
+ * @author Mustafa Garip
  */
 
 #include <gtest/gtest.h>
@@ -37,7 +42,7 @@ namespace
  * @brief IoU of two TLWH output tracks (inclusive of the +1 convention is
  *        unnecessary here — a coarse overlap measure suffices for the invariant).
  */
-float trackIoU(const SushiTrack_Track& a, const SushiTrack_Track& b)
+float trackIoU(const sushitrack_track_t& a, const sushitrack_track_t& b)
 {
     const float ax2 = a.x + a.width,  ay2 = a.y + a.height;
     const float bx2 = b.x + b.width,  by2 = b.y + b.height;
@@ -52,13 +57,13 @@ float trackIoU(const SushiTrack_Track& a, const SushiTrack_Track& b)
 /**
  * @brief Asserts no two simultaneously-Tracked output tracks overlap above 0.85.
  */
-void expectNoOverlappingTrackedPair(const std::vector<SushiTrack_Track>& out, int n)
+void expectNoOverlappingTrackedPair(const std::vector<sushitrack_track_t>& out, int n)
 {
     for (int i = 0; i < n; ++i)
         for (int j = i + 1; j < n; ++j)
         {
-            const SushiTrack_Track& a = out[static_cast<std::size_t>(i)];
-            const SushiTrack_Track& b = out[static_cast<std::size_t>(j)];
+            const sushitrack_track_t& a = out[static_cast<std::size_t>(i)];
+            const sushitrack_track_t& b = out[static_cast<std::size_t>(j)];
             if (a.state == kTracked && b.state == kTracked)
                 EXPECT_LE(trackIoU(a, b), 0.85f)
                     << "Two Tracked tracks (" << a.track_id << ", " << b.track_id
@@ -73,12 +78,12 @@ void expectNoOverlappingTrackedPair(const std::vector<SushiTrack_Track>& out, in
 class DuplicateSuppressionTest : public ::testing::Test
 {
 protected:
-    SushiTrackHdl     hdl_    = nullptr;
-    SushiTrack_Params params_ = {};
+    sushitrack_tracker_t     hdl_    = nullptr;
+    sushitrack_params_t params_ = {};
 
     void SetUp() override
     {
-        SushiTrack_GetDefaultParams(&params_);
+        sushitrack_get_default_params(&params_);
         params_.time_aware           = 0;
         params_.enable_tentative     = 0;
         params_.primary_assoc_mode   = 1;
@@ -89,11 +94,11 @@ protected:
         params_.match_thresh         = 0.9f;
         params_.duplicate_iou_thresh = 0.15f;   // suppress when IoU > 0.85
 
-        hdl_ = SushiTrack_Create(&params_);
+        hdl_ = sushitrack_create(&params_);
         ASSERT_NE(hdl_, nullptr);
     }
 
-    void TearDown() override { if (hdl_) SushiTrack_Destroy(hdl_); }
+    void TearDown() override { if (hdl_) sushitrack_destroy(hdl_); }
 };
 
 /**
@@ -103,23 +108,23 @@ protected:
  */
 TEST_F(DuplicateSuppressionTest, TransientDuplicateCollapsesToSingleIdentity)
 {
-    std::vector<SushiTrack_Track> out(8);
+    std::vector<sushitrack_track_t> out(8);
 
     // Confirm a single, long-lived track at a fixed location
     for (int i = 0; i < 6; ++i)
     {
-        SushiTrack_Object d = makeDet(100.0f, 200.0f);
-        int n = SushiTrack_Update(hdl_, &d, 1, out.data(), 8, 0.04f);
+        sushitrack_object_t d = makeDet(100.0f, 200.0f);
+        int n = sushitrack_update(hdl_, &d, 1, out.data(), 8, 0.04f);
         ASSERT_GE(n, 1);
         expectNoOverlappingTrackedPair(out, n);
     }
 
     // One frame with a near-coincident twin (IoU ~0.89). The extra high-confidence detection seeds a second, younger track.
     {
-        SushiTrack_Object d1 = makeDet(100.0f, 200.0f);
-        SushiTrack_Object d2 = makeDet(103.0f, 200.0f);   // 3 px offset -> IoU > 0.85
-        SushiTrack_Object dets[2] = { d1, d2 };
-        int n = SushiTrack_Update(hdl_, dets, 2, out.data(), 8, 0.04f);
+        sushitrack_object_t d1 = makeDet(100.0f, 200.0f);
+        sushitrack_object_t d2 = makeDet(103.0f, 200.0f);   // 3 px offset -> IoU > 0.85
+        sushitrack_object_t dets[2] = { d1, d2 };
+        int n = sushitrack_update(hdl_, dets, 2, out.data(), 8, 0.04f);
         ASSERT_GE(n, 1);
     }
 
@@ -127,8 +132,8 @@ TEST_F(DuplicateSuppressionTest, TransientDuplicateCollapsesToSingleIdentity)
     int final_tracked = 0;
     for (int i = 0; i < 4; ++i)
     {
-        SushiTrack_Object d = makeDet(100.0f, 200.0f);
-        int n = SushiTrack_Update(hdl_, &d, 1, out.data(), 8, 0.04f);
+        sushitrack_object_t d = makeDet(100.0f, 200.0f);
+        int n = sushitrack_update(hdl_, &d, 1, out.data(), 8, 0.04f);
         ASSERT_GE(n, 1);
         expectNoOverlappingTrackedPair(out, n);
         final_tracked = countTracked(out, n);
@@ -145,20 +150,20 @@ TEST_F(DuplicateSuppressionTest, TransientDuplicateCollapsesToSingleIdentity)
  */
 TEST_F(DuplicateSuppressionTest, CoincidentDetectionsDoNotEstablishTwinIdentities)
 {
-    std::vector<SushiTrack_Track> out(8);
+    std::vector<sushitrack_track_t> out(8);
 
     // Seed with two near-identical detections, then feed a single detection.
-    SushiTrack_Object s1 = makeDet(250.0f, 250.0f);
-    SushiTrack_Object s2 = makeDet(253.0f, 250.0f);
-    SushiTrack_Object seed[2] = { s1, s2 };
-    int n0 = SushiTrack_Update(hdl_, seed, 2, out.data(), 8, 0.04f);
+    sushitrack_object_t s1 = makeDet(250.0f, 250.0f);
+    sushitrack_object_t s2 = makeDet(253.0f, 250.0f);
+    sushitrack_object_t seed[2] = { s1, s2 };
+    int n0 = sushitrack_update(hdl_, seed, 2, out.data(), 8, 0.04f);
     ASSERT_GE(n0, 1);
 
     int final_tracked = 0;
     for (int i = 0; i < 6; ++i)
     {
-        SushiTrack_Object d = makeDet(250.0f, 250.0f);
-        int n = SushiTrack_Update(hdl_, &d, 1, out.data(), 8, 0.04f);
+        sushitrack_object_t d = makeDet(250.0f, 250.0f);
+        int n = sushitrack_update(hdl_, &d, 1, out.data(), 8, 0.04f);
         ASSERT_GE(n, 1);
         expectNoOverlappingTrackedPair(out, n);
         final_tracked = countTracked(out, n);

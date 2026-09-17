@@ -23,7 +23,17 @@ Thumbs.db
 
 # Docker files
 Dockerfile
+Dockerfile.cli
 .dockerignore
+
+# Package and docs build outputs
+package/
+docs/html/
+
+# Worktrees and scratch
+.worktrees/
+worktrees/
+.superpowers/
 
 # Data
 tests/regression/evaluator/data/*/pred/

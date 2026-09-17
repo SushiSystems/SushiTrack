@@ -1,35 +1,36 @@
+/**************************************************************************/
+/* TestKalmanFilter.cpp                                                   */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      test_kalman_filter.cpp
- * @brief     Unit tests for KalmanFilter and NSAKalmanFilter.
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      12.05.2026
- * @version   v1.0.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
- *
- * Coverage
- * --------
- * - initiate(): mean block matches measurement, velocity block is zero.
- * - initiate(): covariance is diagonal and positive.
- * - predict(): position shifts by velocity * dt.
- * - predict(): covariance grows (uncertainty increases).
- * - update(): mean moves toward measurement after correction.
- * - update(): covariance shrinks (uncertainty decreases).
- * - isInGate(): observation at predicted mean passes chi-squared gate.
- * - isInGate(): observation far from mean fails chi-squared gate.
- * - getGateFlags(): batch version agrees with scalar isInGate.
- * - setNoiseMultipliers(): predict covariance growth is proportional to multipliers.
- * - NSAKalmanFilter initiate() sets a valid non-zero covariance.
- * - XYAH coordinate mode: initiate mean matches [cx, cy, aspect, height].
- * - predict(): multi-step integration for dt > 1.
- * - XYAH mode: numerical stability during predict-update cycles.
- * - NSAKalmanFilter update(): score=0 does not result in negative covariance.
- * - update(): covariance remains symmetric.
+ * @file TestKalmanFilter.cpp
+ * @brief Unit tests for Kalman filter motion prediction.
+ * @author Mustafa Garip
  */
 
 #include <gtest/gtest.h>
-#include "SushiTrack/KalmanFilter.h"
-#include "SushiTrack/NSAKalmanFilter.h"
-#include "SushiTrack/KalmanTypes.h"
+#include <SushiTrack/kalman_filter.hpp>
+#include <SushiTrack/nsa_kalman_filter.hpp>
+#include <SushiTrack/kalman_types.hpp>
 
 #include <Eigen/Dense>
 #include <cmath>

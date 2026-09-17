@@ -1,32 +1,37 @@
+/**************************************************************************/
+/* Helpers.h                                                              */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      Helpers.h
- * @brief     Shared fixtures and helpers for the end-to-end integration suite.
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      15.06.2026
- * @version   v1.0.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
- *
- * These helpers drive the tracker exclusively through the public C API
- * (SushiTrackC.h), exactly as a downstream FFI consumer would. They are kept
- * header-only and inline so each translation unit in the integration target can
- * include them without an extra link dependency.
- *
- * Assertion philosophy
- * --------------------
- * Integration assertions check *observable contract* and *structural
- * invariants* — identity persistence, lifecycle state, output capacity,
- * finiteness — not the exact filtered geometry. The Kalman filter deliberately
- * blends prediction with measurement, so the reported box lags a raw detection
- * by (1 - K) * innovation; asserting equality with the raw detection coordinate
- * tests "did the filter ignore its own prediction", which is never the property
- * under test. Where position matters, prefer "is the track on the correct side"
- * (closer to A than B) over "equals A".
+ * @file Helpers.h
+ * @brief Provides test fixture helpers and synthetic data generators.
+ * @author Mustafa Garip
  */
+
 
 #ifndef SUSHITRACK_INTEGRATION_HELPERS_H
 #define SUSHITRACK_INTEGRATION_HELPERS_H
 
-#include "SushiTrackC.h"
+#include <SushiTrack/sushitrack_c.h>
 
 #include <cmath>
 #include <cstddef>
@@ -35,7 +40,7 @@
 namespace sushitrack_it
 {
 
-/** @brief Track lifecycle states as reported in SushiTrack_Track::state. */
+/** @brief Track lifecycle states as reported in sushitrack_track_t::state. */
 enum TrackStateCode
 {
     kNew       = 0,
@@ -47,17 +52,15 @@ enum TrackStateCode
 
 /**
  * @brief Constructs a benign detection without an appearance feature.
- *
- * Defaults model a pedestrian-sized box (50x100) at high confidence.
  */
-inline SushiTrack_Object makeDet(float x,
-                                float y,
-                                float score  = 0.9f,
-                                float width  = 50.0f,
-                                float height = 100.0f,
-                                int   label  = 1)
+inline sushitrack_object_t makeDet(float x,
+                                   float y,
+                                   float score  = 0.9f,
+                                   float width  = 50.0f,
+                                   float height = 100.0f,
+                                   int   label  = 1)
 {
-    SushiTrack_Object o{};
+    sushitrack_object_t o{};
     o.x        = x;
     o.y        = y;
     o.width    = width;
@@ -71,17 +74,16 @@ inline SushiTrack_Object makeDet(float x,
 
 /**
  * @brief Constructs a detection backed by an external feature pointer.
- *        The caller owns the feature memory; it must outlive the Update call.
  */
-inline SushiTrack_Object makeDetWithFeat(float        x,
-                                        float        y,
-                                        const float* feat,
-                                        int          feat_dim,
-                                        float        score  = 0.9f,
-                                        float        width  = 50.0f,
-                                        float        height = 100.0f)
+inline sushitrack_object_t makeDetWithFeat(float        x,
+                                           float        y,
+                                           const float* feat,
+                                           int          feat_dim,
+                                           float        score  = 0.9f,
+                                           float        width  = 50.0f,
+                                           float        height = 100.0f)
 {
-    SushiTrack_Object o = makeDet(x, y, score, width, height);
+    sushitrack_object_t o = makeDet(x, y, score, width, height);
     o.feat             = feat;
     o.feat_dim         = feat_dim;
     return o;
@@ -89,11 +91,10 @@ inline SushiTrack_Object makeDetWithFeat(float        x,
 
 /**
  * @brief Locates a track in an output buffer by its persistent ID.
- * @return Pointer into @p out for the matching track, or nullptr.
  */
-inline const SushiTrack_Track* findById(const std::vector<SushiTrack_Track>& out,
-                                       int                                 n,
-                                       int64_t                             id)
+inline const sushitrack_track_t* findById(const std::vector<sushitrack_track_t>& out,
+                                          int                                    n,
+                                          int64_t                                id)
 {
     for (int i = 0; i < n; ++i)
         if (out[static_cast<std::size_t>(i)].track_id == id)
@@ -102,11 +103,9 @@ inline const SushiTrack_Track* findById(const std::vector<SushiTrack_Track>& out
 }
 
 /**
- * @brief Returns true when every geometric field of @p t is finite and the
- *        box has strictly positive extent. The single invariant every track
- *        must satisfy on every frame regardless of configuration.
+ * @brief Checks whether geometric fields of track are finite with positive extent.
  */
-inline bool geometryIsSane(const SushiTrack_Track& t)
+inline bool geometryIsSane(const sushitrack_track_t& t)
 {
     return std::isfinite(t.x) && std::isfinite(t.y) &&
            std::isfinite(t.width) && std::isfinite(t.height) &&
@@ -116,7 +115,7 @@ inline bool geometryIsSane(const SushiTrack_Track& t)
 /**
  * @brief Counts tracks in the output that currently report the Tracked state.
  */
-inline int countTracked(const std::vector<SushiTrack_Track>& out, int n)
+inline int countTracked(const std::vector<sushitrack_track_t>& out, int n)
 {
     int c = 0;
     for (int i = 0; i < n; ++i)
@@ -126,11 +125,7 @@ inline int countTracked(const std::vector<SushiTrack_Track>& out, int n)
 }
 
 /**
- * @brief Builds an L2-distinct one-hot feature vector along @p axis.
- *
- * Two vectors produced with different axes are exactly orthogonal, so their
- * cosine similarity is zero — the cleanest possible appearance separation for
- * a ReID test.
+ * @brief Builds an L2-distinct one-hot feature vector along specified axis.
  */
 inline std::vector<float> oneHotFeature(int dim, int axis, float magnitude = 1.0f)
 {

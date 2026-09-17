@@ -1,29 +1,34 @@
+/**************************************************************************/
+/* TestTimingPolicies.cpp                                                 */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      TestTimingPolicies.cpp
- * @brief     Unit tests for FrameTimingPolicy and WallClockTimingPolicy.
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      12.05.2026
- * @version   v1.0.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
- *
- * Coverage
- * --------
- * FrameTimingPolicy
- *   - toKfDt() always returns 1.0 regardless of input.
- *   - isExpired() returns false when frame_count <= buffer_frames.
- *   - isExpired() returns true when frame_count > buffer_frames.
- *
- * WallClockTimingPolicy
- *   - toKfDt() converts real dt=1/fps to exactly 1.0.
- *   - toKfDt() clips output at MAX_KF_DT_STEPS (5.0).
- *   - toKfDt() snaps values within 1e-4 of 1.0 to exactly 1.0.
- *   - isExpired() returns false when accumulated < timeout.
- *   - isExpired() returns true when accumulated > timeout.
- *   - fps=0 is clamped to fps=1 (no division-by-zero).
+ * @file TestTimingPolicies.cpp
+ * @brief Unit tests for frame and wall-clock timing policies.
+ * @author Mustafa Garip
  */
 
 #include <gtest/gtest.h>
-#include "SushiTrack/TimingPolicies.h"
+#include <SushiTrack/timing_policies.hpp>
 
 using namespace SushiTrack;
 
@@ -183,8 +188,8 @@ TEST(WallClockTimingPolicyTest, NegativeDtProducesNonPositiveKfDt)
 TEST(WallClockTimingPolicyTest, ExactCapBoundaryReturnsCap)
 {
     WallClockTimingPolicy p(25);
-    float dt_at_cap = MAX_KF_DT_STEPS / 25.f;
-    EXPECT_FLOAT_EQ(p.toKfDt(dt_at_cap), MAX_KF_DT_STEPS);
+    float dt_at_cap = kMaxKfDtSteps / 25.f;
+    EXPECT_FLOAT_EQ(p.toKfDt(dt_at_cap), kMaxKfDtSteps);
 }
 
 /**

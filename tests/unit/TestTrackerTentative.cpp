@@ -1,37 +1,34 @@
+/**************************************************************************/
+/* TestTrackerTentative.cpp                                               */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      TestTrackerTentative.cpp
- * @brief     Tracker-level tests for tentative track age-out, promotion, and disable logic.
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      12.05.2026
- * @version   v1.1.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
- *
- * Coverage
- * --------
- * TrackerTentativeTest (time_aware=1, tentative_confirm_hits=3, max_age=0.08 s)
- *   - Tentative track ages out on the wall-clock seconds budget in time-aware mode.
- *   - Tentative track is promoted to Tracked after the required hit count.
- *   - Re-association after a miss resets lost_time to zero and increments hits.
- *   - A miss landing exactly on the seconds budget does not expire the track.
- *   - Two simultaneous tentative tracks evolve independently per frame.
- *   - A promoted Tracked track persists with the same ID on subsequent frames.
- *
- * TrackerTentativeFrameBudgetTest (time_aware=0, max_miss_frames=2)
- *   - Tentative track ages out on a fixed missed-frame budget, independent of dt.
- *
- * TrackerTentativeInitSuppressTest (tentative_init_suppress_iou)
- *   - A detection overlapping a confirmed track does not spawn a new tentative.
- *   - Control: with the gate disabled the overlapping detection inits a tentative.
- *
- * TrackerTentativeDisabledTest (enable_tentative=0)
- *   - A new detection immediately produces a Tracked, confirmed track.
- *
- * Tracking state integers map to SushiTrack::TrackState:
- *   Tracked=1, Lost=2, Removed=3, Tentative=4
+ * @file TestTrackerTentative.cpp
+ * @brief Unit tests for tentative track lifecycle validation.
+ * @author Mustafa Garip
  */
 
 #include <gtest/gtest.h>
-#include "SushiTrackC.h"
+#include <SushiTrack/sushitrack_c.h>
 #include <vector>
 
 // TrackerTentativeTest
@@ -47,12 +44,12 @@
 class TrackerTentativeTest : public ::testing::Test
 {
 protected:
-    SushiTrackHdl     hdl_    = nullptr;
-    SushiTrack_Params params_ = {};
+    sushitrack_tracker_t     hdl_    = nullptr;
+    sushitrack_params_t params_ = {};
 
     void SetUp() override
     {
-        SushiTrack_GetDefaultParams(&params_);
+        sushitrack_get_default_params(&params_);
         params_.time_aware                = 1;
         params_.enable_tentative          = 1;
         params_.tentative_confirm_hits    = 3;
@@ -64,16 +61,16 @@ protected:
         params_.high_thresh               = 0.2f;
         params_.tentative_fast_thresh     = 1.0f;
 
-        hdl_ = SushiTrack_Create(&params_);
+        hdl_ = sushitrack_create(&params_);
         ASSERT_NE(hdl_, nullptr);
     }
 
-    void TearDown() override { SushiTrack_Destroy(hdl_); }
+    void TearDown() override { sushitrack_destroy(hdl_); }
 
     /** @brief Returns a detection with the given top-left position. */
-    SushiTrack_Object det(float x, float y) const
+    sushitrack_object_t det(float x, float y) const
     {
-        SushiTrack_Object o{};
+        sushitrack_object_t o{};
         o.x = x; o.y = y;
         o.width = 50.0f; o.height = 100.0f;
         o.score = 0.9f;  o.label  = 1;
@@ -87,29 +84,24 @@ protected:
  * Under the fixture's time_aware=1, age-out tracks real elapsed time: each missed frame
  * adds its dt to lost_time and removal happens once it exceeds tentative_max_age_seconds.
  * The larger dt on the second miss is what tips it past 0.08 s, so removal occurs after
- * two missed frames rather than at a fixed frame count.
- *
- * Frame 1 — detection creates a Tentative track.
- * Frame 2 — missed (dt=0.04): lost_time=0.04 s, within budget, stays Tentative.
- * Frame 3 — missed (dt=0.05): lost_time=0.09 s exceeds 0.08 s, track becomes Removed.
  */
 TEST_F(TrackerTentativeTest, AgesOutViaSecondsBudgetWhenTimeAware)
 {
-    std::vector<SushiTrack_Track> out(10);
-    SushiTrack_Object d0 = det(100.0f, 200.0f);
+    std::vector<sushitrack_track_t> out(10);
+    sushitrack_object_t d0 = det(100.0f, 200.0f);
 
-    int n = SushiTrack_Update(hdl_, &d0, 1, out.data(), 10, 0.04f);
+    int n = sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state,        4);
     EXPECT_EQ(out[0].is_confirmed, 0);
     EXPECT_EQ(out[0].hits,         1);
 
-    n = SushiTrack_Update(hdl_, nullptr, 0, out.data(), 10, 0.04f); // lost_time 0.04
+    n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f); // lost_time 0.04
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 4);
     EXPECT_FLOAT_EQ(out[0].lost_time, 0.04f);
 
-    n = SushiTrack_Update(hdl_, nullptr, 0, out.data(), 10, 0.05f); // lost_time 0.09 > 0.08
+    n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.05f); // lost_time 0.09 > 0.08
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 3);
     EXPECT_FLOAT_EQ(out[0].lost_time, 0.09f);
@@ -121,16 +113,11 @@ TEST_F(TrackerTentativeTest, AgesOutViaSecondsBudgetWhenTimeAware)
  * With time_aware=0 the per-frame dt is ignored (effective_dt = 1/frame_rate) and age-out
  * uses tentative_max_miss_frames=2, so strictness is constant regardless of frame rate.
  * The varying dt passed to Update has no effect on the outcome; removal happens on the
- * third consecutive miss (the budget tolerates two).
- *
- * Frame 1 — detection creates a Tentative track.
- * Frames 2,3 — 1st and 2nd misses are tolerated, state stays Tentative.
- * Frame 4 — 3rd miss exceeds the 2-frame budget, track becomes Removed.
  */
 TEST(TrackerTentativeFrameBudgetTest, AgesOutViaFrameBudgetWhenFrameAware)
 {
-    SushiTrack_Params params = {};
-    SushiTrack_GetDefaultParams(&params);
+    sushitrack_params_t params = {};
+    sushitrack_get_default_params(&params);
     params.time_aware                = 0;
     params.enable_tentative          = 1;
     params.tentative_confirm_hits    = 3;
@@ -141,30 +128,30 @@ TEST(TrackerTentativeFrameBudgetTest, AgesOutViaFrameBudgetWhenFrameAware)
     params.high_thresh               = 0.2f;
     params.tentative_fast_thresh     = 1.0f;
 
-    SushiTrackHdl hdl = SushiTrack_Create(&params);
+    sushitrack_tracker_t hdl = sushitrack_create(&params);
     ASSERT_NE(hdl, nullptr);
 
-    std::vector<SushiTrack_Track> out(10);
-    SushiTrack_Object o{};
+    std::vector<sushitrack_track_t> out(10);
+    sushitrack_object_t o{};
     o.x = 100.0f; o.y = 200.0f; o.width = 50.0f; o.height = 100.0f; o.score = 0.9f; o.label = 1;
 
-    int n = SushiTrack_Update(hdl, &o, 1, out.data(), 10, 0.04f);
+    int n = sushitrack_update(hdl, &o, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 4);
 
-    n = SushiTrack_Update(hdl, nullptr, 0, out.data(), 10, 0.05f); // 1st miss, dt ignored
+    n = sushitrack_update(hdl, nullptr, 0, out.data(), 10, 0.05f); // 1st miss, dt ignored
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 4);
 
-    n = SushiTrack_Update(hdl, nullptr, 0, out.data(), 10, 0.50f); // 2nd miss, dt ignored
+    n = sushitrack_update(hdl, nullptr, 0, out.data(), 10, 0.50f); // 2nd miss, dt ignored
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 4);
 
-    n = SushiTrack_Update(hdl, nullptr, 0, out.data(), 10, 0.01f); // 3rd miss, removed
+    n = sushitrack_update(hdl, nullptr, 0, out.data(), 10, 0.01f); // 3rd miss, removed
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 3);
 
-    SushiTrack_Destroy(hdl);
+    sushitrack_destroy(hdl);
 }
 
 /**
@@ -175,12 +162,12 @@ TEST(TrackerTentativeFrameBudgetTest, AgesOutViaFrameBudgetWhenFrameAware)
  */
 TEST_F(TrackerTentativeTest, PromotedToTrackedAtHitThreshold)
 {
-    std::vector<SushiTrack_Track> out(10);
+    std::vector<sushitrack_track_t> out(10);
 
-    SushiTrack_Update(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
-    SushiTrack_Update(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
+    sushitrack_update(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
+    sushitrack_update(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
 
-    int n = SushiTrack_Update(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
+    int n = sushitrack_update(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state,        1);
     EXPECT_EQ(out[0].is_confirmed, 1);
@@ -197,21 +184,21 @@ TEST_F(TrackerTentativeTest, PromotedToTrackedAtHitThreshold)
  */
 TEST_F(TrackerTentativeTest, PartialHitSequenceResetsLostTimeOnMatch)
 {
-    std::vector<SushiTrack_Track> out(10);
-    SushiTrack_Object d0 = det(100.0f, 200.0f);
+    std::vector<sushitrack_track_t> out(10);
+    sushitrack_object_t d0 = det(100.0f, 200.0f);
 
-    int n = SushiTrack_Update(hdl_, &d0, 1, out.data(), 10, 0.04f);
+    int n = sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 4);
     EXPECT_EQ(out[0].hits,  1);
     EXPECT_FLOAT_EQ(out[0].lost_time, 0.0f);
 
-    n = SushiTrack_Update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 4);
     EXPECT_FLOAT_EQ(out[0].lost_time, 0.04f);
 
-    n = SushiTrack_Update(hdl_, &d0, 1, out.data(), 10, 0.04f);
+    n = sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 4);
     EXPECT_EQ(out[0].hits,  2);
@@ -224,17 +211,15 @@ TEST_F(TrackerTentativeTest, PartialHitSequenceResetsLostTimeOnMatch)
  * Under time_aware=1 the boundary is exclusive: lost_time reaching tentative_max_age_seconds
  * (0.08 s) exactly keeps the track, which must remain non-Tracked rather than be removed.
  *
- * Frame 1 — detection creates a Tentative track.
- * Frame 2 — no detection (dt=0.08): lost_time hits the 0.08 s boundary, track survives.
  */
 TEST_F(TrackerTentativeTest, SingleMissDoesNotExpire)
 {
-    std::vector<SushiTrack_Track> out(10);
-    SushiTrack_Object d0 = det(100.0f, 200.0f);
+    std::vector<sushitrack_track_t> out(10);
+    sushitrack_object_t d0 = det(100.0f, 200.0f);
 
-    SushiTrack_Update(hdl_, &d0, 1, out.data(), 10, 0.04f);
+    sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
 
-    int n = SushiTrack_Update(hdl_, nullptr, 0, out.data(), 10, 0.08f);
+    int n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.08f);
     ASSERT_EQ(n, 1);
     EXPECT_NE(out[0].state, 1);
     EXPECT_FLOAT_EQ(out[0].lost_time, 0.08f);
@@ -249,17 +234,17 @@ TEST_F(TrackerTentativeTest, SingleMissDoesNotExpire)
  */
 TEST_F(TrackerTentativeTest, TwoSimultaneousTentativeTracksIndependent)
 {
-    std::vector<SushiTrack_Track> out(10);
+    std::vector<sushitrack_track_t> out(10);
 
-    SushiTrack_Object both[2];
+    sushitrack_object_t both[2];
     both[0] = det(100.0f, 200.0f);
     both[1] = det(700.0f, 500.0f);
 
-    int n = SushiTrack_Update(hdl_, both, 2, out.data(), 10, 0.04f);
+    int n = sushitrack_update(hdl_, both, 2, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 2);
 
-    SushiTrack_Object first = det(100.0f, 200.0f);
-    n = SushiTrack_Update(hdl_, &first, 1, out.data(), 10, 0.04f);
+    sushitrack_object_t first = det(100.0f, 200.0f);
+    n = sushitrack_update(hdl_, &first, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 2);
 
     int hits2_count      = 0;
@@ -281,16 +266,16 @@ TEST_F(TrackerTentativeTest, TwoSimultaneousTentativeTracksIndependent)
  */
 TEST_F(TrackerTentativeTest, TentativePromotedTrackPersistsAfterPromotion)
 {
-    std::vector<SushiTrack_Track> out(10);
+    std::vector<sushitrack_track_t> out(10);
 
-    SushiTrack_Update(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
-    SushiTrack_Update(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
-    int n = SushiTrack_Update(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
+    sushitrack_update(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
+    sushitrack_update(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
+    int n = sushitrack_update(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 1);
     int64_t promoted_id = out[0].track_id;
 
-    n = SushiTrack_Update(hdl_, &det(106.0f, 206.0f), 1, out.data(), 10, 0.04f);
+    n = sushitrack_update(hdl_, &det(106.0f, 206.0f), 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].track_id, promoted_id);
     EXPECT_EQ(out[0].state,    1);
@@ -302,10 +287,10 @@ TEST_F(TrackerTentativeTest, TentativePromotedTrackPersistsAfterPromotion)
 namespace
 {
     /** @brief Builds params with tentative enabled and the given init-suppression IoU. */
-    SushiTrack_Params suppressParams(float suppress_iou)
+    sushitrack_params_t suppressParams(float suppress_iou)
     {
-        SushiTrack_Params p = {};
-        SushiTrack_GetDefaultParams(&p);
+        sushitrack_params_t p = {};
+        sushitrack_get_default_params(&p);
         p.time_aware                 = 1;
         p.enable_tentative           = 1;
         p.tentative_confirm_hits     = 3;
@@ -319,19 +304,19 @@ namespace
     }
 
     /** @brief A 50x100 detection at (x, y) with score 0.9. */
-    SushiTrack_Object obj(float x, float y)
+    sushitrack_object_t obj(float x, float y)
     {
-        SushiTrack_Object o{};
+        sushitrack_object_t o{};
         o.x = x; o.y = y; o.width = 50.0f; o.height = 100.0f; o.score = 0.9f; o.label = 1;
         return o;
     }
 
     /** @brief Confirms a single track over three matched frames at (100,200)->(104,204). */
-    void confirmTrack(SushiTrackHdl hdl, std::vector<SushiTrack_Track>& out)
+    void confirmTrack(sushitrack_tracker_t hdl, std::vector<sushitrack_track_t>& out)
     {
-        SushiTrack_Update(hdl, &obj(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
-        SushiTrack_Update(hdl, &obj(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
-        int n = SushiTrack_Update(hdl, &obj(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
+        sushitrack_update(hdl, &obj(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
+        sushitrack_update(hdl, &obj(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
+        int n = sushitrack_update(hdl, &obj(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
         ASSERT_EQ(n, 1);
         ASSERT_EQ(out[0].state, 1);
     }
@@ -347,19 +332,19 @@ namespace
  */
 TEST(TrackerTentativeInitSuppressTest, OverlappingDetectionDoesNotInitNewTentative)
 {
-    SushiTrack_Params params = suppressParams(0.7f);
-    SushiTrackHdl hdl = SushiTrack_Create(&params);
+    sushitrack_params_t params = suppressParams(0.7f);
+    sushitrack_tracker_t hdl = sushitrack_create(&params);
     ASSERT_NE(hdl, nullptr);
 
-    std::vector<SushiTrack_Track> out(10);
+    std::vector<sushitrack_track_t> out(10);
     confirmTrack(hdl, out);
 
-    SushiTrack_Object pair[2] = { obj(106.0f, 206.0f), obj(111.0f, 206.0f) };
-    int n = SushiTrack_Update(hdl, pair, 2, out.data(), 10, 0.04f);
+    sushitrack_object_t pair[2] = { obj(106.0f, 206.0f), obj(111.0f, 206.0f) };
+    int n = sushitrack_update(hdl, pair, 2, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 1);
 
-    SushiTrack_Destroy(hdl);
+    sushitrack_destroy(hdl);
 }
 
 /**
@@ -372,15 +357,15 @@ TEST(TrackerTentativeInitSuppressTest, OverlappingDetectionDoesNotInitNewTentati
  */
 TEST(TrackerTentativeInitSuppressTest, OverlappingDetectionInitsTentativeWhenGateDisabled)
 {
-    SushiTrack_Params params = suppressParams(2.0f);
-    SushiTrackHdl hdl = SushiTrack_Create(&params);
+    sushitrack_params_t params = suppressParams(2.0f);
+    sushitrack_tracker_t hdl = sushitrack_create(&params);
     ASSERT_NE(hdl, nullptr);
 
-    std::vector<SushiTrack_Track> out(10);
+    std::vector<sushitrack_track_t> out(10);
     confirmTrack(hdl, out);
 
-    SushiTrack_Object pair[2] = { obj(106.0f, 206.0f), obj(111.0f, 206.0f) };
-    int n = SushiTrack_Update(hdl, pair, 2, out.data(), 10, 0.04f);
+    sushitrack_object_t pair[2] = { obj(106.0f, 206.0f), obj(111.0f, 206.0f) };
+    int n = sushitrack_update(hdl, pair, 2, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 2);
 
     int confirmed = 0, tentative = 0;
@@ -392,7 +377,7 @@ TEST(TrackerTentativeInitSuppressTest, OverlappingDetectionInitsTentativeWhenGat
     EXPECT_EQ(confirmed, 1);
     EXPECT_EQ(tentative, 1);
 
-    SushiTrack_Destroy(hdl);
+    sushitrack_destroy(hdl);
 }
 
 // TrackerTentativeDisabledTest — enable_tentative=0
@@ -406,12 +391,12 @@ TEST(TrackerTentativeInitSuppressTest, OverlappingDetectionInitsTentativeWhenGat
 class TrackerTentativeDisabledTest : public ::testing::Test
 {
 protected:
-    SushiTrackHdl     hdl_    = nullptr;
-    SushiTrack_Params params_ = {};
+    sushitrack_tracker_t     hdl_    = nullptr;
+    sushitrack_params_t params_ = {};
 
     void SetUp() override
     {
-        SushiTrack_GetDefaultParams(&params_);
+        sushitrack_get_default_params(&params_);
         params_.time_aware                = 1;
         params_.enable_tentative          = 0;
         params_.tentative_confirm_hits    = 3;
@@ -422,16 +407,16 @@ protected:
         params_.track_thresh              = 0.1f;
         params_.high_thresh               = 0.2f;
 
-        hdl_ = SushiTrack_Create(&params_);
+        hdl_ = sushitrack_create(&params_);
         ASSERT_NE(hdl_, nullptr);
     }
 
-    void TearDown() override { SushiTrack_Destroy(hdl_); }
+    void TearDown() override { sushitrack_destroy(hdl_); }
 
     /** @brief Returns a detection at the given top-left position. */
-    SushiTrack_Object det(float x, float y) const
+    sushitrack_object_t det(float x, float y) const
     {
-        SushiTrack_Object o{};
+        sushitrack_object_t o{};
         o.x = x; o.y = y;
         o.width = 50.0f; o.height = 100.0f;
         o.score = 0.9f;  o.label  = 1;
@@ -445,10 +430,10 @@ protected:
  */
 TEST_F(TrackerTentativeDisabledTest, WithTentativeDisabledNewTrackIsImmediatelyTracked)
 {
-    std::vector<SushiTrack_Track> out(10);
-    SushiTrack_Object d0 = det(100.0f, 200.0f);
+    std::vector<sushitrack_track_t> out(10);
+    sushitrack_object_t d0 = det(100.0f, 200.0f);
 
-    int n = SushiTrack_Update(hdl_, &d0, 1, out.data(), 10, 0.04f);
+    int n = sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state,        1);
     EXPECT_EQ(out[0].is_confirmed, 1);

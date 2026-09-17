@@ -1,20 +1,30 @@
+/**************************************************************************/
+/* TestObservationMomentum.cpp                                            */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      TestObservationMomentum.cpp
- * @brief     End-to-end coverage of the observation-centric momentum (OCM) path.
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      24.06.2026
- * @version   v1.0.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
- *
- * Scope
- * -----
- * The momentum decorator is unit-tested in isolation against a stub cost; this
- * file exercises it through the public C API with enable_ocm=1, driving real
- * Kalman-estimated motion so the IMM regime gate (momentum applies only while a
- * track is Cruising) is genuinely in the loop. The assertions check observable
- * contract — identity persistence, output sanity, and that the term stays inert
- * exactly where it is gated off — rather than a metric delta, which belongs to
- * the regression harness.
+ * @file TestObservationMomentum.cpp
+ * @brief Integration tests for observation-centric momentum.
+ * @author Mustafa Garip
  */
 
 #include <gtest/gtest.h>
@@ -31,10 +41,10 @@ namespace
 {
 
 /** @brief Builds a tracker on the IMM regime path with OCM toggled by @p ocm. */
-inline SushiTrackHdl buildHdl(int ocm)
+inline sushitrack_tracker_t buildHdl(int ocm)
 {
-    SushiTrack_Params p = {};
-    SushiTrack_GetDefaultParams(&p);
+    sushitrack_params_t p = {};
+    sushitrack_get_default_params(&p);
     p.time_aware         = 0;
     p.enable_tentative   = 0;
     p.kalman_type        = 2;   // IMM provides the motion regime
@@ -45,7 +55,7 @@ inline SushiTrackHdl buildHdl(int ocm)
     p.track_thresh       = 0.1f;
     p.high_thresh        = 0.5f;
     p.match_thresh       = 0.9f;
-    return SushiTrack_Create(&p);
+    return sushitrack_create(&p);
 }
 
 /**
@@ -54,10 +64,10 @@ inline SushiTrackHdl buildHdl(int ocm)
  */
 TEST(ObservationMomentumIT, CruisingObjectKeepsStableId)
 {
-    SushiTrackHdl hdl = buildHdl(/*ocm=*/1);
+    sushitrack_tracker_t hdl = buildHdl(/*ocm=*/1);
     ASSERT_NE(hdl, nullptr);
 
-    std::vector<SushiTrack_Track> out(4);
+    std::vector<sushitrack_track_t> out(4);
     std::set<int64_t> hold_ids;
 
     float x = 100.0f, v = 0.0f;
@@ -65,8 +75,8 @@ TEST(ObservationMomentumIT, CruisingObjectKeepsStableId)
     {
         v = std::min(5.0f, v + 0.25f);
         x += v;
-        SushiTrack_Object d = makeDet(x, 200.0f);
-        int n = SushiTrack_Update(hdl, &d, 1, out.data(), 4, 0.04f);
+        sushitrack_object_t d = makeDet(x, 200.0f);
+        int n = sushitrack_update(hdl, &d, 1, out.data(), 4, 0.04f);
         ASSERT_GE(n, 1);
 
         for (int k = 0; k < n; ++k)
@@ -82,7 +92,7 @@ TEST(ObservationMomentumIT, CruisingObjectKeepsStableId)
     EXPECT_EQ(hold_ids.size(), static_cast<std::size_t>(1))
         << "A steadily cruising object did not keep a single identity under OCM.";
 
-    SushiTrack_Destroy(hdl);
+    sushitrack_destroy(hdl);
 }
 
 /**
@@ -96,18 +106,18 @@ TEST(ObservationMomentumIT, StationaryObjectUnaffectedByMomentum)
 
     auto run = [&](int ocm)
     {
-        SushiTrackHdl hdl = buildHdl(ocm);
+        sushitrack_tracker_t hdl = buildHdl(ocm);
         EXPECT_NE(hdl, nullptr);
-        std::vector<SushiTrack_Track> out(4);
+        std::vector<sushitrack_track_t> out(4);
         std::vector<std::array<float, 4>> boxes;
         for (int i = 0; i < kFrames; ++i)
         {
-            SushiTrack_Object d = makeDet(100.0f, 200.0f);
-            int n = SushiTrack_Update(hdl, &d, 1, out.data(), 4, 0.04f);
+            sushitrack_object_t d = makeDet(100.0f, 200.0f);
+            int n = sushitrack_update(hdl, &d, 1, out.data(), 4, 0.04f);
             EXPECT_GE(n, 1);
             boxes.push_back({out[0].x, out[0].y, out[0].width, out[0].height});
         }
-        SushiTrack_Destroy(hdl);
+        sushitrack_destroy(hdl);
         return boxes;
     };
 
@@ -130,10 +140,10 @@ TEST(ObservationMomentumIT, StationaryObjectUnaffectedByMomentum)
  */
 TEST(ObservationMomentumIT, ParallelCruisersKeepDistinctIds)
 {
-    SushiTrackHdl hdl = buildHdl(/*ocm=*/1);
+    sushitrack_tracker_t hdl = buildHdl(/*ocm=*/1);
     ASSERT_NE(hdl, nullptr);
 
-    std::vector<SushiTrack_Track> out(8);
+    std::vector<sushitrack_track_t> out(8);
     std::set<int64_t> a_ids, b_ids;
 
     float xa = 100.0f, xb = 100.0f, v = 0.0f;
@@ -142,8 +152,8 @@ TEST(ObservationMomentumIT, ParallelCruisersKeepDistinctIds)
         v = std::min(5.0f, v + 0.25f);
         xa += v;
         xb += v;
-        SushiTrack_Object d[2] = { makeDet(xa, 200.0f), makeDet(xb, 500.0f) };
-        int n = SushiTrack_Update(hdl, d, 2, out.data(), 8, 0.04f);
+        sushitrack_object_t d[2] = { makeDet(xa, 200.0f), makeDet(xb, 500.0f) };
+        int n = sushitrack_update(hdl, d, 2, out.data(), 8, 0.04f);
         ASSERT_GE(n, 2);
 
         if (i >= 20)
@@ -164,7 +174,7 @@ TEST(ObservationMomentumIT, ParallelCruisersKeepDistinctIds)
     EXPECT_NE(*a_ids.begin(), *b_ids.begin())
         << "Two parallel cruisers collapsed onto a shared identity under OCM.";
 
-    SushiTrack_Destroy(hdl);
+    sushitrack_destroy(hdl);
 }
 
 } // namespace

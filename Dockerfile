@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /workspace/sushitrack
 
-# Python paketlerini yükle
+# Python packages
 RUN pip3 install --no-cache-dir \
     numpy==2.4.4 \
     pandas==3.0.2 \
@@ -31,13 +31,12 @@ RUN pip3 install --no-cache-dir \
     tqdm==4.67.3 \
     torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --extra-index-url https://download.pytorch.org/whl/cu121
 
-
 COPY . /workspace/sushitrack/
 
-# `ds` CLI. A symlink rather than a shell alias so it also works from a
-# non-interactive `docker run ... ds build`, which never reads ~/.bashrc.
-RUN chmod +x /workspace/sushitrack/cli/ds.sh && \
-    ln -sf /workspace/sushitrack/cli/ds.sh /usr/local/bin/ds
+# `st` and `sushitrack` CLI symlinks for non-interactive and interactive container usage.
+RUN chmod +x /workspace/sushitrack/cli/st.sh /workspace/sushitrack/cli/sushitrack.sh && \
+    ln -sf /workspace/sushitrack/cli/st.sh /usr/local/bin/st && \
+    ln -sf /workspace/sushitrack/cli/sushitrack.sh /usr/local/bin/sushitrack
 
 CMD ["/bin/bash"]
 

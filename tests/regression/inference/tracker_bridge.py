@@ -1,14 +1,13 @@
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+"""Bridges the inference pipeline with tracker implementations."""
+
 import ctypes
 import os
 import platform
 import sys
-from ctypes import c_float, c_int, c_void_p, Structure, POINTER
+from ctypes import POINTER, Structure, c_float, c_int, c_void_p
 
-# The SushiTrack tracker is driven through the shared public-API binding
-# (bindings/python/sushitrack.py) rather than the reduced regression shim, so the
-# C-API is consumed in exactly one place and the binding is exercised on every
-# inference frame. The reference trackers (ByteTrack, OCSORT) have no public C
-# API and remain on the TrackerRegistry shim below.
 _BINDINGS_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "bindings", "python")
 )
@@ -42,16 +41,10 @@ class TrackerBridge:
     def __init__(self, tracker_name: str, build_dir: str = "build"):
         self.tracker_name = tracker_name
 
-        # SushiTrack goes through the public-API binding; everything else through
-        # the multi-tracker TrackerRegistry shim.
         if tracker_name.strip().lower() == "sushitrack":
             self._mode = "binding"
-            from sushitrack import SushiTrack
-            # Driven by the runtime sushitrack.json (resolved by the library:
-            # SUSHITRACK_CONFIG env var, then an upward search), so the inference
-            # path honours the same config as the regression binary. Falls back
-            # to compiled defaults when no file is found.
-            self._ds = SushiTrack(config="auto")
+            from sushitrack import Tracker
+            self._st = Tracker(config="auto")
             return
 
         self._mode = "shim"
@@ -64,11 +57,9 @@ class TrackerBridge:
             raise RuntimeError(f"Failed to create tracker: {tracker_name}")
 
     def _load_library(self, build_dir: str):
-        # find the DLL/SO
         system = platform.system()
         lib_name = "tracker_bridge.dll" if system == "Windows" else "libtracker_bridge.so"
 
-        # Look in standard cmake output directories
         search_paths = [
             os.path.join(build_dir, "bin", lib_name),
             os.path.join(build_dir, "bin", "Release", lib_name),
@@ -103,18 +94,12 @@ class TrackerBridge:
         self.lib.tracker_process_c.restype = None
 
     def update(self, detections: list, embeddings=None):
-        """
-        detections format: list of dicts or list of lists: [x, y, w, h, score, label]
-        embeddings format: optional list of 1D arrays or a 2D numpy array
-        returns list of dicts: [{'track_id': id, 'bbox': [x,y,w,h], 'score': s}]
-        """
+        """Processes detections and returns tracked results."""
         if self._mode == "binding":
             return self._update_binding(detections, embeddings)
         return self._update_shim(detections, embeddings)
 
     def _update_binding(self, detections: list, embeddings=None):
-        # Map detections (+ optional embeddings) onto the binding's tuple form
-        # (x, y, w, h, score, label[, feat]) and re-emit the bridge dict shape.
         dets = []
         for i, det in enumerate(detections):
             row = (det[0], det[1], det[2], det[3], det[4], int(det[5]))
@@ -124,10 +109,10 @@ class TrackerBridge:
                     row = row + (emb,)
             dets.append(row)
 
-        tracks = self._ds.update(dets, dt=1.0)
+        tracks = self._st.update(dets, dt=1.0)
         return [
             {"track_id": t.track_id, "bbox": [t.x, t.y, t.width, t.height], "score": t.score}
-            for t in tracks if t.is_activated   # parity with the C++ adapter filter
+            for t in tracks if t.is_activated
         ]
 
     def _update_shim(self, detections: list, embeddings=None):
@@ -136,10 +121,9 @@ class TrackerBridge:
             return []
 
         det_array = (CDetection * num_dets)()
-        feat_refs = [] # Prevent garbage collection during C call
+        feat_refs = []
 
         for i, det in enumerate(detections):
-            # assume det is [x, y, w, h, score, class_id]
             det_array[i].x = det[0]
             det_array[i].y = det[1]
             det_array[i].w = det[2]
@@ -158,7 +142,7 @@ class TrackerBridge:
                 det_array[i].feat = ctypes.cast(None, POINTER(ctypes.c_float))
                 det_array[i].feat_dim = 0
 
-        max_results = max(num_dets * 2, 100) # safe buffer
+        max_results = max(num_dets * 2, 100)
         res_array = (CTrackResult * max_results)()
         num_res = c_int(0)
 
@@ -184,9 +168,9 @@ class TrackerBridge:
 
     def __del__(self):
         if getattr(self, '_mode', None) == "binding":
-            ds = getattr(self, '_ds', None)
-            if ds is not None:
-                ds.close()
+            st = getattr(self, '_st', None)
+            if st is not None:
+                st.close()
             return
         if hasattr(self, 'tracker_ptr') and self.tracker_ptr:
             if hasattr(self, 'lib') and self.lib:

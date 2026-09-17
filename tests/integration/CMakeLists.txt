@@ -26,8 +26,8 @@ add_executable(integration_test
 
 target_include_directories(integration_test PRIVATE
     ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/3rdparty
-    ${CMAKE_SOURCE_DIR}/3rdparty/eigen
+    ${CMAKE_SOURCE_DIR}/third_party
+    ${CMAKE_SOURCE_DIR}/third_party/eigen
 )
 
 target_link_libraries(integration_test PRIVATE

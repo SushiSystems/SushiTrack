@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(sushitrack)
+project(sushitrack VERSION 1.0.0 LANGUAGES CXX C)
 
 # ============================================================
 # Build Type & Options
@@ -63,7 +63,7 @@ endif()
 # ============================================================
 # Eigen
 # ============================================================
-set(EIGEN3_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/eigen")
+set(EIGEN3_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/eigen")
 if(EXISTS "${EIGEN3_INCLUDE_DIR}/Eigen/Dense")
     message(STATUS "Found local Eigen at: ${EIGEN3_INCLUDE_DIR}")
     if(NOT TARGET Eigen3::Eigen)
@@ -80,19 +80,21 @@ endif()
 # SushiTrack Library Target
 # ============================================================
 add_library(${PROJECT_NAME} SHARED
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/KalmanFilter.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/IMMFilter.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Tracklet.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/SushiTrackTracker.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/SushiTrackC.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ConfigLoader.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/DistanceStrategies.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/AssignmentSolvers.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/LAPJV.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Object.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Rect.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Logger.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/kalman_filter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/imm_filter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/tracklet.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/tracker.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/sushitrack_c.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/config_loader.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/distance_strategies.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/assignment_solvers.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/lapjv.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/object.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/rect.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/logger.cpp
 )
+
+target_compile_definitions(${PROJECT_NAME} PRIVATE SUSHITRACK_EXPORTS)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -102,17 +104,17 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 # nlohmann/json is a private implementation detail of the JSON config loader;
 # it must not leak onto the public include interface.
 target_include_directories(${PROJECT_NAME} PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party
 )
 
 
 # ============================================================
-# External Trackers (3rdparty)
+# External Trackers (third_party)
 # ============================================================
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/bytetrack
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/bytetrack
                  ${CMAKE_CURRENT_BINARY_DIR}/bytetrack)
 
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/ocsort
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/ocsort
                  ${CMAKE_CURRENT_BINARY_DIR}/ocsort)
 
 

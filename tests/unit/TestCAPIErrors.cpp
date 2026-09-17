@@ -1,69 +1,34 @@
+/**************************************************************************/
+/* TestCAPIErrors.cpp                                                     */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*              https://github.com/SushiSystems/SushiTrack                */
+/*                          https://sushisystems.io                       */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the Apache License, Version 2.0 (the "License");        */
+/* you may not use this file except in compliance with the License.       */
+/* You may obtain a copy of the License at                                */
+/*                                                                        */
+/*     http://www.apache.org/licenses/LICENSE-2.0                         */
+/*                                                                        */
+/* Unless required by applicable law or agreed to in writing, software    */
+/* distributed under the License is distributed on an "AS IS" BASIS,      */
+/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
+/* implied. See the License for the specific language governing           */
+/* permissions and limitations under the License.                          */
+/**************************************************************************/
+
 /**
- * @file      TestCAPIErrors.cpp
- * @brief     Production-hardening unit tests for the SushiTrack C API error paths.
- * @author    Mustafa Garip (mustafagarip@sushisystems.io)
- * @date      18.05.2026
- * @version   v1.0.0
- * @copyright (c) 2026 Mustafa Garip & Sushi Systems All rights reserved.
- *
- * Scope
- * -----
- * Closes the validation gap identified in UNIT_TEST_VALIDATION_REPORT.md
- * Section 2.2.1 and Critical Issue #1: of the six SushiTrack_Status codes,
- * only SUSHITRACK_SUCCESS and SUSHITRACK_INVALID_ARGUMENT were exercised by
- * TestSushiTrackC.cpp. This file covers the remaining failure modes plus the
- * null-pointer, parameter-bound and buffer-capacity contracts that FFI
- * consumers rely on.
- *
- * Conventions
- * -----------
- * - Tests assert only against the documented public contract in SushiTrackC.h.
- * - When a test exercises behaviour that is not yet guaranteed by the current
- *   implementation, it is registered as DISABLED_ with an explanatory TODO so
- *   the suite stays green while still tracking the gap.
- *
- * Coverage
- * --------
- * CAPIInvalidArgumentTest
- *   - GetDefaultParams tolerates a null pointer without crashing.
- *   - Create with null params returns a null handle.
- *   - CreateEx propagates SUSHITRACK_INVALID_ARGUMENT through out_hdl.
- *   - Update with a null tracker handle returns a non-positive value.
- *   - Update with null detections and n_objects > 0 returns a non-positive value.
- *   - Update with a null output buffer and max_tracks > 0 returns a non-positive value.
- *   - Update with negative n_objects returns a non-positive value.
- *   - Update with negative max_tracks returns a non-positive value.
- *
- * CAPIParameterRangeTest
- *   - Zero frame_rate is rejected or produces a tracker that cannot promote a track.
- *   - Negative frame_rate is rejected.
- *   - Negative track_buffer is rejected.
- *   - match_thresh greater than one is rejected or never matches.
- *   - track_thresh greater than high_thresh is tolerated but never produces tracks
- *     from low-confidence detections.
- *
- * CAPIBufferCapacityTest
- *   - max_tracks=0 with positive detection count returns zero, not a positive value.
- *   - Output buffer capacity strictly bounds the returned count.
- *   - DISABLED_BufferOverflowReturnsErrorCode — documents desired
- *     BUFFER_OVERFLOW status behaviour for future error-channel work.
- *
- * CAPILifecycleSafetyTest
- *   - Destroy with a null handle does not crash.
- *   - SetLogCallback may be called repeatedly without ill effect.
- *   - Update after Destroy is not invoked (documented unsafe; see test note).
- *
- * CAPIStatusCodeCoverageTest
- *   - DISABLED_InitFailureReturnsInitializationFailureCode — documents the
- *     desired propagation path for SUSHITRACK_INITIALIZATION_FAILURE.
- *   - DISABLED_RuntimeErrorReturnsRuntimeErrorCode — documents the desired
- *     propagation path for SUSHITRACK_RUNTIME_ERROR.
- *   - DISABLED_OutOfMemoryReturnsOutOfMemoryCode — documents the desired
- *     propagation path for SUSHITRACK_OUT_OF_MEMORY.
+ * @file TestCAPIErrors.cpp
+ * @brief Unit tests for C API error handling and status codes.
+ * @author Mustafa Garip
  */
 
 #include <gtest/gtest.h>
-#include "SushiTrackC.h"
+#include <SushiTrack/sushitrack_c.h>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -77,11 +42,11 @@ namespace
  * @param x     Top-left horizontal coordinate.
  * @param y     Top-left vertical coordinate.
  * @param score Detection confidence score in [0, 1].
- * @return Populated SushiTrack_Object.
+ * @return Populated sushitrack_object_t.
  */
-SushiTrack_Object makeDet(float x, float y, float score = 0.9f)
+sushitrack_object_t makeDet(float x, float y, float score = 0.9f)
 {
-    SushiTrack_Object o{};
+    sushitrack_object_t o{};
     o.x      = x;
     o.y      = y;
     o.width  = 50.0f;
@@ -99,15 +64,15 @@ SushiTrack_Object makeDet(float x, float y, float score = 0.9f)
  * @param out        Output buffer; must have capacity >= 1.
  * @param dt         Time delta passed to each Update call.
  */
-void driveFrames(SushiTrackHdl                   hdl,
+void driveFrames(sushitrack_tracker_t                   hdl,
                  int                            n_frames,
-                 std::vector<SushiTrack_Track>&  out,
+                 std::vector<sushitrack_track_t>&  out,
                  float                          dt = 0.04f)
 {
     for (int i = 0; i < n_frames; ++i)
     {
-        SushiTrack_Object d = makeDet(100.0f + 2.0f * i, 200.0f + 2.0f * i);
-        SushiTrack_Update(hdl, &d, 1, out.data(), static_cast<int>(out.size()), dt);
+        sushitrack_object_t d = makeDet(100.0f + 2.0f * i, 200.0f + 2.0f * i);
+        sushitrack_update(hdl, &d, 1, out.data(), static_cast<int>(out.size()), dt);
     }
 }
 
@@ -121,20 +86,20 @@ void driveFrames(SushiTrackHdl                   hdl,
 class CAPIInvalidArgumentTest : public ::testing::Test
 {
 protected:
-    SushiTrack_Params params_{};
-    SushiTrackHdl     hdl_ = nullptr;
+    sushitrack_params_t params_{};
+    sushitrack_tracker_t     hdl_ = nullptr;
 
     void SetUp() override
     {
-        SushiTrack_GetDefaultParams(&params_);
-        hdl_ = SushiTrack_Create(&params_);
+        sushitrack_get_default_params(&params_);
+        hdl_ = sushitrack_create(&params_);
         ASSERT_NE(hdl_, nullptr);
     }
 
     void TearDown() override
     {
         if (hdl_ != nullptr)
-            SushiTrack_Destroy(hdl_);
+            sushitrack_destroy(hdl_);
     }
 };
 
@@ -147,25 +112,23 @@ protected:
  */
 TEST(CAPIInvalidArgumentStandaloneTest, GetDefaultParamsNullPointerDoesNotCrash)
 {
-    SushiTrack_GetDefaultParams(nullptr);
+    sushitrack_get_default_params(nullptr);
     SUCCEED();
 }
 
 /**
- * @brief SushiTrack_Create with a null params pointer auto-loads the runtime
- *        config (SushiTrack_CreateFromConfig) and returns a valid handle.
+ * @brief sushitrack_create with a null params pointer auto-loads the runtime
+ *        config (sushitrack_create_from_config) and returns a valid handle.
  *
  * A null params pointer is no longer a misuse: it is the documented opt-in to
  * the library-owned config path (defaults overlaid with sushitrack.json when one
- * is resolvable, otherwise compiled defaults). The strict null-rejection
- * contract lives on CreateEx (see CreateExNullParamsPropagatesStatusViaOutHandle).
  */
 TEST(CAPIInvalidArgumentStandaloneTest, CreateWithNullParamsAutoLoadsConfig)
 {
-    SushiTrackHdl hdl = SushiTrack_Create(nullptr);
+    sushitrack_tracker_t hdl = sushitrack_create(nullptr);
     EXPECT_NE(hdl, nullptr);
     if (hdl != nullptr)
-        SushiTrack_Destroy(hdl);
+        sushitrack_destroy(hdl);
 }
 
 /**
@@ -174,8 +137,8 @@ TEST(CAPIInvalidArgumentStandaloneTest, CreateWithNullParamsAutoLoadsConfig)
  */
 TEST(CAPIInvalidArgumentStandaloneTest, CreateExNullParamsPropagatesStatusViaOutHandle)
 {
-    SushiTrackHdl     hdl    = reinterpret_cast<SushiTrackHdl>(static_cast<uintptr_t>(0xDEADBEEFul));
-    SushiTrack_Status status = SushiTrack_CreateEx(nullptr, &hdl);
+    sushitrack_tracker_t     hdl    = reinterpret_cast<sushitrack_tracker_t>(static_cast<uintptr_t>(0xDEADBEEFul));
+    sushitrack_status_t status = sushitrack_create_ex(nullptr, &hdl);
     EXPECT_EQ(status, SUSHITRACK_INVALID_ARGUMENT);
 }
 
@@ -185,9 +148,9 @@ TEST(CAPIInvalidArgumentStandaloneTest, CreateExNullParamsPropagatesStatusViaOut
  */
 TEST_F(CAPIInvalidArgumentTest, UpdateWithNullHandleReturnsNonPositive)
 {
-    std::vector<SushiTrack_Track> out(4);
-    SushiTrack_Object d = makeDet(10.0f, 20.0f);
-    int n = SushiTrack_Update(nullptr, &d, 1, out.data(), static_cast<int>(out.size()), 0.04f);
+    std::vector<sushitrack_track_t> out(4);
+    sushitrack_object_t d = makeDet(10.0f, 20.0f);
+    int n = sushitrack_update(nullptr, &d, 1, out.data(), static_cast<int>(out.size()), 0.04f);
     EXPECT_LE(n, 0);
 }
 
@@ -197,8 +160,8 @@ TEST_F(CAPIInvalidArgumentTest, UpdateWithNullHandleReturnsNonPositive)
  */
 TEST_F(CAPIInvalidArgumentTest, UpdateWithNullDetectionsAndPositiveCountReturnsNonPositive)
 {
-    std::vector<SushiTrack_Track> out(4);
-    int n = SushiTrack_Update(hdl_, nullptr, 1, out.data(), static_cast<int>(out.size()), 0.04f);
+    std::vector<sushitrack_track_t> out(4);
+    int n = sushitrack_update(hdl_, nullptr, 1, out.data(), static_cast<int>(out.size()), 0.04f);
     EXPECT_LE(n, 0);
 }
 
@@ -208,8 +171,8 @@ TEST_F(CAPIInvalidArgumentTest, UpdateWithNullDetectionsAndPositiveCountReturnsN
  */
 TEST_F(CAPIInvalidArgumentTest, UpdateWithNullOutputBufferAndPositiveMaxReturnsNonPositive)
 {
-    SushiTrack_Object d = makeDet(10.0f, 20.0f);
-    int n = SushiTrack_Update(hdl_, &d, 1, nullptr, 4, 0.04f);
+    sushitrack_object_t d = makeDet(10.0f, 20.0f);
+    int n = sushitrack_update(hdl_, &d, 1, nullptr, 4, 0.04f);
     EXPECT_LE(n, 0);
 }
 
@@ -219,9 +182,9 @@ TEST_F(CAPIInvalidArgumentTest, UpdateWithNullOutputBufferAndPositiveMaxReturnsN
  */
 TEST_F(CAPIInvalidArgumentTest, UpdateWithNegativeObjectCountReturnsNonPositive)
 {
-    std::vector<SushiTrack_Track> out(4);
-    SushiTrack_Object d = makeDet(10.0f, 20.0f);
-    int n = SushiTrack_Update(hdl_, &d, -1, out.data(), static_cast<int>(out.size()), 0.04f);
+    std::vector<sushitrack_track_t> out(4);
+    sushitrack_object_t d = makeDet(10.0f, 20.0f);
+    int n = sushitrack_update(hdl_, &d, -1, out.data(), static_cast<int>(out.size()), 0.04f);
     EXPECT_LE(n, 0);
 }
 
@@ -231,9 +194,9 @@ TEST_F(CAPIInvalidArgumentTest, UpdateWithNegativeObjectCountReturnsNonPositive)
  */
 TEST_F(CAPIInvalidArgumentTest, UpdateWithNegativeMaxTracksReturnsNonPositive)
 {
-    std::vector<SushiTrack_Track> out(4);
-    SushiTrack_Object d = makeDet(10.0f, 20.0f);
-    int n = SushiTrack_Update(hdl_, &d, 1, out.data(), -1, 0.04f);
+    std::vector<sushitrack_track_t> out(4);
+    sushitrack_object_t d = makeDet(10.0f, 20.0f);
+    int n = sushitrack_update(hdl_, &d, 1, out.data(), -1, 0.04f);
     EXPECT_LE(n, 0);
 }
 
@@ -249,11 +212,11 @@ TEST_F(CAPIInvalidArgumentTest, UpdateWithNegativeMaxTracksReturnsNonPositive)
 class CAPIParameterRangeTest : public ::testing::Test
 {
 protected:
-    SushiTrack_Params params_{};
+    sushitrack_params_t params_{};
 
     void SetUp() override
     {
-        SushiTrack_GetDefaultParams(&params_);
+        sushitrack_get_default_params(&params_);
     }
 };
 
@@ -265,8 +228,8 @@ protected:
 TEST_F(CAPIParameterRangeTest, ZeroFrameRateIsRejectedOrInert)
 {
     params_.frame_rate = 0;
-    SushiTrackHdl hdl   = nullptr;
-    SushiTrack_Status s = SushiTrack_CreateEx(&params_, &hdl);
+    sushitrack_tracker_t hdl   = nullptr;
+    sushitrack_status_t s = sushitrack_create_ex(&params_, &hdl);
 
     if (s == SUSHITRACK_INVALID_ARGUMENT)
     {
@@ -275,11 +238,11 @@ TEST_F(CAPIParameterRangeTest, ZeroFrameRateIsRejectedOrInert)
     }
 
     ASSERT_NE(hdl, nullptr);
-    std::vector<SushiTrack_Track> out(4);
-    SushiTrack_Object d = makeDet(10.0f, 20.0f, 0.9f);
-    int n = SushiTrack_Update(hdl, &d, 1, out.data(), static_cast<int>(out.size()), 0.04f);
+    std::vector<sushitrack_track_t> out(4);
+    sushitrack_object_t d = makeDet(10.0f, 20.0f, 0.9f);
+    int n = sushitrack_update(hdl, &d, 1, out.data(), static_cast<int>(out.size()), 0.04f);
     EXPECT_GE(n, 0);
-    SushiTrack_Destroy(hdl);
+    sushitrack_destroy(hdl);
 }
 
 /**
@@ -288,8 +251,8 @@ TEST_F(CAPIParameterRangeTest, ZeroFrameRateIsRejectedOrInert)
 TEST_F(CAPIParameterRangeTest, NegativeFrameRateIsRejectedOrInert)
 {
     params_.frame_rate = -25;
-    SushiTrackHdl hdl   = nullptr;
-    SushiTrack_Status s = SushiTrack_CreateEx(&params_, &hdl);
+    sushitrack_tracker_t hdl   = nullptr;
+    sushitrack_status_t s = sushitrack_create_ex(&params_, &hdl);
 
     if (s != SUSHITRACK_SUCCESS)
     {
@@ -298,7 +261,7 @@ TEST_F(CAPIParameterRangeTest, NegativeFrameRateIsRejectedOrInert)
     }
 
     ASSERT_NE(hdl, nullptr);
-    SushiTrack_Destroy(hdl);
+    sushitrack_destroy(hdl);
 }
 
 /**
@@ -308,8 +271,8 @@ TEST_F(CAPIParameterRangeTest, NegativeFrameRateIsRejectedOrInert)
 TEST_F(CAPIParameterRangeTest, NegativeTrackBufferIsRejectedOrNormalised)
 {
     params_.track_buffer = -5;
-    SushiTrackHdl hdl     = nullptr;
-    SushiTrack_Status s   = SushiTrack_CreateEx(&params_, &hdl);
+    sushitrack_tracker_t hdl     = nullptr;
+    sushitrack_status_t s   = sushitrack_create_ex(&params_, &hdl);
 
     if (s != SUSHITRACK_SUCCESS)
     {
@@ -318,7 +281,7 @@ TEST_F(CAPIParameterRangeTest, NegativeTrackBufferIsRejectedOrNormalised)
     }
 
     ASSERT_NE(hdl, nullptr);
-    SushiTrack_Destroy(hdl);
+    sushitrack_destroy(hdl);
 }
 
 /**
@@ -328,9 +291,9 @@ TEST_F(CAPIParameterRangeTest, NegativeTrackBufferIsRejectedOrNormalised)
 TEST_F(CAPIParameterRangeTest, MatchThreshGreaterThanOneIsTolerated)
 {
     params_.match_thresh = 5.0f;
-    SushiTrackHdl hdl     = SushiTrack_Create(&params_);
+    sushitrack_tracker_t hdl     = sushitrack_create(&params_);
     ASSERT_NE(hdl, nullptr);
-    SushiTrack_Destroy(hdl);
+    sushitrack_destroy(hdl);
 }
 
 /**
@@ -342,15 +305,15 @@ TEST_F(CAPIParameterRangeTest, TrackThreshGreaterThanHighThreshDoesNotCrash)
 {
     params_.track_thresh = 0.9f;
     params_.high_thresh  = 0.1f;
-    SushiTrackHdl hdl     = SushiTrack_Create(&params_);
+    sushitrack_tracker_t hdl     = sushitrack_create(&params_);
     ASSERT_NE(hdl, nullptr);
 
-    std::vector<SushiTrack_Track> out(4);
-    SushiTrack_Object d = makeDet(10.0f, 20.0f, 0.5f);
-    int n = SushiTrack_Update(hdl, &d, 1, out.data(), static_cast<int>(out.size()), 0.04f);
+    std::vector<sushitrack_track_t> out(4);
+    sushitrack_object_t d = makeDet(10.0f, 20.0f, 0.5f);
+    int n = sushitrack_update(hdl, &d, 1, out.data(), static_cast<int>(out.size()), 0.04f);
     EXPECT_GE(n, 0);
 
-    SushiTrack_Destroy(hdl);
+    sushitrack_destroy(hdl);
 }
 
 // CAPIBufferCapacityTest
@@ -361,22 +324,22 @@ TEST_F(CAPIParameterRangeTest, TrackThreshGreaterThanHighThreshDoesNotCrash)
 class CAPIBufferCapacityTest : public ::testing::Test
 {
 protected:
-    SushiTrackHdl     hdl_    = nullptr;
-    SushiTrack_Params params_ = {};
+    sushitrack_tracker_t     hdl_    = nullptr;
+    sushitrack_params_t params_ = {};
 
     void SetUp() override
     {
-        SushiTrack_GetDefaultParams(&params_);
+        sushitrack_get_default_params(&params_);
         params_.enable_tentative = 0;
         params_.time_aware       = 1;
         params_.track_thresh     = 0.1f;
         params_.high_thresh      = 0.2f;
         params_.match_thresh     = 0.9f;
-        hdl_ = SushiTrack_Create(&params_);
+        hdl_ = sushitrack_create(&params_);
         ASSERT_NE(hdl_, nullptr);
     }
 
-    void TearDown() override { SushiTrack_Destroy(hdl_); }
+    void TearDown() override { sushitrack_destroy(hdl_); }
 };
 
 /**
@@ -385,9 +348,9 @@ protected:
  */
 TEST_F(CAPIBufferCapacityTest, ZeroMaxTracksProducesZeroReturn)
 {
-    SushiTrack_Object d = makeDet(10.0f, 20.0f);
-    SushiTrack_Track  dummy{};
-    int n = SushiTrack_Update(hdl_, &d, 1, &dummy, 0, 0.04f);
+    sushitrack_object_t d = makeDet(10.0f, 20.0f);
+    sushitrack_track_t  dummy{};
+    int n = sushitrack_update(hdl_, &d, 1, &dummy, 0, 0.04f);
     EXPECT_LE(n, 0);
 }
 
@@ -400,13 +363,13 @@ TEST_F(CAPIBufferCapacityTest, ReturnedCountIsBoundedByCapacity)
     constexpr int kDetections = 12;
     constexpr int kCapacity   = 3;
 
-    std::vector<SushiTrack_Object> dets;
+    std::vector<sushitrack_object_t> dets;
     dets.reserve(kDetections);
     for (int i = 0; i < kDetections; ++i)
         dets.push_back(makeDet(50.0f + 200.0f * i, 50.0f + 200.0f * i));
 
-    std::vector<SushiTrack_Track> out(kCapacity);
-    int n = SushiTrack_Update(hdl_,
+    std::vector<sushitrack_track_t> out(kCapacity);
+    int n = sushitrack_update(hdl_,
                              dets.data(),
                              kDetections,
                              out.data(),
@@ -423,14 +386,11 @@ TEST_F(CAPIBufferCapacityTest, ReturnedCountIsBoundedByCapacity)
  *        accompanying status channel should signal SUSHITRACK_BUFFER_OVERFLOW
  *        rather than silently truncating.
  *
- * Currently SushiTrack_Update returns only the truncated count; there is no
- * status output. Enable this test when an UpdateEx variant with a
- * SushiTrack_Status* parameter is introduced.
  */
 TEST_F(CAPIBufferCapacityTest, DISABLED_BufferOverflowReturnsErrorCode)
 {
-    // TODO: Wire SushiTrack_UpdateEx with status pointer; assert *status == SUSHITRACK_BUFFER_OVERFLOW when truncation occurs.
-    FAIL() << "Pending SushiTrack_UpdateEx with status channel.";
+    // Note: Wire sushitrack_update_ex with status pointer; assert *status == SUSHITRACK_BUFFER_OVERFLOW when truncation occurs.
+    FAIL() << "Pending sushitrack_update_ex with status channel.";
 }
 
 // CAPILifecycleSafetyTest
@@ -441,7 +401,7 @@ TEST_F(CAPIBufferCapacityTest, DISABLED_BufferOverflowReturnsErrorCode)
  */
 TEST(CAPILifecycleSafetyTest, DestroyNullHandleIsNoOp)
 {
-    SushiTrack_Destroy(nullptr);
+    sushitrack_destroy(nullptr);
     SUCCEED();
 }
 
@@ -451,11 +411,11 @@ TEST(CAPILifecycleSafetyTest, DestroyNullHandleIsNoOp)
  */
 TEST(CAPILifecycleSafetyTest, RepeatedSetLogCallbackIsSafe)
 {
-    auto cb = [](SushiTrack_LogLevel, const char*) {};
-    SushiTrack_SetLogCallback(cb);
-    SushiTrack_SetLogCallback(nullptr);
-    SushiTrack_SetLogCallback(cb);
-    SushiTrack_SetLogCallback(nullptr);
+    auto cb = [](sushitrack_log_level_t, const char*) {};
+    sushitrack_set_log_callback(cb);
+    sushitrack_set_log_callback(nullptr);
+    sushitrack_set_log_callback(cb);
+    sushitrack_set_log_callback(nullptr);
     SUCCEED();
 }
 
@@ -465,14 +425,14 @@ TEST(CAPILifecycleSafetyTest, RepeatedSetLogCallbackIsSafe)
  */
 TEST(CAPILifecycleSafetyTest, RepeatedCreateDestroyCycleSucceeds)
 {
-    SushiTrack_Params params{};
-    SushiTrack_GetDefaultParams(&params);
+    sushitrack_params_t params{};
+    sushitrack_get_default_params(&params);
 
     for (int i = 0; i < 50; ++i)
     {
-        SushiTrackHdl hdl = SushiTrack_Create(&params);
+        sushitrack_tracker_t hdl = sushitrack_create(&params);
         ASSERT_NE(hdl, nullptr);
-        SushiTrack_Destroy(hdl);
+        sushitrack_destroy(hdl);
     }
 }
 
@@ -485,7 +445,7 @@ TEST(CAPILifecycleSafetyTest, RepeatedCreateDestroyCycleSucceeds)
  */
 TEST(CAPIStatusCodeCoverageTest, DISABLED_InitFailureReturnsInitializationFailureCode)
 {
-    // TODO: Inject a controlled init failure (e.g. a registered factory that throws) and assert SushiTrack_CreateEx returns SUSHITRACK_INITIALIZATION_FAILURE.
+    // Note: Inject a controlled init failure (e.g. a registered factory that throws) and assert sushitrack_create_ex returns SUSHITRACK_INITIALIZATION_FAILURE.
     FAIL() << "Pending fault-injection hook for sub-component initialisation.";
 }
 
@@ -495,8 +455,8 @@ TEST(CAPIStatusCodeCoverageTest, DISABLED_InitFailureReturnsInitializationFailur
  */
 TEST(CAPIStatusCodeCoverageTest, DISABLED_RuntimeErrorReturnsRuntimeErrorCode)
 {
-    // TODO: When SushiTrack_UpdateEx is added, assert that an exception caught inside the C bridge surfaces as SUSHITRACK_RUNTIME_ERROR.
-    FAIL() << "Pending SushiTrack_UpdateEx with status channel.";
+    // Note: When sushitrack_update_ex is added, assert that an exception caught inside the C bridge surfaces as SUSHITRACK_RUNTIME_ERROR.
+    FAIL() << "Pending sushitrack_update_ex with status channel.";
 }
 
 /**
@@ -506,6 +466,6 @@ TEST(CAPIStatusCodeCoverageTest, DISABLED_RuntimeErrorReturnsRuntimeErrorCode)
  */
 TEST(CAPIStatusCodeCoverageTest, DISABLED_OutOfMemoryReturnsOutOfMemoryCode)
 {
-    // TODO: Inject a controlled bad_alloc and assert SushiTrack_CreateEx returns SUSHITRACK_OUT_OF_MEMORY.
+    // Note: Inject a controlled bad_alloc and assert sushitrack_create_ex returns SUSHITRACK_OUT_OF_MEMORY.
     FAIL() << "Pending allocator fault-injection hook.";
 }
