@@ -59,7 +59,7 @@ pipeline are included.
 
 ## Architecture
 
-The runtime is organised around interfaces that the tracker depends on. Concrete implementations are wired up by the C-API entry point (`SushiTrack_CreateEx` in `src/SushiTrackC.cpp`) based on the `SushiTrack_Params` flags. The core orchestrator `SushiTrackTracker` (see `include/SushiTrack/SushiTrackTracker.h`) consumes only the abstractions.
+The runtime is organised around interfaces that the tracker depends on. Concrete implementations are wired up by the C-API entry point (`sushitrack_create_ex` in `source/SushiTrackC.cpp`) based on the `sushitrack_params_t` flags. The core orchestrator `Tracker` (see `include/SushiTrack/Tracker.h`) consumes only the abstractions.
 
 | Interface | Purpose | Concrete implementations |
 |---|---|---|
@@ -101,7 +101,7 @@ Visual features are L2-normalised and exponentially smoothed (`feature_momentum`
 
 **NSA Kalman filter** — `kalman_type=1` selects `NSAKalmanFilter`, a variant that scales measurement noise by detection confidence in both `initiate` and `project`.
 
-**IMM motion estimator** — `kalman_type=2`. A four-model Interacting Multiple Model filter (constant velocity, constant acceleration, near-constant-position, and a nonlinear coordinated-turn mode handled with an unscented update) replaces the single Kalman model. Its mode probabilities yield a continuous `maneuver_probability` (mass on the manoeuvring models) and a discrete `kinematic_state` (`Stationary`/`Cruising`/`Maneuvering`, or `Coasting` while Lost), consumed by association cost shaping, lost-buffer scaling and OCM weighting. See the IMM section of [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+**IMM motion estimator** — `kalman_type=2`. A four-model Interacting Multiple Model filter (constant velocity, constant acceleration, near-constant-position, and a nonlinear coordinated-turn mode handled with an unscented update) replaces the single Kalman model. Its mode probabilities yield a continuous `maneuver_probability` (mass on the manoeuvring models) and a discrete `kinematic_state` (`Stationary`/`Cruising`/`Maneuvering`, or `Coasting` while Lost), consumed by association cost shaping, lost-buffer scaling and OCM weighting. See the IMM section of [architecture/OVERVIEW.md](architecture/OVERVIEW.md).
 
 **Coordinate representations** — `enable_xyah=0` (default) uses TLWH state (`[x, y, w, h, vx, vy, vw, vh]`); `enable_xyah=1` uses centroid + aspect ratio + height (`[cx, cy, a, h, …]`). `iou_plus_one=1` (default) uses inclusive box dimensions consistent with the ByteTrack reference.
 
@@ -117,9 +117,9 @@ Visual features are L2-normalised and exponentially smoothed (`feature_momentum`
 
 **Timing policies** — `time_aware=0` uses `FrameTimingPolicy` (dt=1.0 each call, expiry by frame count). `time_aware=1` uses `WallClockTimingPolicy`: dt is treated as real seconds and multiplied by `frame_rate` to obtain a KF step, capped at 5.0. Track expiry compares accumulated wall time against `track_buffer / frame_rate` seconds (strict >, with a 1e-4 epsilon for symmetry with the frame-counted path).
 
-**C API** — `SushiTrackC.h` exposes an opaque `SushiTrackHdl` plus `SushiTrack_GetDefaultParams`, `SushiTrack_Create`, `SushiTrack_CreateEx`, `SushiTrack_Update`, `SushiTrack_Destroy`, `SushiTrack_SetLogCallback`. Suitable for FFI integration from Python, Rust, or any C-FFI language.
+**C API** — `sushitrack_c.h` exposes an opaque `sushitrack_tracker_t` plus `sushitrack_get_default_params`, `sushitrack_create`, `sushitrack_create_ex`, `sushitrack_update`, `sushitrack_destroy`, `sushitrack_set_log_callback`. Suitable for FFI integration from Python, Rust, or any C-FFI language.
 
-**Logging** — `SUSHITRACK_LOG_DEBUG/INFO/WARN/ERROR` macros route to a single global callback registered via `SushiTrack_SetLogCallback`. The callback is stored atomically; setting/clearing it is thread-safe.
+**Logging** — `SUSHITRACK_LOG_DEBUG/INFO/WARN/ERROR` macros route to a single global callback registered via `sushitrack_set_log_callback`. The callback is stored atomically; setting/clearing it is thread-safe.
 
 **Thread safety** — `Tracklet` state access is mutex-protected for `getMean`/`getCovariance`/`getMeasurement`. The `KalmanFilter` LLT projection cache is mutex-protected.
 
@@ -131,7 +131,7 @@ Visual features are L2-normalised and exponentially smoothed (`feature_momentum`
 |---|---|
 | C++ compiler | C++17 (MSVC 19.20+, GCC 9+, Clang 10+) |
 | CMake | ≥ 3.14 |
-| Eigen | vendored at `3rdparty/eigen` |
+| Eigen | vendored at `third_party/eigen` |
 | GoogleTest | provided via conda or system package |
 | Ninja | provided via conda |
 | Python | 3.11 |
@@ -154,11 +154,11 @@ sushitrack/
 ├── sushitrack.json                # Runtime config loaded by the library (see Tracker config files)
 │
 ├── include/
-│   ├── SushiTrackC.h              # C-compatible public API
+│   ├── sushitrack_c.h              # C-compatible public API
 │   └── SushiTrack/
-│       ├── SushiTrackTracker.h    # Core orchestrator
-│       ├── SushiTrackTypes.h      # Status codes, log levels, callback typedef
-│       ├── TrackerConfig.h       # C++ config struct (mirror of SushiTrack_Params)
+│       ├── Tracker.h    # Core orchestrator
+│       ├── types.hpp      # Status codes, log levels, callback typedef
+│       ├── TrackerConfig.h       # C++ config struct (mirror of sushitrack_params_t)
 │       ├── Tracklet.h            # Per-track state, lifecycle, feature history
 │       ├── IMMFilter.h          # IMM multi-model estimator
 │       ├── KalmanFilter.h        # Linear Kalman filter
@@ -182,13 +182,13 @@ sushitrack/
 │       ├── Object.h              # Detection input struct
 │       └── Rect.h                # Bounding-box template
 │
-├── src/                          # Library implementations (mirrors include/)
+├── source/                          # Library implementations (mirrors include/)
 │
 ├── bindings/
 │   └── python/
 │       └── sushitrack.py          # ctypes binding to the public C API
 │
-├── 3rdparty/
+├── third_party/
 │   ├── eigen/                    # Header-only linear algebra
 │   ├── nlohmann/                 # Header-only JSON (config parsing)
 │   ├── bytetrack/                # Reference ByteTrack for regression comparison
@@ -217,7 +217,7 @@ sushitrack/
 │   │   ├── TestTrackerBuffers.cpp
 │   │   ├── TestLogger.cpp
 │   │   ├── TestSushiTrackC.cpp
-│   │   ├── TestSushiTrackTracker.cpp
+│   │   ├── TestTracker.cpp
 │   │   ├── TestCAPIErrors.cpp
 │   │   ├── TestIntegration.cpp
 │   │   ├── TestBoundaryConditions.cpp
@@ -494,7 +494,7 @@ pass/fail for the same binary.
 | `--tracker <name>` | `sushitrack` (default), `bytetrack`, or `ocsort` |
 | `--compare` | Run all three trackers side-by-side |
 | `--eval-only` | Skip the binary; re-score existing `pred/*.txt` files |
-| `--trackeval` | Use the official `3rdparty/TrackEval/scripts/run_mot_challenge.py` instead of the internal runner |
+| `--trackeval` | Use the official `third_party/TrackEval/scripts/run_mot_challenge.py` instead of the internal runner |
 | `--export <dir>` | Export TrackEval JSON/CSV to `<dir>` |
 | `--private` | Only `*-YOLOX` sequences (MOT only) |
 | `--public` | All sequences except `*-YOLOX` (MOT only) |
@@ -541,9 +541,9 @@ ctypes. Arguments after `--` are forwarded to `demo.py` untouched.
 | `--reid-model <path>` | `osnet_x1_0.onnx` | Path to the ReID ONNX model |
 
 ```bash
-ds infer -n yolox-x -c 3rdparty/weight/mot17x.pth.tar --source 3rdparty/video/MOT17-04.mp4 --num-classes 1 --legacy
+ds infer -n yolox-x -c third_party/weight/mot17x.pth.tar --source third_party/video/MOT17-04.mp4 --num-classes 1 --legacy
 
-ds infer -n yolox-x -c 3rdparty/weight/mot17x.pth.tar --source tests/regression/evaluator/data/MOT20-01/img1 --num-classes 1 --legacy
+ds infer -n yolox-x -c third_party/weight/mot17x.pth.tar --source tests/regression/evaluator/data/MOT20-01/img1 --num-classes 1 --legacy
 
 ds infer --source 0 --tracker sushitrack --no-save --no-screen --stress
 ```
@@ -581,65 +581,65 @@ ds docker run
 
 ## C API
 
-Header: `include/SushiTrackC.h`. Link against the compiled `sushitrack` shared library.
+Header: `include/sushitrack_c.h`. Link against the compiled `sushitrack` shared library.
 
 Minimal usage:
 
 ```c
-#include "SushiTrackC.h"
+#include "sushitrack_c.h"
 
-SushiTrack_Params params;
-SushiTrack_GetDefaultParams(&params);
+sushitrack_params_t params;
+sushitrack_get_default_params(&params);
 params.kalman_type      = 2;
 params.enable_tentative  = 1;
 params.frame_rate        = 25;
 
-SushiTrackHdl hdl;
-SushiTrack_Status s = SushiTrack_CreateEx(&params, &hdl);
+sushitrack_tracker_t hdl;
+sushitrack_status_t s = sushitrack_create_ex(&params, &hdl);
 if (s != SUSHITRACK_SUCCESS) { /* handle */ }
 
-SushiTrack_Object  dets[MAX_DETS];   /* fill in per frame */
-SushiTrack_Track   tracks[MAX_TRACKS];
-int n = SushiTrack_Update(hdl, dets, n_dets, tracks, MAX_TRACKS, dt);
+sushitrack_object_t  dets[MAX_DETS];   /* fill in per frame */
+sushitrack_track_t   tracks[MAX_TRACKS];
+int n = sushitrack_update(hdl, dets, n_dets, tracks, MAX_TRACKS, dt);
 
-SushiTrack_Destroy(hdl);
+sushitrack_destroy(hdl);
 ```
 
-`SushiTrack_Create` returns `NULL` on failure; `SushiTrack_CreateEx` returns a `SushiTrack_Status` code and writes the handle through `out_hdl`. `SushiTrack_Update` returns the number of tracks written. Output tracks are sorted by lifecycle priority (`Tracked` < `Tentative` < `Lost` < `Removed`); the buffer is truncated if too small, with a warning logged.
+`sushitrack_create` returns `NULL` on failure; `sushitrack_create_ex` returns a `sushitrack_status_t` code and writes the handle through `out_hdl`. `sushitrack_update` returns the number of tracks written. Output tracks are sorted by lifecycle priority (`Tracked` < `Tentative` < `Lost` < `Removed`); the buffer is truncated if too small, with a warning logged.
 
-The track-output `feat` pointer references memory owned by the tracker and is only valid until the next `SushiTrack_Update` or `SushiTrack_Destroy`.
+The track-output `feat` pointer references memory owned by the tracker and is only valid until the next `sushitrack_update` or `sushitrack_destroy`.
 
-### Status codes (`SushiTrack_Status`)
+### Status codes (`sushitrack_status_t`)
 
 | Code | Value |
 |---|---|
 | `SUSHITRACK_SUCCESS` | 0 |
-| `SUSHITRACK_INVALID_ARGUMENT` | −1 |
-| `SUSHITRACK_INITIALIZATION_FAILURE` | −2 |
-| `SUSHITRACK_OUT_OF_MEMORY` | −3 |
-| `SUSHITRACK_RUNTIME_ERROR` | −4 |
-| `SUSHITRACK_BUFFER_OVERFLOW` | −5 |
+| `SUSHITRACK_INVALID_ARGUMENT` | -1 |
+| `SUSHITRACK_INITIALIZATION_FAILURE` | -2 |
+| `SUSHITRACK_OUT_OF_MEMORY` | -3 |
+| `SUSHITRACK_RUNTIME_ERROR` | -4 |
+| `SUSHITRACK_BUFFER_OVERFLOW` | -5 |
 
 ### Logging
 
 ```c
-void my_logger(SushiTrack_LogLevel level, const char* msg) { /* … */ }
-SushiTrack_SetLogCallback(my_logger);  /* pass NULL to unregister */
+void my_logger(sushitrack_LogLevel level, const char* msg) { /* … */ }
+sushitrack_set_log_callback(my_logger);  /* pass NULL to unregister */
 ```
 
-`SushiTrack_LogLevel` is `DEBUG=0`, `INFO=1`, `WARN=2`, `ERROR=3`. The callback is stored atomically and safe to set/clear from any thread.
+`sushitrack_LogLevel` is `DEBUG=0`, `INFO=1`, `WARN=2`, `ERROR=3`. The callback is stored atomically and safe to set/clear from any thread.
 
 ### Track output fields
 
-`SushiTrack_Track` includes `track_id`, `age` (tracklet length in frames), `last_seen_frame`, `feat`/`feat_dim`, `x/y/width/height`, `score`, `lost_time` (seconds or frames depending on `time_aware`), `label`, `state` (TrackState enum integer), `kinematic_state` (`0=Stationary, 1=Cruising, 2=Maneuvering, 3=Coasting`), `is_activated`, `is_confirmed`, `hits`, and `frames_since_last_update`.
+`sushitrack_track_t` includes `track_id`, `age` (tracklet length in frames), `last_seen_frame`, `feat`/`feat_dim`, `x/y/width/height`, `score`, `lost_time` (seconds or frames depending on `time_aware`), `label`, `state` (TrackState enum integer), `kinematic_state` (`0=Stationary, 1=Cruising, 2=Maneuvering, 3=Coasting`), `is_activated`, `is_confirmed`, `hits`, and `frames_since_last_update`.
 
 ---
 
 ## Python Binding
 
 `bindings/python/sushitrack.py` is a dependency-free `ctypes` binding to the
-public C API. It mirrors `SushiTrack_Object`, `SushiTrack_Track`, and
-`SushiTrack_Params` exactly and wraps the entry points in a `SushiTrack` class, so
+public C API. It mirrors `sushitrack_object_t`, `sushitrack_track_t`, and
+`sushitrack_params_t` exactly and wraps the entry points in a `SushiTrack` class, so
 callers never write `ctypes` themselves. The shared library is located
 automatically under `build/` (override with the `SUSHITRACK_LIB` environment
 variable or the `lib_path` argument).
@@ -647,7 +647,7 @@ variable or the `lib_path` argument).
 ```python
 from sushitrack import SushiTrack, TrackState
 
-# Any SushiTrack_Params field is a keyword override; the rest keep their defaults.
+# Any sushitrack_params_t field is a keyword override; the rest keep their defaults.
 tracker = SushiTrack(frame_rate=30, enable_tentative=1, iou_type=1)
 
 for frame in stream:
@@ -696,15 +696,15 @@ missing, the deploy fails with an explicit message telling you to build first.
 
 ### `--deploy cpp` layout
 
-Targets a C or C++ consumer through the **C ABI** (`SushiTrackC.h`). The C ABI is
+Targets a C or C++ consumer through the **C ABI** (`sushitrack_c.h`). The C ABI is
 deliberately dependency-free — it does **not** pull in Eigen or any C++ header —
 so only two headers are shipped.
 
 ```
 package/
 ├── include/
-│   ├── SushiTrackC.h                 # public C API
-│   └── SushiTrack/SushiTrackTypes.h   # status codes, log levels (only C dependency of the API)
+│   ├── sushitrack_c.h                 # public C API
+│   └── SushiTrack/types.hpp   # status codes, log levels (only C dependency of the API)
 ├── lib/
 │   └── sushitrack.lib                # Windows import library (Linux: libsushitrack.so)
 ├── bin/
@@ -726,11 +726,11 @@ cmake --build build
 ```
 
 To integrate into your own project: add `package/include` to the include path,
-include `SushiTrackC.h`, link against `package/lib/sushitrack.lib` (Windows) or
+include `sushitrack_c.h`, link against `package/lib/sushitrack.lib` (Windows) or
 `package/lib/libsushitrack.so` (Linux), and ensure the runtime library is
 resolvable at load time (DLL on `PATH`/beside the exe on Windows; RPATH or
 `LD_LIBRARY_PATH` on Linux). Create the tracker with
-`SushiTrack_CreateFromConfig("sushitrack.json")` to pick up the bundled config, and
+`sushitrack_createFromConfig("sushitrack.json")` to pick up the bundled config, and
 edit that JSON to retune the algorithm without recompiling.
 
 ### `--deploy python` layout
@@ -815,7 +815,7 @@ Each tracker owns a dedicated JSON file:
 | `tests/bytetrack.json` | ByteTrack | regression harness |
 | `tests/ocsort.json` | OCSORT | regression harness |
 
-`sushitrack.json` is bound to the library, not the test harness: the C API parses it directly (`src/ConfigLoader.cpp`), so a compiled `sushitrack.dll`/`.so` is retuned by editing the file with **no recompilation**. Resolution order: the `$SUSHITRACK_CONFIG` environment variable, then an upward search for `sushitrack.json` from the working directory (so a binary launched from `build/bin` still finds the file at the project root). Any missing key falls back to the compiled default from `SushiTrack_GetDefaultParams`.
+`sushitrack.json` is bound to the library, not the test harness: the C API parses it directly (`source/ConfigLoader.cpp`), so a compiled `sushitrack.dll`/`.so` is retuned by editing the file with **no recompilation**. Resolution order: the `$SUSHITRACK_CONFIG` environment variable, then an upward search for `sushitrack.json` from the working directory (so a binary launched from `build/bin` still finds the file at the project root). Any missing key falls back to the compiled default from `sushitrack_get_default_params`.
 
 The schema is layered `basic` / `advanced`. The outer `"sushitrack"` wrapper is optional — a file whose root is already the `basic`/`advanced` object is also accepted:
 
@@ -836,11 +836,11 @@ The schema is layered `basic` / `advanced`. The outer `"sushitrack"` wrapper is 
 }
 ```
 
-C API entry points (`include/SushiTrackC.h`):
+C API entry points (`include/sushitrack_c.h`):
 
-- `SushiTrack_LoadParamsFromJson(path, &params)` — overlay a file onto a seeded `SushiTrack_Params` (`path = NULL` uses the resolution order above). A missing file is non-fatal.
-- `SushiTrack_CreateFromConfig(path)` — seed defaults, overlay the file, and create in one call.
-- `SushiTrack_Create(NULL)` — shorthand for `SushiTrack_CreateFromConfig(NULL)`. Passing an explicit `SushiTrack_Params*` bypasses file loading entirely (programmatic control).
+- `sushitrack_LoadParamsFromJson(path, &params)` — overlay a file onto a seeded `sushitrack_params_t` (`path = NULL` uses the resolution order above). A missing file is non-fatal.
+- `sushitrack_createFromConfig(path)` — seed defaults, overlay the file, and create in one call.
+- `sushitrack_create(NULL)` — shorthand for `sushitrack_createFromConfig(NULL)`. Passing an explicit `sushitrack_params_t*` bypasses file loading entirely (programmatic control).
 
 The Python binding mirrors this: `SushiTrack(config="auto")` resolves `sushitrack.json` through the library, `config="<path>"` loads an explicit file, and keyword overrides still win over the file.
 
@@ -848,7 +848,7 @@ The Python binding mirrors this: `SushiTrack(config="auto")` resolves `sushitrac
 
 ## Configuration Parameters
 
-All knobs are exposed both on `SushiTrack_Params` (C API, `include/SushiTrackC.h`) and `SushiTrack::TrackerConfig` (C++, `include/SushiTrack/TrackerConfig.h`). Defaults below are from `SushiTrack_GetDefaultParams`.
+All knobs are exposed both on `sushitrack_params_t` (C API, `include/sushitrack_c.h`) and `SushiTrack::TrackerConfig` (C++, `include/SushiTrack/TrackerConfig.h`). Defaults below are from `sushitrack_get_default_params`.
 
 ### Detection thresholds
 
@@ -937,7 +937,7 @@ All knobs are exposed both on `SushiTrack_Params` (C API, `include/SushiTrackC.h
 
 | Key | Default | Description |
 |---|---|---|
-| `kalman_type` | 0 | Motion estimator: `0` linear Kalman, `1` NSA, `2` IMM multi-model. With `2` each track reports a `kinematic_state` and continuous `maneuver_probability`; the IMM noise/transition parameters are built-in (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)). |
+| `kalman_type` | 0 | Motion estimator: `0` linear Kalman, `1` NSA, `2` IMM multi-model. With `2` each track reports a `kinematic_state` and continuous `maneuver_probability`; the IMM noise/transition parameters are built-in (see [architecture/OVERVIEW.md](architecture/OVERVIEW.md)). |
 
 ### Timing
 
@@ -965,7 +965,7 @@ GTest-based, deterministic, no external data. Targets compiled when `-DBUILD_UNI
 - `TestTrackerBuffers` — track_buffer expiry under both timing modes
 - `TestLogger` — callback dispatch, va_list path
 - `TestSushiTrackC` / `TestCAPIErrors` — C-API surface and error codes
-- `TestSushiTrackTracker` / `TestIntegration` — end-to-end flow
+- `TestTracker` / `TestIntegration` — end-to-end flow
 - `TestBoundaryConditions` — empty inputs, oversized output buffer, null args
 - `TestConfiguration` — config-driven parameter parsing
 
@@ -1028,7 +1028,7 @@ ds test --suite integration             # ctest --test-dir build -L '^integratio
 - **`report_generator.py`** — `print_trackeval_table(results, compare)` formats the per-tracker × per-sequence table; `export_trackeval_results(results, dir)` writes JSON/CSV.
 - **`run_eval.py`** — standalone CLI for `TrackEvalRunner` (independent of the compiled binary).
 
-`ds eval` automatically chains regression_test → TrackEval; pass `--eval-only` to skip the C++ binary and re-evaluate cached predictions, or `--trackeval` to invoke the upstream `3rdparty/TrackEval/scripts/run_mot_challenge.py` script.
+`ds eval` automatically chains regression_test → TrackEval; pass `--eval-only` to skip the C++ binary and re-evaluate cached predictions, or `--trackeval` to invoke the upstream `third_party/TrackEval/scripts/run_mot_challenge.py` script.
 
 ---
 
@@ -1045,8 +1045,8 @@ Example end-to-end run:
 ```bash
 ds build
 ds infer \
-    -n yolox-x -c 3rdparty/weight/mot17x.pth.tar \
-    --source 3rdparty/video/MOT17-04.mp4 \
+    -n yolox-x -c third_party/weight/mot17x.pth.tar \
+    --source third_party/video/MOT17-04.mp4 \
     --tracker SushiTrack --num-classes 1 --legacy
 ```
 
@@ -1113,7 +1113,7 @@ ds build           # produces build/bin/<cfg>/sushitrack.{dll,so}
 
 Either way the adapter uses the shipped Python binding
 ([`bindings/python/sushitrack.py`](#python-binding)), which wraps the **public C
-API** (`include/SushiTrackC.h`) — not the regression `tracker_bridge`, whose
+API** (`include/sushitrack_c.h`) — not the regression `tracker_bridge`, whose
 reduced struct omits the state/feature/kinematic fields.
 
 ### Step 2 — Implement the Ultralytics tracker contract
@@ -1136,9 +1136,9 @@ Two conversions matter:
 import numpy as np
 from sushitrack import SushiTrack, TrackState     # bindings/python/sushitrack.py
 
-class SushiTrackTracker:
+class Tracker:
     def __init__(self, frame_rate=30, **overrides):
-        # overrides are SushiTrack_Params fields, e.g. enable_tentative=1, iou_type=1
+        # overrides are sushitrack_params_t fields, e.g. enable_tentative=1, iou_type=1
         self.ds = SushiTrack(frame_rate=frame_rate, **overrides)
         self.dt = 1.0 / float(frame_rate)
 
@@ -1186,12 +1186,12 @@ when you import in-repo (Option B); `SUSHITRACK_LIB` overrides both:
 
 ```python
 from ultralytics import YOLO
-from sushitrack_adapter import SushiTrackTracker
+from sushitrack_adapter import Tracker
 
 def on_predict_start(predictor, persist=False):
     bs = predictor.dataset.bs
     predictor.trackers = [
-        SushiTrackTracker(frame_rate=30, enable_tentative=1, iou_type=1)
+        Tracker(frame_rate=30, enable_tentative=1, iou_type=1)
         for _ in range(bs)
     ]
 
@@ -1209,7 +1209,7 @@ for result in model.track(source="video.mp4", stream=True, persist=True):
 Because Ultralytics' built-in `on_predict_postprocess_end` already calls
 `predictor.trackers[i].update(...)` and interprets the returned array, supplying
 your own `on_predict_start` is enough to swap the tracker. (Alternatively, fork
-the package and add `"sushitrack": SushiTrackTracker` to `TRACKER_MAP` with a
+the package and add `"sushitrack": Tracker` to `TRACKER_MAP` with a
 matching `sushitrack.yaml`; the callback route above avoids touching vendored
 code and is the recommended path.)
 
@@ -1263,11 +1263,11 @@ code and is the recommended path.)
 Evaluated on the MOT17 and MOT20 train sets and DanceTrack, comparing SushiTrack
 against the bundled ByteTrack and OC-SORT references at matched parameters.
 Metrics are from TrackEval. The per-tracker aggregates below summarise the
-internal run recorded in [docs/benchmarks/PRIVATE.md](docs/benchmarks/PRIVATE.md),
+internal run recorded in [reference/BENCHMARKS.md](reference/BENCHMARKS.md),
 which also holds the per-sequence breakdown. SushiTrack ran on the default
 linear-Kalman path (`kalman_type=0`) with the tentative lifecycle, OCM, and ORU
 enabled and appearance ReID off; the full config is in that file. Latency is the
-mean per-frame `update()` time, single-threaded, excluding I/O. PRIVATE.md also
+mean per-frame `update()` time, single-threaded, excluding I/O. BENCHMARKS.md also
 records the `kalman_type=2` IMM ablation: 45.8 % overall HOTA against 45.7 % here,
 at roughly four times the per-frame latency.
 
@@ -1307,6 +1307,16 @@ at roughly four times the per-frame latency.
 
 ## License
 
-Copyright © 2026 Mustafa Garip & Sushi Systems All rights reserved.
+Copyright (c) 2026-present Mustafa Garip & Sushi Systems.
 
-This software and all associated source files are proprietary. No part of this codebase may be copied, modified, distributed, sublicensed, or used in any form without the prior written consent of Mustafa Garip & Sushi Systems
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
