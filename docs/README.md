@@ -1294,3 +1294,18 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
+### Vendored code
+
+`third_party/` carries code written by other people under their own licences.
+Each directory keeps that licence beside the code, and a `NOTICE` naming where
+it came from and what changed:
+
+| Directory | Upstream | Licence |
+|---|---|---|
+| `third_party/bytetrack` | [ByteTrack-cpp](https://github.com/Vertical-Beach/ByteTrack-cpp), a port of [ByteTrack](https://github.com/ifzhang/ByteTrack) | MIT |
+| `third_party/ocsort` | [OC_SORT_CPP](https://github.com/Postroggy/OC_SORT_CPP), a port of [OC-SORT](https://github.com/noahcao/OC_SORT) | MIT |
+| `third_party/eigen` | [Eigen](https://eigen.tuxfamily.org) | MPL-2.0 |
+| `third_party/nlohmann` | [JSON for Modern C++](https://github.com/nlohmann/json) | MIT |
+| `third_party/TrackEval` | [TrackEval](https://github.com/JonathonLuiten/TrackEval) | MIT |
+| `third_party/yolox` | [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) | Apache-2.0 |

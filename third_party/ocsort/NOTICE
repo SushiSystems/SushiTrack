@@ -1,0 +1,13 @@
+OC_SORT_CPP
+https://github.com/Postroggy/OC_SORT_CPP
+
+Vendored into SushiTrack as the reference implementation the regression
+harness measures SushiTrack against. It is a C++ port by Yueqi Guo of OC-SORT,
+published in Python by Jinkun Cao and others at
+https://github.com/noahcao/OC_SORT. The port carries the MIT licence,
+reproduced in LICENSE beside this file; OC-SORT itself is MIT as well.
+
+Changed here: the headers were renamed to the .hpp spelling this tree uses
+(association.h to Association.hpp, kalmanfilter.h to KalmanFilter.hpp,
+OCsort.h to OCSort.hpp, and so on), and CMakeLists.txt was rewritten for this
+workspace. The header guards still name the project they came from.

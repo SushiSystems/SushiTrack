@@ -1,0 +1,11 @@
+ByteTrack-cpp
+https://github.com/Vertical-Beach/ByteTrack-cpp
+
+Vendored into SushiTrack as the reference implementation the regression
+harness measures SushiTrack against. It is a C++ port by Vertical Beach of
+ByteTrack, published in Python by Yifu Zhang and others at
+https://github.com/ifzhang/ByteTrack. Both carry the MIT licence, reproduced
+in LICENSE beside this file with both copyright lines.
+
+Changed here: CMakeLists.txt, which points the build at the Eigen under
+third_party/eigen and silences two MSVC conversion warnings.
