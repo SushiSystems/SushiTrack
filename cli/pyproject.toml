@@ -12,19 +12,15 @@ dependencies = [
     # No Typer: the command layer here is its own thin argparse wrapper
     # (see sushitrack_cli/app.py), not shared with the Typer-based sibling
     # CLIs. Rich IS declared directly, even though sushicore.console is the
-    # only thing that imports it: pipx resolves this project's own
-    # dependency list, but sushicore's (an unpublished, editable-installed
-    # package - see the note below) never enters that resolution, so its
-    # transitive need for Rich has to be stated here or it goes unmet.
+    # only thing that imports it: sushicore now brings rich>=13.0 in
+    # transitively, but a package this CLI itself relies on (indirectly,
+    # through sushicore.console) stays a direct dependency so its version
+    # floor is stated here rather than left to whatever sushicore happens
+    # to pull in.
     "rich>=13.0",
+    "sushicore>=0.1.0",
     "tomli>=2.0; python_version < '3.11'",
 ]
-
-# sushicore (shared CLI presentation layer, see D:/Projects/sushistack/sushicore) is
-# intentionally NOT listed above: it isn't published to any index, so a bare
-# "sushicore>=0.1.0" dependency can't be resolved by pip/pipx from a clean
-# environment. `pip install -e cli` expects it already installed once in the
-# same environment (`pip install -e ../../sushistack/sushicore`).
 
 [project.scripts]
 st = "sushitrack_cli.cli:entry"

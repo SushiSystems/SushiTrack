@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 2026-09-22 — build: Took `sushicore` from PyPI instead of a sibling checkout (`cli/pyproject.toml`).
+
 - 2026-09-21 — docs: Added the upstream licence and a `NOTICE` to `third_party/bytetrack` and `third_party/ocsort`, and listed every vendored dependency in `docs/README.md`.
 
 - 2026-09-17 — cli: Rewired `st` onto `sushicore`'s console/config layer, adding `cli/pyproject.toml`, `cli/config.toml`, and `cli/sushistack.deps.toml`.
