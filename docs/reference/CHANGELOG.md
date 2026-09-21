@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 2026-09-22 — test: Added a Python suite for the `st` command, pinning what `proc` and `env` do (`cli/tests/`).
+
 - 2026-09-22 — build: Took `sushicore` from PyPI instead of a sibling checkout (`cli/pyproject.toml`).
 
 - 2026-09-21 — docs: Added the upstream licence and a `NOTICE` to `third_party/bytetrack` and `third_party/ocsort`, and listed every vendored dependency in `docs/README.md`.

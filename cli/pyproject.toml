@@ -22,6 +22,12 @@ dependencies = [
     "tomli>=2.0; python_version < '3.11'",
 ]
 
+[project.optional-dependencies]
+# Declared rather than assumed: a contributor should not have to guess what
+# `python -m pytest cli/tests` needs. The sibling module CLIs do not declare
+# this yet; `hub` does.
+test = ["pytest>=7.0"]
+
 [project.scripts]
 st = "sushitrack_cli.cli:entry"
 sushitrack = "sushitrack_cli.cli:entry"

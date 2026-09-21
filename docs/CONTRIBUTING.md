@@ -146,7 +146,20 @@ tests/
   unit/         # Per-component tests. Fast, deterministic, no file I/O.
   integration/  # Multi-frame, end-to-end behavioral tests using the C API.
   regression/   # MOT benchmark evaluation against ground truth.
+cli/tests/      # The `st` command itself, in Python.
 ```
+
+The C++ suites test the library. `cli/tests/` tests the CLI that drives it, and runs
+without building anything:
+
+```bash
+pip install -e "cli[test]"
+python -m pytest cli/tests -q
+```
+
+No test there runs a real tool, prints through the shared console, or reads the
+developer's own project: a test that does says something different on someone else's
+machine.
 
 ### Building and running tests
 
