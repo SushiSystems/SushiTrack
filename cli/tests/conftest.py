@@ -13,8 +13,15 @@ something different on someone else's machine.
 from __future__ import annotations
 
 import importlib.util
+import sys
+from pathlib import Path
 
 import pytest
+
+# The package under test sits in cli/, one level above this file, and the suite
+# is run from the repository root as often as from cli/. Putting cli/ on the
+# path here means the same command works from either.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 if importlib.util.find_spec("sushicore") is None:  # pragma: no cover - import guard
     raise RuntimeError(
