@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 2026-09-23 — evaluator/inference: Replaced `loguru` with `sushicore`'s `Console`, matching every sibling Sushi* CLI (`tests/regression/evaluator/`, `tests/regression/inference/`, `environment.yml`, `Dockerfile`).
+
 - 2026-09-22 — cli: Made `st doctor`'s compiler check and `st test`'s ctest `-C` flag OS-agnostic instead of Windows-only (`cli/sushitrack_cli/services/diag.py`, `cli/sushitrack_cli/services/tests.py`, `environment.yml`).
 
 - 2026-09-22 — build: Hid symbols by default on every platform, exporting only `SUSHITRACK_API`; fixed a linker-dropped static initializer this uncovered in the IMM Kalman filter registration (`CMakeLists.txt`, `include/SushiTrack/sushitrack_c.h`, `tests/unit/CMakeLists.txt`, `tests/integration/CMakeLists.txt`, `tests/regression/CMakeLists.txt`, `tests/regression/TrackerRegistry.h`, `third_party/ocsort/CMakeLists.txt`).

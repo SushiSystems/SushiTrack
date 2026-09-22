@@ -22,7 +22,6 @@ RUN pip3 install --no-cache-dir \
     scipy==1.17.1 \
     pytest==9.0.3 \
     absl-py==2.4.0 \
-    loguru==0.7.3 \
     matplotlib==3.10.9 \
     opencv-python==4.13.0.92 \
     pillow==12.2.0 \

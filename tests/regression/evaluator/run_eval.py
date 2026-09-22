@@ -15,7 +15,7 @@ if str(_THIS_DIR) not in sys.path:
 if str(_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(_TOOLS_DIR))
 
-from loguru import logger
+from sushitrack_cli import console
 from trackeval_runner import TrackEvalRunner
 
 
@@ -72,14 +72,14 @@ def main():
         return
 
     data_dir = resolve_data_dir(args)
-    logger.info(f"Data directory : {data_dir}")
+    console.info(f"Data directory : {data_dir}")
 
     runner    = TrackEvalRunner(data_root=str(data_dir), split=args.split)
     scenarios = [args.scenario] if args.scenario else None
     results   = runner.evaluate(trackers=args.trackers, scenarios=scenarios)
 
     if not results:
-        logger.error("No results produced. Check that pred/ files exist.")
+        console.error("No results produced. Check that pred/ files exist.")
         sys.exit(1)
 
     runner.print_results(results, compare=args.compare)

@@ -13,8 +13,15 @@ import re
 import cv2
 import numpy as np
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
-from loguru import logger
+
+# demo.py already puts cli/ on sys.path when it imports this module, but
+# pipeline.py is also importable on its own, so it repeats the same hack.
+_CLI_DIR = Path(__file__).parent.parent.parent.parent / "cli"
+if str(_CLI_DIR) not in sys.path:
+    sys.path.append(str(_CLI_DIR))
+from sushitrack_cli import console
 
 _YOLOX_AVAILABLE = True
 _YOLOX_IMPORT_ERROR = None
@@ -155,7 +162,7 @@ class YOLOXDetector(IDetector):
         if ckpt_path:
             ckpt = torch.load(ckpt_path, map_location="cpu")
             self.model.load_state_dict(ckpt["model"])
-            logger.info(f"Loaded checkpoint from {ckpt_path}")
+            console.info(f"Loaded checkpoint from {ckpt_path}")
 
     def preproc(self, img: np.ndarray, input_size: Tuple[int, int]) -> Tuple[np.ndarray, float]:
         """
@@ -304,7 +311,7 @@ class VideoPipeline:
                         im_ext = seq_sec.get("imExt", ".jpg")
                         self.fps = float(seq_sec.get("frameRate", "30"))
                 except Exception as e:
-                    logger.warning(f"Failed to parse seqinfo.ini: {e}. Using defaults.")
+                    console.warn(f"Failed to parse seqinfo.ini: {e}. Using defaults.")
             
             img_folder = os.path.join(video_path, im_dir)
             if not os.path.isdir(img_folder):
@@ -365,7 +372,7 @@ class VideoPipeline:
         frame_id = 0
         total_time = 0.0
         
-        logger.info(f"Starting pipeline on {self.video_path} at {self.fps} FPS")
+        console.info(f"Starting pipeline on {self.video_path} at {self.fps} FPS")
 
         while True:
             if self.is_image_seq:
@@ -384,9 +391,10 @@ class VideoPipeline:
             frame_id += 1
             if frame_id % 20 == 0:
                 if self.total_frames > 0:
-                    logger.info(f"Processing frame {frame_id}/{self.total_frames} ({frame_id/self.total_frames*100:.1f}%)")
+                    console.progress("frame", frame_id, self.total_frames,
+                                     frame_id / self.total_frames)
                 else:
-                    logger.info(f"Processing frame {frame_id}")
+                    console.progress("frame", frame_id, frame_id)
 
             start_time = time.time()
             
@@ -448,7 +456,7 @@ class VideoPipeline:
             cv2.destroyAllWindows()
             
         avg_fps = frame_id / total_time if total_time > 0 else 0
-        logger.success(f"Processed {frame_id} frames at {avg_fps:.2f} FPS (avg).")
+        console.success(f"Processed {frame_id} frames at {avg_fps:.2f} FPS (avg).")
 
     def _draw_frame(self, frame: np.ndarray, tracks: List[Dict[str, Any]]):
         """

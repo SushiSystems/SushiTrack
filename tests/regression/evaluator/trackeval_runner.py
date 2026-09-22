@@ -14,7 +14,7 @@ _3RDPARTY_TRACKEVAL = _PROJECT_ROOT / "third_party" / "TrackEval"
 if _3RDPARTY_TRACKEVAL.exists() and str(_3RDPARTY_TRACKEVAL) not in sys.path:
     sys.path.insert(0, str(_3RDPARTY_TRACKEVAL))
 
-from loguru import logger
+from sushitrack_cli import console
 
 def _ensure_trackeval() -> bool:
     """
@@ -25,7 +25,7 @@ def _ensure_trackeval() -> bool:
         import trackeval  # noqa
         return True
     except ImportError:
-        logger.error("TrackEval not found.\n"
+        console.error("TrackEval not found.\n"
                   "  Install: pip install git+https://github.com/JonathonLuiten/TrackEval.git")
         return False
 
@@ -141,7 +141,7 @@ class TrackEvalRunner:
         if scenarios is None:
             scenarios = self._discover_scenarios()
         if not scenarios:
-            logger.warning(f"No scenarios found in {self.data_root}")
+            console.warn(f"No scenarios found in {self.data_root}")
             return {}
 
         groups: dict = {}
@@ -227,12 +227,12 @@ class TrackEvalRunner:
             gt_folder       = tmp / "gt"
             trackers_folder = tmp / "trackers"
 
-            logger.info("Loading ground truth...")
+            console.info("Loading ground truth...")
             valid_seqs = []
             for seq in scenarios:
                 src_gt = self.data_root / seq / "gt" / "gt.txt"
                 if not src_gt.exists():
-                    logger.warning(f"  [MISS] {seq:<32} gt.txt not found")
+                    console.warn(f"  [MISS] {seq:<32} gt.txt not found")
                     continue
                 seq_root = gt_folder / seq
                 (seq_root / "gt").mkdir(parents=True, exist_ok=True)
@@ -241,16 +241,16 @@ class TrackEvalRunner:
                 (seq_root / "img1").mkdir(exist_ok=True)
                 valid_seqs.append(seq)
                 print(f"  [ OK ] {seq:<32} gt loaded")
-            logger.info(f"  -> {len(valid_seqs)} sequences with GT")
+            console.info(f"  -> {len(valid_seqs)} sequences with GT")
             if not valid_seqs:
                 return {}
 
-            logger.info(f"Loading predictions for '{tracker_name}'...")
+            console.info(f"Loading predictions for '{tracker_name}'...")
             submitted_seqs = []
             for seq in valid_seqs:
                 src_pred = self.data_root / seq / "pred" / tracker_name / f"{seq}.txt"
                 if not src_pred.exists():
-                    logger.warning(f"  [MISS] {seq:<32} pred/{tracker_name}/{seq}.txt not found")
+                    console.warn(f"  [MISS] {seq:<32} pred/{tracker_name}/{seq}.txt not found")
                     continue
                 dst_dir = trackers_folder / tracker_name / self.split
                 dst_dir.mkdir(parents=True, exist_ok=True)
@@ -260,13 +260,13 @@ class TrackEvalRunner:
                 if sdup: msg += f"  ! {sdup} duplicates removed"
                 print(msg)
                 submitted_seqs.append(seq)
-            logger.info(f"  -> {len(submitted_seqs)} sequences submitted")
+            console.info(f"  -> {len(submitted_seqs)} sequences submitted")
             if not submitted_seqs:
-                logger.warning(f"No pred files for '{tracker_name}' -- skipping.")
+                console.warn(f"No pred files for '{tracker_name}' -- skipping.")
                 return {}
 
             benchmark = _detect_benchmark(submitted_seqs[0])
-            logger.info(f"Benchmark inferred: {benchmark}")
+            console.info(f"Benchmark inferred: {benchmark}")
             seqmap_dir = tmp / "seqmaps"
             seqmap_dir.mkdir(parents=True, exist_ok=True)
             with open(seqmap_dir / f"{benchmark}-{self.split}.txt", "w", encoding="utf-8") as f:
@@ -274,7 +274,7 @@ class TrackEvalRunner:
                 for seq in submitted_seqs:
                     f.write(f"{seq}\n")
 
-            logger.info("Running TrackEval engine...")
+            console.info("Running TrackEval engine...")
             dataset_config = {
                 "GT_FOLDER":            str(gt_folder),
                 "TRACKERS_FOLDER":      str(trackers_folder),
@@ -322,7 +322,7 @@ class TrackEvalRunner:
             evaluator = trackeval.Evaluator(evaluator_config)
             raw, _msg = evaluator.evaluate([dataset], metrics)
 
-            logger.info("Processing results...")
+            console.info("Processing results...")
             return self._extract_results(raw, tracker_name, submitted_seqs)
 
         finally:

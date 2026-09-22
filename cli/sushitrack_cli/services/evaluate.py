@@ -19,7 +19,7 @@ def _load_evaluator(paths):
         from report_generator import (export_trackeval_results,
                                       print_trackeval_table)
     except ImportError as exc:
-        # The evaluator has its own dependency set (numpy, scipy, loguru, TrackEval); name
+        # The evaluator has its own dependency set (numpy, scipy, TrackEval); name
         console.error(
             f"Internal evaluator unavailable: {exc}.\n"
             f"Its dependencies come from environment.yml "

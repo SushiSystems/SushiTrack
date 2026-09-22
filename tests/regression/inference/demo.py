@@ -11,17 +11,19 @@ import sys
 import os
 import time
 from pathlib import Path
-from loguru import logger
 
 # Ensure we can import from the local directory and the project root
 _THIS_DIR = Path(__file__).parent
 _PROJECT_ROOT = _THIS_DIR.parent.parent.parent
 _YOLOX_DIR = _PROJECT_ROOT / "third_party" / "yolox"
 _BUILD_DIR = _PROJECT_ROOT / "build"
+_CLI_DIR = _PROJECT_ROOT / "cli"
 
 sys.path.append(str(_THIS_DIR))
 sys.path.append(str(_YOLOX_DIR))
+sys.path.append(str(_CLI_DIR))
 
+from sushitrack_cli import console
 from tracker_bridge import TrackerBridge
 from pipeline import VideoPipeline, YOLOXDetector, OSNetExtractor
 
@@ -64,17 +66,17 @@ def main():
     """
     args = make_parser().parse_args()
 
-    logger.info("--- Starting Moduler Video Pipeline ---")
-    logger.info(f"Tracker: {args.tracker}")
-    logger.info(f"Source: {args.source}")
-    logger.info(f"Stress Mode: {args.stress}")
-    logger.info(f"YOLOX Model: {args.name}")
+    console.info("--- Starting Moduler Video Pipeline ---")
+    console.info(f"Tracker: {args.tracker}")
+    console.info(f"Source: {args.source}")
+    console.info(f"Stress Mode: {args.stress}")
+    console.info(f"YOLOX Model: {args.name}")
 
     try:
         # Determine target image size
         if len(args.tsize) == 1:
             if args.tsize[0] == 640 and args.ckpt and "mot17" in args.ckpt.lower():
-                logger.info("Detected MOT17 model, using default resolution (800, 1440)")
+                console.info("Detected MOT17 model, using default resolution (800, 1440)")
                 tsize = (800, 1440)
             else:
                 tsize = (args.tsize[0], args.tsize[0])
@@ -92,7 +94,7 @@ def main():
             num_classes=args.num_classes,
             legacy=args.legacy
         )
-        logger.info("[Demo] YOLOX Detector initialized successfully.")
+        console.info("[Demo] YOLOX Detector initialized successfully.")
 
         # 2. Determine Save Path
         save_path = None
@@ -104,28 +106,28 @@ def main():
                 save_path = f"result_{input_name}_{timestamp}.mp4"
             else:
                 save_path = args.save_name
-            logger.info(f"[Demo] Output will be saved to: {save_path}")
+            console.info(f"[Demo] Output will be saved to: {save_path}")
 
         # 3. Initialize Tracker Bridge
         tracker = TrackerBridge(tracker_name=args.tracker, build_dir=str(_BUILD_DIR))
-        logger.info(f"[Demo] {args.tracker} Tracker loaded successfully.")
-        
+        console.info(f"[Demo] {args.tracker} Tracker loaded successfully.")
+
         # 3.5 Initialize ReID Extractor
         extractor = None
         if args.reid:
-            logger.info(f"[Demo] Loading ReID Extractor with model: {args.reid_model}")
+            console.info(f"[Demo] Loading ReID Extractor with model: {args.reid_model}")
             extractor = OSNetExtractor(model_path=args.reid_model, device=args.device)
 
         # 4. Initialize Pipeline
         pipeline = VideoPipeline(video_path=args.source, detector=detector, stress_mode=is_stress, save_path=save_path, mot_label=args.mot_label, extractor=extractor)
-        logger.info("[Demo] Pipeline orchestrator initialized.")
+        console.info("[Demo] Pipeline orchestrator initialized.")
 
         # Run Pipeline
         pipeline.run(tracker)
-        logger.success("[Demo] Pipeline execution completed without errors.")
-        
+        console.success("[Demo] Pipeline execution completed without errors.")
+
     except Exception as e:
-        logger.exception(f"[Demo] Critical error occurred: {str(e)}")
+        console.error(f"[Demo] Critical error occurred: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":

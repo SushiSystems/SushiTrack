@@ -8,11 +8,11 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-_TOOLS_DIR = Path(__file__).parent.parent.parent / "cli"
+_TOOLS_DIR = Path(__file__).parent.parent.parent.parent / "cli"
 if str(_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(_TOOLS_DIR))
 
-from loguru import logger
+from sushitrack_cli import console
 RED, GREEN, YELLOW, BLUE, RESET = "\033[91m", "\033[92m", "\033[93m", "\033[94m", "\033[0m"
 
 #: @brief ANSI escape sequence for bold text.
@@ -300,7 +300,7 @@ def export_trackeval_results(results: dict, out_dir: str) -> None:
     json_path = out / "mot_results.json"
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2)
-    logger.success(f"JSON export: {json_path}")
+    console.success(f"JSON export: {json_path}")
 
     csv_path = out / "mot_results.csv"
     fields = [
@@ -318,4 +318,4 @@ def export_trackeval_results(results: dict, out_dir: str) -> None:
                 row = {"tracker": tracker, "scenario": seq}
                 row.update(m)
                 writer.writerow(row)
-    logger.success(f"CSV export: {csv_path}")
+    console.success(f"CSV export: {csv_path}")

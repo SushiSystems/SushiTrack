@@ -41,7 +41,6 @@ dependencies:
       - iniconfig==2.3.0
       - jinja2==3.1.6
       - kiwisolver==1.5.0
-      - loguru==0.7.3
       - markdown-it-py==4.2.0
       - markupsafe==3.0.3
       - matplotlib==3.10.9
@@ -63,6 +62,7 @@ dependencies:
       - scipy==1.17.1
       - setuptools==81.0.0
       - six==1.17.0
+      - sushicore==0.4.0
       - sympy==1.13.1
       - tabulate==0.10.0
       - tqdm==4.67.3
