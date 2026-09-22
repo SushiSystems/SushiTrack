@@ -370,10 +370,24 @@ def entry(argv=None, prog=None):
         stem = Path(sys.argv[0]).stem.lower()
         if stem in ("sushitrack", "st"):
             app.info.name = stem
+    # A bare invocation is a request for help, not a usage error: it prints the
+    # same page as --help and exits 0. Click's own no_args_is_help (the reason
+    # `app` still declares it, for anything that calls the Typer object
+    # directly) raises NoArgsIsHelpError, a UsageError whose exit code is 2 --
+    # so a bare `st` is spelled out as `st --help` here instead of relying on
+    # that path.
+    call_args = list(sys.argv[1:] if argv is None else argv)
+    if not call_args:
+        call_args = ["--help"]
+    # standalone_mode stays at Typer's default (True): Click's own no-args-is-help
+    # and usage-error handling (NoArgsIsHelpError, UsageError, ...) run only in
+    # that mode. With it off those raise as bare exceptions instead of exiting,
+    # since only standalone_mode's sys.exit() path converts them to SystemExit.
     try:
-        return app(args=argv, standalone_mode=False)
+        app(args=call_args)
     except SystemExit as exc:
         return exc.code or 0
+    return 0
 
 
 if __name__ == "__main__":

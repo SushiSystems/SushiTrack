@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typer.testing import CliRunner
 
-from sushitrack_cli.cli import app
+from sushitrack_cli.cli import app, entry
 
 K_GROUPS = {
     "Project": ["build", "test", "run", "clean", "deploy", "docker"],
@@ -70,3 +70,18 @@ def test_a_bare_invocation_prints_the_same_page():
 def test_docker_sub_app_draws_its_own_page():
     out = _run("docker", "--help")
     assert "build" in out and "run" in out
+
+
+def test_entry_exits_zero_on_a_bare_invocation():
+    """A bare `st` is a help request, not a usage error: entry() must return 0,
+    not Click's own no_args_is_help exit code (2, a UsageError) — regression
+    test for a bug caught by hand after this suite first shipped green."""
+    assert entry(argv=[]) == 0
+
+
+def test_entry_exits_zero_on_help():
+    assert entry(argv=["--help"]) == 0
+
+
+def test_entry_exits_nonzero_on_an_unknown_command():
+    assert entry(argv=["bogus-command"]) != 0
