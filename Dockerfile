@@ -33,10 +33,11 @@ RUN pip3 install --no-cache-dir \
 
 COPY . /workspace/sushitrack/
 
-# `st` and `sushitrack` CLI symlinks for non-interactive and interactive container usage.
-RUN chmod +x /workspace/sushitrack/cli/st.sh /workspace/sushitrack/cli/sushitrack.sh && \
-    ln -sf /workspace/sushitrack/cli/st.sh /usr/local/bin/st && \
-    ln -sf /workspace/sushitrack/cli/sushitrack.sh /usr/local/bin/sushitrack
+# Installs the `st` and `sushitrack` console-script entry points onto PATH
+# (pip's default install location for a non-`--user` root install on Debian,
+# /usr/local/bin, is already on PATH in this image). No separate symlink step:
+# the CLI is a pip package (cli/pyproject.toml), not shell wrapper scripts.
+RUN pip3 install --no-cache-dir /workspace/sushitrack/cli
 
 CMD ["/bin/bash"]
 
