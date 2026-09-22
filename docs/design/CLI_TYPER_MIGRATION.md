@@ -20,7 +20,7 @@ In scope:
 Out of scope (reviewed, no gap found):
 
 - `cli/sushitrack_cli/config.py` — already builds on `ModuleConfig`/`ModuleProfile`; its sectioned schema is a documented, deliberate deviation from `sushicore.config_base.ToolConfig`'s flat table (SushiTrack provisions nothing from the shared SushiStack dependency tree, unlike SushiAI/SushiEngine/SushiBLAS).
-- `cli/sushitrack_cli/console.py` — already the same `LazyConsole` wrapper every sibling CLI uses, unchanged.
+- `cli/sushitrack_cli/console.py` — already the same `LazyConsole` wrapper every sibling CLI uses. One addition is still needed: `current()`, the accessor `sushicore.typer_help.help_group` takes and that `sushiai.console`/`sushidsp.console` already carry; `st`'s `console.py` is missing only that one function, not a structural gap.
 - `cli/sushitrack_cli/services/{build,deploy,discovery,docker,evaluate,infer,label,runner,tests}.py` — already shaped as thin `(cfg, paths, ...) -> exit code` functions, the same shape siblings use; the extra files (`evaluate`, `infer`, `label`) are domain-specific to SushiTrack (MOT benchmarking, YOLOX inference) and have no sibling counterpart to match against.
 
 ## 3. Design
