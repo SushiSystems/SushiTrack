@@ -1,15 +1,21 @@
 """The SushiTrack developer CLI (`st` / `sushitrack`).
 
-Thin command layer: each command parses arguments and delegates to
-:mod:`sushitrack_cli.services`. Nothing here does real work, so the surface stays
-readable as one file and the behaviour stays testable without argparse.
+Thin Typer layer: each command parses arguments and delegates to
+:mod:`sushitrack_cli.services`. Nothing here does real work, so the surface
+stays readable as one file and the behaviour stays testable without Typer.
 """
 
-import sys
-from pathlib import Path
+from __future__ import annotations
 
-from . import __version__
-from .app import App, Opt, main
+import sys
+import types
+from pathlib import Path
+from typing import Optional
+
+import typer
+from sushicore.typer_help import help_group
+
+from . import console
 from .config import context
 from .services import build as build_svc
 from .services import deploy as deploy_svc
@@ -19,69 +25,98 @@ from .services import infer as infer_svc
 from .services import label as label_svc
 from .services import runner as run_svc
 from .services import tests as test_svc
+from .services.build import BuildType
+from .services.deploy import DeployKind
+from .services.tests import Suite
 
-app = App(
-    prog="st",
-    description="SushiTrack developer CLI — build, test, evaluate, run and Docker.",
-    version=__version__,
-    epilog="Built on sushicore, the console/config layer shared with sr/se/sa/sb/sd/hub.",
+K_PROJECT = "Project"
+K_BENCHMARK = "Benchmark"
+K_DIAGNOSTICS = "Diagnostics"
+
+_help_group = help_group(console.current)
+
+app = typer.Typer(
+    name="st",
+    cls=_help_group,
+    help="SushiTrack developer CLI — build, test, evaluate, run and Docker.",
+    no_args_is_help=True,
+    add_completion=False,
+    rich_markup_mode="rich",
 )
 
-docker = app.group("docker", "Docker image and container management.")
 
-app.section("Project", "build", "test", "run", "clean", "deploy")
-app.section("Benchmark", "eval", "infer")
-app.section("Diagnostics", "status", "doctor", "config", "paths", "env")
-
-
-@app.command("build", options=[
-    Opt("--type", "-t", dest="build_type", default=None, metavar="TYPE",
+# --------------------------------------------------------------------------- #
+# build / test / run / clean / deploy (Project)
+# --------------------------------------------------------------------------- #
+@app.command(
+    "build",
+    rich_help_panel=K_PROJECT,
+    epilog="st build\n"
+           "st build --type debug\n"
+           "st build --no-test  # Library only\n"
+           "st build --deploy cpp  # Build, then assemble package/",
+)
+def build(
+    type: Optional[BuildType] = typer.Option(
+        None, "--type", "-t", case_sensitive=False,
         help="Build type: release | debug | relwithdebinfo | minsizerel "
              "(default from config)."),
-    Opt("--no-test", dest="no_test", action="store_true",
+    no_test: bool = typer.Option(
+        False, "--no-test",
         help="Skip the test targets (library only). Tests are built by default."),
-    Opt("--clean", action="store_true",
-        help="Delete the build tree before configuring."),
-    Opt("--jobs", "-j", type=int, default=None, metavar="N",
-        help="Parallel build jobs (default: CPU count)."),
-    Opt("--deploy", choices=list(deploy_svc.KINDS), default=None,
+    clean: bool = typer.Option(
+        False, "--clean", help="Delete the build tree before configuring."),
+    jobs: Optional[int] = typer.Option(
+        None, "--jobs", "-j", help="Parallel build jobs (default: CPU count)."),
+    deploy: Optional[DeployKind] = typer.Option(
+        None, "--deploy", case_sensitive=False,
         help="After building, assemble package/ for the given consumer."),
-    Opt("-D", dest="cmake_defines", action="append", default=[],
-        metavar="VAR=VALUE",
+    define: Optional[list[str]] = typer.Option(
+        None, "-D", metavar="VAR=VALUE",
         help="Extra -D option passed straight to cmake (repeatable)."),
-])
-def build(args):
+):
     """Configure and build the project.
 
-    cmake configure runs only when the requested configuration differs from what
-    the build tree was configured with; otherwise the existing tree is reused.
+    cmake configure runs only when the requested configuration differs from
+    what the build tree was configured with; otherwise the existing tree is
+    reused.
     """
     cfg, paths = context()
-    build_type = build_svc.normalize_build_type(args.build_type) \
-        if args.build_type else None
+    build_type = build_svc.normalize_build_type(type.value) if type else None
     code = build_svc.build(
-        cfg, paths, build_type=build_type, clean=args.clean, jobs=args.jobs,
-        tests=not args.no_test,
-        defines=[f"-D{define}" for define in args.cmake_defines])
-    if code != 0 or not args.deploy:
-        return code
-    return deploy_svc.deploy(paths, args.deploy)
+        cfg, paths, build_type=build_type, clean=clean, jobs=jobs,
+        tests=not no_test,
+        defines=[f"-D{item}" for item in (define or [])])
+    if code != 0 or not deploy:
+        raise typer.Exit(code)
+    raise typer.Exit(deploy_svc.deploy(paths, deploy.value))
 
 
-@app.command("test", options=[
-    Opt("--suite", "-s", choices=list(test_svc.SUITES),
-        default=test_svc.DEFAULT_SUITE,
+@app.command(
+    "test",
+    rich_help_panel=K_PROJECT,
+    epilog="st test  # functional: unit + integration + regression\n"
+           "st test --suite unit\n"
+           "st test --suite unit -f 'RectTest'\n"
+           "st test --suite integration --repeat 3\n"
+           "st test --suite all -j 8",
+)
+def test(
+    suite: Suite = typer.Option(
+        Suite(test_svc.DEFAULT_SUITE), "--suite", "-s", case_sensitive=False,
         help="CTest label group to run ('all' runs every test). "
              f"Default: {test_svc.DEFAULT_SUITE}."),
-    Opt("--filter", "-f", default=None, metavar="REGEX",
+    filter: Optional[str] = typer.Option(
+        None, "--filter", "-f", metavar="REGEX",
         help="ctest -R regex over 'Suite.Case' test names."),
-    Opt("--repeat", "-r", type=int, default=0, metavar="N",
+    repeat: int = typer.Option(
+        0, "--repeat", "-r", min=0, metavar="N",
         help="Re-run each test up to N times, stopping on the first failure "
              "(ctest --repeat until-fail). Useful for hunting flaky tests."),
-    Opt("--jobs", "-j", type=int, default=None, metavar="N",
+    jobs: Optional[int] = typer.Option(
+        None, "--jobs", "-j", metavar="N",
         help="Run up to N tests concurrently (ctest --parallel)."),
-])
-def test(args):
+):
     """Run the test suites via CTest labels.
 
     For GTest-level knobs (shuffle, break-on-failure) run the binary directly:
@@ -91,180 +126,255 @@ def test(args):
     and `st infer`.
     """
     cfg, paths = context()
-    return test_svc.test(cfg, paths, suite=args.suite, filter=args.filter,
-                         repeat=args.repeat, jobs=args.jobs)
+    raise typer.Exit(test_svc.test(cfg, paths, suite=suite.value, filter=filter,
+                                   repeat=repeat, jobs=jobs))
 
 
-@app.command("eval", options=[
-    Opt("--scenario", default=None, metavar="NAME",
-        help="Sequence name or substring filter (default: every sequence)."),
-    Opt("--tracker", default=None, metavar="NAME",
-        help="Tracker to run: sushitrack | bytetrack | ocsort."),
-    Opt("--compare", action="store_true",
-        help="Run every tracker side by side."),
-    Opt("--eval-only", action="store_true",
-        help="Skip inference; re-score the existing pred/*.txt files."),
-    Opt("--trackeval", action="store_true",
-        help="Score with the official TrackEval script instead of the "
-             "internal runner."),
-    Opt("--export", default=None, metavar="DIR",
-        help="Write CSV/JSON metric exports to DIR."),
-    Opt("--private", action="store_true",
-        help="Only MOT sequences with private (YOLOX) detections."),
-    Opt("--public", action="store_true",
-        help="Exclude MOT sequences with private detections."),
-])
-def evaluate(args):
-    """Run the MOT label benchmark and print TrackEval metrics.
+@app.command(
+    "run",
+    rich_help_panel=K_PROJECT,
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    epilog="st run  # Pick from a list\n"
+           "st run unit_test\n"
+           "st run unit_test -- --gtest_filter='TrackletTest.*'",
+)
+def run(
+    ctx: typer.Context,
+    target: Optional[str] = typer.Argument(
+        None, help="Executable name (exact, then substring match). "
+                    "Omit to pick from a list."),
+    select: bool = typer.Option(
+        False, "--select", "-s",
+        help="Always show the picker, even when a target is given."),
+):
+    """Run a built executable."""
+    cfg, paths = context()
+    raise typer.Exit(run_svc.run(cfg, paths, target=target, select=select,
+                                 forwarded=list(ctx.args)))
 
-    Drives the regression binary over det.txt-backed sequences, then scores the
-    predictions (HOTA / DetA / AssA / MOTA / IDF1 / IDSW / latency).
+
+@app.command("clean", rich_help_panel=K_PROJECT, epilog="st clean")
+def clean():
+    """Remove the build tree and the assembled package directory."""
+    _, paths = context()
+    raise typer.Exit(build_svc.clean(paths))
+
+
+@app.command(
+    "deploy", rich_help_panel=K_PROJECT,
+    epilog="st deploy cpp\nst deploy python",
+)
+def deploy_cmd(
+    kind: DeployKind = typer.Argument(..., help="Consumer flavour to assemble."),
+):
+    """Assemble package/ from the current build for C/C++ or Python consumers."""
+    _, paths = context()
+    raise typer.Exit(deploy_svc.deploy(paths, kind.value))
+
+
+# --------------------------------------------------------------------------- #
+# docker (Project)
+# --------------------------------------------------------------------------- #
+docker_app = typer.Typer(
+    cls=_help_group,
+    help="Docker image and container management.",
+    no_args_is_help=True,
+)
+app.add_typer(docker_app, name="docker", rich_help_panel=K_PROJECT)
+
+
+@docker_app.command(
+    "build",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    epilog="st docker build\nst docker build --no-cache",
+)
+def docker_build(
+    ctx: typer.Context,
+    no_cache: bool = typer.Option(
+        False, "--no-cache", help="Rebuild every layer, ignoring Docker's cache."),
+):
+    """Build the SushiTrack Docker image."""
+    cfg, paths = context()
+    raise typer.Exit(docker_svc.build(cfg, paths, no_cache=no_cache,
+                                      forwarded=list(ctx.args)))
+
+
+@docker_app.command(
+    "run",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    epilog="st docker run\nst docker run -- bash -lc 'echo hi'",
+)
+def docker_run(
+    ctx: typer.Context,
+    no_gpu: bool = typer.Option(
+        False, "--no-gpu",
+        help="Omit --gpus all (no GPU available, or a CPU-only run)."),
+):
+    """Start the developer container with this repo mounted.
+
+    Args after `--` are the command to run inside the container, in place of
+    an interactive bash: st docker run -- bash -lc 'echo hi'
     """
     cfg, paths = context()
-    tracker = label_svc.resolve_tracker(args.tracker or cfg.test_tracker)
-    return label_svc.evaluate_sequences(
-        cfg, paths, scenario=args.scenario, tracker=tracker,
-        compare=args.compare, eval_only=args.eval_only,
-        trackeval=args.trackeval, export=args.export,
-        private=args.private, public=args.public)
+    raise typer.Exit(docker_svc.run(cfg, paths, no_gpu=no_gpu,
+                                    command=list(ctx.args) or None))
 
 
-@app.command("infer", forwards=True, options=[
-    Opt("--source", default=None, metavar="PATH",
-        help="Video path or camera index (required)."),
-    Opt("--tracker", default=None, metavar="NAME",
+# --------------------------------------------------------------------------- #
+# eval / infer (Benchmark)
+# --------------------------------------------------------------------------- #
+@app.command(
+    "eval",
+    rich_help_panel=K_BENCHMARK,
+    epilog="st eval\n"
+           "st eval --compare\n"
+           "st eval --scenario MOT17-04-DPM --compare\n"
+           "st eval --eval-only --export ./results\n"
+           "st eval --trackeval --private",
+)
+def evaluate(
+    scenario: Optional[str] = typer.Option(
+        None, "--scenario", metavar="NAME",
+        help="Sequence name or substring filter (default: every sequence)."),
+    tracker: Optional[str] = typer.Option(
+        None, "--tracker", metavar="NAME",
+        help="Tracker to run: sushitrack | bytetrack | ocsort."),
+    compare: bool = typer.Option(
+        False, "--compare", help="Run every tracker side by side."),
+    eval_only: bool = typer.Option(
+        False, "--eval-only",
+        help="Skip inference; re-score the existing pred/*.txt files."),
+    trackeval: bool = typer.Option(
+        False, "--trackeval",
+        help="Score with the official TrackEval script instead of the "
+             "internal runner."),
+    export: Optional[str] = typer.Option(
+        None, "--export", metavar="DIR",
+        help="Write CSV/JSON metric exports to DIR."),
+    private: bool = typer.Option(
+        False, "--private",
+        help="Only MOT sequences with private (YOLOX) detections."),
+    public: bool = typer.Option(
+        False, "--public",
+        help="Exclude MOT sequences with private detections."),
+):
+    """Run the MOT label benchmark and print TrackEval metrics.
+
+    Drives the regression binary over det.txt-backed sequences, then scores
+    the predictions (HOTA / DetA / AssA / MOTA / IDF1 / IDSW / latency).
+    """
+    cfg, paths = context()
+    key = label_svc.resolve_tracker(tracker or cfg.test_tracker)
+    raise typer.Exit(label_svc.evaluate_sequences(
+        cfg, paths, scenario=scenario, tracker=key, compare=compare,
+        eval_only=eval_only, trackeval=trackeval, export=export,
+        private=private, public=public))
+
+
+@app.command(
+    "infer",
+    rich_help_panel=K_BENCHMARK,
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    epilog="st infer -n yolox-x -c third_party/weight/mot17x.pth.tar "
+           "--source third_party/video/MOT17-04.mp4 --num-classes 1 --legacy\n"
+           "st infer --source 0 --tracker sushitrack --no-save --no-screen --stress",
+)
+def infer(
+    ctx: typer.Context,
+    source: Optional[str] = typer.Option(
+        None, "--source", metavar="PATH", help="Video path or camera index (required)."),
+    tracker: Optional[str] = typer.Option(
+        None, "--tracker", metavar="NAME",
         help="Tracker to drive: sushitrack | bytetrack | ocsort."),
-    Opt("--name", "-n", default="yolox-s", help="YOLOX model name."),
-    Opt("--ckpt", "-c", default=None, help="YOLOX checkpoint path."),
-    Opt("--device", default="gpu", help="cpu or gpu."),
-    Opt("--conf", type=float, default=0.1,
-        help="Detection confidence threshold."),
-    Opt("--nms", type=float, default=0.45, help="NMS threshold."),
-    Opt("--tsize", type=int, nargs="+", default=None, metavar="N",
-        help="Inference resolution [H W] or [S]."),
-    Opt("--num-classes", type=int, default=80, help="YOLOX class count."),
-    Opt("--legacy", action="store_true",
-        help="Legacy YOLOX normalisation."),
-    Opt("--stress", action="store_true",
-        help="Headless maximum-throughput mode."),
-    Opt("--no-save", action="store_true",
-        help="Do not write an output video."),
-    Opt("--save_name", default=None, help="Output video filename."),
-    Opt("--mot-label", action="store_true",
-        help="Write detections to output/det.txt."),
-    Opt("--no-screen", action="store_true", help="Disable the UI display."),
-    Opt("--reid", action="store_true",
-        help="Enable OSNet ReID embedding extraction."),
-    Opt("--reid-model", default="osnet_x1_0.onnx",
-        help="Path to the ReID ONNX model."),
-])
-def infer(args):
+    name: str = typer.Option("yolox-s", "--name", "-n", help="YOLOX model name."),
+    ckpt: Optional[str] = typer.Option(None, "--ckpt", "-c", help="YOLOX checkpoint path."),
+    device: str = typer.Option("gpu", "--device", help="cpu or gpu."),
+    conf: float = typer.Option(0.1, "--conf", help="Detection confidence threshold."),
+    nms: float = typer.Option(0.45, "--nms", help="NMS threshold."),
+    tsize: Optional[tuple[int, int]] = typer.Option(
+        None, "--tsize", metavar="H W",
+        help="Inference resolution H W (square: pass the same value twice)."),
+    num_classes: int = typer.Option(80, "--num-classes", help="YOLOX class count."),
+    legacy: bool = typer.Option(False, "--legacy", help="Legacy YOLOX normalisation."),
+    stress: bool = typer.Option(False, "--stress", help="Headless maximum-throughput mode."),
+    no_save: bool = typer.Option(False, "--no-save", help="Do not write an output video."),
+    save_name: Optional[str] = typer.Option(
+        None, "--save_name", help="Output video filename."),
+    mot_label: bool = typer.Option(
+        False, "--mot-label", help="Write detections to output/det.txt."),
+    no_screen: bool = typer.Option(False, "--no-screen", help="Disable the UI display."),
+    reid: bool = typer.Option(False, "--reid", help="Enable OSNet ReID embedding extraction."),
+    reid_model: str = typer.Option(
+        "osnet_x1_0.onnx", "--reid-model", help="Path to the ReID ONNX model."),
+):
     """Run the YOLOX video inference pipeline through tracker_bridge.
 
     Example: st infer --source clip.mp4 -c weights/mot17x.pth.tar --tsize 800 1440
     """
     cfg, paths = context()
-    return infer_svc.run(cfg, paths, args)
+    args = types.SimpleNamespace(
+        source=source, tracker=tracker, name=name, ckpt=ckpt, device=device,
+        conf=conf, nms=nms, tsize=tsize, num_classes=num_classes, legacy=legacy,
+        stress=stress, no_save=no_save, save_name=save_name, mot_label=mot_label,
+        no_screen=no_screen, reid=reid, reid_model=reid_model,
+        forwarded=list(ctx.args))
+    raise typer.Exit(infer_svc.run(cfg, paths, args))
 
 
-@app.command("run", forwards=True, options=[
-    Opt("target", nargs="?", default=None,
-        help="Executable name (exact, then substring match). "
-             "Omit to pick from a list."),
-    Opt("--select", "-s", action="store_true",
-        help="Always show the picker, even when a target is given."),
-])
-def run(args):
-    """Run a built executable.
-
-    Example: st run unit_test -- --gtest_filter='TrackletTest.*'
-    """
-    cfg, paths = context()
-    return run_svc.run(cfg, paths, target=args.target, select=args.select,
-                       forwarded=args.forwarded)
-
-
-@app.command("clean")
-def clean(args):
-    """Remove the build tree and the assembled package directory."""
-    _, paths = context()
-    return build_svc.clean(paths)
-
-
-@app.command("deploy", options=[
-    Opt("kind", choices=list(deploy_svc.KINDS),
-        help="Consumer flavour to assemble."),
-])
-def deploy(args):
-    """Assemble package/ from the current build for C/C++ or Python consumers."""
-    _, paths = context()
-    return deploy_svc.deploy(paths, args.kind)
-
-
-@app.command("status")
-def status(args):
+# --------------------------------------------------------------------------- #
+# status / doctor / config / paths / env (Diagnostics)
+# --------------------------------------------------------------------------- #
+@app.command("status", rich_help_panel=K_DIAGNOSTICS, epilog="st status")
+def status():
     """Show what is built, what is missing and which data sets are present."""
-    return diag_svc.status(*context())
+    raise typer.Exit(diag_svc.status(*context()))
 
 
-@app.command("doctor")
-def doctor(args):
+@app.command("doctor", rich_help_panel=K_DIAGNOSTICS, epilog="st doctor")
+def doctor():
     """Check the toolchain and data this project needs, and report what is missing."""
-    return diag_svc.doctor(*context())
+    raise typer.Exit(diag_svc.doctor(*context()))
 
 
-@app.command("config")
-def config(args):
+@app.command("config", rich_help_panel=K_DIAGNOSTICS, epilog="st config")
+def config():
     """Print the resolved configuration and where each value came from."""
-    return diag_svc.config_show(*context())
+    raise typer.Exit(diag_svc.config_show(*context()))
 
 
-@app.command("paths")
-def paths(args):
+@app.command("paths", rich_help_panel=K_DIAGNOSTICS, epilog="st paths")
+def paths():
     """Print the resolved project directories (replaces cli/paths.env)."""
-    return diag_svc.paths_show(*context())
+    raise typer.Exit(diag_svc.paths_show(*context()))
 
 
-@app.command("env", options=[
-    Opt("--all", "-a", dest="show_all", action="store_true",
+@app.command(
+    "env", rich_help_panel=K_DIAGNOSTICS,
+    epilog="st env\nst env --all  # Show every variable, not just build-relevant",
+)
+def env(
+    show_all: bool = typer.Option(
+        False, "--all", "-a",
         help="Show every variable, not just the build-relevant ones."),
-])
-def env(args):
+):
     """Print the environment cmake, ctest and the test binaries execute under."""
     cfg, project_paths = context()
-    return diag_svc.env_dump(cfg, project_paths, show_all=args.show_all)
-
-
-@docker.command("build", forwards=True, options=[
-    Opt("--no-cache", action="store_true",
-        help="Rebuild every layer, ignoring Docker's cache."),
-])
-def docker_build(args):
-    """Build the SushiTrack Docker image."""
-    cfg, paths = context()
-    return docker_svc.build(cfg, paths, no_cache=args.no_cache,
-                            forwarded=args.forwarded)
-
-
-@docker.command("run", forwards=True, options=[
-    Opt("--no-gpu", action="store_true",
-        help="Omit --gpus all (no GPU available, or a CPU-only run)."),
-    Opt("--command", "-c", nargs="+", default=None, metavar="ARG",
-        help="Command to run in the container instead of an interactive bash."),
-])
-def docker_run(args):
-    """Start the developer container with this repo mounted."""
-    cfg, paths = context()
-    return docker_svc.run(cfg, paths, no_gpu=args.no_gpu, command=args.command,
-                          forwarded=args.forwarded)
+    raise typer.Exit(diag_svc.env_dump(cfg, project_paths, show_all=show_all))
 
 
 def entry(argv=None, prog=None):
     """Process entry point: returns an exit code, never raises for user error."""
     if prog:
-        app.prog = prog
+        app.info.name = prog
     elif sys.argv:
         stem = Path(sys.argv[0]).stem.lower()
         if stem in ("sushitrack", "st"):
-            app.prog = stem
-    return main(app, argv)
+            app.info.name = stem
+    try:
+        return app(args=argv, standalone_mode=False)
+    except SystemExit as exc:
+        return exc.code or 0
+
+
+if __name__ == "__main__":
+    app()
