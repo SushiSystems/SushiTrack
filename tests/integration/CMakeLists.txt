@@ -30,8 +30,10 @@ target_include_directories(integration_test PRIVATE
     ${CMAKE_SOURCE_DIR}/third_party/eigen
 )
 
+# See tests/unit/CMakeLists.txt's comment: linked against the static
+# whitebox-only twin, not the SHARED sushitrack target.
 target_link_libraries(integration_test PRIVATE
-    sushitrack
+    sushitrack_static
     GTest::GTest
 )
 

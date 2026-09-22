@@ -27,14 +27,19 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # ============================================================
 # Shared Library Symbol Export
-# Windows (MSVC): auto-generate .lib import library
-# Linux (GCC/Clang): default visibility hidden, export explicitly
+#
+# Hidden by default, on every platform; only symbols carrying SUSHITRACK_API
+# (include/SushiTrack/sushitrack_export.hpp) are exported. Windows needs no
+# CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS auto-export: every function in the public C
+# API (include/SushiTrack/sushitrack_c.h) already carries SUSHITRACK_API, so
+# __declspec(dllexport)/dllimport does the same job the .hpp's
+# __attribute__((visibility("default"))) branch does on GCC/Clang, and an
+# internal symbol that forgot the macro stays hidden on both, instead of
+# leaking out on Windows only.
 # ============================================================
-set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
-if(NOT WIN32)
-    set(CMAKE_CXX_VISIBILITY_PRESET default)
-    set(CMAKE_VISIBILITY_INLINES_HIDDEN OFF)
-endif()
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS OFF)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 
 # ============================================================
 # Compiler Flags
@@ -47,6 +52,17 @@ if(MSVC)
         /fp:fast     # Fast floating point
         /arch:AVX2   # Enable AVX2 instructions for Ryzen/Modern CPUs
         /DNDEBUG
+        # C4251 ("needs to have dll-interface"): fires because Tracker
+        # (include/SushiTrack/tracker.hpp) is SUSHITRACK_API for the internal
+        # targets that link its C++ symbols directly (unit/integration tests,
+        # tracker_bridge), and now surfaces now that hidden-by-default export
+        # goes through real dllexport/dllimport instead of
+        # CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS's bulk .def export. Safe to
+        # silence here: every target in this build tree shares one compiler
+        # and one CRT version, which is the exact condition C4251 exists to
+        # flag as unsafe. The public C ABI (sushitrack_c.h) never exposes
+        # Tracker, so no external consumer is affected either way.
+        /wd4251
     )
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 else()
@@ -58,6 +74,13 @@ else()
         -funroll-loops
         -DNDEBUG
     )
+    # Mirrors the MSVC branch's /arch:AVX2 -- same x86 assumption, same ISA
+    # target -- so a "fast" build behaves the same across compilers instead of
+    # only opting into AVX2 on Windows. Skipped outright on a non-x86 host
+    # (e.g. ARM), where -mavx2 would fail to compile rather than no-op.
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i686)$")
+        add_compile_options(-mavx2)
+    endif()
 endif()
 
 # ============================================================
@@ -79,7 +102,7 @@ endif()
 # ============================================================
 # SushiTrack Library Target
 # ============================================================
-add_library(${PROJECT_NAME} SHARED
+set(SUSHITRACK_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/source/kalman_filter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/imm_filter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/tracklet.cpp
@@ -94,6 +117,8 @@ add_library(${PROJECT_NAME} SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/source/logger.cpp
 )
 
+add_library(${PROJECT_NAME} SHARED ${SUSHITRACK_SOURCES})
+
 target_compile_definitions(${PROJECT_NAME} PRIVATE SUSHITRACK_EXPORTS)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
@@ -104,6 +129,58 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 # nlohmann/json is a private implementation detail of the JSON config loader;
 # it must not leak onto the public include interface.
 target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party
+)
+
+# ------------------------------------------------------------
+# Internal object-library twin, for whitebox test linkage only.
+#
+# Hidden-by-default visibility (above) is correct for the public DLL
+# boundary: only SUSHITRACK_API-tagged symbols (the C API, plus Tracker
+# itself) should ever be resolvable from outside sushitrack.dll/.so. But
+# tests/unit and tests/integration link directly against internal classes
+# that were never meant to be part of that public surface (Rect<T>,
+# LAPJVSolver, the cost calculators, Logger, ...) -- exporting all of those
+# just to satisfy the test linker would defeat the point of hiding them.
+# Compiling the same sources a second time sidesteps the question: with no
+# DLL boundary, hidden visibility never stops the final test executable's
+# linker from resolving any of its symbols. SUSHITRACK_STATIC (see
+# include/SushiTrack/sushitrack_export.hpp) makes SUSHITRACK_API a no-op
+# here, so this target's own translation units never see a dllexport
+# attribute -- there is nothing to export, only ordinary external linkage
+# within one link step.
+#
+# OBJECT, not STATIC: several classes (IMMFilter, NSAKalmanFilter, ...)
+# register themselves into KalmanFilterRegistry purely as a static
+# initializer's side effect (kalman_filter_registry.hpp's
+# KalmanFilterRegistrar) -- nothing else in the program ever calls a
+# function these translation units define, so nothing creates an
+# unresolved symbol for the linker to pull their .obj in for. A STATIC
+# library is an archive that a consuming linker extracts members from on
+# demand; with no such demand, MSVC's linker silently drops
+# imm_filter.obj entirely, the registrar's constructor never runs, and
+# `st test --suite unit` on a kalman_type=2 (IMM) tracker crashes on a
+# null IStatePredictor from the now-unregistered factory -- root-caused
+# 2026-09-22 against a STATIC first attempt at this same target; kept here
+# so the next person who reaches for STATIC hits this comment first. An
+# OBJECT library carries no archive step:
+# CMake hands every one of its .obj files to a consumer's link line
+# unconditionally, the same way listing these sources directly on
+# ${PROJECT_NAME} already does for the SHARED library above.
+# ------------------------------------------------------------
+add_library(${PROJECT_NAME}_static OBJECT EXCLUDE_FROM_ALL ${SUSHITRACK_SOURCES})
+# PUBLIC, not PRIVATE: a consumer (unit_test, integration_test) including
+# sushitrack_c.h must see SUSHITRACK_STATIC too, or SUSHITRACK_API resolves to
+# its default __declspec(dllimport) branch in the consumer's own translation
+# units -- an import thunk with nothing to import from, since this target has
+# no DLL. Propagating the define is what makes "link this object library"
+# behave like ordinary static linking on the consumer side as well.
+target_compile_definitions(${PROJECT_NAME}_static PUBLIC SUSHITRACK_STATIC)
+target_include_directories(${PROJECT_NAME}_static PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${EIGEN3_INCLUDE_DIR}
+)
+target_include_directories(${PROJECT_NAME}_static PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party
 )
 

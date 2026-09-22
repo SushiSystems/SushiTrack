@@ -35,8 +35,13 @@ target_include_directories(regression_test PRIVATE
     ${CMAKE_SOURCE_DIR}/third_party/eigen
 )
 
+# Linked against sushitrack_static, not the SHARED sushitrack target: the
+# TestInfrastructure::SushiTrackAdapter this links (SushiTrackAdapter.h)
+# constructs SushiTrack::Object/Rect<float> directly, neither of which is
+# part of the public C ABI's export surface. See tests/unit/CMakeLists.txt's
+# comment and the root CMakeLists.txt's sushitrack_static target.
 target_link_libraries(regression_test PRIVATE
-    sushitrack
+    sushitrack_static
     bytetrack
     libocsort
     GTest::GTest
@@ -67,8 +72,13 @@ target_include_directories(tracker_bridge PRIVATE
     ${CMAKE_SOURCE_DIR}/third_party/eigen
 )
 
+# See regression_test's comment above: statically linked for the same
+# reason. tracker_bridge's own export surface is unaffected -- only its
+# EXPORT_API-tagged extern "C" functions (TrackerRegistry.h) are exported;
+# the statically-linked SushiTrack code stays internal to tracker_bridge.dll,
+# compiled hidden-by-default like every other target here.
 target_link_libraries(tracker_bridge PRIVATE
-    sushitrack
+    sushitrack_static
     bytetrack
     libocsort
 )

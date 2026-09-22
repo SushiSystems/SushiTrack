@@ -40,8 +40,12 @@ target_include_directories(unit_test PRIVATE
     ${CMAKE_SOURCE_DIR}/third_party/eigen
 )
 
+# Linked against the static, whitebox-only twin (sushitrack_static, see the
+# root CMakeLists.txt), not the SHARED sushitrack target: these tests reach
+# into internal classes (Rect, LAPJVSolver, the cost calculators, Logger, ...)
+# that hidden-by-default visibility deliberately keeps out of the public DLL.
 target_link_libraries(unit_test PRIVATE
-    sushitrack
+    sushitrack_static
     GTest::GTest
 )
 

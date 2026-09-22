@@ -33,23 +33,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#ifndef SUSHITRACK_API
-#if defined(_WIN32) || defined(__CYGWIN__)
-    #if defined(SUSHITRACK_EXPORTS) || defined(SUSHITRACK_BUILDING_LIBRARY)
-        #define SUSHITRACK_API __declspec(dllexport)
-    #elif defined(SUSHITRACK_STATIC)
-        #define SUSHITRACK_API
-    #else
-        #define SUSHITRACK_API __declspec(dllimport)
-    #endif
-#else
-    #if defined(__GNUC__) && __GNUC__ >= 4
-        #define SUSHITRACK_API __attribute__((visibility("default")))
-    #else
-        #define SUSHITRACK_API
-    #endif
-#endif
-#endif
+// Pure preprocessor macros, no C++ syntax: including it here keeps this
+// header's C ABI dependency-free (see docs/README.md's `--deploy cpp` layout)
+// while still defining SUSHITRACK_API in exactly one place, not a second copy
+// that could drift from the one sushitrack_export.hpp already carries.
+#include "SushiTrack/sushitrack_export.hpp"
 
 #ifdef __cplusplus
 extern "C"

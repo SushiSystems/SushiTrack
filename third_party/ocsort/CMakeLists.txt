@@ -3,7 +3,6 @@ project(libocsort)
 
 set(CMAKE_CXX_STANDARD 17)
 
-set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 file(GLOB SRC_LIST src/*.cpp)
 
 # Using STATIC to avoid DLL issues in test builds if not needed as shared

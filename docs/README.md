@@ -140,7 +140,7 @@ Visual features are L2-normalised and exponentially smoothed (`feature_momentum`
 Python runtime dependencies are defined by `environment.yml` (the source of
 truth): `numpy==2.4.4`, `pandas==3.0.2`, `scipy==1.17.1`, `pytest==9.0.3`, `absl-py==2.4.0`, `loguru==0.7.3`, `matplotlib==3.10.9`, `opencv-python==4.13.0.92`, `pillow==12.2.0`, `pycocotools==2.0.11`, `rich==15.0.0`, `tqdm==4.67.3`. PyTorch (`torch`/`torchvision`/`torchaudio`) is installed from the conda `pytorch` channel with `pytorch-cuda=12.1`. The `Dockerfile` mirrors the same package set via pip and pins PyTorch to `torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1` from the cu121 wheel index.
 
-Compiler flags: MSVC compiles with `/W3 /O2 /Ot /fp:fast /arch:AVX2 /DNDEBUG`; GCC/Clang compile with `-Wall -O3 -ffast-math -funroll-loops -DNDEBUG`. Library is built `SHARED`; on Windows `CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS` is `ON`. Outputs are unified under `${CMAKE_BINARY_DIR}/bin` and `${CMAKE_BINARY_DIR}/lib`.
+Compiler flags: MSVC compiles with `/W3 /O2 /Ot /fp:fast /arch:AVX2 /DNDEBUG`; GCC/Clang compile with `-Wall -O3 -ffast-math -funroll-loops -DNDEBUG` (plus `-mavx2` on x86_64, mirroring the MSVC flag). Library is built `SHARED` with hidden-by-default symbol visibility on every platform; only functions carrying `SUSHITRACK_API` (`include/SushiTrack/sushitrack_export.hpp`) are exported, via `__declspec(dllexport)`/`dllimport` on Windows and `__attribute__((visibility("default")))` on GCC/Clang. Outputs are unified under `${CMAKE_BINARY_DIR}/bin` and `${CMAKE_BINARY_DIR}/lib`.
 
 ---
 

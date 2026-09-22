@@ -124,11 +124,17 @@ private:
     }();
 
 
-// C-API for ctypes interoperability
+// C-API for ctypes interoperability. A smaller copy of
+// SushiTrack/sushitrack_export.hpp's pattern rather than a reuse of
+// SUSHITRACK_API itself: that macro is gated by SUSHITRACK_EXPORTS, specific
+// to the sushitrack target, and tracker_bridge is a separate DLL that ctypes
+// dlopen()s directly, never links against -- so it needs no dllimport branch.
 #ifdef _WIN32
 #define EXPORT_API __declspec(dllexport)
-#else
+#elif defined(__GNUC__) && __GNUC__ >= 4
 #define EXPORT_API __attribute__((visibility("default")))
+#else
+#define EXPORT_API
 #endif
 
 extern "C" 
