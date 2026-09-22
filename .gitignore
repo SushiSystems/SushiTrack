@@ -51,6 +51,7 @@ venv/
 .pytest_cache/
 *.pth
 *.tar
+*.egg-info/
 
 # Videos
 *.mp4
