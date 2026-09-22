@@ -63,6 +63,13 @@ Add, mirroring the sibling CLIs' `cli/tests/`:
 
 `test_env.py` and `test_proc.py` are unchanged.
 
+### 3.5 `infer --tsize`: one approved exception to §4's flag-behaviour rule
+
+Click's `Option` has no equivalent to argparse's `nargs="+"` (variable-count values on one flag; only `Argument` supports `nargs=-1`; confirmed directly — Click raises `TypeError: nargs=-1 is not supported for options.`). Two commands relied on it:
+
+- `infer`'s `--tsize` accepted either a single value (`--tsize 640`, square) or two (`--tsize 800 1440`, H W). Resolved: `--tsize` becomes a fixed two-value option (`nargs=2`, `Tuple[int, int]`), so a square size is spelled `--tsize 640 640`. `--tsize 800 1440` and every other current example keep working unchanged.
+- `docker run`'s `--command`/`-c` took the whole container command as a word list. Resolved: the flag is removed; the existing trailing-`--`-forwarding mechanism (`ctx.args`), which today carries extra `docker run` flags inserted before the image name, now carries the container command instead — `st docker run -- bash -lc "echo hi"` in place of `st docker run --command bash -lc "echo hi"`. The "extra docker run flags before the image name" use `forwarded` served is dropped (no flag exercised it in `docs/README.md` or any test); `docker build`'s own `--`-forwarding (extra `docker build` flags) is unaffected, since it has no competing flag.
+
 ## 4. Non-goals
 
 - No change to any command's name, flag name, default value, or exit-code behaviour. This is a framework swap, not a UX redesign.
