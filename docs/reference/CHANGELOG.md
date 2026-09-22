@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- 2026-09-22 — cli: Made `st doctor`'s compiler check and `st test`'s ctest `-C` flag OS-agnostic instead of Windows-only (`cli/sushitrack_cli/services/diag.py`, `cli/sushitrack_cli/services/tests.py`, `environment.yml`).
+
+- 2026-09-22 — build: Hid symbols by default on every platform, exporting only `SUSHITRACK_API`; fixed a linker-dropped static initializer this uncovered in the IMM Kalman filter registration (`CMakeLists.txt`, `include/SushiTrack/sushitrack_c.h`, `tests/unit/CMakeLists.txt`, `tests/integration/CMakeLists.txt`, `tests/regression/CMakeLists.txt`, `tests/regression/TrackerRegistry.h`, `third_party/ocsort/CMakeLists.txt`).
+
 - 2026-09-22 — build: Fixed `Dockerfile` and `README.md` referencing `cli/st.sh`/`cli/st.py`, which no longer exist since the CLI became a pip package (`Dockerfile`, `README.md`).
 
 - 2026-09-22 — cli: Rebuilt the `st` command layer on Typer, matching every sibling Sushi* CLI (`cli/sushitrack_cli/cli.py`, removed `cli/sushitrack_cli/app.py`).
