@@ -3,7 +3,6 @@
 import enum
 
 from .. import console, proc
-from ..config import IS_WINDOWS
 from ..env import load_build_env
 from . import build as build_svc
 
@@ -59,11 +58,17 @@ def test(cfg, paths, suite=DEFAULT_SUITE, filter=None, repeat=0, jobs=None):
                      f"(stops on the first failure).")
     if jobs and jobs > 1:
         command += ["--parallel", str(jobs)]
-    if IS_WINDOWS:
-        # A multi-config generator needs the configuration named explicitly; harmless on a
-        build_type = build_svc.cache_value(build_dir, "CMAKE_BUILD_TYPE")
-        if not build_type:
-            command += ["-C", build_svc.normalize_build_type(cfg.build_type)]
+    # A multi-config generator (Visual Studio, Xcode, Ninja Multi-Config)
+    # leaves CMAKE_BUILD_TYPE unset in the cache -- the configuration is
+    # chosen at build/test time instead, via -C, which every generator kind
+    # accepts harmlessly. Keyed on the cache, not the host OS, so a
+    # multi-config generator used anywhere (Ninja Multi-Config on Linux,
+    # Visual Studio on Windows) is handled the same way; single-config
+    # generators (Ninja, Unix Makefiles, ...) always populate the cache
+    # value, so this never fires for them regardless of platform.
+    build_type = build_svc.cache_value(build_dir, "CMAKE_BUILD_TYPE")
+    if not build_type:
+        command += ["-C", build_svc.normalize_build_type(cfg.build_type)]
 
     console.info(f"Suite: {suite}")
     code = proc.run_drained(command, cwd=build_dir,

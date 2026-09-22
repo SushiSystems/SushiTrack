@@ -162,15 +162,26 @@ def doctor(cfg, paths):
             ninja or (f"not on PATH; build tree uses {cached}" if from_cache
                       else f"not found — required by the '{generator}' generator")))
 
+    # Probed by name rather than branched on the host OS: MSVC only ever
+    # answers to vcvars (cl.exe supports no --version flag proc.tool_version
+    # could read), but Clang and GCC are both documented as supported
+    # (docs/README.md's Requirements table) and both installable on either
+    # platform -- MinGW-w64 g++ or clang-cl on Windows, either on Linux.
+    # Every one found is reported, not just the first.
+    compilers = []
     if IS_WINDOWS:
         vcvars = os.environ.get("VSINSTALLDIR") or find_vcvars()
-        checks.append(_check("msvc", vcvars is not None,
-                             str(vcvars or "no Visual Studio C++ toolset found")))
-    else:
-        compiler = (proc.tool_version("c++", env=build_env)
-                    or proc.tool_version("g++", env=build_env))
-        checks.append(_check("c++ compiler", compiler is not None,
-                             compiler or "no c++/g++ on PATH"))
+        if vcvars:
+            compilers.append(("MSVC", str(vcvars)))
+    for label, exe in (("Clang", "clang++"), ("GCC", "g++")):
+        version = proc.tool_version(exe, env=build_env)
+        if version is not None:
+            compilers.append((label, version))
+    checks.append(_check(
+        "c++ compiler", bool(compilers),
+        "; ".join(f"{label}: {info}" for label, info in compilers) if compilers
+        else ("no MSVC (vcvars), clang++ or g++ found" if IS_WINDOWS
+              else "no clang++ or g++ on PATH")))
 
     eigen = paths.third_party / "eigen" / "Eigen" / "Dense"
     checks.append(_check("eigen", eigen.is_file(),
