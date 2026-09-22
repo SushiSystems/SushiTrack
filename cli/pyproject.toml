@@ -9,16 +9,15 @@ description = "SushiTrack developer CLI (build / test / eval / infer / run)"
 authors = [{ name = "Mustafa Garip", email = "garipm@mef.edu.tr" }]
 requires-python = ">=3.10"
 dependencies = [
-    # No Typer: the command layer here is its own thin argparse wrapper
-    # (see sushitrack_cli/app.py), not shared with the Typer-based sibling
-    # CLIs. Rich IS declared directly, even though sushicore.console is the
-    # only thing that imports it: sushicore now brings rich>=13.0 in
-    # transitively, but a package this CLI itself relies on (indirectly,
-    # through sushicore.console) stays a direct dependency so its version
-    # floor is stated here rather than left to whatever sushicore happens
-    # to pull in.
+    # The command layer (sushitrack_cli/cli.py) is Typer, the same framework
+    # every sibling Sushi* CLI (sa/sb/sd/hub) uses. Rich IS declared directly,
+    # even though sushicore.console and typer both bring it in transitively: a
+    # package this CLI itself relies on stays a direct dependency so its
+    # version floor is stated here rather than left to whatever sushicore or
+    # typer happens to pull in.
+    "typer>=0.12",
     "rich>=13.0",
-    "sushicore>=0.1.0",
+    "sushicore>=0.4.0",
     "tomli>=2.0; python_version < '3.11'",
 ]
 
