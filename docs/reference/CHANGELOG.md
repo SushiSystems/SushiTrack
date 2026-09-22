@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 2026-09-22 — cli: Rebuilt the `st` command layer on Typer, matching every sibling Sushi* CLI (`cli/sushitrack_cli/cli.py`, removed `cli/sushitrack_cli/app.py`).
+
 - 2026-09-22 — test: Added a Python suite for the `st` command, pinning what `proc` and `env` do (`cli/tests/`).
 
 - 2026-09-22 — build: Took `sushicore` from PyPI instead of a sibling checkout (`cli/pyproject.toml`).

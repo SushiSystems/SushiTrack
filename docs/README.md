@@ -275,8 +275,7 @@ sushitrack/
     ├── config.local.toml         # Per-machine overrides (not tracked)
     ├── sushistack.deps.toml      # SushiStack dependency fragment (GoogleTest only)
     ├── sushitrack_cli/
-    │   ├── cli.py                # Command declarations (one thin layer)
-    │   ├── app.py                # Declarative argparse layer
+    │   ├── cli.py                # Typer command declarations (one thin layer)
     │   ├── config.py             # Layered TOML config + sushicore root resolution
     │   ├── env.py                # MSVC (vcvars) environment snapshotting
     │   ├── proc.py               # Subprocess helpers
@@ -505,7 +504,7 @@ ctypes. Arguments after `--` are forwarded to `demo.py` untouched.
 | `--device {cpu,gpu}` | `gpu` | Inference device |
 | `--conf <float>` | `0.1` | Detection confidence floor |
 | `--nms <float>` | `0.45` | NMS IoU threshold |
-| `--tsize <H W \| S>` | – | Inference resolution; single value treated as square |
+| `--tsize <H W>` | – | Inference resolution; pass the same value twice for a square size |
 | `--num-classes <int>` | `80` | Class count (set `1` for MOT) |
 | `--legacy` | off | Legacy YOLOX normalisation (BGR→RGB, 0–1 scale, ImageNet mean/std) |
 | `--stress` | off | Headless max-throughput mode |
@@ -546,11 +545,12 @@ st clean
 ### `st docker build` / `st docker run`
 
 `docker build` / `docker run` are issued directly — there are no shell wrappers left. `run` mounts the repo at the configured `docker.workdir` and passes `--gpus all` unless `--no-gpu` is given:
-`docker run -it --rm --gpus all -v "<root>:/workspace/sushitrack" -w /workspace/sushitrack sushitrack bash`.
+`docker run -it --rm --gpus all -v "<root>:/workspace/sushitrack" -w /workspace/sushitrack sushitrack bash`. Args after `--` replace the default `bash` with the command run inside the container.
 
 ```bash
 st docker build
 st docker run
+st docker run -- bash -lc "echo hi"
 ```
 
 ---
@@ -1217,8 +1217,7 @@ code and is the recommended path.)
 | File | Purpose |
 |---|---|
 | `cli/pyproject.toml` | Package metadata; installed with pipx, provides the `st` and `sushitrack` entry points |
-| `cli/sushitrack_cli/cli.py` | Flat command declarations delegating to the service layer |
-| `cli/sushitrack_cli/app.py` | Declarative argparse layer (command registry, grouped help, `--` passthrough) |
+| `cli/sushitrack_cli/cli.py` | Typer command declarations delegating to the service layer, plus the `docker` sub-app |
 | `cli/sushitrack_cli/config.py` | Layered TOML config, `ST_*` overrides, project-root and path resolution via `sushicore.module_config` |
 | `cli/sushitrack_cli/console.py` | `sushicore`'s console, theme and icon set, wired in lazily |
 | `cli/sushitrack_cli/env.py` | vcvars discovery and build-environment snapshotting on Windows |
