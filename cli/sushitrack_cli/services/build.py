@@ -1,5 +1,6 @@
 """Configure, build and clean the project."""
 
+import enum
 import os
 import shutil
 from pathlib import Path
@@ -9,6 +10,15 @@ from ..config import IS_WINDOWS
 from ..env import load_build_env
 
 BUILD_TYPES = ("Release", "Debug", "RelWithDebInfo", "MinSizeRel")
+
+
+class BuildType(str, enum.Enum):
+    """The `--type` choices for `st build`, lower-cased for the CLI surface."""
+
+    release = "release"
+    debug = "debug"
+    relwithdebinfo = "relwithdebinfo"
+    minsizerel = "minsizerel"
 
 LIBRARY_TARGET = "sushitrack"
 # Every target the test build produces. Listed explicitly (rather than building th

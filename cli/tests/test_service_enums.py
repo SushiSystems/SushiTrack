@@ -1,0 +1,21 @@
+"""The Typer command layer's selection enums mirror their service's own
+string constants exactly — one canonical value set, not two."""
+
+from __future__ import annotations
+
+from sushitrack_cli.services import build as build_svc
+from sushitrack_cli.services import deploy as deploy_svc
+from sushitrack_cli.services import tests as test_svc
+
+
+def test_build_type_values_match_build_types():
+    assert {member.value for member in build_svc.BuildType} == \
+        {name.lower() for name in build_svc.BUILD_TYPES}
+
+
+def test_suite_values_match_suites():
+    assert {member.value for member in test_svc.Suite} == set(test_svc.SUITES)
+
+
+def test_deploy_kind_values_match_kinds():
+    assert {member.value for member in deploy_svc.DeployKind} == set(deploy_svc.KINDS)

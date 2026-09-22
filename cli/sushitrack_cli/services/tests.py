@@ -1,11 +1,13 @@
 """Test execution through CTest labels."""
 
+import enum
+
 from .. import console, proc
 from ..config import IS_WINDOWS
 from ..env import load_build_env
 from . import build as build_svc
 
-# Suite -> CTest label-selection regex (`ctest -L`). The single categories anchor 
+# Suite -> CTest label-selection regex (`ctest -L`). The single categories anchor
 SUITE_LABELS = {
     "unit": "^unit$",
     "integration": "^integration$",
@@ -14,6 +16,16 @@ SUITE_LABELS = {
 }
 SUITES = (*SUITE_LABELS, "all")
 DEFAULT_SUITE = "functional"
+
+
+class Suite(str, enum.Enum):
+    """The `--suite` choices for `st test`."""
+
+    unit = "unit"
+    integration = "integration"
+    regression = "regression"
+    functional = "functional"
+    all = "all"
 
 
 def ctest_exe(cfg):

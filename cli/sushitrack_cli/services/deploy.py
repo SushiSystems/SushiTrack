@@ -5,6 +5,7 @@ Two flavours: ``cpp`` (headers + link/runtime library + a CMake example) and
 are self-contained — the consumer needs neither this repo nor a build tree.
 """
 
+import enum
 import platform
 import shutil
 
@@ -13,6 +14,13 @@ from ..config import IS_WINDOWS
 from . import discovery
 
 KINDS = ("cpp", "python")
+
+
+class DeployKind(str, enum.Enum):
+    """The `deploy` command's consumer-flavour argument."""
+
+    cpp = "cpp"
+    python = "python"
 
 _CPP_EXAMPLE = """\
 /*
