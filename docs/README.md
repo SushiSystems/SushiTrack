@@ -278,10 +278,10 @@ sushitrack/
     │   ├── cli.py                # Typer command declarations (one thin layer)
     │   ├── config.py             # Layered TOML config + sushicore root resolution
     │   ├── env.py                # MSVC (vcvars) environment snapshotting
-    │   ├── proc.py               # Subprocess helpers
+    │   ├── process.py            # Shared sushicore process runner
     │   ├── console.py            # sushicore console, wired in lazily
     │   └── services/             # build, tests, evaluate, deploy, docker,
-    │                             #   diag, discovery, runner
+    │                             #   diag, artifacts, checks, runner
     └── misc/
         ├── clean_preds.sh        # Wipes pred/ directories under evaluator/data
         ├── clean_preds.bat       # Wipes pred/ directories under evaluator/data (Windows)
