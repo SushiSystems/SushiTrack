@@ -1,5 +1,6 @@
 # CLI per-machine config and build-env snapshot
 cli/config.local.json
+cli/config.local.toml
 .sushitrack_env.json
 
 # Build Directories

@@ -1,18 +1,10 @@
-"""Layered configuration and path resolution.
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+"""Loads SushiTrack's layered configuration and resolves its paths.
 
-Root and config-directory resolution — the walk from the invocation directory
-up to a marker file, then the layered ``config.toml`` / ``config.local.toml``
-lookup — is :class:`sushicore.module_config.ModuleConfig`'s job, shared with
-every other Sushi* CLI. ``use_workspace_config=False`` because SushiTrack
-provisions nothing from the shared SushiStack dependency tree: its own Eigen
-and nlohmann-json are vendored under ``third_party/``, and GoogleTest comes
-from conda or the system package manager, not the bundled toolchain.
-
-What stays here is genuinely SushiTrack's own: a config schema shaped by
-section (``paths``, ``build``, ``docker``, ``test``) rather than the flat
-``[tool]`` table :class:`sushicore.config_base.ToolConfig` assumes, so the
-layering and environment-override logic below reads those sections directly
-instead of going through that shared, single-section loader.
+Root and config-directory resolution belongs to :class:`sushicore.module_config.ModuleConfig`.
+The sectioned tables (``cli``, ``paths``, ``build``, ``docker``, ``test``) load here; the
+``[tool]`` table loads as :class:`ToolSettings` through sushicore, workspace-aware.
 """
 
 from __future__ import annotations
@@ -22,7 +14,9 @@ import platform
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
+from sushicore.config_base import load_tool_config
 from sushicore.module_config import ModuleConfig
+from sushicore.provision.config import ProvisionSettings
 from sushicore.profile import ModuleProfile
 from sushicore.workspace import read_toml
 
@@ -35,9 +29,14 @@ PROFILE = ModuleProfile(
     env_prefix="ST",
     root_marker="include/SushiTrack/sushitrack_c.h",
     env_of_interest=("EIGEN", "SUSHITRACK"),
+    extra_env_overrides={
+        "cmake_exe": "ST_CMAKE",
+        "ctest_exe": "ST_CTEST",
+        "generator": "ST_GENERATOR",
+    },
 )
 
-_MODULE = ModuleConfig(PROFILE, use_workspace_config=False)
+_MODULE = ModuleConfig(PROFILE, use_workspace_config=True)
 
 find_project_root = _MODULE.find_project_root
 config_dir = _MODULE.config_dir
@@ -56,6 +55,13 @@ class Appearance:
     color: str = "auto"  # auto | always | never
     color_overrides: dict = field(default_factory=dict)
     icon_overrides: dict = field(default_factory=dict)
+
+
+@dataclass
+class ToolSettings(ProvisionSettings):
+    """Holds the ``[tool]`` section: host build tools and provisioned toolchain roots."""
+
+    generator: str = ""
 
 
 @dataclass
@@ -81,11 +87,7 @@ class Config:
     paths_package: str = "package"
 
     build_type: str = "Release"
-    # Empty means "let cmake pick its default generator for the platform".
-    build_generator: str = ""
     build_jobs: int = 0  # 0 -> os.cpu_count()
-    build_cmake: str = "cmake"
-    build_ctest: str = "ctest"
 
     docker_image: str = "sushitrack"
     docker_workdir: str = "/workspace/sushitrack"
@@ -95,6 +97,8 @@ class Config:
 
     # Populated by the loader, not read from any file: field name -> origin ("default"
     sources: dict = field(default_factory=dict)
+
+    tool: ToolSettings = field(default_factory=ToolSettings)
 
     def expand(self, value):
         """Expand ``~`` and ``$VAR`` in a configured path-like string."""
@@ -119,10 +123,7 @@ ENV_OVERRIDES = {
     "paths_third_party": "ST_3RDPARTY_DIR",
     "paths_config": "ST_CONFIG_FILE",
     "build_type": "ST_BUILD_TYPE",
-    "build_generator": "ST_GENERATOR",
     "build_jobs": "ST_JOBS",
-    "build_cmake": "ST_CMAKE",
-    "build_ctest": "ST_CTEST",
     "docker_image": "ST_DOCKER_IMAGE",
     "docker_gpus": "ST_DOCKER_GPUS",
     "test_tracker": "ST_TRACKER",
@@ -175,10 +176,26 @@ def _apply_env(cfg):
             cfg.sources[name] = f"env:{var}"
 
 
+def load_tool(root=None):
+    """Load the ``[tool]`` section through sushicore's layered loader.
+
+    Returns:
+        The workspace-aware settings inside a checkout, else defaults with env overrides.
+    """
+    try:
+        config_dir(root)
+    except SystemExit:
+        plat = platform.system().lower()
+        return load_tool_config(ToolSettings, [], plat, PROFILE.env_overrides())
+    return _MODULE.load(ToolSettings)
+
+
 def load_config(root=None):
     """Load and resolve the layered configuration for the current platform."""
     cfg = Config()
-    cfg.sources = {f.name: "default" for f in fields(cfg) if f.name != "sources"}
+    cfg.sources = {f.name: "default" for f in fields(cfg)
+                   if f.name not in ("sources", "tool")}
+    cfg.tool = load_tool(root)
     try:
         cfg_dir = config_dir(root)
     except SystemExit:

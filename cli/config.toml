@@ -26,10 +26,7 @@ package = "package"
 
 [build]
 type = "Release"
-generator = ""
 jobs = 0
-cmake = "cmake"
-ctest = "ctest"
 
 [docker]
 image = "sushitrack"
@@ -39,5 +36,10 @@ gpus = true
 [test]
 tracker = "sushitrack"
 
-[platform.windows.build]
+[tool]
+cmake_exe = ""
+ctest_exe = ""
+generator = ""
+
+[tool.windows]
 generator = "Ninja"

@@ -1,3 +1,5 @@
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
+# Licensed under the Apache License, Version 2.0. See LICENSE.
 """Configure, build and clean the project."""
 
 import enum
@@ -42,11 +44,11 @@ def normalize_build_type(value):
 
 
 def cmake_exe(cfg):
-    return cfg.expand(cfg.build_cmake) or "cmake"
+    return cfg.expand(cfg.tool.cmake_exe) or "cmake"
 
 
 def generator(cfg):
-    configured = cfg.expand(cfg.build_generator)
+    configured = cfg.expand(cfg.tool.generator)
     if configured:
         return configured
     # Windows has no default single-config generator worth using here: the old build.b

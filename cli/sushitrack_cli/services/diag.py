@@ -1,3 +1,5 @@
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
+# Licensed under the Apache License, Version 2.0. See LICENSE.
 """Read-only diagnostics: status, doctor, config, env, paths.
 
 Unlike sibling CLIs' diag.py, this does not delegate config_show/env_dump to
@@ -16,7 +18,8 @@ from datetime import datetime
 from pathlib import Path
 
 from .. import console, proc
-from ..config import CONFIG_NAMES, Config, ENV_OVERRIDES, IS_WINDOWS, config_dir
+from ..config import (CONFIG_NAMES, ENV_OVERRIDES, IS_WINDOWS, PROFILE, Config,
+                      config_dir)
 from ..env import find_vcvars, load_build_env
 from . import build as build_svc
 from . import discovery
@@ -151,7 +154,7 @@ def doctor(cfg, paths):
                          ctest_version or f"'{ctest}' not on PATH — "
                                           f"required by `st test`"))
 
-    generator = cfg.expand(cfg.build_generator) or ("Ninja" if IS_WINDOWS else "")
+    generator = cfg.expand(cfg.tool.generator) or ("Ninja" if IS_WINDOWS else "")
     if generator.lower().startswith("ninja"):
         ninja = proc.tool_version("ninja", env=build_env)
         # An already-configured tree pins its make program in the cache, so a build keeps 
@@ -245,7 +248,9 @@ def config_show(cfg, paths):
 
     rows = [[field.name, str(getattr(cfg, field.name)),
              _muted(cfg.sources.get(field.name, "default"))]
-            for field in fields(Config) if field.name != "sources"]
+            for field in fields(Config) if field.name not in ("sources", "tool")]
+    rows += [[f"tool.{field.name}", str(getattr(cfg.tool, field.name)), _muted("tool")]
+             for field in fields(cfg.tool)]
     console.table(["Setting", "Value", "Source"], rows, title="Resolved configuration")
 
     console.console.print()
@@ -257,8 +262,8 @@ def config_show(cfg, paths):
         # Parens, not brackets: Rich would try to parse a literal "[found]" as
         # a markup tag and raise, since "found" names no registered style.
         console.console.print(_muted(f"  {name:<20} ({state})"))
-    console.console.print(_muted(
-        "  overrides: " + ", ".join(sorted(set(ENV_OVERRIDES.values())))))
+    names = set(ENV_OVERRIDES.values()) | set(PROFILE.env_overrides().values())
+    console.console.print(_muted("  overrides: " + ", ".join(sorted(names))))
     return 0
 
 

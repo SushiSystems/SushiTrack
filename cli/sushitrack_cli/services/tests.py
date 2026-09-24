@@ -1,3 +1,5 @@
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
+# Licensed under the Apache License, Version 2.0. See LICENSE.
 """Test execution through CTest labels."""
 
 import enum
@@ -28,7 +30,7 @@ class Suite(str, enum.Enum):
 
 
 def ctest_exe(cfg):
-    return cfg.expand(cfg.build_ctest) or "ctest"
+    return cfg.expand(cfg.tool.ctest_exe) or "ctest"
 
 
 def test(cfg, paths, suite=DEFAULT_SUITE, filter=None, repeat=0, jobs=None):
