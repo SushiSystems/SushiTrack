@@ -1,14 +1,6 @@
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
 # Licensed under the Apache License, Version 2.0. See LICENSE.
-"""Read-only diagnostics: status, doctor, config, env, paths.
-
-Unlike sibling CLIs' diag.py, this does not delegate config_show/env_dump to
-sushicore.diag.Diagnostics: that class's ConfigModule protocol assumes a
-flat, single-table config (``_ENV_OVERRIDES`` keyed directly by field name),
-and SushiTrack's Config is sectioned (paths_*, build_*, docker_*, test_*) for
-the reason config.py's own module docstring gives. status, doctor and
-paths_show also have no Diagnostics equivalent to begin with.
-"""
+"""Reports SushiTrack's status, doctor checks, resolved config, build env and paths."""
 
 import os
 import platform

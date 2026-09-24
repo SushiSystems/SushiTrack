@@ -144,6 +144,31 @@ def _merge_platform(document):
     return merged
 
 
+#: Legacy ``[build]`` key -> the ``[tool]`` key that replaced it.
+_LEGACY_TOOL_KEYS = {"cmake": "cmake_exe", "ctest": "ctest_exe", "generator": "generator"}
+
+
+def legacy_tool_keys(document):
+    """List the legacy build-tool keys in a raw TOML document.
+
+    Returns:
+        ``(old key, replacement)`` pairs, ``[build]`` first, then each ``[platform.<os>.build]``.
+    """
+    found = [(f"[build] {key}", f"[tool] {new}")
+             for key, new in _LEGACY_TOOL_KEYS.items() if key in (document.get("build") or {})]
+    for plat, overlay in (document.get("platform") or {}).items():
+        build = (overlay or {}).get("build") or {}
+        found += [(f"[platform.{plat}.build] {key}", f"[tool] {new}")
+                  for key, new in _LEGACY_TOOL_KEYS.items() if key in build]
+    return found
+
+
+def _warn(message):
+    """Print one config warning through st's console."""
+    from . import console  # console imports this module
+    console.warn(message)
+
+
 def _coerce(current, raw):
     """Coerce a config/env value to the type of the existing field value."""
     if isinstance(current, bool):
@@ -202,7 +227,10 @@ def load_config(root=None):
         _apply_env(cfg)  # still usable outside a checkout (e.g. `st doctor`)
         return cfg
     for name in CONFIG_NAMES:
-        _apply_document(cfg, read_toml(cfg_dir / name), name)
+        document = read_toml(cfg_dir / name)
+        for old, new in legacy_tool_keys(document):
+            _warn(f"{name}: {old} is ignored; use {new}")
+        _apply_document(cfg, document, name)
     _apply_env(cfg)
     return cfg
 

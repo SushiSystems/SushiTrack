@@ -1,9 +1,6 @@
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
 # Licensed under the Apache License, Version 2.0. See LICENSE.
-"""The sectioned config layering: defaults -> config.toml -> config.local.toml
--> ST_* env, with a per-platform overlay. Mirrors the sibling CLIs' own
-test_config.py, adapted to this CLI's sectioned schema (see config.py's
-module docstring for why it is sectioned rather than flat)."""
+"""Tests the config layering: defaults, config.toml, config.local.toml, ST_* env, platform."""
 
 from __future__ import annotations
 
@@ -18,10 +15,11 @@ from sushitrack_cli.config import IS_WINDOWS, Config, ToolSettings, load_config
 
 
 @pytest.fixture
-def st_checkout(monkeypatch):
-    """Return this SushiTrack checkout's root with the tool env overrides cleared."""
+def st_checkout(monkeypatch, tmp_path):
+    """Return this checkout's root with tool env cleared and an empty workspace."""
     for var in config_module.PROFILE.env_overrides().values():
         monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("SUSHISTACK_HOME", str(tmp_path))
     return config_module.find_project_root()
 
 
@@ -121,3 +119,30 @@ def test_config_no_longer_has_build_tool_fields():
 def test_tool_settings_are_a_provision_config():
     """Assert st's tool settings carry every field provision reads."""
     assert issubclass(ToolSettings, ProvisionSettings)
+
+
+def test_legacy_tool_keys_name_each_old_key_and_its_replacement():
+    document = {
+        "build": {"cmake": "c", "ctest": "t", "type": "Debug"},
+        "platform": {platform.system().lower(): {"build": {"generator": "Ninja"}}},
+    }
+    found = config_module.legacy_tool_keys(document)
+    assert found == [
+        ("[build] cmake", "[tool] cmake_exe"),
+        ("[build] ctest", "[tool] ctest_exe"),
+        (f"[platform.{platform.system().lower()}.build] generator", "[tool] generator"),
+    ]
+
+
+def test_load_config_warns_once_per_legacy_key(tmp_path, monkeypatch):
+    monkeypatch.setattr(config_module, "config_dir", lambda root=None: tmp_path)
+    (tmp_path / "config.local.toml").write_text(
+        '[build]\ncmake = "x"\ngenerator = "y"\n', encoding="utf-8")
+    said = []
+    monkeypatch.setattr(config_module, "_warn", said.append)
+
+    config_module.load_config(tmp_path)
+
+    assert len(said) == 2
+    assert all("config.local.toml" in line for line in said)
+    assert "[tool] cmake_exe" in said[0]

@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- 2026-09-24 — cli: Moved cmake, ctest and generator into a `[tool]` section loaded as `ToolSettings` through sushicore (`cli/sushitrack_cli/config.py`, `cli/config.toml`).
+- 2026-09-24 — cli: Moved cmake, ctest and generator into `[tool]`, loaded as `ToolSettings` through sushicore and layered over the linked workspace's tool paths (`cli/sushitrack_cli/config.py`, `cli/config.toml`).
 - 2026-09-23 — evaluator/inference: Replaced `loguru` with `sushicore`'s `Console`, matching every sibling Sushi* CLI (`tests/regression/evaluator/`, `tests/regression/inference/`, `environment.yml`, `Dockerfile`).
 
 - 2026-09-22 — cli: Made `st doctor`'s compiler check and `st test`'s ctest `-C` flag OS-agnostic instead of Windows-only (`cli/sushitrack_cli/services/diag.py`, `cli/sushitrack_cli/services/tests.py`, `environment.yml`).
