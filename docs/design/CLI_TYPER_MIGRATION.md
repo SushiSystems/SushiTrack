@@ -61,7 +61,7 @@ Add, mirroring the sibling CLIs' `cli/tests/`:
 - `test_config.py` — the sectioned layering (`config.toml` → `config.local.toml` → `ST_*` env) and the platform-table overlay resolve as documented.
 - `test_console_lazy.py` — importing `sushitrack_cli.console` touches neither the filesystem nor `sys.argv`, and the console builds only on first attribute access.
 
-`test_env.py` and `test_proc.py` are unchanged.
+`test_env.py` now tests the environment against `sushicore.build_env`, and `test_proc.py` was deleted along with `proc.py`.
 
 ### 3.5 `infer --tsize`: one approved exception to §4's flag-behaviour rule
 
