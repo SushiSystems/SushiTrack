@@ -46,7 +46,7 @@ def normalize_build_type(value):
 
 
 #: Generators whose configured tree leaves a build file behind.
-_SENTINEL_GENERATORS = ("Ninja", "Unix Makefiles", "")
+_SENTINEL_GENERATORS = ("Ninja", "Unix Makefiles")
 
 DRIVER = CMakeDriver(console, RUNNER)
 

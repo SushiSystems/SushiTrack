@@ -93,3 +93,51 @@ def test_a_visual_studio_tree_is_not_reconfigured_for_a_missing_makefile(tmp_pat
     paths = SimpleNamespace(root=tmp_path, build=build)
     assert build_svc.build(_cfg(generator=gen), paths, tests=False) == 0
     assert len(runner.calls) == 1
+
+
+def _configured_tree(tmp_path, stamp, sentinel=None, home=None):
+    """Lay out a build tree with a cache, a stamp and an optional sentinel file."""
+    build = tmp_path / "build"
+    build.mkdir()
+    if sentinel:
+        (build / sentinel).write_text("", encoding="utf-8")
+    (build / "CMakeCache.txt").write_text(
+        f"CMAKE_HOME_DIRECTORY:INTERNAL={home or tmp_path}\n", encoding="utf-8")
+    (build / build_svc.STAMP_NAME).write_text(stamp, encoding="utf-8")
+    return SimpleNamespace(root=tmp_path, build=build)
+
+
+def test_an_empty_generator_needs_no_makefile(tmp_path, runner):
+    """Reuses a tree built by CMake's default generator whatever file it left."""
+    paths = _configured_tree(tmp_path, "Release|OFF|", sentinel="build.ninja")
+    assert build_svc.build(_cfg(windows=False), paths, tests=False) == 0
+    assert [c[1] for c in runner.calls] == ["--build"]
+
+
+def test_a_stamp_mismatch_reconfigures(tmp_path, runner):
+    """Reconfigures when the stamp names other settings."""
+    paths = _configured_tree(tmp_path, "Debug|OFF|Ninja", sentinel="build.ninja")
+    assert build_svc.build(_cfg(), paths, tests=False) == 0
+    assert [c[1] for c in runner.calls] == ["-S", "--build"]
+    stamp = (paths.build / build_svc.STAMP_NAME).read_text(encoding="utf-8")
+    assert stamp == "Release|OFF|Ninja"
+
+
+@pytest.mark.parametrize("generator, sentinel",
+                         [("", "Makefile"), ("Visual Studio 17 2022", None)])
+def test_a_stale_tree_reconfigures(tmp_path, runner, generator, sentinel):
+    """Reconfigures a tree whose cache names another source directory."""
+    paths = _configured_tree(tmp_path, f"Release|OFF|{generator}", sentinel=sentinel,
+                             home=tmp_path / "elsewhere")
+    assert build_svc.build(_cfg(generator=generator, windows=False), paths,
+                           tests=False) == 0
+    assert [c[1] for c in runner.calls] == ["-S", "--build"]
+
+
+def test_clean_removes_the_tree_before_configuring(tmp_path, runner):
+    """Deletes the old tree and configures a fresh one."""
+    paths = _configured_tree(tmp_path, "Release|OFF|Ninja", sentinel="build.ninja")
+    (paths.build / "leftover.o").write_text("", encoding="utf-8")
+    assert build_svc.build(_cfg(), paths, clean=True, tests=False) == 0
+    assert not (paths.build / "leftover.o").exists()
+    assert [c[1] for c in runner.calls] == ["-S", "--build"]
