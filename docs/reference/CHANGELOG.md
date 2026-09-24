@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-09-24 — cli: Moved st test's ctest invocation onto sushicore's CMakeDriver.ctest_run (`cli/sushitrack_cli/services/tests.py`).
 - 2026-09-24 — cli: Moved st build's cmake configure and compile onto sushicore's CMakeDriver (`cli/sushitrack_cli/services/build.py`).
 - 2026-09-24 — cli: Rebuilt the vcvars build environment on sushicore.build_env with a keyed cache (`cli/sushitrack_cli/env.py`).
 - 2026-09-24 — cli: Added a build-tree artifact locator over sushicore's ExecutableIndex (`cli/sushitrack_cli/services/artifacts.py`).

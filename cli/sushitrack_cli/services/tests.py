@@ -6,7 +6,7 @@ import enum
 
 from sushicore import cmake_cache
 
-from .. import console, proc
+from .. import console
 from ..env import load_build_env
 from . import build as build_svc
 
@@ -32,11 +32,23 @@ class Suite(str, enum.Enum):
 
 
 def ctest_exe(cfg):
-    return cfg.expand(cfg.tool.ctest_exe) or "ctest"
+    """Return the ctest executable the driver resolves from *cfg*'s tool settings."""
+    return build_svc.DRIVER.ctest(cfg.tool)
+
+
+def _config_flag(cfg, build_dir):
+    """Return the -C value a multi-config tree needs, or None for a single-config one."""
+    if cmake_cache.cached_value(build_dir, "CMAKE_BUILD_TYPE"):
+        return None
+    return build_svc.normalize_build_type(cfg.build_type)
 
 
 def test(cfg, paths, suite=DEFAULT_SUITE, filter=None, repeat=0, jobs=None):
-    """Run a suite via CTest. Returns its exit code."""
+    """Run a suite via CTest.
+
+    Returns:
+        ctest's exit code, or 1 when the tree is absent or stale.
+    """
     console.header("Test")
     build_dir = paths.build
     if not build_dir.is_dir():
@@ -49,34 +61,12 @@ def test(cfg, paths, suite=DEFAULT_SUITE, filter=None, repeat=0, jobs=None):
             f"  - run `st build --clean` to reconfigure it cleanly first.")
         return 1
 
-    command = [ctest_exe(cfg), "--test-dir", str(build_dir),
-               "--output-on-failure"]
-    if suite != "all":
-        command += ["-L", SUITE_LABELS[suite]]
-    if filter:
-        # gtest_discover_tests registers tests as "Suite.Case"; ctest -R filters those nam
-        command += ["-R", filter]
-    if repeat > 0:
-        command += ["--repeat", f"until-fail:{repeat}"]
-        console.info(f"Repeating each test up to {repeat}x "
-                     f"(stops on the first failure).")
-    if jobs and jobs > 1:
-        command += ["--parallel", str(jobs)]
-    # A multi-config generator (Visual Studio, Xcode, Ninja Multi-Config)
-    # leaves CMAKE_BUILD_TYPE unset in the cache -- the configuration is
-    # chosen at build/test time instead, via -C, which every generator kind
-    # accepts harmlessly. Keyed on the cache, not the host OS, so a
-    # multi-config generator used anywhere (Ninja Multi-Config on Linux,
-    # Visual Studio on Windows) is handled the same way; single-config
-    # generators (Ninja, Unix Makefiles, ...) always populate the cache
-    # value, so this never fires for them regardless of platform.
-    build_type = cmake_cache.cached_value(build_dir, "CMAKE_BUILD_TYPE")
-    if not build_type:
-        command += ["-C", build_svc.normalize_build_type(cfg.build_type)]
-
     console.info(f"Suite: {suite}")
-    code = proc.run_drained(command, cwd=build_dir,
-                            env=load_build_env(cfg.tool, build_dir))
+    code = build_svc.DRIVER.ctest_run(
+        cfg.tool, build_dir, load_build_env(cfg.tool, build_dir),
+        label_regex=None if suite == "all" else SUITE_LABELS[suite],
+        filter=filter, repeat=repeat, jobs=jobs,
+        config=_config_flag(cfg, build_dir))
     if code != 0:
         console.error(f"Suite '{suite}' failed (exit {code}).")
     return code
