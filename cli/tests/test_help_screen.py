@@ -10,7 +10,7 @@ from sushitrack_cli.cli import app, entry
 K_GROUPS = {
     "Project": ["build", "test", "run", "clean", "deploy", "docker"],
     "Benchmark": ["eval", "infer"],
-    "Diagnostics": ["status", "doctor", "config", "paths", "env"],
+    "Diagnostics": ["status", "config", "paths", "env"],
 }
 
 K_EXAMPLES = {
@@ -85,3 +85,9 @@ def test_entry_exits_zero_on_help():
 
 def test_entry_exits_nonzero_on_an_unknown_command():
     assert entry(argv=["bogus-command"]) != 0
+
+
+def test_shared_provision_commands_are_listed():
+    page = _run("--help")
+    for name in ("setup", "doctor", "link", "unlink"):
+        assert name in page

@@ -31,11 +31,6 @@ class Suite(str, enum.Enum):
     all = "all"
 
 
-def ctest_exe(cfg):
-    """Return the ctest executable the driver resolves from *cfg*'s tool settings."""
-    return build_svc.DRIVER.ctest(cfg.tool)
-
-
 def _config_flag(cfg, build_dir):
     """Return the -C value a multi-config tree needs, or None for a single-config one."""
     if cmake_cache.cached_value(build_dir, "CMAKE_BUILD_TYPE"):

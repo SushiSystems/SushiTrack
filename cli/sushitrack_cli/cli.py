@@ -13,10 +13,11 @@ from pathlib import Path
 from typing import Optional
 
 import typer
+from sushicore.provision.commands import ModuleProvision, register_provision_commands
 from sushicore.typer_help import help_group
 
 from . import console
-from .config import context
+from .config import PROFILE, context, find_project_root, load_tool
 from .services import build as build_svc
 from .services import deploy as deploy_svc
 from .services import diag as diag_svc
@@ -25,6 +26,7 @@ from .services import infer as infer_svc
 from .services import label as label_svc
 from .services import runner as run_svc
 from .services import tests as test_svc
+from .services.checks import st_checks
 from .services.build import BuildType
 from .services.deploy import DeployKind
 from .services.tests import Suite
@@ -322,18 +324,12 @@ def infer(
 
 
 # --------------------------------------------------------------------------- #
-# status / doctor / config / paths / env (Diagnostics)
+# status / config / paths / env (Diagnostics)
 # --------------------------------------------------------------------------- #
 @app.command("status", rich_help_panel=K_DIAGNOSTICS, epilog="st status")
 def status():
     """Show what is built, what is missing and which data sets are present."""
     raise typer.Exit(diag_svc.status(*context()))
-
-
-@app.command("doctor", rich_help_panel=K_DIAGNOSTICS, epilog="st doctor")
-def doctor():
-    """Check the toolchain and data this project needs, and report what is missing."""
-    raise typer.Exit(diag_svc.doctor(*context()))
 
 
 @app.command("config", rich_help_panel=K_DIAGNOSTICS, epilog="st config")
@@ -360,6 +356,15 @@ def env(
     """Print the environment cmake, ctest and the test binaries execute under."""
     cfg, project_paths = context()
     raise typer.Exit(diag_svc.env_dump(cfg, project_paths, show_all=show_all))
+
+
+register_provision_commands(app, ModuleProvision(
+    profile=PROFILE,
+    project_root=find_project_root,
+    load_config=load_tool,
+    console=console.current,
+    extra_checks=lambda: st_checks(context()[1]),
+))
 
 
 def entry(argv=None, prog=None):

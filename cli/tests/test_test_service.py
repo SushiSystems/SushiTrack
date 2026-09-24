@@ -74,6 +74,3 @@ def test_a_stale_tree_is_refused(tmp_path, rec):
     assert test_svc.test(_CFG, paths) == 1
     assert rec.calls == []
 
-
-def test_ctest_exe_resolves_through_the_driver():
-    assert test_svc.ctest_exe(_CFG) == "ctest"

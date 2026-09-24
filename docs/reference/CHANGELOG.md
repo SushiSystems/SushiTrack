@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-09-24 — cli: Replaced st doctor with sushicore's shared setup, doctor, link and unlink commands plus SushiTrack's own checks (`cli/sushitrack_cli/cli.py`, `cli/sushitrack_cli/services/checks.py`).
 - 2026-09-24 — cli: Moved st run, label and deploy onto the shared runner and artifact locator (`services/runner.py`, `services/label.py`, `services/deploy.py`).
 - 2026-09-24 — cli: Moved st status and st env onto the shared runner, artifact locator and cmake cache reader (`services/diag.py`).
 - 2026-09-24 — cli: Moved st docker, infer and eval onto the shared sushicore runner (`services/docker.py`, `services/infer.py`, `services/evaluate.py`).

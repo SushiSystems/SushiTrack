@@ -398,7 +398,10 @@ subgroup. Arguments after a bare `--` are forwarded to the underlying binary.
 | `st clean` | Remove `build/` and `package/` |
 | `st deploy {cpp,python}` | Assemble `package/` from the current build |
 | `st status` | What is built, what is missing, which data sets are present |
-| `st doctor` | Verify the toolchain; non-zero exit when a requirement is missing |
+| `st setup [--dry-run]` | Provision the dependencies in `cli/sushistack.deps.toml`, then run the doctor |
+| `st doctor [--for GROUP]` | Check readiness per group (`build`, `test`, `infer`, `eval`); non-zero exit when a required check fails |
+| `st link [--workspace PATH]` | Register this checkout in a SushiStack workspace |
+| `st unlink [--workspace PATH]` | Remove this checkout from a SushiStack workspace |
 | `st config` | Resolved configuration and the origin of every value |
 | `st paths` | Resolved project directories |
 | `st env` | Environment cmake and the test binaries execute under |
