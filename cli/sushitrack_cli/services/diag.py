@@ -15,9 +15,10 @@ from .. import console, proc
 from ..config import (CONFIG_NAMES, ENV_OVERRIDES, IS_WINDOWS, PROFILE, Config,
                       config_dir)
 from ..env import find_vcvars, load_build_env
+from ..process import RUNNER
 from . import build as build_svc
-from . import discovery
 from . import tests as test_svc
+from .artifacts import find_binary, find_file, shared_lib_name
 
 # Variable-name prefixes worth surfacing by default in `st env`: the ones that act
 _ENV_OF_INTEREST = ("PATH", "CC", "CXX", "CMAKE", "NINJA", "INCLUDE", "LIB",
@@ -29,6 +30,7 @@ _TEST_BINARIES = ("unit_test", "integration_test", "regression_test")
 
 
 def _mtime(path):
+    """Return the file's modification time as text, or \"?\" when unreadable."""
     try:
         return datetime.fromtimestamp(path.stat().st_mtime).strftime(
             "%Y-%m-%d %H:%M")
@@ -37,15 +39,15 @@ def _mtime(path):
 
 
 def _git_describe(paths):
-    if proc.which("git") is None:
+    """Return "branch @ commit" with a dirty marker, or None without git."""
+    code, out, _ = RUNNER.capture(["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                                  cwd=paths.root)
+    if code == 127:
         return None
-    code, out, _ = proc.capture(["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                                cwd=paths.root)
     branch = out.strip() if code == 0 else "?"
-    code, out, _ = proc.capture(["git", "rev-parse", "--short", "HEAD"],
-                                cwd=paths.root)
+    code, out, _ = RUNNER.capture(["git", "rev-parse", "--short", "HEAD"], cwd=paths.root)
     commit = out.strip() if code == 0 else "?"
-    code, out, _ = proc.capture(["git", "status", "--porcelain"], cwd=paths.root)
+    code, out, _ = RUNNER.capture(["git", "status", "--porcelain"], cwd=paths.root)
     dirty = " (dirty)" if code == 0 and out.strip() else ""
     return f"{branch} @ {commit}{dirty}"
 
@@ -65,6 +67,7 @@ def _muted(text):
 
 
 def status(cfg, paths):
+    """Print the project status table and return 0."""
     console.header("Project status")
 
     rows = []
@@ -80,17 +83,17 @@ def status(cfg, paths):
         rows.append(["build tree", _state("absent", False),
                      _muted(f"{paths.build} — run `st build`")])
 
-    library = discovery.find_artifact(paths.build, discovery.shared_lib_name())
+    library = find_file(paths.build, shared_lib_name())
     rows.append(["library", _state("built" if library else "missing", library),
                  _muted(f"{library} ({_mtime(library)})" if library
-                        else discovery.shared_lib_name())])
+                        else shared_lib_name())])
 
     for name in _TEST_BINARIES:
-        binary = discovery.find_binary(paths.build, name)
+        binary = find_binary(paths.build, name)
         rows.append([name, _state("built" if binary else "missing", binary),
                      _muted(f"{binary} ({_mtime(binary)})" if binary else "")])
 
-    bridge = discovery.find_artifact(
+    bridge = find_file(
         paths.build, "tracker_bridge.dll" if IS_WINDOWS
         else "libtracker_bridge.so")
     rows.append(["tracker_bridge",
