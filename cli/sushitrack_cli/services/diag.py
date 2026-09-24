@@ -9,6 +9,8 @@ from dataclasses import fields
 from datetime import datetime
 from pathlib import Path
 
+from sushicore import cmake_cache
+
 from .. import console, proc
 from ..config import (CONFIG_NAMES, ENV_OVERRIDES, IS_WINDOWS, PROFILE, Config,
                       config_dir)
@@ -70,8 +72,8 @@ def status(cfg, paths):
     rows.append(["repository", paths.root.name, _muted(revision or str(paths.root))])
 
     if paths.build.is_dir():
-        build_type = build_svc.cache_value(paths.build, "CMAKE_BUILD_TYPE") or "?"
-        generator = build_svc.cache_value(paths.build, "CMAKE_GENERATOR") or "?"
+        build_type = cmake_cache.cached_value(paths.build, "CMAKE_BUILD_TYPE") or "?"
+        generator = cmake_cache.cached_value(paths.build, "CMAKE_GENERATOR") or "?"
         rows.append(["build tree", _state("configured", True),
                      _muted(f"{build_type} / {generator} / {paths.build}")])
     else:
@@ -135,7 +137,7 @@ def doctor(cfg, paths):
     # Checked against the same environment the build runs under, not the current shell
     build_env = load_build_env(cfg.tool, paths.build)
 
-    cmake = build_svc.cmake_exe(cfg)
+    cmake = build_svc.DRIVER.cmake(cfg.tool)
     version = proc.tool_version(cmake, env=build_env)
     checks.append(_check("cmake", version is not None,
                          version or f"'{cmake}' not on PATH — required to build"))
@@ -150,7 +152,7 @@ def doctor(cfg, paths):
     if generator.lower().startswith("ninja"):
         ninja = proc.tool_version("ninja", env=build_env)
         # An already-configured tree pins its make program in the cache, so a build keeps 
-        cached = build_svc.cache_value(paths.build, "CMAKE_MAKE_PROGRAM")
+        cached = cmake_cache.cached_value(paths.build, "CMAKE_MAKE_PROGRAM")
         from_cache = cached and Path(cached).is_file()
         checks.append(_check(
             "ninja", ninja is not None or bool(from_cache),

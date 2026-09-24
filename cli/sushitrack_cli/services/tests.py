@@ -4,6 +4,8 @@
 
 import enum
 
+from sushicore import cmake_cache
+
 from .. import console, proc
 from ..env import load_build_env
 from . import build as build_svc
@@ -40,7 +42,7 @@ def test(cfg, paths, suite=DEFAULT_SUITE, filter=None, repeat=0, jobs=None):
     if not build_dir.is_dir():
         console.error(f"{build_dir} not found. Run `st build` first.")
         return 1
-    if build_svc.stale_tree(build_dir, paths.root):
+    if cmake_cache.is_stale(build_dir, paths.root):
         console.error(
             f"{build_dir} was configured for a different source path "
             f"(e.g. a Docker volume build reused on this host).\n"
@@ -68,7 +70,7 @@ def test(cfg, paths, suite=DEFAULT_SUITE, filter=None, repeat=0, jobs=None):
     # Visual Studio on Windows) is handled the same way; single-config
     # generators (Ninja, Unix Makefiles, ...) always populate the cache
     # value, so this never fires for them regardless of platform.
-    build_type = build_svc.cache_value(build_dir, "CMAKE_BUILD_TYPE")
+    build_type = cmake_cache.cached_value(build_dir, "CMAKE_BUILD_TYPE")
     if not build_type:
         command += ["-C", build_svc.normalize_build_type(cfg.build_type)]
 

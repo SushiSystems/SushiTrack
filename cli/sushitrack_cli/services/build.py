@@ -3,13 +3,15 @@
 """Configure, build and clean the project."""
 
 import enum
-import os
 import shutil
 from pathlib import Path
 
-from .. import console, proc
-from ..config import IS_WINDOWS
+from sushicore import cmake_cache
+from sushicore.cmake_driver import CMakeDriver
+
+from .. import console
 from ..env import load_build_env
+from ..process import RUNNER
 
 BUILD_TYPES = ("Release", "Debug", "RelWithDebInfo", "MinSizeRel")
 
@@ -43,87 +45,71 @@ def normalize_build_type(value):
                      f"Choose one of: {', '.join(BUILD_TYPES)}.")
 
 
-def cmake_exe(cfg):
-    return cfg.expand(cfg.tool.cmake_exe) or "cmake"
+#: Generators whose configured tree leaves a build file behind.
+_SENTINEL_GENERATORS = ("Ninja", "Unix Makefiles", "")
+
+DRIVER = CMakeDriver(console, RUNNER)
 
 
-def generator(cfg):
-    configured = cfg.expand(cfg.tool.generator)
+def generator(cfg) -> str:
+    """Return the configured generator, else Ninja on Windows and CMake's default elsewhere."""
+    configured = cfg.tool.expand(cfg.tool.generator)
     if configured:
         return configured
-    # Windows has no default single-config generator worth using here: the old build.b
-    return "Ninja" if IS_WINDOWS else ""
-
-
-def cache_value(build_dir, key):
-    """Read *key* from a build tree's CMakeCache.txt, or None."""
-    cache = Path(build_dir) / "CMakeCache.txt"
-    if not cache.is_file():
-        return None
-    try:
-        for line in cache.read_text(encoding="utf-8",
-                                    errors="replace").splitlines():
-            name, _, value = line.partition("=")
-            if name.split(":")[0] == key:
-                return value.strip()
-    except OSError:
-        return None
-    return None
-
-
-def stale_tree(build_dir, root):
-    """True when the tree was configured against a different source directory.
-
-    A build tree carried over from elsewhere (a Docker volume build reused on the
-    host) has absolute paths baked into its cache that no longer exist, so CTest's
-    EXISTS guards fail and ctest reports "No tests were found" even though the
-    sources are fine. Detecting it lets the caller reconfigure instead.
-    """
-    home = cache_value(build_dir, "CMAKE_HOME_DIRECTORY")
-    if not home:
-        return False
-    return os.path.normcase(os.path.normpath(home)) != \
-        os.path.normcase(os.path.normpath(str(root)))
+    return "Ninja" if cfg.tool.is_windows else ""
 
 
 def _stamp_key(build_type, tests, generator_name, defines):
+    """Join the settings that force a reconfigure when they change."""
     return "|".join([build_type, "ON" if tests else "OFF", generator_name,
                      *sorted(defines)])
 
 
-def _needs_configure(build_dir, generator_name, stamp_key, root):
-    if not build_dir.is_dir():
+def _needs_configure(build_dir: Path, generator_name: str, stamp_key: str,
+                     root: Path) -> bool:
+    """Return whether the tree must be configured from scratch."""
+    if generator_name in _SENTINEL_GENERATORS:
+        if DRIVER.needs_configure(build_dir, generator_name, root=root):
+            return True
+    elif not build_dir.is_dir():
         return True
-    sentinel = "build.ninja" if generator_name == "Ninja" else "Makefile"
-    if generator_name in ("Ninja", "Unix Makefiles") \
-            and not (build_dir / sentinel).is_file():
-        return True
-    if not (build_dir / "CMakeCache.txt").is_file():
-        return True
-    if stale_tree(build_dir, root):
+    elif cmake_cache.is_stale(build_dir, root):
         console.warn("Build tree was configured for a different source path "
                      "(e.g. a Docker volume build); reconfiguring from scratch.")
         return True
+    if not (build_dir / "CMakeCache.txt").is_file():
+        return True
     stamp = build_dir / STAMP_NAME
-    if stamp.is_file():
-        return stamp.read_text(encoding="utf-8").strip() != stamp_key
-    # No stamp (a pre-upgrade tree, or a hand-run cmake): reconfigure once so the tree
-    return True
+    if not stamp.is_file():
+        return True
+    return stamp.read_text(encoding="utf-8").strip() != stamp_key
+
+
+def _configure_args(cfg, paths, build_type, tests, generator_name, defines):
+    """Return the configure argv st's build policy asks for."""
+    args = [DRIVER.cmake(cfg.tool), "-S", str(paths.root), "-B", str(paths.build)]
+    if generator_name:
+        args += ["-G", generator_name]
+    args += [f"-DCMAKE_BUILD_TYPE={build_type}", "-DBUILD_MOT_TEST=OFF"]
+    args += [f"-D{option}={'ON' if tests else 'OFF'}" for option in TEST_OPTIONS]
+    return args + list(defines)
 
 
 def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
           defines=()):
-    """Configure (when needed) and build. Returns an exit code."""
+    """Configure when needed, then build st's targets.
+
+    Returns:
+        The exit code of the failing step, else 0.
+    """
     console.header("Build")
     build_dir = paths.build
     build_type = build_type or normalize_build_type(cfg.build_type)
     generator_name = generator(cfg)
-    cmake = cmake_exe(cfg)
 
-    if clean:
-        if build_dir.exists():
-            console.info(f"Removing build directory: {build_dir}")
-            shutil.rmtree(build_dir, ignore_errors=True)
+    if clean and build_dir.exists():
+        console.info(f"Removing build directory: {build_dir}")
+        shutil.rmtree(build_dir, ignore_errors=True)
 
     console.info(f"Type: {build_type}  |  tests: {'ON' if tests else 'OFF'}"
                  + (f"  |  generator: {generator_name}" if generator_name else ""))
@@ -132,23 +118,12 @@ def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
     stamp_key = _stamp_key(build_type, tests, generator_name, defines)
 
     if _needs_configure(build_dir, generator_name, stamp_key, paths.root):
-        # Reconfigured from an empty tree: a cached option flip (tests ON->OFF, or a diffe
         if build_dir.exists():
             shutil.rmtree(build_dir, ignore_errors=True)
         build_dir.mkdir(parents=True, exist_ok=True)
-
-        options = [f"-DCMAKE_BUILD_TYPE={build_type}", "-DBUILD_MOT_TEST=OFF"]
-        options += [f"-D{option}={'ON' if tests else 'OFF'}"
-                    for option in TEST_OPTIONS]
-        options += list(defines)
-
-        configure = [cmake, "-S", str(paths.root), "-B", str(build_dir)]
-        if generator_name:
-            configure += ["-G", generator_name]
-        configure += options
-
         console.info("Configuring...")
-        code = proc.run(configure, cwd=paths.root, env=env)
+        args = _configure_args(cfg, paths, build_type, tests, generator_name, defines)
+        code = DRIVER.configure(args, paths.root, env)
         if code != 0:
             console.error("CMake configuration failed.")
             return code
@@ -158,13 +133,9 @@ def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
                      "skipping cmake configure.")
 
     targets = [LIBRARY_TARGET] + (list(TEST_TARGETS) if tests else [])
-    command = [cmake, "--build", str(build_dir), "--config", build_type,
-               "--parallel", str(jobs or cfg.jobs())]
-    for target in targets:
-        command += ["--target", target]
-
     console.info("Building...")
-    code = proc.run(command, cwd=paths.root, env=env)
+    code = DRIVER.compile(cfg.tool, build_dir, paths.root, env, config=build_type,
+                          targets=targets, jobs=jobs or cfg.jobs())
     if code != 0:
         console.error("Build failed.")
         return code
