@@ -1,3 +1,5 @@
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
+# Licensed under the Apache License, Version 2.0. See LICENSE.
 """The SushiTrack developer CLI (`st` / `sushitrack`).
 
 Thin Typer layer: each command parses arguments and delegates to

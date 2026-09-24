@@ -11,7 +11,7 @@ from .. import console
 from ..config import (CONFIG_NAMES, ENV_OVERRIDES, IS_WINDOWS, PROFILE, Config,
                       config_dir)
 from ..env import load_build_env
-from ..process import RUNNER
+from ..process import MISSING_EXIT_CODE, RUNNER
 from .artifacts import find_binary, find_file, shared_lib_name
 
 # Variable-name prefixes worth surfacing by default in `st env`: the ones that act
@@ -36,7 +36,7 @@ def _git_describe(paths):
     """Return "branch @ commit" with a dirty marker, or None without git."""
     code, out, _ = RUNNER.capture(["git", "rev-parse", "--abbrev-ref", "HEAD"],
                                   cwd=paths.root)
-    if code == 127:
+    if code == MISSING_EXIT_CODE:
         return None
     branch = out.strip() if code == 0 else "?"
     code, out, _ = RUNNER.capture(["git", "rev-parse", "--short", "HEAD"], cwd=paths.root)

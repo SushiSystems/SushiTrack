@@ -1,3 +1,5 @@
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
+# Licensed under the Apache License, Version 2.0. See LICENSE.
 """st's help screen groups its commands under three headings, in the same
 order the removed app.py's app.section(...) calls declared them."""
 
@@ -88,6 +90,6 @@ def test_entry_exits_nonzero_on_an_unknown_command():
 
 
 def test_shared_provision_commands_are_listed():
-    page = _run("--help")
+    tokens = set(_run("--help").split())
     for name in ("setup", "doctor", "link", "unlink"):
-        assert name in page
+        assert name in tokens

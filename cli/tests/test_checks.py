@@ -7,8 +7,10 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+from sushicore.provision import checks as sushicore_checks
 from sushicore.provision.doctor import Doctor, State
 
+from sushitrack_cli.services import checks
 from sushitrack_cli.services.checks import st_checks
 
 
@@ -57,6 +59,16 @@ def test_datasets_found_when_a_sequence_has_ground_truth(st_paths, tmp_path):
     gt.parent.mkdir(parents=True)
     gt.write_text("", encoding="utf-8")
     assert _by_name(st_checks(st_paths))["datasets"].run().state is State.OK
+
+
+@pytest.mark.parametrize("system, fix", [
+    ("Windows", "winget install Docker.DockerDesktop"),
+    ("Linux", "https://docs.docker.com/engine/install/"),
+])
+def test_missing_docker_fix_follows_the_platform(st_paths, monkeypatch, system, fix):
+    monkeypatch.setattr(checks.platform, "system", lambda: system)
+    monkeypatch.setattr(sushicore_checks.probe, "binary_works", lambda exe: False)
+    assert _by_name(st_checks(st_paths))["docker"].run().fix == fix
 
 
 def test_doctor_for_infer_runs_only_infer(st_paths, monkeypatch):

@@ -4,10 +4,16 @@
 
 from __future__ import annotations
 
+import platform
+
 from sushicore.provision.checks import path_check, python_module_check, tool_check
 from sushicore.provision.doctor import Check, CheckResult, FunctionCheck, State
 
 _PIP_NAMES = {"cv2": "opencv-python"}
+
+_DOCKER_WINDOWS_FIX = "winget install Docker.DockerDesktop"
+
+_DOCKER_DOCS_FIX = "https://docs.docker.com/engine/install/"
 
 _DATA_FIX = "place MOT sequences as described in docs/README.md#data-layout"
 
@@ -16,6 +22,11 @@ def _submodule(name, paths, folder, marker, group, required):
     """Return a check passing when the submodule under third_party/*folder* holds *marker*."""
     fix = f"git submodule update --init third_party/{folder}"
     return path_check(name, paths.third_party / folder / marker, group, required, fix)
+
+
+def _docker_fix():
+    """Return the Docker install fix for the running platform."""
+    return _DOCKER_WINDOWS_FIX if platform.system() == "Windows" else _DOCKER_DOCS_FIX
 
 
 def _python(module, group):
@@ -39,7 +50,7 @@ def st_checks(paths) -> list[Check]:
     """Return every SushiTrack-specific check, grouped as build, infer and eval."""
     return [
         _submodule("eigen", paths, "eigen", "Eigen/Dense", "build", True),
-        tool_check("docker", "docker", "build", False, "install Docker"),
+        tool_check("docker", "docker", "build", False, _docker_fix()),
         _submodule("yolox", paths, "yolox", "setup.py", "infer", False),
         _python("torch", "infer"),
         _python("torchvision", "infer"),

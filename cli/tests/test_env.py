@@ -1,3 +1,5 @@
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
+# Licensed under the Apache License, Version 2.0. See LICENSE.
 """What st's build environment does, now composed from sushicore.build_env."""
 
 from __future__ import annotations
@@ -22,6 +24,11 @@ def _no_vcvars_run(monkeypatch):
                         lambda *a: (_ for _ in ()).throw(AssertionError("vcvars ran")))
 
 
+def _detected_vcvars(monkeypatch):
+    """Make detection find a vcvars64.bat, as on a machine with Visual Studio."""
+    monkeypatch.setattr(env, "find_vcvars", lambda: "C:/vs/detected/vcvars64.bat")
+
+
 def test_off_windows_the_current_environment_is_used_as_is(tmp_path, monkeypatch):
     """Snapshots nothing off Windows."""
     _no_vcvars_run(monkeypatch)
@@ -40,6 +47,7 @@ def test_a_cached_snapshot_is_read_back(tmp_path, monkeypatch):
 def test_a_cache_from_another_vcvars_is_ignored(tmp_path, monkeypatch):
     """Rejects a snapshot whose key no longer matches."""
     monkeypatch.delenv("VSINSTALLDIR", raising=False)
+    _detected_vcvars(monkeypatch)
     monkeypatch.setattr(env, "snapshot_vcvars", lambda path, out: {"INCLUDE": "C:/fresh"})
     (tmp_path / env.CACHE_NAME).write_text(json.dumps(
         {"key": "stale", "env": {"INCLUDE": "C:/gone"}}), encoding="utf-8")
@@ -49,6 +57,7 @@ def test_a_cache_from_another_vcvars_is_ignored(tmp_path, monkeypatch):
 def test_an_unreadable_cache_is_rebuilt_rather_than_fatal(tmp_path, monkeypatch):
     """Costs a vcvars run, not the build."""
     monkeypatch.delenv("VSINSTALLDIR", raising=False)
+    _detected_vcvars(monkeypatch)
     monkeypatch.setattr(env, "snapshot_vcvars", lambda path, out: {"INCLUDE": "C:/fresh"})
     (tmp_path / env.CACHE_NAME).write_text("{ not json", encoding="utf-8")
     assert env.load_build_env(_tool(), tmp_path)["INCLUDE"] == "C:/fresh"
@@ -57,6 +66,7 @@ def test_an_unreadable_cache_is_rebuilt_rather_than_fatal(tmp_path, monkeypatch)
 def test_a_fresh_snapshot_is_written_to_the_cache(tmp_path, monkeypatch):
     """Keeps what was learned under the current key."""
     monkeypatch.delenv("VSINSTALLDIR", raising=False)
+    _detected_vcvars(monkeypatch)
     monkeypatch.setattr(env, "snapshot_vcvars", lambda path, out: {"LIB": "C:/libs"})
     tool = _tool()
     env.load_build_env(tool, tmp_path)
@@ -67,6 +77,7 @@ def test_a_fresh_snapshot_is_written_to_the_cache(tmp_path, monkeypatch):
 def test_no_snapshot_means_the_environment_is_left_alone(tmp_path, monkeypatch):
     """Changes nothing when vcvars fails."""
     monkeypatch.delenv("VSINSTALLDIR", raising=False)
+    _detected_vcvars(monkeypatch)
     monkeypatch.setattr(env, "snapshot_vcvars", lambda path, out: None)
     assert env.load_build_env(_tool(), tmp_path) == dict(os.environ)
     assert not (tmp_path / env.CACHE_NAME).exists()
