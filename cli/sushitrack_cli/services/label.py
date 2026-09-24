@@ -2,9 +2,11 @@
 
 import sys
 
-from .. import console, proc
+from .. import console
 from ..env import load_build_env
-from . import discovery, evaluate
+from ..process import RUNNER
+from . import evaluate
+from .artifacts import find_binary
 
 # Registry key -> the display name the C++ TrackerRegistry and demo.py use.
 TRACKERS = {
@@ -85,16 +87,16 @@ def _parse_perf(stdout):
 
 
 def _run_regression(tool, paths, gtest_filter):
-    binary = discovery.find_binary(paths.build, "regression_test")
+    """Run regression_test under *gtest_filter* and parse its PERF lines from stdout."""
+    binary = find_binary(paths.build, "regression_test")
     if not binary:
         console.error("regression_test binary not found. Run `st build` first.")
         return 1, {}
 
     console.command(f"{binary} --gtest_filter={gtest_filter}")
-    # Captured rather than streamed because the PERF lines have to be parsed; the outp
-    code, out, err = proc.capture([str(binary), f"--gtest_filter={gtest_filter}"],
-                                  cwd=paths.root,
-                                  env=load_build_env(tool, paths.build))
+    code, out, err = RUNNER.capture([str(binary), f"--gtest_filter={gtest_filter}"],
+                                    cwd=paths.root,
+                                    env=load_build_env(tool, paths.build))
     if code != 0:
         console.error(f"regression_test failed (exit {code}).")
         print(out)

@@ -1,8 +1,9 @@
 """Run a built executable, by name or by picking one interactively."""
 
-from .. import console, proc
+from .. import console
 from ..env import load_build_env
-from . import discovery
+from ..process import RUNNER
+from .artifacts import EXECUTABLES
 
 
 def _select(paths):
@@ -11,7 +12,7 @@ def _select(paths):
     Falls back to an error rather than a prompt when stdin is not a terminal, so
     a scripted `st run --select` fails loudly instead of hanging.
     """
-    executables = discovery.list_executables(paths.build)
+    executables = EXECUTABLES.find(paths.build)
     if not executables:
         console.error("No executables found. Run `st build` first.")
         return None
@@ -38,12 +39,12 @@ def run(cfg, paths, target=None, select=False, forwarded=()):
         if binary is None:
             return 1
     else:
-        binary = discovery.match_by_name(paths.build, target)
+        binary = EXECUTABLES.match(paths.build, target)
         if binary is None:
             console.error(f"No executable matching '{target}' under {paths.build}. "
                           f"Run `st run` with no target to list what is available.")
             return 1
 
     console.header(f"Run {binary.name}")
-    return proc.run([str(binary), *forwarded], cwd=paths.root,
-                    env=load_build_env(cfg.tool, paths.build))
+    return RUNNER.run([str(binary), *forwarded], paths.root,
+                      env=load_build_env(cfg.tool, paths.build))

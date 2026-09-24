@@ -11,7 +11,7 @@ import shutil
 
 from .. import console
 from ..config import IS_WINDOWS
-from . import discovery
+from .artifacts import find_file, import_lib_name, shared_lib_name
 
 KINDS = ("cpp", "python")
 
@@ -173,13 +173,13 @@ def _copy_config(paths, pkg_dir):
 
 
 def _deploy_cpp(paths, pkg_dir):
-    runtime = discovery.find_artifact(paths.build, discovery.shared_lib_name())
+    runtime = find_file(paths.build, shared_lib_name())
     if not runtime:
-        console.error(f"{discovery.shared_lib_name()} not found. Run `st build` first.")
+        console.error(f"{shared_lib_name()} not found. Run `st build` first.")
         return False
-    import_lib = discovery.find_artifact(paths.build, discovery.import_lib_name())
+    import_lib = find_file(paths.build, import_lib_name())
     if not import_lib:
-        console.error(f"{discovery.import_lib_name()} not found. Run `st build` first.")
+        console.error(f"{import_lib_name()} not found. Run `st build` first.")
         return False
 
     include_dst = pkg_dir / "include" / "SushiTrack"
@@ -192,10 +192,10 @@ def _deploy_cpp(paths, pkg_dir):
             shutil.copy2(hdr, include_dst / hdr.name)
 
     (pkg_dir / "lib").mkdir(parents=True, exist_ok=True)
-    shutil.copy2(import_lib, pkg_dir / "lib" / discovery.import_lib_name())
+    shutil.copy2(import_lib, pkg_dir / "lib" / import_lib_name())
     if IS_WINDOWS:
         (pkg_dir / "bin").mkdir(parents=True, exist_ok=True)
-        shutil.copy2(runtime, pkg_dir / "bin" / discovery.shared_lib_name())
+        shutil.copy2(runtime, pkg_dir / "bin" / shared_lib_name())
 
     _copy_config(paths, pkg_dir)
     (pkg_dir / "example").mkdir(parents=True, exist_ok=True)
@@ -203,16 +203,16 @@ def _deploy_cpp(paths, pkg_dir):
     (pkg_dir / "example" / "CMakeLists.txt").write_text(_CPP_EXAMPLE_CMAKE,
                                                         encoding="utf-8")
     (pkg_dir / "README.md").write_text(
-        _CPP_README.format(import_lib=discovery.import_lib_name(),
-                           runtime_lib=discovery.shared_lib_name(),
+        _CPP_README.format(import_lib=import_lib_name(),
+                           runtime_lib=shared_lib_name(),
                            platform=platform.system()), encoding="utf-8")
     return True
 
 
 def _deploy_python(paths, pkg_dir):
-    runtime = discovery.find_artifact(paths.build, discovery.shared_lib_name())
+    runtime = find_file(paths.build, shared_lib_name())
     if not runtime:
-        console.error(f"{discovery.shared_lib_name()} not found. Run `st build` first.")
+        console.error(f"{shared_lib_name()} not found. Run `st build` first.")
         return False
 
     binding = paths.root / "bindings" / "python" / "sushitrack.py"
@@ -224,14 +224,14 @@ def _deploy_python(paths, pkg_dir):
     module_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(binding, module_dir / binding.name)
     # Bundled beside the module because the binding's find_library() looks there first
-    shutil.copy2(runtime, module_dir / discovery.shared_lib_name())
+    shutil.copy2(runtime, module_dir / shared_lib_name())
     (module_dir / "__init__.py").write_text(
         f"from .{binding.stem} import *  # noqa: F401,F403\n", encoding="utf-8")
 
     _copy_config(paths, pkg_dir)
     (pkg_dir / "example.py").write_text(_PY_EXAMPLE, encoding="utf-8")
     (pkg_dir / "README.md").write_text(
-        _PY_README.format(runtime_lib=discovery.shared_lib_name(),
+        _PY_README.format(runtime_lib=shared_lib_name(),
                           platform=platform.system()), encoding="utf-8")
     return True
 
