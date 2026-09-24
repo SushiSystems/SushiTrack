@@ -1,8 +1,11 @@
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
+# Licensed under the Apache License, Version 2.0. See LICENSE.
 """What st's process runner does, pinned against sushicore's Runner."""
 
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 
 from conftest import RecordingConsole
@@ -25,13 +28,23 @@ def test_run_returns_the_child_exit_code(tmp_path):
 def test_run_echoes_the_command(tmp_path):
     runner, spy = _runner()
     runner.run([sys.executable, "-c", "pass"], tmp_path)
-    assert spy.lines
+    assert spy.said('-c pass')
 
 
 def test_a_missing_executable_keeps_st_exit_code(tmp_path):
     runner, spy = _runner()
     assert runner.run([MISSING], tmp_path) == 127
     assert spy.said("Executable not found")
+
+
+def test_an_interrupted_child_returns_130(tmp_path, monkeypatch):
+    def interrupt(*_args, **_kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(subprocess, "run", interrupt)
+    runner, spy = _runner()
+    assert runner.run([sys.executable, "-c", "pass"], tmp_path) == 130
+    assert ("warn", "Interrupted.") in spy.lines
 
 
 def test_run_drained_returns_the_child_exit_code(tmp_path):
