@@ -74,7 +74,7 @@ def test(cfg, paths, suite=DEFAULT_SUITE, filter=None, repeat=0, jobs=None):
 
     console.info(f"Suite: {suite}")
     code = proc.run_drained(command, cwd=build_dir,
-                            env=load_build_env(build_dir))
+                            env=load_build_env(cfg.tool, build_dir))
     if code != 0:
         console.error(f"Suite '{suite}' failed (exit {code}).")
     return code

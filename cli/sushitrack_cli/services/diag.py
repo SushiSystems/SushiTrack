@@ -133,7 +133,7 @@ def doctor(cfg, paths):
                          f"{platform.python_version()} at {sys.executable}"))
 
     # Checked against the same environment the build runs under, not the current shell
-    build_env = load_build_env(paths.build)
+    build_env = load_build_env(cfg.tool, paths.build)
 
     cmake = build_svc.cmake_exe(cfg)
     version = proc.tool_version(cmake, env=build_env)
@@ -269,7 +269,7 @@ def paths_show(cfg, paths):
 
 def env_dump(cfg, paths, show_all=False):
     console.header("Build environment")
-    env = load_build_env(paths.build)
+    env = load_build_env(cfg.tool, paths.build)
 
     def keep(key):
         return show_all or key.upper().startswith(_ENV_OF_INTEREST)

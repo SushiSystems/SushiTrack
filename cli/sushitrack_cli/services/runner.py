@@ -46,4 +46,4 @@ def run(cfg, paths, target=None, select=False, forwarded=()):
 
     console.header(f"Run {binary.name}")
     return proc.run([str(binary), *forwarded], cwd=paths.root,
-                    env=load_build_env(paths.build))
+                    env=load_build_env(cfg.tool, paths.build))

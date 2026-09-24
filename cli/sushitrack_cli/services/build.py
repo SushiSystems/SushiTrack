@@ -128,7 +128,7 @@ def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
     console.info(f"Type: {build_type}  |  tests: {'ON' if tests else 'OFF'}"
                  + (f"  |  generator: {generator_name}" if generator_name else ""))
 
-    env = load_build_env(build_dir)
+    env = load_build_env(cfg.tool, build_dir)
     stamp_key = _stamp_key(build_type, tests, generator_name, defines)
 
     if _needs_configure(build_dir, generator_name, stamp_key, paths.root):

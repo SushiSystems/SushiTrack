@@ -84,7 +84,7 @@ def _parse_perf(stdout):
     return perf
 
 
-def _run_regression(paths, gtest_filter):
+def _run_regression(tool, paths, gtest_filter):
     binary = discovery.find_binary(paths.build, "regression_test")
     if not binary:
         console.error("regression_test binary not found. Run `st build` first.")
@@ -94,7 +94,7 @@ def _run_regression(paths, gtest_filter):
     # Captured rather than streamed because the PERF lines have to be parsed; the outp
     code, out, err = proc.capture([str(binary), f"--gtest_filter={gtest_filter}"],
                                   cwd=paths.root,
-                                  env=load_build_env(paths.build))
+                                  env=load_build_env(tool, paths.build))
     if code != 0:
         console.error(f"regression_test failed (exit {code}).")
         print(out)
@@ -123,7 +123,7 @@ def evaluate_sequences(cfg, paths, scenario=None, tracker="sushitrack",
 
     perf = {}
     if not eval_only:
-        code, perf = _run_regression(paths, _gtest_filter(names, trackers))
+        code, perf = _run_regression(cfg.tool, paths, _gtest_filter(names, trackers))
         if code != 0:
             return code
 

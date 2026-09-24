@@ -1,133 +1,71 @@
-"""Build-environment snapshotting (Windows MSVC)."""
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+"""Assembles the environment st's build, test and run children see."""
 
+from __future__ import annotations
+
+import hashlib
 import json
 import os
 from pathlib import Path
 
-from . import console, proc
-from .config import IS_WINDOWS
+from sushicore.build_env import merge_env, read_cache, snapshot_vcvars, write_cache
+from sushicore.provision.probe import find_vcvars
+
+from . import console
 
 CACHE_NAME = ".sushitrack_env.json"
 
-_VS_EDITIONS = ("BuildTools", "Community", "Professional", "Enterprise")
-_VCVARS_REL = Path("VC") / "Auxiliary" / "Build" / "vcvars64.bat"
+
+def cache_key(tool) -> str:
+    """Hash the settings that decide what a vcvars snapshot contains."""
+    material = json.dumps({"platform": tool.platform, "vs_vcvars": tool.vs_vcvars},
+                          sort_keys=True)
+    return hashlib.sha256(material.encode()).hexdigest()
 
 
-def _vswhere_path():
-    program_files = os.environ.get("ProgramFiles(x86)") or os.environ.get(
-        "ProgramFiles", r"C:\Program Files")
-    return Path(program_files) / "Microsoft Visual Studio" / "Installer" / "vswhere.exe"
+def vcvars_path(tool) -> Path | None:
+    """Return the configured vcvars64.bat when it exists, else the detected one."""
+    configured = tool.expand(tool.vs_vcvars) if tool.vs_vcvars else ""
+    if configured and Path(configured).is_file():
+        return Path(configured)
+    return find_vcvars()
 
 
-def _from_vswhere():
-    vswhere = _vswhere_path()
-    if not vswhere.is_file():
-        return None
-    code, out, _ = proc.capture([
-        str(vswhere), "-latest", "-prerelease", "-products", "*",
-        "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
-        "-property", "installationPath",
-    ])
-    if code != 0:
-        return None
-    for line in out.splitlines():
-        candidate = Path(line.strip()) / _VCVARS_REL
-        if line.strip() and candidate.is_file():
-            return candidate
-    return None
-
-
-def _from_disk_scan():
-    """Scan the canonical install roots for vcvars64.bat.
-
-    Needed when vswhere does not register a freshly installed VS — observed with
-    build-tools-only configurations — so a working toolchain is not reported
-    missing just because the registry lookup came back empty.
-    """
-    roots = [Path(os.environ[var]) / "Microsoft Visual Studio"
-             for var in ("ProgramFiles", "ProgramFiles(x86)")
-             if os.environ.get(var)]
-    for root in roots:
-        if not root.is_dir():
-            continue
-        for year in sorted((d for d in root.iterdir() if d.is_dir()),
-                           key=lambda d: d.name, reverse=True):
-            for edition in _VS_EDITIONS:
-                candidate = year / edition / _VCVARS_REL
-                if candidate.is_file():
-                    return candidate
-    return None
-
-
-def find_vcvars():
-    """Locate vcvars64.bat, or None when no Visual Studio install is found."""
-    if not IS_WINDOWS:
-        return None
-    return _from_vswhere() or _from_disk_scan()
-
-
-def _snapshot_windows():
+def _snapshot(tool) -> dict[str, str] | None:
+    """Return a fresh vcvars snapshot, or None when there is nothing to take."""
     if os.environ.get("VSINSTALLDIR"):
-        return None  # already inside a VS developer shell
-    vcvars = find_vcvars()
+        return None
+    vcvars = vcvars_path(tool)
     if vcvars is None:
         console.warn("No Visual Studio installation detected; "
                      "assuming the compiler is already on PATH.")
         return None
-    console.info(f"Loading Visual Studio environment from {vcvars}")
-    # Passed as one string, not a list: subprocess would re-quote the elements and man
-    code, out, _ = proc.capture(f'cmd /c call "{vcvars}" >nul && set')
-    if code != 0:
-        console.warn("vcvars64.bat returned non-zero; using the current env.")
-        return None
-    snapshot = {}
-    for line in out.splitlines():
-        key, sep, value = line.partition("=")
-        if sep and key:
-            snapshot[key] = value
-    return snapshot
+    return snapshot_vcvars(vcvars, console)
 
 
-def _merge(base, overlay):
-    """Merge *overlay* into *base*, prepending PATH instead of replacing it.
+def load_build_env(tool, build_dir) -> dict[str, str]:
+    """Return the environment for build, test and run children.
 
-    PATH is written back into whichever case variant *base* already uses
-    (Windows' "Path"): adding a second "PATH" key leaves two conflicting entries
-    and child processes then honour only one, so directories added to the other
-    silently vanish from executable and DLL resolution.
+    Args:
+        tool: The resolved `cfg.tool` settings.
+        build_dir: Where the snapshot cache lives.
+
+    Returns:
+        `os.environ` off Windows or without a snapshot; else it merged with one.
     """
-    merged = dict(base)
-    path_key = next((k for k in merged if k.upper() == "PATH"), None)
-    for key, value in overlay.items():
-        if key.upper() == "PATH":
-            target = path_key or key
-            existing = merged.get(target, "")
-            merged[target] = value + os.pathsep + existing if existing else value
-            path_key = target
-        else:
-            merged[key] = value
-    return merged
-
-
-def load_build_env(build_dir):
-    """Environment for build/test subprocesses, snapshotting MSVC on Windows."""
-    if not IS_WINDOWS:
+    if not tool.is_windows:
         return dict(os.environ)
-
     cache_file = Path(build_dir) / CACHE_NAME
-    if cache_file.is_file():
+    key = cache_key(tool)
+    snapshot = read_cache(cache_file, key)
+    if snapshot is None:
+        snapshot = _snapshot(tool)
+        if not snapshot:
+            return dict(os.environ)
         try:
-            cached = json.loads(cache_file.read_text(encoding="utf-8"))
-            return _merge(dict(os.environ), cached["env"])
-        except (json.JSONDecodeError, OSError, KeyError):
-            pass  # stale or unreadable; fall through and rebuild
-
-    snapshot = _snapshot_windows()
-    if not snapshot:
-        return dict(os.environ)
-    try:
-        Path(build_dir).mkdir(parents=True, exist_ok=True)
-        cache_file.write_text(json.dumps({"env": snapshot}), encoding="utf-8")
-    except OSError:
-        pass  # a read-only tree only costs us the caching, not the build
-    return _merge(dict(os.environ), snapshot)
+            Path(build_dir).mkdir(parents=True, exist_ok=True)
+        except OSError:
+            return merge_env(os.environ, snapshot)
+        write_cache(cache_file, key, snapshot)
+    return merge_env(os.environ, snapshot)
