@@ -1,9 +1,12 @@
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
+# Licensed under the Apache License, Version 2.0. See LICENSE.
 """TrackEval metric evaluation, internal wrapper or the official script."""
 
 import shutil
 import sys
 
-from .. import console, proc
+from .. import console
+from ..process import RUNNER
 
 # MOT20 sequences are scored against the MOT20 benchmark definition, everything el
 _BENCHMARKS = ("MOT17", "MOT20")
@@ -147,6 +150,6 @@ def run_official(paths, sequences, trackers):
                    "--SPLIT_TO_EVAL", "train"]
         if len(sequences) == 1:
             command += ["--SEQ_INFO", sequences[0]]
-        if proc.run(command, cwd=trackeval_dir) != 0:
+        if RUNNER.run(command, trackeval_dir) != 0:
             failures += 1
     return 1 if failures else 0

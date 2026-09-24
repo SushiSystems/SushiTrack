@@ -1,3 +1,5 @@
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
+# Licensed under the Apache License, Version 2.0. See LICENSE.
 """The YOLOX video inference pipeline behind `st infer`.
 
 A front-end for tests/regression/inference/demo.py: this only translates flags and
@@ -7,7 +9,8 @@ Python dependencies (torch, opencv) — those belong to the demo, not to this CL
 
 import sys
 
-from .. import console, proc
+from .. import console
+from ..process import RUNNER
 from .label import TRACKERS, resolve_tracker
 
 # Flag name on the parsed namespace -> the switch demo.py expects.
@@ -56,4 +59,4 @@ def run(cfg, paths, args):
 
     console.header("Infer")
     console.info(f"Tracker: {TRACKERS[key]}  |  source: {args.source}")
-    return proc.run(command, cwd=paths.root)
+    return RUNNER.run(command, paths.root)

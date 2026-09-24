@@ -1,9 +1,12 @@
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
+# Licensed under the Apache License, Version 2.0. See LICENSE.
 """Docker image and container management.
 
 Replaces cli/docker/build.{sh,bat} and cli/docker/run.{sh,bat}.
 """
 
-from .. import console, proc
+from .. import console
+from ..process import RUNNER
 
 
 def build(cfg, paths, no_cache=False, forwarded=()):
@@ -15,7 +18,7 @@ def build(cfg, paths, no_cache=False, forwarded=()):
     command.extend(forwarded)
     command.append(".")
 
-    code = proc.run(command, cwd=paths.root)
+    code = RUNNER.run(command, paths.root)
     if code != 0:
         console.error("Docker build failed.")
         return code
@@ -36,4 +39,4 @@ def run(cfg, paths, no_gpu=False, command=None, forwarded=()):
     argv.extend(forwarded)
     argv.append(cfg.docker_image)
     argv.extend(command or ["bash"])
-    return proc.run(argv, cwd=paths.root)
+    return RUNNER.run(argv, paths.root)
