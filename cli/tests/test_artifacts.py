@@ -1,3 +1,5 @@
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
+# Licensed under the Apache License, Version 2.0. See LICENSE.
 """What the build-tree locator finds."""
 
 from __future__ import annotations
@@ -46,3 +48,15 @@ def test_match_prefers_an_exact_name(tmp_path):
     exact = _plant(tmp_path / "bin" / artifacts.executable_name("unit_test"))
     _plant(tmp_path / "bin" / artifacts.executable_name("unit_test_extra"))
     assert artifacts.EXECUTABLES.match(tmp_path, "unit_test") == exact
+
+
+def test_find_binary_adds_the_platform_suffix(tmp_path):
+    """Finds an executable by its bare name."""
+    exe = _plant(tmp_path / "bin" / artifacts.executable_name("tool"))
+    assert artifacts.find_binary(tmp_path, "tool") == exe
+
+
+def test_import_lib_name_names_the_link_library():
+    """Names the library a C++ consumer links against."""
+    expected = "sushitrack.lib" if artifacts.IS_WINDOWS else "libsushitrack.so"
+    assert artifacts.import_lib_name() == expected

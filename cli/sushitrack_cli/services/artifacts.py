@@ -4,7 +4,9 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+from typing import Iterator
 
 from sushicore.discovery import ExecutableIndex
 
@@ -32,14 +34,14 @@ def import_lib_name() -> str:
     return "sushitrack.lib" if IS_WINDOWS else "libsushitrack.so"
 
 
-def _candidates(build_dir: Path, filename: str):
+def _candidates(build_dir: Path, filename: str) -> Iterator[Path]:
     """Yield the conventional locations of *filename*, most likely first."""
     for bin_dir in _BIN_DIRS:
         for config in _CONFIG_DIRS:
             yield Path(build_dir, *(p for p in (bin_dir, config, filename) if p))
 
 
-def find_file(build_dir, filename: str) -> Path | None:
+def find_file(build_dir: str | os.PathLike, filename: str) -> Path | None:
     """Return the path to *filename* under the build tree, or None.
 
     Args:
@@ -59,6 +61,6 @@ def find_file(build_dir, filename: str) -> Path | None:
     return found[0] if found else None
 
 
-def find_binary(build_dir, name: str) -> Path | None:
+def find_binary(build_dir: str | os.PathLike, name: str) -> Path | None:
     """Return the built executable *name*, adding the suffix on Windows."""
     return find_file(build_dir, executable_name(name))
