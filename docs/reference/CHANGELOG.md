@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-04 — cli: Required sushicore 0.7.0, whose setup takes --toolchain and --no-gpu (`cli/pyproject.toml`).
 - 2026-09-24 — cli: Removed the unused private copies `cli/sushitrack_cli/proc.py`, `cli/sushitrack_cli/services/discovery.py` and `cli/tests/test_proc.py`.
 - 2026-09-24 — cli: Replaced st doctor with sushicore's shared setup, doctor, link and unlink commands plus SushiTrack's own checks (`cli/sushitrack_cli/cli.py`, `cli/sushitrack_cli/services/checks.py`).
 - 2026-09-24 — cli: Moved st run, label and deploy onto the shared runner and artifact locator (`cli/sushitrack_cli/services/runner.py`, `cli/sushitrack_cli/services/label.py`, `cli/sushitrack_cli/services/deploy.py`).
