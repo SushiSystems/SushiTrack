@@ -30,6 +30,9 @@ includes `SushiTrack/sushitrack_export.hpp`, which holds preprocessor macros onl
 else from the library, so a C consumer needs no Eigen and no C++ header. The package still
 carries every header of `include/SushiTrack/`.
 
+`sushitrack_c.h` includes that file and does not repeat the macro, so `SUSHITRACK_API` is defined
+in exactly one place. A second copy could drift from the one `sushitrack_export.hpp` carries.
+
 ```
 package/
 ├── include/

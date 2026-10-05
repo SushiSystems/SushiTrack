@@ -18,10 +18,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// Pure preprocessor macros, no C++ syntax: including it here keeps this
-// header's C ABI dependency-free (see docs/guides/DEPLOY_PACKAGES.md)
-// while still defining SUSHITRACK_API in exactly one place, not a second copy
-// that could drift from the one sushitrack_export.hpp already carries.
+// Holds preprocessor macros only, so this header stays C; see docs/guides/DEPLOY_PACKAGES.md.
 #include "SushiTrack/sushitrack_export.hpp"
 
 #ifdef __cplusplus

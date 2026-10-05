@@ -21,8 +21,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-# demo.py already puts cli/ on sys.path when it imports this module, but
-# pipeline.py is also importable on its own, so it repeats the same hack.
+# cli/ goes on sys.path here too, because this module is also imported without demo.py.
 _CLI_DIR = Path(__file__).parent.parent.parent.parent / "cli"
 if str(_CLI_DIR) not in sys.path:
     sys.path.append(str(_CLI_DIR))

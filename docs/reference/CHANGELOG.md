@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-05 — docs: Shortened eleven comment paragraphs and docstrings and moved their reasoning into the manual (`docs/architecture/CLI_PACKAGE.md`, `docs/guides/TESTING.md`, `docs/guides/DEPLOY_PACKAGES.md`, `docs/guides/INFERENCE.md`).
 - 2026-10-05 — docs: Split the manual into pages under an index, added the required documents and archived the finished Typer and migration records (`docs/README.md`, `docs/reference/`, `docs/design/`, `docs/archive/`, `tools/`).
 - 2026-10-05 — cli: Renamed st docker to st container; the old word still runs, hidden, until 2027-03-25 (`cli/sushitrack_cli/cli.py`, `cli/sushitrack_cli/aliases.py`).
 - 2026-10-05 — cli: Added --version and --describe and took config, env and the entry point from sushicore (`cli/sushitrack_cli/cli.py`, `cli/sushitrack_cli/services/diag.py`, `cli/sushitrack_cli/__main__.py`).

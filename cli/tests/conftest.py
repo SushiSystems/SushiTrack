@@ -3,16 +3,9 @@
 # Copyright (c) 2026 Sushi Systems
 # Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
 # Commercial use requires a licence from Sushi Systems.
-"""Fixtures for the SushiTrack CLI's tests.
+"""Provides the fixtures of the SushiTrack CLI's tests; none of them reaches the machine.
 
-``sushitrack_cli`` imports :mod:`sushicore` at module load, so the suite cannot
-be collected without it. Since 2026-09-22 sushicore is an ordinary PyPI
-dependency of this CLI rather than a checkout to be found on disk, so there is
-nothing to search for: it is installed or it is not.
-
-Nothing here reaches the machine. A test that runs a real tool, prints through
-the shared console, or reads the developer's own project is a test that says
-something different on someone else's machine.
+The rules of the suite are in docs/guides/TESTING.md.
 """
 
 from __future__ import annotations
@@ -23,9 +16,7 @@ from pathlib import Path
 
 import pytest
 
-# The package under test sits in cli/, one level above this file, and the suite
-# is run from the repository root as often as from cli/. Putting cli/ on the
-# path here means the same command works from either.
+# cli/ goes on the path so the suite runs from the repository root as well as from cli/.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 if importlib.util.find_spec("sushicore") is None:  # pragma: no cover - import guard

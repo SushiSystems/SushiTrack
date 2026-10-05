@@ -40,9 +40,11 @@ From [SushiTrack migration and rebranding](SUSHITRACK_MIGRATION.md), section 5.
 
 ## Documentation
 
-- Close the 13 findings of `check_source_comments.py` (comment paragraphs, three long module
-  docstrings, one history word); the estate programme on code does this. The checker does not
-  test that every symbol carries a `@brief`.
+- Close the last finding of `check_source_comments.py`: it reads the two `#include` lines inside
+  the `_CPP_EXAMPLE` string of `cli/sushitrack_cli/services/deploy.py` as a comment run. The
+  checker does not test that every symbol carries a `@brief`.
+- Import `sushitrack_cli` in `tests/regression/inference/pipeline.py` and `demo.py` without
+  appending `cli/` to `sys.path`.
 - Check `docs/architecture/OVERVIEW.md`, `docs/reference/CLI.md` and
   `docs/reference/CONFIGURATION.md` against the sources line by line.
 - Record the date, commit and machine of the next benchmark run in

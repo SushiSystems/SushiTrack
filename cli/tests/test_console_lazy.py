@@ -3,17 +3,9 @@
 # Copyright (c) 2026 Sushi Systems
 # Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
 # Commercial use requires a licence from Sushi Systems.
-"""Regression tests for the lazy console initialisation.
+"""Tests that importing the console builds nothing, so st --help runs outside a checkout.
 
-The bug: console.py used to build the console at import time, which called
-config_dir() -> find_project_root() and raised SystemExit outside a checkout.
-Because cli.py imports console transitively, *every* `st` invocation —
-including `st --help`, which Typer can answer with no project — would die
-with "Not inside a SushiTrack project" if this regressed.
-
-The lifecycle lives in sushicore.cli_console.LazyConsole; these tests pin
-that this CLI is wired to it, mirroring the sibling CLIs' own
-test_console_lazy.py.
+The failure these tests guard against is in docs/architecture/CLI_PACKAGE.md.
 """
 
 from __future__ import annotations

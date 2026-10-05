@@ -133,8 +133,7 @@ def config_show(cfg, paths):
     for name in CONFIG_NAMES:
         path = config_dir(paths.root) / name
         state = "found" if path.is_file() else "absent"
-        # Parens, not brackets: Rich would try to parse a literal "[found]" as
-        # a markup tag and raise, since "found" names no registered style.
+        # Rich raises on a literal "[found]", an unregistered markup tag, so the state is in parens.
         console.console.print(_muted(f"  {name:<20} ({state})"))
     names = set(ENV_OVERRIDES.values()) | set(PROFILE.env_overrides().values())
     console.console.print(_muted("  overrides: " + ", ".join(sorted(names))))

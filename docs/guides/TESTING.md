@@ -68,3 +68,26 @@ Direct invocation:
 st run integration_test
 st test --suite integration             # ctest --test-dir build -L '^integration$'
 ```
+
+## CLI tests (`cli/tests/`)
+
+A pytest suite for the `st` package. It needs no build.
+
+`sushitrack_cli` imports `sushicore` at module load, so the suite cannot be collected without it.
+sushicore is an ordinary PyPI dependency of the CLI, not a checkout to be found on disk, so
+`cli/tests/conftest.py` searches for nothing: sushicore is installed or it is not, and
+`conftest.py` raises when it is not.
+
+The package under test sits in `cli/`, one level above `conftest.py`, and the suite is run from the
+repository root as often as from `cli/`. `conftest.py` puts `cli/` on `sys.path` so the same
+command works from either.
+
+Nothing in the fixtures reaches the machine. A test that runs a real tool, prints through the
+shared console, or reads the developer's own project says something different on someone else's
+machine.
+
+Direct invocation:
+
+```bash
+python -m pytest cli/tests -q
+```

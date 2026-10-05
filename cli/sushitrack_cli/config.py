@@ -23,9 +23,7 @@ from sushicore.provision.config import ProvisionSettings
 from sushicore.profile import ModuleProfile
 from sushicore.workspace import read_toml
 
-#: How SushiTrack describes itself to the shared machinery. The C API header is
-#: the distinctive marker: a bare CMakeLists.txt exists in any enclosing
-#: checkout, but this path only ever sits at the SushiTrack root.
+#: root_marker exists only at the SushiTrack root; see docs/architecture/CLI_PACKAGE.md.
 PROFILE = ModuleProfile(
     name="SushiTrack",
     program="st",
@@ -111,10 +109,7 @@ class Config:
         return self.build_jobs if self.build_jobs > 0 else (os.cpu_count() or 2)
 
 
-# Config field -> environment variable that overrides it. Sectioned rather
-# than flat (unlike sushicore.profile.ModuleProfile.env_overrides(), which
-# assumes one ToolConfig field per override), so it stays local rather than
-# derived from the shared profile.
+# Maps each config field to its overriding variable; see docs/architecture/CLI_PACKAGE.md.
 ENV_OVERRIDES = {
     "cli_theme": "ST_THEME",
     "cli_icons": "ST_ICONS",
