@@ -1,5 +1,8 @@
-# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
-# Licensed under the Apache License, Version 2.0. See LICENSE.
+# test_diag_service.py
+# SushiTrack - https://github.com/SushiSystems/SushiTrack
+# Copyright (c) 2026 Sushi Systems
+# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
+# Commercial use requires a licence from Sushi Systems.
 """Tests diag's git probe and env dump on the shared bricks."""
 
 from __future__ import annotations

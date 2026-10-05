@@ -1,5 +1,7 @@
 # Contributing to SushiTrack
 
+Contributions from outside Sushi Systems are not accepted yet.
+
 This document defines the engineering standards for contributing to SushiTrack. It assumes familiarity with C++17, the CMake build system, and the unified developer CLI (`st` / `sushitrack`).
 
 ---
@@ -78,7 +80,8 @@ All public declarations in `include/SushiTrack/` must carry Doxygen comments.
 
 ### File header
 
-Every source and header file starts with the standard Apache-2.0 header and Doxygen file tag:
+Every source and header file starts with the license block of the `source-comments` skill,
+written by `write_license_block.py` and never by hand, followed by the Doxygen file tag:
 
 ```cpp
 /**

@@ -1,9 +1,14 @@
+# pipeline.py
+# SushiTrack - https://github.com/SushiSystems/SushiTrack
+# Copyright (c) 2026 Sushi Systems
+# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
+# Commercial use requires a licence from Sushi Systems.
+# Holds code ported from YOLOX (Apache-2.0), see NOTICE.md
+# Copyright (c) 2021-2022 Megvii Inc. All rights reserved.
 """
 @file      pipeline.py
 @brief     Core video processing pipeline abstracting detection and tracking.
 @author    Mustafa Garip (mustafagarip@sushisystems.io)
-@version   v1.0.0
-@copyright Copyright (c) 2026-present Mustafa Garip & Sushi Systems. All rights reserved.
 """
 
 import os

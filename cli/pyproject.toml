@@ -7,6 +7,7 @@ name = "sushitrack-cli"
 version = "0.1.0"
 description = "SushiTrack developer CLI (build / test / eval / infer / run)"
 authors = [{ name = "Mustafa Garip", email = "garipm@mef.edu.tr" }]
+license = { text = "PolyForm-Noncommercial-1.0.0" }
 requires-python = ">=3.10"
 dependencies = [
     # The command layer (sushitrack_cli/cli.py) is Typer, the same framework

@@ -1,3 +1,8 @@
+# conftest.py
+# SushiTrack - https://github.com/SushiSystems/SushiTrack
+# Copyright (c) 2026 Sushi Systems
+# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
+# Commercial use requires a licence from Sushi Systems.
 """Fixtures for the SushiTrack CLI's tests.
 
 ``sushitrack_cli`` imports :mod:`sushicore` at module load, so the suite cannot

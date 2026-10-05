@@ -1,5 +1,8 @@
-# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
-# Licensed under the Apache License, Version 2.0. See LICENSE.
+# sushitrack.py
+# SushiTrack - https://github.com/SushiSystems/SushiTrack
+# Copyright (c) 2026 Sushi Systems
+# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
+# Commercial use requires a licence from Sushi Systems.
 """Python ctypes bindings for the SushiTrack C ABI.
 
 Wraps the native library interface declared in include/SushiTrack/sushitrack_c.h.

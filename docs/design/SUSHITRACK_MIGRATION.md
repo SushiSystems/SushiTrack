@@ -1,21 +1,22 @@
-# SushiTrack Open-Source Migration and Rebranding
+# SushiTrack Migration and Rebranding
 
 **Status:** Open — phase 1 of 4
 
 This design document specifies the complete transition of the repository from
-SushiTrack to SushiTrack, under the Apache-2.0 license, fully conforming to the
+SushiTrack to SushiTrack, under the PolyForm Noncommercial License 1.0.0, fully conforming to the
 Sushi Systems engineering doctrine (`sushiskills`).
 
 ## 1. Context and Motivation
 
-The project is entering the open-source ecosystem as a core tracking library within
-Sushi Systems. All intellectual property rights have been transferred, and the codebase
-is being released as an open-source project under Apache License Version 2.0.
+The project becomes a core tracking library within Sushi Systems. All intellectual property
+rights have been transferred. The codebase is source-available, free for non-commercial use
+under the PolyForm Noncommercial License 1.0.0; commercial use needs a licence from Sushi
+Systems, see `COMMERCIAL.md`.
 
 The repository must reflect Sushi Systems standards:
 - Clear separation of responsibilities (`SOLID`).
 - Standard repository layout (`repository-layout`).
-- Explicit Doxygen and Apache-2.0 headers (`source-comments`).
+- Doxygen comments and the license block of `source-comments`.
 - Unified developer CLI (`st` / `sushitrack`).
 - Standard checkers and test verification (`project-tools`, `testing`).
 
@@ -25,8 +26,8 @@ The repository must reflect Sushi Systems standards:
 - **C++ Namespace:** `SushiTrack`
 - **C API Prefix:** `sushitrack_`
 - **Header Tree:** `<SushiTrack/*.hpp>`, `<SushiTrack/sushitrack_c.h>`
-- **License:** Apache License Version 2.0 (`LICENSE`)
-- **Copyright Holder:** `Copyright (c) 2026-present Mustafa Garip & Sushi Systems`
+- **License:** PolyForm Noncommercial License 1.0.0 (`LICENSE`), commercial terms in `COMMERCIAL.md`
+- **Copyright Holder:** `Copyright (c) 2026 Sushi Systems`
 - **Organization Website:** `https://sushisystems.io`
 - **Repository URL:** `https://github.com/SushiSystems/SushiTrack`
 - **CLI Commands:** `sushitrack` and `st`
@@ -117,31 +118,18 @@ SushiTrack/
 
 ### 3.2 Licensing and Source File Headers
 
-Every C, C++, Python, and shell file receives a standardized Apache-2.0 header:
+Every C, C++, Python, shell and CMake file opens with the license block of the
+`source-comments` skill. `write_license_block.py` in SushiSkills writes it; `NOTICE.md` records
+the exact command, which also adds the upstream lines of the ported files.
 
 ```cpp
-/**************************************************************************/
-/* tracker.hpp                                                            */
-/**************************************************************************/
-/*                          This file is part of:                         */
-/*                               SushiTrack                               */
-/*              https://github.com/SushiSystems/SushiTrack                */
-/*                          https://sushisystems.io                       */
-/**************************************************************************/
-/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
-/*                                                                        */
-/* Licensed under the Apache License, Version 2.0 (the "License");        */
-/* you may not use this file except in compliance with the License.       */
-/* You may obtain a copy of the License at                                */
-/*                                                                        */
-/*     http://www.apache.org/licenses/LICENSE-2.0                         */
-/*                                                                        */
-/* Unless required by applicable law or agreed to in writing, software    */
-/* distributed under the License is distributed on an "AS IS" BASIS,      */
-/* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
-/* implied. See the License for the specific language governing           */
-/* permissions and limitations under the License.                          */
-/**************************************************************************/
+/****************************************************************/
+/* tracker.hpp                                                  */
+/* SushiTrack - https://github.com/SushiSystems/SushiTrack      */
+/* Copyright (c) 2026 Sushi Systems                             */
+/* Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.    */
+/* Commercial use requires a licence from Sushi Systems.        */
+/****************************************************************/
 
 /**
  * @file tracker.hpp
@@ -195,14 +183,14 @@ All C API declarations use the full prefix `sushitrack_`:
 ## 4. Execution Phases
 
 1. **Phase 1: Licensing and Repository Structure Alignment**
-   - Place root `LICENSE` (Apache 2.0) and root `README.md`.
+   - Place root `LICENSE`, `COMMERCIAL.md`, `NOTICE.md` and root `README.md`.
    - Move `src/` to `source/`, `3rdparty/` to `third_party/`, `.tools/` to `tools/`.
    - Organize `docs/` tree (`docs/reference/CHANGELOG.md`, `docs/architecture/OVERVIEW.md`, `docs/design/`).
    - Clean up stray test discovery files.
 2. **Phase 2: Header Tree, C++ Core, and C API Modernization**
    - Move headers from `include/SushiTrack/` to `include/SushiTrack/`.
    - Rename headers and source files to snake_case (`tracker.hpp`, `sushitrack_c.h`, etc.).
-   - Apply Apache-2.0 and Doxygen comment headers across all source files.
+   - Apply the license block and Doxygen comment headers across all source files.
    - Update `CMakeLists.txt` for `project(sushitrack VERSION 1.0.0)` and `SUSHITRACK_API`.
    - Update `namespace SushiTrack` to `namespace SushiTrack` and classes to `SushiTrack::Tracker`.
    - Modernize C API to `sushitrack_` function prefixes.

@@ -1,5 +1,8 @@
-# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
-# Licensed under the Apache License, Version 2.0. See LICENSE.
+# setup.py
+# SushiTrack - https://github.com/SushiSystems/SushiTrack
+# Copyright (c) 2026 Sushi Systems
+# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
+# Commercial use requires a licence from Sushi Systems.
 """Builds and packages the sushitrack Python distribution."""
 
 from __future__ import annotations
@@ -13,7 +16,7 @@ setup(
     author="Mustafa Garip & Sushi Systems",
     author_email="mustafagarip@sushisystems.io",
     url="https://github.com/SushiSystems/SushiTrack",
-    license="Apache-2.0",
+    license="PolyForm-Noncommercial-1.0.0",
     py_modules=["sushitrack"],
     python_requires=">=3.11",
 )
