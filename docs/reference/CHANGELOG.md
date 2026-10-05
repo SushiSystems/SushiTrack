@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- 2026-10-05 — cli: Renamed st docker to st container; the old word still runs, hidden, until 2027-03-25 (`cli/sushitrack_cli/cli.py`, `cli/sushitrack_cli/aliases.py`).
+- 2026-10-05 — cli: Added --version and --describe and took config, env and the entry point from sushicore (`cli/sushitrack_cli/cli.py`, `cli/sushitrack_cli/services/diag.py`, `cli/sushitrack_cli/__main__.py`).
+- 2026-10-05 — cli: Changed st eval with no matching sequence and st clean with a surviving directory to exit 1 (`cli/sushitrack_cli/services/label.py`, `cli/sushitrack_cli/services/build.py`).
+- 2026-10-05 — cli: Reported an unknown build type or tracker and a malformed config.toml as one error line (`cli/sushitrack_cli/errors.py`, `cli/sushitrack_cli/services/build.py`, `cli/sushitrack_cli/services/label.py`).
+- 2026-10-05 — cli: Repaired the C and Python examples st deploy writes and eight cut comments (`cli/sushitrack_cli/services/deploy.py`).
+- 2026-10-05 — cli: Listed setup, doctor, link and unlink under the Diagnostics help panel (`cli/sushitrack_cli/cli.py`).
+- 2026-10-05 — docs: Corrected the sushicore install step and documented st run, deploy, the diagnostics, the root options and the exit codes (`docs/README.md`).
 - 2026-10-05 — licence: Replaced Apache-2.0 with PolyForm Noncommercial 1.0.0 and named the ported files and the benchmark data (`LICENSE`, `COMMERCIAL.md`, `NOTICE.md`, `third_party/licenses/`, `README.md`).
 - 2026-10-04 — cli: Required sushicore 0.7.0, whose setup takes --toolchain and --no-gpu (`cli/pyproject.toml`).
 - 2026-09-24 — cli: Removed the unused private copies `cli/sushitrack_cli/proc.py`, `cli/sushitrack_cli/services/discovery.py` and `cli/tests/test_proc.py`.

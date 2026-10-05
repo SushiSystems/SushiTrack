@@ -144,3 +144,36 @@ def test_clean_removes_the_tree_before_configuring(tmp_path, runner):
     assert build_svc.build(_cfg(), paths, clean=True, tests=False) == 0
     assert not (paths.build / "leftover.o").exists()
     assert [c[1] for c in runner.calls] == ["-S", "--build"]
+
+
+@pytest.mark.parametrize("stamp, clean", [("Release|OFF|Ninja", True),
+                                          ("Debug|OFF|Ninja", False)])
+def test_build_stops_at_a_tree_it_could_not_remove(tmp_path, monkeypatch, runner,
+                                                   stamp, clean):
+    """Returns 1 and runs no cmake when the clean or the reconfigure removal fails."""
+    monkeypatch.setattr(build_svc.shutil, "rmtree", lambda target, ignore_errors=False: None)
+    paths = _configured_tree(tmp_path, stamp, sentinel="build.ninja")
+    assert build_svc.build(_cfg(), paths, clean=clean, tests=False) == 1
+    assert runner.calls == []
+
+
+def test_clean_reports_a_tree_it_could_not_remove(tmp_path, monkeypatch, recorder):
+    """Returns 1 and names the directory when the build tree survives the removal."""
+    spy = recorder(build_svc)
+    monkeypatch.setattr(build_svc.shutil, "rmtree", lambda target, ignore_errors=False: None)
+    build_dir = tmp_path / "build"
+    build_dir.mkdir()
+    paths = SimpleNamespace(build=build_dir, package=tmp_path / "package")
+    assert build_svc.clean(paths) == 1
+    assert spy.said(f"Could not remove {build_dir}")
+    assert not spy.said("Removed:")
+
+
+def test_clean_removes_both_trees(tmp_path, recorder):
+    """Returns 0 and leaves neither the build tree nor the package directory."""
+    recorder(build_svc)
+    paths = SimpleNamespace(build=tmp_path / "build", package=tmp_path / "package")
+    paths.build.mkdir()
+    paths.package.mkdir()
+    assert build_svc.clean(paths) == 0
+    assert not paths.build.exists() and not paths.package.exists()

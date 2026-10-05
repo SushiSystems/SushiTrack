@@ -98,7 +98,7 @@ class Config:
 
     test_tracker: str = "sushitrack"
 
-    # Populated by the loader, not read from any file: field name -> origin ("default"
+    # sources maps each field name to the layer its value came from.
     sources: dict = field(default_factory=dict)
 
     tool: ToolSettings = field(default_factory=ToolSettings)

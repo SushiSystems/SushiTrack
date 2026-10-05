@@ -41,3 +41,11 @@ def test_regression_capture_keeps_streams_apart(tmp_path, monkeypatch, recorder)
 def test_deploy_no_longer_imports_discovery():
     assert not hasattr(deploy, "discovery")
     assert deploy.shared_lib_name() in ("sushitrack.dll", "libsushitrack.so")
+
+
+def test_eval_fails_when_no_sequence_matches(tmp_path, recorder):
+    """Returns 1 and says so when the scenario filter matches no sequence."""
+    spy = recorder(label)
+    paths = SimpleNamespace(data_root=lambda: tmp_path)
+    assert label.evaluate_sequences(SimpleNamespace(), paths, scenario="MOT99") == 1
+    assert spy.said("No sequence matched")

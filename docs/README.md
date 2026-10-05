@@ -38,7 +38,13 @@ pipeline are included.
   - [project test label](#project-test-label)
   - [project test inference](#project-test-inference)
   - [project clean](#project-clean)
-  - [docker build / docker run](#docker-build--docker-run)
+  - [st run](#st-run)
+  - [st deploy](#st-deploy)
+  - [st container build / st container run](#st-container-build--st-container-run)
+  - [Diagnostics](#diagnostics)
+  - [Provisioning](#provisioning)
+  - [Root options](#root-options)
+  - [Exit codes](#exit-codes)
 - [C API](#c-api)
 - [Python Binding](#python-binding)
 - [Deploy Packages](#deploy-packages)
@@ -276,6 +282,8 @@ sushitrack/
     ├── sushistack.deps.toml      # SushiStack dependency fragment (GoogleTest only)
     ├── sushitrack_cli/
     │   ├── cli.py                # Typer command declarations (one thin layer)
+    │   ├── aliases.py            # Old command spellings and their last day
+    │   ├── errors.py             # Failures printed as one line
     │   ├── config.py             # Layered TOML config + sushicore root resolution
     │   ├── env.py                # MSVC (vcvars) environment snapshotting
     │   ├── process.py            # Shared sushicore process runner
@@ -301,13 +309,20 @@ CLI (`sr`, `se`, `sa`, `sb`, `sd`, `hub`). Inside a SushiStack workspace,
 
 ```bash
 pipx install cli/
-pipx inject sushitrack-cli --editable /path/to/sushistack/sushicore
 ```
 
-`sushicore` is not published to any index — it ships inside the `sushistack`
-repository — so the second step is required outside a workspace `hub` would
-otherwise handle. Once installed, `st --help` (or its full-name alias,
-`sushitrack --help`) lists every command.
+`cli/pyproject.toml` declares `sushicore>=0.7.0` as an ordinary dependency, next to
+`typer>=0.12` and `rich>=13.0`. PyPI carries sushicore 0.1.0 to 0.4.0, so until 0.7.0 is
+published `pipx install cli/` cannot resolve that requirement. Until then, install
+sushicore from a checkout into one environment, then the CLI beside it:
+
+```bash
+pip install -e /path/to/sushicore
+pip install -e cli
+```
+
+Once installed, `st --help` (or its full-name alias, `sushitrack --help`) lists every
+command and `st --version` prints the installed version of `sushitrack-cli`.
 
 ### Conda environment
 
@@ -321,11 +336,11 @@ conda activate sushitrack
 ### Docker
 
 ```bash
-st docker build      # builds image from ./Dockerfile (CUDA 12.1, Ubuntu 22.04)
-st docker run        # docker run -it --rm -v $(pwd):/workspace/sushitrack sushitrack bash
+st container build   # builds image from ./Dockerfile (CUDA 12.1, Ubuntu 22.04)
+st container run     # docker run -it --rm -v $(pwd):/workspace/sushitrack sushitrack bash
 ```
 
-The Dockerfile pins the same wheel versions as `environment.yml`. The project root is bind-mounted at `/workspace/sushitrack`; output files written inside the container are immediately visible on the host. `st` is symlinked into `/usr/local/bin`, so it works interactively and as `docker run ... st build` alike.
+The Dockerfile pins the same wheel versions as `environment.yml`. The project root is bind-mounted at `/workspace/sushitrack`; output files written inside the container are immediately visible on the host. The image installs the CLI with `pip3 install`, which puts `st` and `sushitrack` on `PATH`, so `st` works interactively and as `docker run ... st build` alike.
 
 ---
 
@@ -385,7 +400,7 @@ directory at the repository root — see [Deploy Packages](#deploy-packages).
 
 ## CLI Reference
 
-Commands are flat: `st <command> [flags]`, with `st docker <action>` the only
+Commands are flat: `st <command> [flags]`, with `st container <action>` the only
 subgroup. Arguments after a bare `--` are forwarded to the underlying binary.
 
 | Command | Purpose |
@@ -398,18 +413,19 @@ subgroup. Arguments after a bare `--` are forwarded to the underlying binary.
 | `st clean` | Remove `build/` and `package/` |
 | `st deploy {cpp,python}` | Assemble `package/` from the current build |
 | `st status` | What is built, what is missing, which data sets are present |
-| `st setup [--dry-run]` | Provision the dependencies in `cli/sushistack.deps.toml`, then run the doctor |
+| `st setup [--dry-run] [--yes] [--toolchain NAME] [--no-gpu]` | Provision the dependencies in `cli/sushistack.deps.toml`, then run the doctor |
 | `st doctor [--for GROUP]` | Check readiness per group (`build`, `test`, `infer`, `eval`); non-zero exit when a required check fails |
 | `st link [--workspace PATH]` | Register this checkout in a SushiStack workspace |
 | `st unlink [--workspace PATH]` | Remove this checkout from a SushiStack workspace |
 | `st config` | Resolved configuration and the origin of every value |
 | `st paths` | Resolved project directories |
-| `st env` | Environment cmake and the test binaries execute under |
-| `st docker build` / `st docker run` | Image build / bind-mounted container |
+| `st env [--all]` | Environment cmake and the test binaries execute under |
+| `st container build` / `st container run` | Image build / bind-mounted container |
+| `st --version` / `st --describe` | Installed version / command catalogue as JSON |
 
 Configuration is layered: built-in defaults → `cli/config.toml` → `cli/config.local.toml`
 → `ST_*` environment variables (`ST_BUILD_DIR`, `ST_BUILD_TYPE`, `ST_GENERATOR`,
-`ST_CMAKE`, `ST_DOCKER_IMAGE`, `ST_TRACKER`, `ST_PROJECT_ROOT`, …). `st config`
+`ST_CMAKE`, `ST_DOCKER_IMAGE`, `ST_TRACKER`, …). `st config`
 prints which layer each value came from.
 
 ### `st build`
@@ -545,16 +561,90 @@ Removes the build directory and the assembled package directory (`build/` and
 st clean
 ```
 
-### `st docker build` / `st docker run`
+### `st run`
+
+Runs an executable from the build tree. The target is matched by exact name first, then
+by substring; with no target, or with `--select`, `st` lists the executables and asks
+which one to run. Arguments after `--` go to the executable.
+
+| Flag | Effect |
+|---|---|
+| `--select, -s` | Show the picker even when a target is given |
+
+```bash
+st run
+st run unit_test
+st run unit_test -- --gtest_filter='TrackletTest.*'
+```
+
+### `st deploy`
+
+`st deploy {cpp,python}` assembles `package/` from the current build without building
+first; `st build --deploy {cpp,python}` does both. The layouts are under
+[Deploy Packages](#deploy-packages).
+
+```bash
+st deploy cpp
+st deploy python
+```
+
+### `st container build` / `st container run`
 
 `docker build` / `docker run` are issued directly — there are no shell wrappers left. `run` mounts the repo at the configured `docker.workdir` and passes `--gpus all` unless `--no-gpu` is given:
 `docker run -it --rm --gpus all -v "<root>:/workspace/sushitrack" -w /workspace/sushitrack sushitrack bash`. Args after `--` replace the default `bash` with the command run inside the container.
 
 ```bash
-st docker build
-st docker run
-st docker run -- bash -lc "echo hi"
+st container build
+st container build --no-cache
+st container run
+st container run -- bash -lc "echo hi"
 ```
+
+`st docker build` and `st docker run` are the old spellings. They still run, are left out
+of `st --help` and `st --describe`, print one notice naming the new spelling when standard
+error is a terminal, and are removed after 2027-03-25. `ST_NO_DEPRECATION_NOTICE=1`
+silences the notice.
+
+### Diagnostics
+
+All four are read-only.
+
+| Command | Prints |
+|---|---|
+| `st status` | The build tree, the library, the test binaries, `tracker_bridge`, the data sets and `package/`, each with its state |
+| `st config` | Every resolved setting, its value and the layer it came from |
+| `st paths` | Every resolved project directory and whether it exists |
+| `st env` | The build-relevant variables of the environment cmake, ctest and the test binaries run under; `--all, -a` prints every variable |
+
+### Provisioning
+
+`setup`, `doctor`, `link` and `unlink` come from `sushicore` and behave the same in every
+Sushi CLI.
+
+| Command | Flags |
+|---|---|
+| `st setup` | `--dry-run` shows what would be installed; `--yes` answers the LLVM-download prompt; `--toolchain NAME` (repeatable) also installs `intel-llvm`, `adaptivecpp` or `oneapi`; `--no-gpu` skips the GPU toolkit |
+| `st doctor` | `--for GROUP` limits the report to `build`, `test`, `infer` or `eval` |
+| `st link` / `st unlink` | `--workspace PATH` names the SushiStack workspace |
+
+### Root options
+
+| Option | Effect |
+|---|---|
+| `--version` | Prints `sushitrack-cli <version>`, the installed package version, and exits |
+| `--describe` | Prints every visible command and its parameters as JSON and exits |
+| `--help` | Prints the help page; a bare `st` prints the same page |
+
+### Exit codes
+
+| Code | Meaning |
+|---|---|
+| 0 | The command succeeded |
+| 1 | The command failed: a missing build tree, binary or script, a failed deploy or evaluation, a directory `st clean` could not remove, no sequence for `st eval` to score, a malformed `cli/config.toml`, an unknown build type or tracker, or a required `st doctor` check |
+| 2 | A usage error: an unknown command or option, `--private` with `--public`, a missing `--source` |
+| 127 | A tool the command needs (`cmake`, `ctest`, `docker`) is not installed |
+| 130 | Interrupted with Ctrl+C |
+| other | The exit code of the child process (`cmake`, `ctest`, `docker`, the executable `st run` started) |
 
 ---
 
@@ -963,7 +1053,7 @@ Parameterised GTest binary that iterates over `Scenario × tracker_factory`. For
 1. Reads `det.txt` frames via `MOTRunner`.
 2. Drives the tracker through `ITrackerAdapter` (`SushiTrackAdapter`, `ByteTrackAdapter`, `OCSORTAdapter`).
 3. Writes predictions to `<sequence>/pred/<tracker>/<sequence>.txt`.
-4. Emits a `[ PERF <tracker> ] <sequence>: <us/frame> us/frame` line read back by the CLI (`cli/sushitrack_cli/services/tests.py`).
+4. Emits a `[ PERF <tracker> ] <sequence>: <us/frame> us/frame` line read back by the CLI (`cli/sushitrack_cli/services/label.py`).
 
 Config resolution: SushiTrack loads `sushitrack.json` through the library (`$SUSHITRACK_CONFIG`, then an upward search); ByteTrack and OCSORT read `tests/bytetrack.json` and `tests/ocsort.json`.
 
@@ -1220,17 +1310,19 @@ code and is the recommended path.)
 | File | Purpose |
 |---|---|
 | `cli/pyproject.toml` | Package metadata; installed with pipx, provides the `st` and `sushitrack` entry points |
-| `cli/sushitrack_cli/cli.py` | Typer command declarations delegating to the service layer, plus the `docker` sub-app |
+| `cli/sushitrack_cli/cli.py` | Typer command declarations delegating to the service layer, plus the `container` sub-app and the shared `sushicore` surfaces |
+| `cli/sushitrack_cli/aliases.py` | The old command spellings `st` still answers to, each with its last day |
+| `cli/sushitrack_cli/errors.py` | The failures `st` prints as one line with exit code 1 |
 | `cli/sushitrack_cli/config.py` | Layered TOML config, `ST_*` overrides, project-root and path resolution via `sushicore.module_config` |
 | `cli/sushitrack_cli/console.py` | `sushicore`'s console, theme and icon set, wired in lazily |
 | `cli/sushitrack_cli/env.py` | vcvars discovery and build-environment snapshotting on Windows |
-| `cli/sushitrack_cli/services/` | build, tests (ctest), label (`st eval`), infer, evaluate (TrackEval), deploy, docker, diag, discovery, runner |
-| `cli/config.toml` | Tracked CLI defaults (`cli`, `paths`, `build`, `docker`, `test` sections) |
+| `cli/sushitrack_cli/services/` | build, tests (ctest), label (`st eval`), infer, evaluate (TrackEval), deploy, docker, diag, artifacts, checks, runner |
+| `cli/config.toml` | Tracked CLI defaults (`cli`, `paths`, `build`, `docker`, `test`, `tool` sections) |
 | `cli/sushistack.deps.toml` | SushiStack dependency fragment: GoogleTest, the only port SushiTrack does not vendor |
 | `cli/misc/clean_preds.sh` / `cli/misc/clean_preds.bat` | Recursively removes `pred/` directories under the evaluator data root |
 | `cli/misc/construct_trackeval_data.ps1` | Creates the official TrackEval directory tree by symlinking GT (MOT17-SDP as representative for each sequence) and copying per-tracker predictions for `sushitrack`/`bytetrack`/`ocsort` |
 
-`Dockerfile`: CUDA 12.1 devel base, installs `build-essential`, `cmake`, `git`, `python3`, `python3-pip`, `libgtest-dev`, `libgl1-mesa-glx`, `libglib2.0-0`, then pip-installs the pinned wheel set, copies the project, and installs the CLI with pipx, symlinking `st` into `/usr/local/bin`.
+`Dockerfile`: CUDA 12.1 devel base, installs `build-essential`, `cmake`, `git`, `python3`, `python3-pip`, `libgtest-dev`, `libgl1-mesa-glx`, `libglib2.0-0`, then pip-installs the pinned wheel set, copies the project, and installs the CLI with `pip3 install`, which puts `st` on `PATH`.
 
 ---
 

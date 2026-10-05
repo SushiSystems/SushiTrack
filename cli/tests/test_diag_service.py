@@ -37,3 +37,15 @@ def test_env_dump_reads_the_tool_settings(tmp_path, monkeypatch, recorder):
     tool = SimpleNamespace(name="tool")
     assert diag.env_dump(SimpleNamespace(tool=tool), SimpleNamespace(build=tmp_path)) == 0
     assert seen["tool"] is tool
+
+
+def test_diagnostics_reads_the_context_once_per_report(monkeypatch):
+    """Passes the context pair to each report and returns the report's code."""
+    calls = []
+    monkeypatch.setattr(diag, "config_show", lambda cfg, paths: calls.append((cfg, paths)) or 0)
+    monkeypatch.setattr(diag, "env_dump",
+                        lambda cfg, paths, show_all=False: calls.append(show_all) or 3)
+    diagnostics = diag.Diagnostics(lambda: ("cfg", "paths"))
+    assert diagnostics.config_show() == 0
+    assert diagnostics.env_dump(show_all=True) == 3
+    assert calls == [("cfg", "paths"), True]

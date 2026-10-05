@@ -13,7 +13,7 @@ from .. import console
 from ..env import load_build_env
 from . import build as build_svc
 
-# Suite -> CTest label-selection regex (`ctest -L`). The single categories anchor
+# Maps each suite to the anchored label regex `ctest -L` selects it with.
 SUITE_LABELS = {
     "unit": "^unit$",
     "integration": "^integration$",

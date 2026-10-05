@@ -5,8 +5,11 @@
 # Commercial use requires a licence from Sushi Systems.
 """Reports SushiTrack's status, resolved config, build env and paths."""
 
+from __future__ import annotations
+
 from dataclasses import fields
 from datetime import datetime
+from typing import Callable
 
 from sushicore import cmake_cache
 
@@ -17,7 +20,7 @@ from ..env import load_build_env
 from ..process import MISSING_EXIT_CODE, RUNNER
 from .artifacts import find_binary, find_file, shared_lib_name
 
-# Variable-name prefixes worth surfacing by default in `st env`: the ones that act
+# Prefixes of the variables `st env` shows without --all.
 _ENV_OF_INTEREST = ("PATH", "CC", "CXX", "CMAKE", "NINJA", "INCLUDE", "LIB",
                     "LD_LIBRARY_PATH", "VCPKG", "CUDA", "ST_", "PYTHON",
                     "VIRTUAL_ENV", "CONDA", "VSINSTALLDIR", "VSCMD",
@@ -114,6 +117,7 @@ def status(cfg, paths):
 
 
 def config_show(cfg, paths):
+    """Print every resolved setting with the layer it came from and return 0."""
     console.header("Resolved configuration")
 
     rows = [[field.name, str(getattr(cfg, field.name)),
@@ -138,6 +142,7 @@ def config_show(cfg, paths):
 
 
 def paths_show(cfg, paths):
+    """Print the resolved project directories and whether each exists, and return 0."""
     console.header("Resolved paths")
     rows = [[name, str(path), "exists" if path.exists() else "missing"]
             for name, path in paths.as_dict().items()]
@@ -146,10 +151,12 @@ def paths_show(cfg, paths):
 
 
 def env_dump(cfg, paths, show_all=False):
+    """Print the environment a build runs under, filtered unless *show_all*, and return 0."""
     console.header("Build environment")
     env = load_build_env(cfg.tool, paths.build)
 
     def keep(key):
+        """Returns whether the variable named *key* is shown."""
         return show_all or key.upper().startswith(_ENV_OF_INTEREST)
 
     shown = {k: v for k, v in sorted(env.items()) if keep(k)}
@@ -161,3 +168,24 @@ def env_dump(cfg, paths, show_all=False):
                  + ("" if show_all else
                     " (build-relevant; use --all for everything)"))
     return 0
+
+
+class Diagnostics:
+    """Prints st's `config` and `env` reports for the commands sushicore registers.
+
+    Args:
+        context: Returns the (config, paths) pair of the checkout the process runs in.
+    """
+
+    __slots__ = ("_context",)
+
+    def __init__(self, context: Callable[[], tuple]) -> None:
+        self._context = context
+
+    def config_show(self) -> int:
+        """Prints the resolved configuration and returns the exit code."""
+        return config_show(*self._context())
+
+    def env_dump(self, show_all: bool = False) -> int:
+        """Prints the build environment, every variable when *show_all*, and returns the code."""
+        return env_dump(*self._context(), show_all=show_all)

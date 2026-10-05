@@ -5,9 +5,9 @@
 # Commercial use requires a licence from Sushi Systems.
 """Enable `python3 -m sushitrack_cli` as an entry point."""
 
-import sys
+from __future__ import annotations
 
-from .cli import entry
+from .cli import main
 
 if __name__ == "__main__":
-    sys.exit(entry())
+    main()

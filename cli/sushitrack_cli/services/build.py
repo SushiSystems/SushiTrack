@@ -14,6 +14,7 @@ from sushicore.cmake_driver import CMakeDriver
 
 from .. import console
 from ..env import load_build_env
+from ..errors import UnknownBuildTypeError
 from ..process import RUNNER
 
 BUILD_TYPES = ("Release", "Debug", "RelWithDebInfo", "MinSizeRel")
@@ -28,14 +29,14 @@ class BuildType(str, enum.Enum):
     minsizerel = "minsizerel"
 
 LIBRARY_TARGET = "sushitrack"
-# Every target the test build produces. Listed explicitly (rather than building th
+# TEST_TARGETS names every target the test build produces.
 TEST_TARGETS = ("unit_test", "integration_test", "regression_test",
                 "tracker_bridge")
 # The CMake options those targets are gated behind.
 TEST_OPTIONS = ("BUILD_UNIT_TEST", "BUILD_REGRESSION_TEST",
                 "BUILD_INTEGRATION_TEST")
 
-# Records the configuration a build tree was configured with. A single-config gene
+# The stamp file records the configuration the build tree was configured with.
 STAMP_NAME = ".sushitrack_config"
 
 
@@ -44,8 +45,8 @@ def normalize_build_type(value):
     for known in BUILD_TYPES:
         if value.lower() == known.lower():
             return known
-    raise SystemExit(f"Unknown build type '{value}'. "
-                     f"Choose one of: {', '.join(BUILD_TYPES)}.")
+    raise UnknownBuildTypeError(f"Unknown build type '{value}'. "
+                                f"Choose one of: {', '.join(BUILD_TYPES)}.")
 
 
 #: Generators whose configured tree leaves a build file behind.
@@ -60,6 +61,15 @@ def generator(cfg) -> str:
     if configured:
         return configured
     return "Ninja" if cfg.tool.is_windows else ""
+
+
+def _remove_tree(target: Path) -> bool:
+    """Deletes *target* and returns whether it is gone, reporting a tree that survived."""
+    shutil.rmtree(target, ignore_errors=True)
+    if not target.exists():
+        return True
+    console.error(f"Could not remove {target}; close whatever holds a file in it and retry.")
+    return False
 
 
 def _stamp_key(build_type, tests, generator_name, defines):
@@ -112,7 +122,8 @@ def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
 
     if clean and build_dir.exists():
         console.info(f"Removing build directory: {build_dir}")
-        shutil.rmtree(build_dir, ignore_errors=True)
+        if not _remove_tree(build_dir):
+            return 1
 
     console.info(f"Type: {build_type}  |  tests: {'ON' if tests else 'OFF'}"
                  + (f"  |  generator: {generator_name}" if generator_name else ""))
@@ -121,8 +132,8 @@ def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
     stamp_key = _stamp_key(build_type, tests, generator_name, defines)
 
     if _needs_configure(build_dir, generator_name, stamp_key, paths.root):
-        if build_dir.exists():
-            shutil.rmtree(build_dir, ignore_errors=True)
+        if build_dir.exists() and not _remove_tree(build_dir):
+            return 1
         build_dir.mkdir(parents=True, exist_ok=True)
         console.info("Configuring...")
         args = _configure_args(cfg, paths, build_type, tests, generator_name, defines)
@@ -147,13 +158,18 @@ def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
 
 
 def clean(paths):
-    """Remove the build tree and the assembled package directory."""
+    """Remove the build tree and the assembled package directory.
+
+    Returns:
+        0 when both are gone, 1 when one of them could not be removed.
+    """
     console.header("Clean")
     removed = []
     for target in (paths.build, paths.package):
         if target.exists():
             console.info(f"Removing {target}")
-            shutil.rmtree(target, ignore_errors=True)
+            if not _remove_tree(Path(target)):
+                return 1
             removed.append(Path(target).name)
     if not removed:
         console.info("Nothing to remove; the tree is already clean.")

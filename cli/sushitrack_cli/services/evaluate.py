@@ -11,7 +11,7 @@ import sys
 from .. import console
 from ..process import RUNNER
 
-# MOT20 sequences are scored against the MOT20 benchmark definition, everything el
+# A MOT20 sequence is scored as MOT20; every other sequence is scored as MOT17.
 _BENCHMARKS = ("MOT17", "MOT20")
 
 
@@ -25,7 +25,7 @@ def _load_evaluator(paths):
         from report_generator import (export_trackeval_results,
                                       print_trackeval_table)
     except ImportError as exc:
-        # The evaluator has its own dependency set (numpy, scipy, TrackEval); name
+        # The message names the evaluator's own dependencies: numpy, scipy, TrackEval.
         console.error(
             f"Internal evaluator unavailable: {exc}.\n"
             f"Its dependencies come from environment.yml "

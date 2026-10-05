@@ -9,6 +9,7 @@ import sys
 
 from .. import console
 from ..env import load_build_env
+from ..errors import UnknownTrackerError
 from ..process import RUNNER
 from . import evaluate
 from .artifacts import find_binary
@@ -22,12 +23,16 @@ TRACKERS = {
 
 
 def resolve_tracker(name):
-    """Normalise a tracker name to its registry key, or exit with the choices."""
+    """Normalise a tracker name to its registry key.
+
+    Raises:
+        UnknownTrackerError: The registry holds no tracker of that name.
+    """
     key = (name or "sushitrack").lower()
     if key not in TRACKERS:
         unique_names = sorted(set(TRACKERS.values()))
-        raise SystemExit(f"Unknown tracker '{name}'. "
-                         f"Available: {', '.join(unique_names)}.")
+        raise UnknownTrackerError(f"Unknown tracker '{name}'. "
+                                  f"Available: {', '.join(unique_names)}.")
     return key
 
 
@@ -113,7 +118,11 @@ def _run_regression(tool, paths, gtest_filter):
 def evaluate_sequences(cfg, paths, scenario=None, tracker="sushitrack",
                        compare=False, eval_only=False, trackeval=False,
                        export=None, private=False, public=False):
-    """Run the benchmark and score it. Returns an exit code."""
+    """Run the benchmark and score it.
+
+    Returns:
+        2 for a flag conflict, 1 when no sequence matched, else the pipeline's exit code.
+    """
     if private and public:
         console.error("--private and --public are mutually exclusive.")
         return 2
@@ -121,8 +130,8 @@ def evaluate_sequences(cfg, paths, scenario=None, tracker="sushitrack",
     console.header("Evaluate")
     names = sequences(paths, scenario, private, public)
     if not names:
-        console.warn(f"No sequences matched under {paths.data_root()}.")
-        return 0
+        console.error(f"No sequence matched under {paths.data_root()}; nothing was scored.")
+        return 1
 
     trackers = list(TRACKERS) if compare else [tracker]
     console.info(f"{len(names)} sequence(s) x {len(trackers)} tracker(s): "

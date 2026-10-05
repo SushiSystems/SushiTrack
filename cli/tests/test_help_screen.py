@@ -3,19 +3,20 @@
 # Copyright (c) 2026 Sushi Systems
 # Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
 # Commercial use requires a licence from Sushi Systems.
-"""st's help screen groups its commands under three headings, in the same
-order the removed app.py's app.section(...) calls declared them."""
+"""Tests that st's help screen groups its commands under three headings, in order."""
 
 from __future__ import annotations
 
 from typer.testing import CliRunner
 
-from sushitrack_cli.cli import app, entry
+import pytest
+
+from sushitrack_cli.cli import app, main
 
 K_GROUPS = {
-    "Project": ["build", "test", "run", "clean", "deploy", "docker"],
+    "Project": ["build", "test", "run", "clean", "deploy", "container"],
     "Benchmark": ["eval", "infer"],
-    "Diagnostics": ["status", "config", "paths", "env"],
+    "Diagnostics": ["status", "config", "paths", "env", "setup", "doctor", "link", "unlink"],
 }
 
 K_EXAMPLES = {
@@ -72,24 +73,33 @@ def test_a_bare_invocation_prints_the_same_page():
     assert result.output.strip() == _run("--help").strip()
 
 
-def test_docker_sub_app_draws_its_own_page():
-    out = _run("docker", "--help")
+@pytest.mark.parametrize("word", ["container", "docker"])
+def test_the_container_sub_app_draws_its_own_page_under_both_words(word):
+    """Draws the sub-application's help page for `container` and for `docker`."""
+    out = _run(word, "--help")
     assert "build" in out and "run" in out
 
 
-def test_entry_exits_zero_on_a_bare_invocation():
-    """A bare `st` is a help request, not a usage error: entry() must return 0,
-    not Click's own no_args_is_help exit code (2, a UsageError) — regression
-    test for a bug caught by hand after this suite first shipped green."""
-    assert entry(argv=[]) == 0
+def _exit_code(argv: list[str]) -> int:
+    """Returns the code main() exits with for *argv*."""
+    with pytest.raises(SystemExit) as raised:
+        main(argv)
+    return raised.value.code or 0
 
 
-def test_entry_exits_zero_on_help():
-    assert entry(argv=["--help"]) == 0
+def test_main_exits_zero_on_a_bare_invocation():
+    """Exits 0 when no argument is given."""
+    assert _exit_code([]) == 0
 
 
-def test_entry_exits_nonzero_on_an_unknown_command():
-    assert entry(argv=["bogus-command"]) != 0
+def test_main_exits_zero_on_help():
+    """Exits 0 for `--help`."""
+    assert _exit_code(["--help"]) == 0
+
+
+def test_main_exits_nonzero_on_an_unknown_command():
+    """Exits non-zero for a command st does not have."""
+    assert _exit_code(["bogus-command"]) != 0
 
 
 def test_shared_provision_commands_are_listed():

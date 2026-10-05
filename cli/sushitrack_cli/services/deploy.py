@@ -35,7 +35,8 @@ _CPP_EXAMPLE = """\
  *   cd example && cmake -B build && cmake --build build
  *   ./build/sushitrack_example        (Windows: copy ../bin/sushitrack.dll next to the exe)
  */
-# include <stdio.h> include "SushiTrack/sushitrack_c.h"
+#include <stdio.h>
+#include "SushiTrack/sushitrack_c.h"
 
 int main(void)
 {
@@ -123,7 +124,7 @@ Run (after `st deploy python`):
 \"\"\"
 from sushitrack import Tracker
 
-# The shared library is bundled inside the sushitrack/ package directory and disco
+# The binding loads the shared library bundled inside the sushitrack/ directory.
 tracker = Tracker(config_path="sushitrack.json")
 
 x = 100.0

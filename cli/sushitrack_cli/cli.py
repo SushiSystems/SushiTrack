@@ -15,13 +15,17 @@ from __future__ import annotations
 import sys
 import types
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 import typer
+from sushicore import entry as core_entry
+from sushicore.diag_commands import register_diagnostic_commands
 from sushicore.provision.commands import ModuleProvision, register_provision_commands
+from sushicore.root_options import register_root_options
 from sushicore.typer_help import help_group
 
 from . import console
+from .aliases import ALIASES
 from .config import PROFILE, context, find_project_root, load_tool
 from .services import build as build_svc
 from .services import deploy as deploy_svc
@@ -39,22 +43,23 @@ from .services.tests import Suite
 K_PROJECT = "Project"
 K_BENCHMARK = "Benchmark"
 K_DIAGNOSTICS = "Diagnostics"
+K_DISTRIBUTION = "sushitrack-cli"
+K_PROGRAMS = ("st", "sushitrack")
+K_FORWARDING = {"allow_extra_args": True, "ignore_unknown_options": True}
 
 _help_group = help_group(console.current)
 
 app = typer.Typer(
     name="st",
     cls=_help_group,
-    help="SushiTrack developer CLI — build, test, evaluate, run and Docker.",
+    help="SushiTrack developer CLI: build, test, run, eval, infer and container.",
     no_args_is_help=True,
     add_completion=False,
     rich_markup_mode="rich",
 )
+register_root_options(app, distribution=K_DISTRIBUTION)
 
 
-# --------------------------------------------------------------------------- #
-# build / test / run / clean / deploy (Project)
-# --------------------------------------------------------------------------- #
 @app.command(
     "build",
     rich_help_panel=K_PROJECT,
@@ -140,7 +145,7 @@ def test(
 @app.command(
     "run",
     rich_help_panel=K_PROJECT,
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    context_settings=K_FORWARDING,
     epilog="st run  # Pick from a list\n"
            "st run unit_test\n"
            "st run unit_test -- --gtest_filter='TrackletTest.*'",
@@ -179,23 +184,27 @@ def deploy_cmd(
     raise typer.Exit(deploy_svc.deploy(paths, kind.value))
 
 
-# --------------------------------------------------------------------------- #
-# docker (Project)
-# --------------------------------------------------------------------------- #
-docker_app = typer.Typer(
+container_app = typer.Typer(
     cls=_help_group,
-    help="Docker image and container management.",
+    help="Build the developer image and start a container from it.",
     no_args_is_help=True,
 )
-app.add_typer(docker_app, name="docker", rich_help_panel=K_PROJECT)
+app.add_typer(container_app, name="container", rich_help_panel=K_PROJECT)
 
-
-@docker_app.command(
-    "build",
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
-    epilog="st docker build\nst docker build --no-cache",
+docker_alias_app = typer.Typer(
+    cls=_help_group,
+    help="The old spelling of `st container`.",
+    no_args_is_help=True,
 )
-def docker_build(
+app.add_typer(docker_alias_app, name="docker", hidden=True)
+
+
+@container_app.command(
+    "build",
+    context_settings=K_FORWARDING,
+    epilog="st container build\nst container build --no-cache",
+)
+def container_build(
     ctx: typer.Context,
     no_cache: bool = typer.Option(
         False, "--no-cache", help="Rebuild every layer, ignoring Docker's cache."),
@@ -206,12 +215,12 @@ def docker_build(
                                       forwarded=list(ctx.args)))
 
 
-@docker_app.command(
+@container_app.command(
     "run",
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
-    epilog="st docker run\nst docker run -- bash -lc 'echo hi'",
+    context_settings=K_FORWARDING,
+    epilog="st container run\nst container run -- bash -lc 'echo hi'",
 )
-def docker_run(
+def container_run(
     ctx: typer.Context,
     no_gpu: bool = typer.Option(
         False, "--no-gpu",
@@ -220,16 +229,19 @@ def docker_run(
     """Start the developer container with this repo mounted.
 
     Args after `--` are the command to run inside the container, in place of
-    an interactive bash: st docker run -- bash -lc 'echo hi'
+    an interactive bash: st container run -- bash -lc 'echo hi'
     """
     cfg, paths = context()
     raise typer.Exit(docker_svc.run(cfg, paths, no_gpu=no_gpu,
                                     command=list(ctx.args) or None))
 
 
-# --------------------------------------------------------------------------- #
-# eval / infer (Benchmark)
-# --------------------------------------------------------------------------- #
+ALIASES.command(docker_alias_app, "build", container_build, "st docker build",
+                hidden=False, context_settings=K_FORWARDING)
+ALIASES.command(docker_alias_app, "run", container_run, "st docker run",
+                hidden=False, context_settings=K_FORWARDING)
+
+
 @app.command(
     "eval",
     rich_help_panel=K_BENCHMARK,
@@ -281,7 +293,7 @@ def evaluate(
 @app.command(
     "infer",
     rich_help_panel=K_BENCHMARK,
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    context_settings=K_FORWARDING,
     epilog="st infer -n yolox-x -c third_party/weight/mot17x.pth.tar "
            "--source third_party/video/MOT17-04.mp4 --num-classes 1 --legacy\n"
            "st infer --source 0 --tracker sushitrack --no-save --no-screen --stress",
@@ -328,40 +340,20 @@ def infer(
     raise typer.Exit(infer_svc.run(cfg, paths, args))
 
 
-# --------------------------------------------------------------------------- #
-# status / config / paths / env (Diagnostics)
-# --------------------------------------------------------------------------- #
 @app.command("status", rich_help_panel=K_DIAGNOSTICS, epilog="st status")
 def status():
     """Show what is built, what is missing and which data sets are present."""
     raise typer.Exit(diag_svc.status(*context()))
 
 
-@app.command("config", rich_help_panel=K_DIAGNOSTICS, epilog="st config")
-def config():
-    """Print the resolved configuration and where each value came from."""
-    raise typer.Exit(diag_svc.config_show(*context()))
-
-
 @app.command("paths", rich_help_panel=K_DIAGNOSTICS, epilog="st paths")
 def paths():
-    """Print the resolved project directories (replaces cli/paths.env)."""
+    """Print the resolved project directories."""
     raise typer.Exit(diag_svc.paths_show(*context()))
 
 
-@app.command(
-    "env", rich_help_panel=K_DIAGNOSTICS,
-    epilog="st env\nst env --all  # Show every variable, not just build-relevant",
-)
-def env(
-    show_all: bool = typer.Option(
-        False, "--all", "-a",
-        help="Show every variable, not just the build-relevant ones."),
-):
-    """Print the environment cmake, ctest and the test binaries execute under."""
-    cfg, project_paths = context()
-    raise typer.Exit(diag_svc.env_dump(cfg, project_paths, show_all=show_all))
-
+register_diagnostic_commands(
+    app, diag_svc.Diagnostics(context), program=PROFILE.program, panel=K_DIAGNOSTICS)
 
 register_provision_commands(app, ModuleProvision(
     profile=PROFILE,
@@ -369,36 +361,31 @@ register_provision_commands(app, ModuleProvision(
     load_config=load_tool,
     console=console.current,
     extra_checks=lambda: st_checks(context()[1]),
+    panel=K_DIAGNOSTICS,
 ))
 
 
-def entry(argv=None, prog=None):
-    """Process entry point: returns an exit code, never raises for user error."""
-    if prog:
-        app.info.name = prog
-    elif sys.argv:
-        stem = Path(sys.argv[0]).stem.lower()
-        if stem in ("sushitrack", "st"):
-            app.info.name = stem
-    # A bare invocation is a request for help, not a usage error: it prints the
-    # same page as --help and exits 0. Click's own no_args_is_help (the reason
-    # `app` still declares it, for anything that calls the Typer object
-    # directly) raises NoArgsIsHelpError, a UsageError whose exit code is 2 --
-    # so a bare `st` is spelled out as `st --help` here instead of relying on
-    # that path.
-    call_args = list(sys.argv[1:] if argv is None else argv)
-    if not call_args:
-        call_args = ["--help"]
-    # standalone_mode stays at Typer's default (True): Click's own no-args-is-help
-    # and usage-error handling (NoArgsIsHelpError, UsageError, ...) run only in
-    # that mode. With it off those raise as bare exceptions instead of exiting,
-    # since only standalone_mode's sys.exit() path converts them to SystemExit.
-    try:
-        app(args=call_args)
-    except SystemExit as exc:
-        return exc.code or 0
-    return 0
+def _program_name() -> str:
+    """Returns the name the process was started under when it is one of st's own, else `st`."""
+    stem = Path(sys.argv[0]).stem.lower() if sys.argv else ""
+    return stem if stem in K_PROGRAMS else PROFILE.program
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    """Runs st and exits; a failure the user can act on is one line and exit code 1.
+
+    Args:
+        argv: The arguments to parse; the process's own when None. An empty list prints the help.
+    """
+    app.info.name = _program_name()
+    arguments = list(sys.argv[1:] if argv is None else argv) or ["--help"]
+    core_entry.run(app, lambda message: console.error(message), argv=arguments)
+
+
+def entry() -> None:
+    """Runs :func:`main`; the `st` and `sushitrack` console scripts name this function."""
+    main()
 
 
 if __name__ == "__main__":
-    app()
+    main()
