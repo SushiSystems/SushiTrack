@@ -4,6 +4,14 @@ Defects the estate audit of 2026-10-05 found that are still open. The audit is
 `docs/agent/2026_10_05_ESTATE_AUDIT/REPORT.md`. Work that is planned and not a defect is in
 [Remaining work](../design/REMAINING_WORK.md).
 
+## C ABI
+
+| Issue | Where |
+| --- | --- |
+| `sushitrack_update` and `sushitrack_get_tracklets` return 0 on a caught exception and on a rejected argument, which a caller cannot tell from a frame with no tracks; the ABI has no status return on these calls and no last-error call | `source/sushitrack_c.cpp`, `include/SushiTrack/sushitrack_c.h` |
+| A log callback that throws while a C entry point's handler logs at ERROR level throws again from inside the handler and crosses the C boundary | `source/logger.cpp`, `source/sushitrack_c.cpp` |
+| `sushitrack_create_ex` can return `SUSHITRACK_RUNTIME_ERROR` with `*out_tracker` already set when its last log line throws, and `sushitrack_create` then drops that handle; a throwing `Tracker` constructor leaks the implementation object | `source/sushitrack_c.cpp` |
+
 ## Installing and versions
 
 | Issue | Where |

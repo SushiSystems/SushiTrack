@@ -715,6 +715,8 @@ namespace SushiTrack
             }
         }
 
+        size_t gated_pairs = 0;
+
         for (size_t i = 0; i < a.size(); ++i)
         {
             if (!a[i]->hasFeature()) continue;
@@ -733,7 +735,7 @@ namespace SushiTrack
 
                 if (gate_validator_ && !in_gate[j])
                 {
-                    SUSHITRACK_LOG_DEBUG("[Distance] PureReID: Track %llu gated out detection %zu (Mahalanobis).", (unsigned long long)a[i]->getTrackId(), j);
+                    ++gated_pairs;
                     out_matrix(i, j) = 1e4f;
                     continue;
                 }
@@ -744,6 +746,12 @@ namespace SushiTrack
                 if (reid_dist < reid_thresh_)
                     out_matrix(i, j) = reid_dist;
             }
+        }
+
+        if (gated_pairs > 0)
+        {
+            SUSHITRACK_LOG_DEBUG("[Distance] PureReID: gated out %zu of %zu pairs (Mahalanobis).",
+                gated_pairs, a.size() * b.size());
         }
     }
 
@@ -827,6 +835,8 @@ namespace SushiTrack
             score_workspace_.push_back(det->getScore());
         }
 
+        size_t gated_pairs = 0;
+
         for (size_t i = 0; i < a.size(); ++i)
         {
             // Per-track state-aware policy; without an IMM regime the state is Cruising and the modifiers collapse to identity.
@@ -845,7 +855,7 @@ namespace SushiTrack
                 // Validation gate: Mahalanobis distance past the chi-squared threshold gets a sentinel cost penalty.
                 if (sq_dists[j] > row_gate_thresh)
                 {
-                    SUSHITRACK_LOG_DEBUG("[Distance] Gating: Track %llu gated out detection %zu (Mahalanobis).", (unsigned long long)a[i]->getTrackId(), j);
+                    ++gated_pairs;
                     out_matrix(i, j) = 1e4f;
                     continue;
                 }
@@ -878,6 +888,12 @@ namespace SushiTrack
                     out_matrix(i, j) = motion_d;
                 }
             }
+        }
+
+        if (gated_pairs > 0)
+        {
+            SUSHITRACK_LOG_DEBUG("[Distance] Gating: gated out %zu of %zu pairs (Mahalanobis).",
+                gated_pairs, a.size() * b.size());
         }
     }
 
@@ -1099,6 +1115,7 @@ namespace SushiTrack
         }
 
         const bool fuse_motion = (motion_cost_weight_ > 1e-6f);
+        size_t gated_pairs = 0;
 
         for (size_t i = 0; i < a.size(); ++i)
         {
@@ -1116,7 +1133,7 @@ namespace SushiTrack
                 // Validation gate: Mahalanobis distance past threshold gets a sentinel cost.
                 if (sq_dists[j] > row_gate_thresh)
                 {
-                    SUSHITRACK_LOG_DEBUG("[Distance] Gating: Track %llu gated out detection %zu (Mahalanobis).", (unsigned long long)a[i]->getTrackId(), j);
+                    ++gated_pairs;
                     out_matrix(i, j) = 1e4f;
                     continue;
                 }
@@ -1134,6 +1151,12 @@ namespace SushiTrack
                     out_matrix(i, j) = iou_d;
                 }
             }
+        }
+
+        if (gated_pairs > 0)
+        {
+            SUSHITRACK_LOG_DEBUG("[Distance] Gating: gated out %zu of %zu pairs (Mahalanobis).",
+                gated_pairs, a.size() * b.size());
         }
     }
 

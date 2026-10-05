@@ -17,6 +17,8 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace
@@ -453,4 +455,200 @@ TEST(CAPIStatusCodeCoverageTest, DISABLED_OutOfMemoryReturnsOutOfMemoryCode)
 {
     // Note: Inject a controlled bad_alloc and assert sushitrack_create_ex returns SUSHITRACK_OUT_OF_MEMORY.
     FAIL() << "Pending allocator fault-injection hook.";
+}
+
+// CAPIBoundaryExceptionTest
+
+namespace
+{
+
+/** @brief Names what the faulting log callback throws. */
+enum class Fault
+{
+    None,           /**< Throws nothing. */
+    NonStd,         /**< Throws an int. */
+    StdWithPercent, /**< Throws a std::runtime_error whose text holds a conversion. */
+};
+
+static sushitrack_log_level_t g_fault_level = SUSHITRACK_LOG_DEBUG;
+static Fault                  g_fault       = Fault::None;
+static std::string            g_last_error;
+
+/**
+ * @brief Records every ERROR line and throws the armed fault at the armed level.
+ * @param level   Severity level forwarded from the logger.
+ * @param message Formatted message forwarded from the logger.
+ */
+void faultingCallback(sushitrack_log_level_t level, const char* message)
+{
+    if (level == SUSHITRACK_LOG_ERROR)
+        g_last_error = message ? message : "";
+
+    if (level != g_fault_level)
+        return;
+
+    if (g_fault == Fault::NonStd)
+        throw 42;
+
+    if (g_fault == Fault::StdWithPercent)
+        throw std::runtime_error("create probe 100%d");
+}
+
+}
+
+/**
+ * @brief Fixture that owns one tracker and arms a log callback that throws.
+ */
+class CAPIBoundaryExceptionTest : public ::testing::Test
+{
+protected:
+    sushitrack_tracker_t hdl_    = nullptr;
+    sushitrack_params_t  params_ = {};
+
+    void SetUp() override
+    {
+        g_fault = Fault::None;
+        g_last_error.clear();
+
+        sushitrack_get_default_params(&params_);
+        params_.enable_tentative = 0;
+        params_.time_aware       = 1;
+        params_.track_thresh     = 0.1f;
+        params_.high_thresh      = 0.2f;
+        params_.match_thresh     = 0.9f;
+        hdl_ = sushitrack_create(&params_);
+        ASSERT_NE(hdl_, nullptr);
+    }
+
+    void TearDown() override
+    {
+        disarm();
+        if (hdl_ != nullptr)
+            sushitrack_destroy(hdl_);
+    }
+
+    /** @brief Installs the callback so that it throws the fault at the given level. */
+    void arm(sushitrack_log_level_t level, Fault fault)
+    {
+        g_fault_level = level;
+        g_fault       = fault;
+        sushitrack_set_log_callback(faultingCallback);
+    }
+
+    /** @brief Removes the callback and clears the fault. */
+    void disarm()
+    {
+        sushitrack_set_log_callback(nullptr);
+        g_fault = Fault::None;
+    }
+};
+
+/**
+ * @brief sushitrack_update contains an exception that is not a std::exception,
+ *        returns zero tracks and logs the failure.
+ */
+TEST_F(CAPIBoundaryExceptionTest, UpdateContainsNonStdException)
+{
+    std::vector<sushitrack_track_t> out(4);
+    sushitrack_object_t d = makeDet(10.0f, 20.0f);
+
+    arm(SUSHITRACK_LOG_DEBUG, Fault::NonStd);
+    int n = -1;
+    EXPECT_NO_THROW(
+        n = sushitrack_update(hdl_, &d, 1, out.data(), static_cast<int>(out.size()), 0.04f));
+
+    EXPECT_EQ(n, 0);
+    EXPECT_NE(g_last_error.find("Update failed"), std::string::npos);
+}
+
+/**
+ * @brief sushitrack_get_tracklets contains an exception that is not a
+ *        std::exception, returns zero tracks and logs the failure.
+ */
+TEST_F(CAPIBoundaryExceptionTest, GetTrackletsContainsNonStdException)
+{
+    std::vector<sushitrack_object_t> dets;
+    for (int i = 0; i < 3; ++i)
+        dets.push_back(makeDet(50.0f + 400.0f * i, 50.0f + 400.0f * i));
+
+    std::vector<sushitrack_track_t> out(8);
+    sushitrack_update(hdl_, dets.data(), 3, out.data(), static_cast<int>(out.size()), 0.04f);
+    ASSERT_GE(sushitrack_get_tracklets(hdl_, out.data(), static_cast<int>(out.size())), 2);
+
+    // A capacity of one makes the truncation warning fire, which is where the callback throws.
+    arm(SUSHITRACK_LOG_WARN, Fault::NonStd);
+    int n = -1;
+    EXPECT_NO_THROW(n = sushitrack_get_tracklets(hdl_, out.data(), 1));
+
+    EXPECT_EQ(n, 0);
+    EXPECT_NE(g_last_error.find("Get tracklets failed"), std::string::npos);
+}
+
+/**
+ * @brief sushitrack_create_ex contains an exception that is not a
+ *        std::exception and reports SUSHITRACK_RUNTIME_ERROR.
+ */
+TEST_F(CAPIBoundaryExceptionTest, CreateExContainsNonStdException)
+{
+    sushitrack_tracker_t created = nullptr;
+    sushitrack_status_t  status  = SUSHITRACK_SUCCESS;
+
+    arm(SUSHITRACK_LOG_INFO, Fault::NonStd);
+    EXPECT_NO_THROW(status = sushitrack_create_ex(&params_, &created));
+    disarm();
+
+    EXPECT_EQ(status, SUSHITRACK_RUNTIME_ERROR);
+    EXPECT_NE(g_last_error.find("Tracker creation failed"), std::string::npos);
+
+    if (created != nullptr)
+        sushitrack_destroy(created);
+}
+
+/**
+ * @brief sushitrack_create_ex logs the text of a caught exception unchanged,
+ *        so a conversion specifier inside it is not expanded.
+ */
+TEST_F(CAPIBoundaryExceptionTest, CreateExLogsExceptionTextVerbatim)
+{
+    sushitrack_tracker_t created = nullptr;
+
+    arm(SUSHITRACK_LOG_INFO, Fault::StdWithPercent);
+    sushitrack_status_t status = sushitrack_create_ex(&params_, &created);
+    disarm();
+
+    EXPECT_EQ(status, SUSHITRACK_RUNTIME_ERROR);
+    EXPECT_NE(g_last_error.find("create probe 100%d"), std::string::npos)
+        << "logged: " << g_last_error;
+
+    if (created != nullptr)
+        sushitrack_destroy(created);
+}
+
+/**
+ * @brief sushitrack_destroy contains an exception that is not a std::exception.
+ */
+TEST_F(CAPIBoundaryExceptionTest, DestroyContainsNonStdException)
+{
+    arm(SUSHITRACK_LOG_INFO, Fault::NonStd);
+    EXPECT_NO_THROW(sushitrack_destroy(hdl_));
+    hdl_ = nullptr;
+
+    EXPECT_NE(g_last_error.find("Destroy threw"), std::string::npos);
+}
+
+/**
+ * @brief sushitrack_load_params_from_json contains an exception that is not a
+ *        std::exception and reports SUSHITRACK_RUNTIME_ERROR.
+ */
+TEST_F(CAPIBoundaryExceptionTest, LoadParamsContainsNonStdException)
+{
+    sushitrack_status_t status = SUSHITRACK_SUCCESS;
+
+    // A missing file is reported at INFO, which is where the callback throws.
+    arm(SUSHITRACK_LOG_INFO, Fault::NonStd);
+    EXPECT_NO_THROW(
+        status = sushitrack_load_params_from_json("this/path/does/not/exist.json", &params_));
+
+    EXPECT_EQ(status, SUSHITRACK_RUNTIME_ERROR);
+    EXPECT_NE(g_last_error.find("Failed to load configuration"), std::string::npos);
 }

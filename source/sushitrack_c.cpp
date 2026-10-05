@@ -407,7 +407,12 @@ extern "C"
         }
         catch (const std::exception& e)
         {
-            SUSHITRACK_LOG_ERROR(e.what());
+            SUSHITRACK_LOG_ERROR("[SushiTrack] Tracker creation failed: %s", e.what());
+            return SUSHITRACK_RUNTIME_ERROR;
+        }
+        catch (...)
+        {
+            SUSHITRACK_LOG_ERROR("[SushiTrack] Tracker creation failed: unknown exception.");
             return SUSHITRACK_RUNTIME_ERROR;
         }
     }
@@ -419,8 +424,18 @@ extern "C"
     void sushitrack_destroy(sushitrack_tracker_t tracker)
     {
         if (!tracker) return;
-        SUSHITRACK_LOG_INFO("[SushiTrack] Destroying tracker instance.");
-        delete static_cast<sushitrack_tracker_impl_t*>(tracker);
+        std::unique_ptr<sushitrack_tracker_impl_t> owner(
+            static_cast<sushitrack_tracker_impl_t*>(tracker));
+
+        try
+        {
+            SUSHITRACK_LOG_INFO("[SushiTrack] Destroying tracker instance.");
+            owner.reset();
+        }
+        catch (...)
+        {
+            SUSHITRACK_LOG_ERROR("[SushiTrack] Destroy threw an unknown exception; the tracker is released.");
+        }
     }
 
     /**
@@ -477,6 +492,11 @@ extern "C"
             SUSHITRACK_LOG_ERROR("[SushiTrack] Update failed: %s", e.what());
             return 0;
         }
+        catch (...)
+        {
+            SUSHITRACK_LOG_ERROR("[SushiTrack] Update failed: unknown exception; returning zero tracks.");
+            return 0;
+        }
     }
 
     /**
@@ -502,6 +522,11 @@ extern "C"
         catch (const std::exception& e)
         {
             SUSHITRACK_LOG_ERROR("[SushiTrack] Get tracklets failed: %s", e.what());
+            return 0;
+        }
+        catch (...)
+        {
+            SUSHITRACK_LOG_ERROR("[SushiTrack] Get tracklets failed: unknown exception; returning zero tracks.");
             return 0;
         }
     }

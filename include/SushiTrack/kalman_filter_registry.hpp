@@ -69,7 +69,7 @@ namespace SushiTrack
             {
                 return it->second(enable_xyah);
             }
-            SUSHITRACK_LOG_ERROR(("[KalmanFilterRegistry] Unregistered Kalman type requested: " + std::to_string(type)).c_str());
+            SUSHITRACK_LOG_ERROR("[KalmanFilterRegistry] Unregistered Kalman type requested: %d", type);
             return nullptr;
         }
 

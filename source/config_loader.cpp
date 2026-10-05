@@ -252,15 +252,17 @@ extern "C"
             return SUSHITRACK_INVALID_ARGUMENT;
         }
 
-        const std::string resolved = SushiTrack::resolveConfigPath(path);
-        if (resolved.empty())
-        {
-            SUSHITRACK_LOG_INFO("[SushiTrack] No configuration file found -- using provided parameters.");
-            return SUSHITRACK_SUCCESS;
-        }
+        std::string resolved;
 
         try
         {
+            resolved = SushiTrack::resolveConfigPath(path);
+            if (resolved.empty())
+            {
+                SUSHITRACK_LOG_INFO("[SushiTrack] No configuration file found -- using provided parameters.");
+                return SUSHITRACK_SUCCESS;
+            }
+
             std::ifstream file(resolved);
             if (!file.is_open())
             {
@@ -277,6 +279,11 @@ extern "C"
         catch (const std::exception& e)
         {
             SUSHITRACK_LOG_ERROR("[SushiTrack] Failed to parse configuration %s: %s", resolved.c_str(), e.what());
+            return SUSHITRACK_RUNTIME_ERROR;
+        }
+        catch (...)
+        {
+            SUSHITRACK_LOG_ERROR("[SushiTrack] Failed to load configuration %s: unknown exception.", resolved.c_str());
             return SUSHITRACK_RUNTIME_ERROR;
         }
     }

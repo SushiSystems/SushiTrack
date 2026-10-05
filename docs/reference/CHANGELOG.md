@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- 2026-10-05 — core: Added catch-all handlers to the C entry points that log a non-std exception and return the call's failure value (`source/sushitrack_c.cpp`, `source/config_loader.cpp`).
+- 2026-10-05 — core: Replaced the per-pair gating log lines with one line per cost-matrix call (`source/distance_strategies.cpp`).
+- 2026-10-05 — core: Passed exception text and the unregistered Kalman type to the logger as arguments of a literal format (`source/sushitrack_c.cpp`, `include/SushiTrack/kalman_filter_registry.hpp`).
 - 2026-10-05 — docs: Shortened eleven comment paragraphs and docstrings and moved their reasoning into the manual (`docs/architecture/CLI_PACKAGE.md`, `docs/guides/TESTING.md`, `docs/guides/DEPLOY_PACKAGES.md`, `docs/guides/INFERENCE.md`).
 - 2026-10-05 — docs: Split the manual into pages under an index, added the required documents and archived the finished Typer and migration records (`docs/README.md`, `docs/reference/`, `docs/design/`, `docs/archive/`, `tools/`).
 - 2026-10-05 — cli: Renamed st docker to st container; the old word still runs, hidden, until 2027-03-25 (`cli/sushitrack_cli/cli.py`, `cli/sushitrack_cli/aliases.py`).

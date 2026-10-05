@@ -18,8 +18,10 @@
 #include <SushiTrack/kalman_filter.hpp>
 #include <SushiTrack/rect.hpp>
 #include <SushiTrack/cost_matrix.hpp>
+#include <SushiTrack/logger.hpp>
 
 #include <memory>
+#include <string>
 #include <vector>
 #include <cmath>
 #include <SushiTrack/i_gate_validator.hpp>
@@ -1027,4 +1029,125 @@ TEST(ObservationMomentumDecoratorTest, ManeuverScaleDoesNotAffectCruisingTrack)
 
     EXPECT_FLOAT_EQ(mo(0, 0), mn(0, 0));
     EXPECT_NEAR(mn(0, 0), 0.3f, 1e-3f);  // full 0.2 bonus, not scaled
+}
+
+// GatingLogVolumeTest
+
+namespace
+{
+
+static int         g_gating_lines = 0;
+static std::string g_last_gating_line;
+
+/**
+ * @brief Counts the log lines that report gated pairs and keeps the last one.
+ * @param message Formatted message forwarded from the logger.
+ */
+void countGatingLines(sushitrack_log_level_t, const char* message)
+{
+    const std::string line = message ? message : "";
+    if (line.find("gated out") == std::string::npos)
+        return;
+
+    ++g_gating_lines;
+    g_last_gating_line = line;
+}
+
+}
+
+/**
+ * @brief Fixture that counts gating log lines for one track and three far detections.
+ */
+class GatingLogVolumeTest : public ::testing::Test
+{
+protected:
+    void SetUp() override
+    {
+        g_gating_lines = 0;
+        g_last_gating_line.clear();
+        Logger::setCallback(countGatingLines);
+    }
+
+    void TearDown() override
+    {
+        Logger::setCallback(nullptr);
+    }
+
+    /** @brief Activates and predicts a track so that its Kalman gate is live. */
+    static std::shared_ptr<Tracklet> live(std::shared_ptr<Tracklet> track)
+    {
+        track->activate(std::make_unique<KalmanFilter>(), 1, 1);
+        track->predict();
+        return track;
+    }
+
+    /** @brief Expects three sentinel cells and one log line that counts all three pairs. */
+    static void expectOneLineForThreeGatedPairs(const CostMatrix& m)
+    {
+        for (size_t j = 0; j < 3; ++j)
+            EXPECT_GE(m(0, j), 1e3f);
+
+        EXPECT_EQ(g_gating_lines, 1);
+        EXPECT_NE(g_last_gating_line.find("3 of 3"), std::string::npos)
+            << "logged: " << g_last_gating_line;
+    }
+};
+
+/**
+ * @brief GatedIoUCostCalculator reports every gated pair of one call in one line.
+ */
+TEST_F(GatingLogVolumeTest, GatedIoULogsOneLinePerCall)
+{
+    auto iou = std::make_shared<IoUCostCalculator>();
+    GatedIoUCostCalculator calc(9.4877f, std::make_shared<KalmanFilter>(), iou);
+
+    std::vector<std::shared_ptr<Tracklet>> av{live(makeT(100.f, 100.f, 50.f, 80.f))};
+    std::vector<std::shared_ptr<Tracklet>> bv;
+    for (int k = 0; k < 3; ++k)
+        bv.push_back(makeT(5100.f + 200.f * k, 100.f, 50.f, 80.f));
+
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    expectOneLineForThreeGatedPairs(m);
+}
+
+/**
+ * @brief FusedCostCalculator reports every gated pair of one call in one line.
+ */
+TEST_F(GatingLogVolumeTest, FusedLogsOneLinePerCall)
+{
+    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto cosine = std::make_shared<CosineCostCalculator>();
+    FusedCostCalculator calc(0.5f, 0.3f, 9.4877f,
+                             std::make_shared<KalmanFilter>(),
+                             iou, cosine);
+
+    std::vector<std::shared_ptr<Tracklet>> av{live(makeT(100.f, 100.f, 50.f, 80.f))};
+    std::vector<std::shared_ptr<Tracklet>> bv;
+    for (int k = 0; k < 3; ++k)
+        bv.push_back(makeT(5100.f + 200.f * k, 100.f, 50.f, 80.f));
+
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    expectOneLineForThreeGatedPairs(m);
+}
+
+/**
+ * @brief PureReIDCostCalculator reports every gated pair of one call in one line.
+ */
+TEST_F(GatingLogVolumeTest, PureReIDLogsOneLinePerCall)
+{
+    PureReIDCostCalculator calc(0.4f, 9.4877f, std::make_shared<KalmanFilter>());
+
+    std::vector<std::shared_ptr<Tracklet>> av{live(makeFeatT(100.f, 100.f, 4, 0))};
+    std::vector<std::shared_ptr<Tracklet>> bv;
+    for (int k = 0; k < 3; ++k)
+        bv.push_back(makeFeatT(5100.f + 200.f * k, 100.f, 4, 0));
+
+    CostMatrix m;
+    calc.calculate(av, bv, m);
+
+    expectOneLineForThreeGatedPairs(m);
 }

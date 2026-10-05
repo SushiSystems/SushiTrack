@@ -16,9 +16,12 @@
 #include <SushiTrack/kalman_filter.hpp>
 #include <SushiTrack/nsa_kalman_filter.hpp>
 #include <SushiTrack/kalman_types.hpp>
+#include <SushiTrack/kalman_filter_registry.hpp>
+#include <SushiTrack/logger.hpp>
 
 #include <Eigen/Dense>
 #include <cmath>
+#include <string>
 
 using namespace SushiTrack;
 using StateMean = KalmanTypes::StateMean;
@@ -545,4 +548,42 @@ TEST(KalmanFilterTest, CovarianceRemainsSymmetricAfterUpdate)
 
     // Check symmetry: A == A^T
     EXPECT_TRUE(cov.isApprox(cov.transpose(), 1e-5f));
+}
+
+// KalmanFilterRegistry
+
+namespace
+{
+
+static std::string g_registry_error;
+
+/**
+ * @brief Keeps the last ERROR line the logger forwards.
+ * @param level   Severity level forwarded from the logger.
+ * @param message Formatted message forwarded from the logger.
+ */
+void recordRegistryError(sushitrack_log_level_t level, const char* message)
+{
+    if (level == SUSHITRACK_LOG_ERROR)
+        g_registry_error = message ? message : "";
+}
+
+}
+
+/**
+ * @brief An unregistered type yields no filter and one ERROR line naming the type.
+ */
+TEST(KalmanFilterRegistryTest, UnregisteredTypeLogsTheTypeAndReturnsNull)
+{
+    g_registry_error.clear();
+    Logger::setCallback(recordRegistryError);
+
+    auto filter = KalmanFilterRegistry::getInstance().create(987654, false);
+
+    Logger::setCallback(nullptr);
+
+    EXPECT_EQ(filter, nullptr);
+    EXPECT_NE(g_registry_error.find("Unregistered Kalman type requested: 987654"),
+              std::string::npos)
+        << "logged: " << g_registry_error;
 }
