@@ -1,6 +1,6 @@
 # SushiTrack Migration and Rebranding
 
-**Status:** Open — phase 1 of 4
+**Status:** Open — phases 2 to 4 landed; phase 1 leaves the two items of section 5
 
 This design document specifies the complete transition of the repository from
 SushiTrack to SushiTrack, under the PolyForm Noncommercial License 1.0.0, fully conforming to the
@@ -38,83 +38,13 @@ The repository must reflect Sushi Systems standards:
 
 ### 3.1 Repository Layout Migration
 
-The repository layout transforms to follow the Sushi Systems single-module structure:
+The repository follows the Sushi Systems single-module structure: public headers in
+`include/SushiTrack/`, sources in `source/`, vendored code in `third_party/`, checkers in
+`tools/`, tests in `tests/unit`, `tests/integration` and `tests/regression`, the CLI package in
+`cli/` and the binding in `bindings/python/`. The tree as it landed is drawn in
+[Project structure](../architecture/PROJECT_STRUCTURE.md).
 
-```
-SushiTrack/
-├── .clang-format
-├── .editorconfig
-├── .gitattributes
-├── .gitignore
-├── AGENTS.md
-├── CLAUDE.md
-├── CMakeLists.txt
-├── LICENSE
-├── README.md
-├── cli/
-│   ├── config.json
-│   ├── pyproject.toml
-│   ├── sushitrack_cli/
-│   ├── st.bat
-│   ├── st.py
-│   ├── st.sh
-│   ├── sushitrack.bat
-│   ├── sushitrack.py
-│   └── sushitrack.sh
-├── docs/
-│   ├── CONTRIBUTING.md
-│   ├── README.md
-│   ├── architecture/
-│   │   └── OVERVIEW.md
-│   ├── design/
-│   │   ├── README.md
-│   │   ├── REMAINING_WORK.md
-│   │   └── SUSHITRACK_MIGRATION.md
-│   └── reference/
-│       └── CHANGELOG.md
-├── include/
-│   └── SushiTrack/
-│       ├── assignment_solvers.hpp
-│       ├── config_loader.hpp
-│       ├── distance_strategies.hpp
-│       ├── imm_filter.hpp
-│       ├── kalman_filter.hpp
-│       ├── lapjv.hpp
-│       ├── logger.hpp
-│       ├── object.hpp
-│       ├── rect.hpp
-│       ├── sushitrack_c.h
-│       ├── tracker.hpp
-│       └── tracklet.hpp
-├── source/
-│   ├── assignment_solvers.cpp
-│   ├── config_loader.cpp
-│   ├── distance_strategies.cpp
-│   ├── imm_filter.cpp
-│   ├── kalman_filter.cpp
-│   ├── lapjv.cpp
-│   ├── logger.cpp
-│   ├── object.cpp
-│   ├── rect.cpp
-│   ├── sushitrack_c.cpp
-│   ├── tracker.cpp
-│   └── tracklet.cpp
-├── tests/
-│   ├── benchmark/
-│   ├── integration/
-│   └── unit/
-├── third_party/
-│   ├── eigen/
-│   ├── json/
-│   └── lapjv/
-└── tools/
-    ├── documentation/
-    │   ├── check_changelog.py
-    │   ├── check_docs_layout.py
-    │   └── check_source_comments.py
-    └── layering/
-        └── check_layering.py
-```
+The target root also holds `.clang-format` and `.editorconfig`.
 
 ### 3.2 Licensing and Source File Headers
 
@@ -164,10 +94,8 @@ All C API declarations use the full prefix `sushitrack_`:
 
 - Package name: `sushitrack_cli`.
 - Program names supported: `st` and `sushitrack`.
-- Entry scripts:
-  - `st.py`, `st.bat`, `st.sh`
-  - `sushitrack.py`, `sushitrack.bat`, `sushitrack.sh`
-- Configuration `cli/config.json` points to:
+- Entry points: the console scripts `st` and `sushitrack`, declared in `cli/pyproject.toml`.
+- Configuration `cli/config.toml` points to:
   - `source/` for source root.
   - `include/SushiTrack` for include directory.
   - `third_party/` for dependencies.
@@ -197,10 +125,20 @@ All C API declarations use the full prefix `sushitrack_`:
 3. **Phase 3: Developer CLI and Python Bindings**
    - Rename `sushitrack_cli` to `sushitrack_cli`.
    - Add entry points `st` and `sushitrack`.
-   - Update `cli/config.json` paths and defaults.
+   - Update `cli/config.toml` paths and defaults.
    - Update `bindings/python` to module `sushitrack`.
 4. **Phase 4: Test Suite Modernization and Full Verification**
    - Update test files in `tests/` to use `<SushiTrack/*.hpp>` and `namespace SushiTrack`.
-   - Build complete project through `python cli/st.py build`.
-   - Execute all unit, integration, and regression tests via `python cli/st.py test`.
+   - Build complete project through `st build`.
+   - Execute all unit, integration, and regression tests via `st test`.
    - Run standard checkers (`tools/documentation/check_source_comments.py`, etc.).
+
+## 5. What is left
+
+Phases 2, 3 and 4 landed. Phase 1 leaves two items, each also in
+[the backlog](REMAINING_WORK.md):
+
+- `.clang-format` and `.editorconfig` do not exist at the root.
+- The test discovery files are still written to the root: `gtest_discover_tests` runs with
+  `WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}` in `tests/unit/CMakeLists.txt`,
+  `tests/integration/CMakeLists.txt` and `tests/regression/CMakeLists.txt`.

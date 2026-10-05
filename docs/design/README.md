@@ -1,8 +1,11 @@
-# Design Documents
+# Design map
 
-Every live topic has exactly one document in this directory.
+Every live topic has exactly one document in this folder. The backlog is
+[Remaining work](REMAINING_WORK.md).
 
 | Topic | Document | Status |
 | --- | --- | --- |
-| SushiTrack Migration & Rebranding | [SUSHITRACK_MIGRATION.md](SUSHITRACK_MIGRATION.md) | Open — phase 1 of 4 |
-| `st` CLI: Typer Migration | [CLI_TYPER_MIGRATION.md](CLI_TYPER_MIGRATION.md) | Open — phase 0 of 1 |
+| Migration from SushiTrack and rebranding | [SUSHITRACK_MIGRATION.md](SUSHITRACK_MIGRATION.md) | Open: phases 2 to 4 landed, two items of phase 1 are left |
+
+The design of the Typer command layer shipped and is archived as
+`docs/archive/design/CLI_TYPER_MIGRATION.md`.

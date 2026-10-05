@@ -15,12 +15,14 @@ Every unit has a single responsibility. Classes and functions must be detachable
 Execute all build, test, and runtime operations through the repository's dedicated CLI:
 
 ```bash
-python cli/st.py build
-python cli/st.py test
-python cli/st.py run <target>
+st build
+st test
+st run <target>
 ```
 
-Never invoke `cmake`, `ninja`, `ctest`, or compiler binaries directly. Only `cli/st.py` configures the required runtime environment, compiler flags, and dynamic library search paths.
+`st` is the console script of the package in `cli/`, installed with pipx; `sushitrack` is the same command under its full name. `docs/getting_started/INSTALL.md` has the install steps and `docs/reference/CLI.md` every command.
+
+Never invoke `cmake`, `ninja`, `ctest`, or compiler binaries directly. Only `st` configures the required runtime environment, compiler flags, and dynamic library search paths.
 
 ## 4. C++17 ABI agreement
 
@@ -33,8 +35,10 @@ Follow the single-module layout defined in `repository-layout`:
 - `source/`: C++ translation units and C API implementation (`sushitrack_c.cpp`).
 - `third_party/`: External dependencies.
 - `tools/`: Static checkers and repository audits.
-- `tests/`: Unit, integration, and benchmark test suites.
-- `docs/`: Repository documentation.
+- `tests/`: Unit, integration, and regression test suites.
+- `cli/`: The `st` CLI package.
+- `bindings/python/`: The ctypes binding.
+- `docs/`: Repository documentation; `docs/README.md` is the index.
 
 ## 6. Strict quality bar and honesty
 

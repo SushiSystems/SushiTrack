@@ -1,0 +1,43 @@
+# Glossary
+
+| Word | Meaning |
+| --- | --- |
+| Detection | One box a detector reports for one frame: top-left `x`, `y`, `width`, `height`, a score and a label, as `sushitrack_object_t` |
+| Track | What the tracker reports for one object in one frame, as `sushitrack_track_t` |
+| Tracklet | The tracker's internal record of one object across frames: estimator state, lifecycle state and feature history (`Tracklet`) |
+| Track state | The lifecycle state of a tracklet: `New`, `Tracked`, `Lost`, `Removed` or `Tentative` |
+| Tentative | A new track that is not yet confirmed; it needs `tentative_confirm_hits` matches before it is promoted |
+| Lost buffer | The period a lost track is kept before removal: `track_buffer` frames, or `track_buffer / frame_rate` seconds when `time_aware=1` |
+| Two-stage association | The ByteTrack scheme: detections at or above `track_thresh` are matched first, then the tracks left over try the low-score detections |
+| Primary stage, secondary stage | The first and second pass of two-stage association |
+| Cost calculator | An `ICostCalculator`; it fills the matrix of pairwise costs between tracks and detections |
+| IoU, DIoU, GIoU, SIoU | The four overlap measures `iou_type` selects for the primary and secondary stages |
+| LAPJV | The Jonker-Volgenant algorithm for the linear assignment problem, used by `LAPJVSolver` |
+| Gate | A test that removes a track and detection pair from association before the solver runs |
+| Mahalanobis gating | A gate on the chi-squared distance between a detection and the track's predicted box, switched by `enable_mahalanobis` |
+| NSA | Noise-scale-adaptive Kalman filter, `kalman_type=1`; it scales measurement noise by detection confidence |
+| IMM | Interacting Multiple Model estimator, `kalman_type=2`; it runs four motion models and mixes them by mode probability |
+| Kinematic state | The motion regime the IMM reports for a track: `Stationary`, `Cruising`, `Maneuvering` or `Coasting` |
+| Maneuver probability | The IMM probability mass on the manoeuvring models, reported per track as `maneuver_probability` |
+| OCM | Observation-centric momentum, `enable_ocm`; it re-ranks primary costs by the direction a track was observed to travel |
+| VDC | Velocity direction consistency, the OC-SORT term OCM applies, bounded by `ocm_vdc_weight` |
+| ORU | Observation-centric re-update, `enable_oru`; on recovery it rolls the estimator back and replays the gap along a straight line |
+| ReID | Appearance matching on a feature vector supplied with each detection, switched by `enable_reid` |
+| TLWH, XYAH | The two box states of the Kalman filter: top-left, width, height; or centre, aspect ratio, height (`enable_xyah`) |
+| Time-aware | `time_aware=1`; `dt` is real seconds and expiry is measured in wall-clock time |
+| Timing policy | An `ITimingPolicy`; it turns `dt` into filter steps and decides when a track expires |
+| C ABI | The binary interface of `include/SushiTrack/sushitrack_c.h`: the `sushitrack_*` functions and structs |
+| Binding | `bindings/python/sushitrack.py`, the `ctypes` wrapper over the C ABI |
+| Reference tracker | ByteTrack or OC-SORT as vendored under `third_party/`, built only to compare against |
+| Adapter | An `ITrackerAdapter` in `tests/regression/`; it drives one tracker through the common harness |
+| `tracker_bridge` | The shared library built from `tests/regression/TrackerRegistry.cpp`; the inference pipeline loads the reference trackers through it |
+| Scenario | One sequence the regression binary runs, registered in `tests/regression/ScenarioList.h` |
+| Sequence | One folder under `tests/regression/evaluator/data/` with `det/det.txt`, `gt/gt.txt` and `seqinfo.ini` |
+| Suite | A CTest label group `st test --suite` selects: `unit`, `integration`, `regression`, `functional` or `all` |
+| Private, public detections | In `st eval`, the `-YOLOX` sequences and the other MOT sequences |
+| TrackEval | The MOTChallenge evaluator under `third_party/TrackEval`; it computes HOTA, CLEAR and Identity metrics |
+| HOTA, DetA, AssA | Higher-order tracking accuracy and its detection and association parts |
+| MOTA, IDF1, IDSW | The CLEAR accuracy, the identity F1 score and the count of identity switches |
+| Deploy package | The `package/` tree `st deploy` assembles for a consumer outside this repository |
+| `st` | The developer CLI of this repository, also installed as `sushitrack` |
+| `sushicore` | The Sushi Systems package that gives every Sushi CLI its console, configuration layering and build driver |

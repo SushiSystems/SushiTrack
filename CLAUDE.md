@@ -6,8 +6,8 @@ When starting work on this project:
 
 1. Follow the Sushi Systems doctrine (`sushiskills`) and repository conventions.
 2. Read `docs/CONTRIBUTING.md` first and follow its rules.
-3. Read `docs/README.md` and `docs/architecture/OVERVIEW.md` before modifying subsystems.
-4. `docs/design/` holds design specifications and roadmaps. Read the relevant design document before changing a subsystem.
+3. Read `docs/README.md`, the index of the manual, and `docs/architecture/OVERVIEW.md` before modifying subsystems.
+4. `docs/design/` holds design specifications and `docs/design/REMAINING_WORK.md`, the single backlog. Read the relevant design document before changing a subsystem.
 
 ## Active skills
 
@@ -45,12 +45,8 @@ State what was verified and what was not. When blocked or uncertain about public
 
 ### Building and toolchain
 
-Never invoke CMake or CTest directly. All builds, tests, and tool invocations must run through the `st` CLI (`st build`, `st test`, `st eval`, `st infer`, `st run`), installed with pipx from `cli/` (see `docs/README.md`'s Installation section). Only the CLI sets the necessary compiler flags and dynamic library paths.
+Never invoke CMake or CTest directly. All builds, tests, and tool invocations must run through the `st` CLI (`st build`, `st test`, `st eval`, `st infer`, `st run`), installed with pipx from `cli/` (see `docs/getting_started/INSTALL.md`). Only the CLI sets the necessary compiler flags and dynamic library paths.
 
 ### Task tracking
 
-Track work with actionable task lists. Record progress in the corresponding `docs/agent/` work directory.
-
----
-
-love you boss, kolay gelsin.
+Track work with actionable task lists. Record progress in the work folder of the task, `docs/agent/<YYYY_MM_DD>_<WORK_NAME>/`, which holds only `SPEC.md`, `PLAN.md` and `REPORT.md`.

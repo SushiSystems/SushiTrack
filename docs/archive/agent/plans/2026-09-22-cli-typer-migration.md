@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.10+, Typer >=0.12 (installed: 0.20.0), `sushicore` >=0.4.0 (installed: 0.4.0, confirmed via `pip index versions sushicore`), pytest, `typer.testing.CliRunner`.
 
-**Spec:** `docs/design/CLI_TYPER_MIGRATION.md`
+**Spec:** `docs/archive/design/CLI_TYPER_MIGRATION.md`
 
 ## Global Constraints
 
@@ -719,7 +719,7 @@ git commit -m "refactor(cli)!: rebuild the st command layer on Typer
 Replaces app.py's argparse wrapper with typer.Typer, matching sa/sb/sd/hub.
 st infer --tsize is now a fixed two-value option, and st docker run's
 container command moves from --command/-c to the trailing -- args, both
-per docs/design/CLI_TYPER_MIGRATION.md §3.5.
+per docs/archive/design/CLI_TYPER_MIGRATION.md §3.5.
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 ```

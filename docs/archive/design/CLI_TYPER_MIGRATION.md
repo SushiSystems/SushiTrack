@@ -1,6 +1,6 @@
 # `st` CLI: Typer Migration
 
-**Status:** Open — phase 0 of 1
+**Status:** Shipped
 
 ## 1. Context and Motivation
 

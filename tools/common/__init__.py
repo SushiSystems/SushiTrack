@@ -4,5 +4,3 @@
 # Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
 # Commercial use requires a licence from Sushi Systems.
 """Holds the runner every checker under tools/ shares."""
-
-from __future__ import annotations

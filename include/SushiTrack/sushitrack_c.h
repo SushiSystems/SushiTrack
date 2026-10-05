@@ -19,7 +19,7 @@
 #include <stdint.h>
 
 // Pure preprocessor macros, no C++ syntax: including it here keeps this
-// header's C ABI dependency-free (see docs/README.md's `--deploy cpp` layout)
+// header's C ABI dependency-free (see docs/guides/DEPLOY_PACKAGES.md)
 // while still defining SUSHITRACK_API in exactly one place, not a second copy
 // that could drift from the one sushitrack_export.hpp already carries.
 #include "SushiTrack/sushitrack_export.hpp"
