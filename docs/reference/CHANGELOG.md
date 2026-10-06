@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-06 — licence: Restored the three-section license box and named both holders in the copyright line of every source file (`tools/licensing/write_license_block.py`, `tools/documentation/check_source_comments.py`).
 - 2026-10-05 — core: Added catch-all handlers to the C entry points that log a non-std exception and return the call's failure value (`source/sushitrack_c.cpp`, `source/config_loader.cpp`).
 - 2026-10-05 — core: Replaced the per-pair gating log lines with one line per cost-matrix call (`source/distance_strategies.cpp`).
 - 2026-10-05 — core: Passed exception text and the unregistered Kalman type to the logger as arguments of a literal format (`source/sushitrack_c.cpp`, `include/SushiTrack/kalman_filter_registry.hpp`).

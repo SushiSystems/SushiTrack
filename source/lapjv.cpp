@@ -1,15 +1,29 @@
-/********************************************************************/
-/* lapjv.cpp                                                        */
-/* SushiTrack - https://github.com/SushiSystems/SushiTrack          */
-/* Copyright (c) 2026 Sushi Systems                                 */
-/* Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.        */
-/* Commercial use requires a licence from Sushi Systems.            */
-/* Holds code ported from ByteTrack-cpp (MIT), see NOTICE.md        */
-/* Copyright (c) 2022 Vertical Beach (lp6m, medalotte)              */
-/* Copyright (c) 2021 Yifu Zhang                                    */
-/* Holds code ported from gatagat/lap (BSD-2-Clause), see NOTICE.md */
-/* Copyright (c) 2012-2025, Tomas Kazmar                            */
-/********************************************************************/
+/**************************************************************************/
+/* lapjv.cpp                                                              */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*               https://github.com/SushiSystems/SushiTrack               */
+/*                         https://sushisystems.io                        */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the PolyForm Noncommercial License 1.0.0 (the           */
+/* "License"); you may not use this file except in compliance with the    */
+/* License. You may obtain a copy of the License at                       */
+/*                                                                        */
+/*     https://polyformproject.org/licenses/noncommercial/1.0.0           */
+/*                                                                        */
+/* Noncommercial use is free. Commercial use requires a separate licence  */
+/* from Sushi Systems; see COMMERCIAL.md. The software is provided        */
+/* "as is", without warranty of any kind.                                 */
+/*                                                                        */
+/* Holds code ported from ByteTrack-cpp (MIT), see NOTICE.md              */
+/* Copyright (c) 2022 Vertical Beach (lp6m, medalotte)                    */
+/* Copyright (c) 2021 Yifu Zhang                                          */
+/* Holds code ported from gatagat/lap (BSD-2-Clause), see NOTICE.md       */
+/* Copyright (c) 2012-2025, Tomas Kazmar                                  */
+/**************************************************************************/
 
 /**
  * @file lapjv.cpp

@@ -1,7 +1,7 @@
 #!/bin/bash
 # clean_preds.sh
 # SushiTrack - https://github.com/SushiSystems/SushiTrack
-# Copyright (c) 2026 Sushi Systems
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
 # Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
 # Commercial use requires a licence from Sushi Systems.
 
