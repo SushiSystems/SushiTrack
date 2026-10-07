@@ -32,6 +32,7 @@ video inference pipeline.
 | [Inference pipeline](guides/INFERENCE.md) | The YOLOX video pipeline behind `st infer` |
 | [Deploy packages](guides/DEPLOY_PACKAGES.md) | The `package/` tree `st deploy` assembles for C, C++ and Python consumers |
 | [Ultralytics integration](guides/ULTRALYTICS_INTEGRATION.md) | How to put SushiTrack behind `model.track()` |
+| [FAQ](guides/FAQ.md) | The questions a newcomer asks, each answered from this manual |
 
 ## Reference
 
