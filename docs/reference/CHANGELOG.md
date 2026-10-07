@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-07 — ci: Passed the repository's secrets to the CI the release job calls (`.github/workflows/release.yml`).
 - 2026-10-07 — ci: Added the release job that builds the documentation bundle after CI and attaches it to the tag's release (`.github/workflows/release.yml`, `ci.yml`).
 - 2026-10-07 — cli: Added `st docs bundle`, registered from SushiCore, and the publish list (`cli/sushitrack_cli/cli.py`, `docs/publish.toml`).
 - 2026-10-07 — docs: Added the frequently asked questions page (`docs/guides/FAQ.md`).
