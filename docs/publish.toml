@@ -1,0 +1,6 @@
+name = "sushitrack"
+title = "SushiTrack"
+summary = "A multi-object tracking library in C++17."
+sections = ["getting_started", "guides", "architecture", "reference"]
+exclude = []
+api = false

@@ -20,6 +20,7 @@ from typing import Optional, Sequence
 import typer
 from sushicore import entry as core_entry
 from sushicore.diag_commands import register_diagnostic_commands
+from sushicore.docs_bundle import register_docs_commands
 from sushicore.provision.commands import ModuleProvision, register_provision_commands
 from sushicore.root_options import register_root_options
 from sushicore.typer_help import help_group
@@ -52,7 +53,7 @@ _help_group = help_group(console.current)
 app = typer.Typer(
     name="st",
     cls=_help_group,
-    help="SushiTrack developer CLI: build, test, run, eval, infer and container.",
+    help="SushiTrack developer CLI: build, test, run, eval, infer, container and docs.",
     no_args_is_help=True,
     add_completion=False,
     rich_markup_mode="rich",
@@ -240,6 +241,15 @@ ALIASES.command(docker_alias_app, "build", container_build, "st docker build",
                 hidden=False, context_settings=K_FORWARDING)
 ALIASES.command(docker_alias_app, "run", container_run, "st docker run",
                 hidden=False, context_settings=K_FORWARDING)
+
+register_docs_commands(
+    app,
+    program=PROFILE.program,
+    panel=K_PROJECT,
+    project_root=find_project_root,
+    report=lambda line: console.success(line),
+    group_cls=_help_group,
+)
 
 
 @app.command(

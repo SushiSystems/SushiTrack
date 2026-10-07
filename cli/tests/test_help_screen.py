@@ -14,7 +14,7 @@ import pytest
 from sushitrack_cli.cli import app, main
 
 K_GROUPS = {
-    "Project": ["build", "test", "run", "clean", "deploy", "container"],
+    "Project": ["build", "test", "run", "clean", "deploy", "container", "docs"],
     "Benchmark": ["eval", "infer"],
     "Diagnostics": ["status", "config", "paths", "env", "setup", "doctor", "link", "unlink"],
 }

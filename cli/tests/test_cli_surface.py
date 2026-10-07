@@ -8,7 +8,9 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from importlib.metadata import version
+from pathlib import Path
 
 import pytest
 import typer.main
@@ -19,9 +21,16 @@ from sushitrack_cli import cli, console
 from sushitrack_cli.config import config_dir
 from sushitrack_cli.services import docker as docker_svc
 
+K_GIT_IDENTITY = ("-c", "user.name=st tests", "-c", "user.email=st-tests@example.invalid")
+K_PUBLISH_LIST = (
+    'name = "sample"\n'
+    'title = "Sample"\n'
+    'summary = "A sample repository."\n'
+    'sections = ["guides"]\n'
+)
 K_VISIBLE = {
     "build", "test", "run", "clean", "deploy", "container build", "container run",
-    "eval", "infer", "status", "config", "paths", "env",
+    "docs bundle", "eval", "infer", "status", "config", "paths", "env",
     "setup", "doctor", "link", "unlink",
 }
 
@@ -75,6 +84,51 @@ def test_the_docker_word_is_absent_from_help_and_describe():
     assert "container" in page.split()
     assert "docker" not in page.split()
     assert not any(name.startswith("docker") for name in _described())
+
+
+def _published_checkout(root: Path) -> None:
+    """Writes a SushiTrack root marker, a one-page docs/ tree and a git commit that holds them."""
+    marker = root / "include" / "SushiTrack" / "sushitrack_c.h"
+    marker.parent.mkdir(parents=True)
+    marker.write_text("", encoding="utf-8")
+    guides = root / "docs" / "guides"
+    guides.mkdir(parents=True)
+    (root / "docs" / "publish.toml").write_text(K_PUBLISH_LIST, encoding="utf-8")
+    (root / "docs" / "README.md").write_text(
+        "# Sample\n\n- [Using](guides/USING.md)\n", encoding="utf-8")
+    (guides / "USING.md").write_text("# Using\n\nRun it.\n", encoding="utf-8")
+    for arguments in (("init", "--quiet"), ("add", "--all"),
+                      (*K_GIT_IDENTITY, "commit", "--quiet", "--message", "docs")):
+        subprocess.run(["git", *arguments], cwd=root, check=True, capture_output=True)
+
+
+def test_docs_bundle_without_a_release_is_a_usage_error():
+    """Exits 2 and names `--release` when `st docs bundle` is given none."""
+    result = _invoke("docs", "bundle")
+    assert result.exit_code == 2
+    assert "--release" in result.output
+
+
+def test_bare_docs_prints_the_group_help_and_exits_two():
+    """Prints the group's help and exits 2, because st builds no API reference."""
+    result = _invoke("docs")
+    assert result.exit_code == 2
+    assert "bundle" in result.output
+
+
+def test_docs_bundle_writes_the_archive_of_the_checkout_it_runs_in(
+        tmp_path, monkeypatch, recorder):
+    """Writes `docs-bundle-1.2.3.tar.gz` and its digest file, and reports both lines."""
+    _published_checkout(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    spy = recorder(cli)
+    result = _invoke("docs", "bundle", "--release", "1.2.3")
+    assert result.exit_code == 0, result.output
+    bundle = tmp_path / "build" / "docs" / "bundle"
+    assert (bundle / "docs-bundle-1.2.3.tar.gz").is_file()
+    assert (bundle / "docs-bundle-1.2.3.tar.gz.sha256").is_file()
+    assert spy.said("docs-bundle-1.2.3.tar.gz (1 pages)")
+    assert spy.said("sha256 ")
 
 
 def _broken_checkout(root) -> None:

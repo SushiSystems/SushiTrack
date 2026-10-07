@@ -1,7 +1,7 @@
 # Command line reference
 
-Commands are flat: `st <command> [flags]`, with `st container <action>` the only
-subgroup. Arguments after a bare `--` are forwarded to the underlying binary.
+Commands are flat: `st <command> [flags]`, with `st container <action>` and
+`st docs bundle` the two subgroups. Arguments after a bare `--` are forwarded to the underlying binary.
 
 | Command | Purpose |
 |---|---|
@@ -21,6 +21,7 @@ subgroup. Arguments after a bare `--` are forwarded to the underlying binary.
 | `st paths` | Resolved project directories |
 | `st env [--all]` | Environment cmake and the test binaries execute under |
 | `st container build` / `st container run` | Image build / bind-mounted container |
+| `st docs bundle --release X.Y.Z` | Pack the published manual pages into the documentation bundle |
 | `st --version` / `st --describe` | Installed version / command catalogue as JSON |
 
 Configuration is layered: built-in defaults → `cli/config.toml` → `cli/config.local.toml`
@@ -205,6 +206,32 @@ of `st --help` and `st --describe`, print one notice naming the new spelling whe
 error is a terminal, and are removed after 2027-03-25. `ST_NO_DEPRECATION_NOTICE=1`
 silences the notice.
 
+## `st docs bundle`
+
+Packs the manual pages `docs/publish.toml` lists into `docs-bundle-<release>.tar.gz`, the
+archive `docs.sushisystems.io` reads, and writes `docs-bundle-<release>.tar.gz.sha256` beside
+it. The command comes from `sushicore` and behaves the same in every Sushi CLI.
+
+| Flag | Meaning |
+|---|---|
+| `--release X.Y.Z` | The release the bundle is named after, three integers. Required; `v1.2.3` and `1.2.3-rc1` are refused |
+| `--out DIR` | The folder the archive is written to. Default: `build/docs/bundle` under the repository root |
+
+It prints the archive's path with its page count, then `sha256` and the digest. The bundle
+records the checked-out commit, so the command needs a git checkout. SushiTrack publishes no
+API reference: the bundle holds pages alone, and a bare `st docs` prints the group's help and
+exits with code 2.
+
+Every Markdown file under `getting_started/`, `guides/`, `architecture/` and `reference/` is
+published. The command stops with one line and exit code 1 when a page has no level-one
+heading, when `docs/README.md` does not link it, or when one of its links names a file that
+does not exist.
+
+```bash
+st docs bundle --release 1.2.3
+st docs bundle --release 1.2.3 --out build/site
+```
+
 ## Diagnostics
 
 All four are read-only.
@@ -240,8 +267,8 @@ Sushi CLI.
 | Code | Meaning |
 |---|---|
 | 0 | The command succeeded |
-| 1 | The command failed: a missing build tree, binary or script, a failed deploy or evaluation, a directory `st clean` could not remove, no sequence for `st eval` to score, a malformed `cli/config.toml`, an unknown build type or tracker, or a required `st doctor` check |
-| 2 | A usage error: an unknown command or option, `--private` with `--public`, a missing `--source` |
+| 1 | The command failed: a missing build tree, binary or script, a failed deploy or evaluation, a directory `st clean` could not remove, no sequence for `st eval` to score, a malformed `cli/config.toml`, an unknown build type or tracker, a required `st doctor` check, or a page `st docs bundle` refuses |
+| 2 | A usage error: an unknown command or option, `--private` with `--public`, a missing `--source`, `st docs bundle` without `--release`, a bare `st docs` |
 | 127 | A tool the command needs (`cmake`, `ctest`, `docker`) is not installed |
 | 130 | Interrupted with Ctrl+C |
 | other | The exit code of the child process (`cmake`, `ctest`, `docker`, the executable `st run` started) |
