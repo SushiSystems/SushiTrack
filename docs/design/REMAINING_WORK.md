@@ -1,6 +1,6 @@
 # Remaining work
 
-Next id: RW-20
+Next id: RW-22
 
 The single backlog of this repository. Defects that stand in the tree are in
 [Known issues](../reference/KNOWN_ISSUES.md); each one names the entry here that closes it.
@@ -33,6 +33,11 @@ The single backlog of this repository. Defects that stand in the tree are in
 ### RW-6 Decide whether contributions from outside are accepted
 - State: decision
 - Done when: the owner has named the contributor agreement, or ruled contributions out
+
+### RW-21 Decide whether st setup creates the conda environment
+- State: decision
+- Done when: the owner has ruled whether `st setup` builds the environment that `.config/conda/environment.yml`
+  describes, as sushistack RW-10 asks
 
 ### RW-7 Decide whether the SushiTrack migration is closed
 - State: decision
@@ -89,9 +94,14 @@ The single backlog of this repository. Defects that stand in the tree are in
 
 ## Install and release
 
+### RW-20 Ship the licence and the third-party notices in every deploy package
+- State: open
+- Done when: both `st deploy` packages hold `LICENSE`, `NOTICE.md` and the licence texts of
+  the ported ByteTrack-cpp and gatagat/lap code
+
 ### RW-16 Take sushicore from one source in every install path
 - State: open
-- Done when: `environment.yml`, the Dockerfile and `cli/pyproject.toml` name the same sushicore
+- Done when: `.config/conda/environment.yml`, the Dockerfile and `cli/pyproject.toml` name the same sushicore
   version and the same source
 
 ### RW-17 Generate every version number from CMakeLists.txt

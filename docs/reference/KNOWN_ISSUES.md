@@ -1,6 +1,6 @@
 # Known issues
 
-Next id: KI-17
+Next id: KI-18
 
 Defects that stand in the tree. The work that closes each one is in
 [Remaining work](../design/REMAINING_WORK.md).
@@ -69,6 +69,14 @@ Defects that stand in the tree. The work that closes each one is in
 - Recognise: `st doctor` passes and `st build` fails at `find_package(GTest)`
 - Workaround: `st build --no-test`
 - Fix: RW-18
+
+### KI-17 Deploy packages ship ported MIT code without its notice
+- Origin: own
+- Where: `cli/sushitrack_cli/services/deploy.py`
+- Cause: the packages copy the headers, the libraries and the configuration, and no licence file
+- Recognise: `package/` holds no `LICENSE` or `NOTICE.md` after `st deploy`
+- Workaround: copy `LICENSE`, `NOTICE.md` and `third_party/bytetrack/LICENSE` into the package by hand
+- Fix: RW-20
 
 ## Repository
 
