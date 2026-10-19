@@ -35,7 +35,7 @@ root.
 
 `ENV_OVERRIDES` in `cli/sushitrack_cli/config.py` maps a config field to the environment variable
 that overrides it. The table is sectioned, not flat.
-`sushicore.profile.ModuleProfile.env_overrides()` assumes one `ToolConfig` field per override, so
+`sushicore.profile.ModuleProfile.env_overrides()` assumes one `ToolSettings` field per override, so
 the table stays local to `config.py` and is not derived from the shared profile.
 
 ### The lazy console

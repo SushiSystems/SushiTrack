@@ -74,8 +74,8 @@ All knobs are exposed both on `sushitrack_params_t` (C API, `include/SushiTrack/
 | `tentative_fast_thresh` | 0.85 | Above this score, `tentative_fast_hits` hits are enough |
 | `tentative_fast_hits` | 1 | Hit count for fast-confirmation regime |
 | `tentative_slow_thresh` | 0.40 | Below this score, extra hits are required |
-| `tentative_slow_hits_offset` | 1 | Extra hits added in `[slow_thresh, high_thresh)` |
-| `tentative_vslow_hits_offset` | 2 | Extra hits added below `slow_thresh` |
+| `tentative_slow_hits_offset` | 1 | Extra hits added between `tentative_slow_thresh` and `high_thresh` |
+| `tentative_vslow_hits_offset` | 2 | Extra hits added below `tentative_slow_thresh` |
 
 ### Motion model
 

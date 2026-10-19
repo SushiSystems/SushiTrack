@@ -1,0 +1,15 @@
+^SushiTrackParams$ # the ctypes struct of bindings/python/sushitrack.py, a folder the checker does not index
+^SUSHITRACK_LIB$ # the variable bindings/python/sushitrack.py reads to find the library
+^set_log_callback$ # a method of the Python binding's Tracker in bindings/python/sushitrack.py
+^Foo$ # the placeholder class of the brace-style example in CONTRIBUTING.md
+^doSomething$ # the placeholder call of the brace-style example in CONTRIBUTING.md
+^(on_predict_start|on_predict_postprocess_end|add_callback|tracker_type|YOLO)$ # Ultralytics names the integration guide hooks into
+^(asarray|argmax|tolist|zip)$ # numpy calls and a Python builtin in the Ultralytics example
+^ultralytics/.*$ # a file of the Ultralytics package the integration guide edits
+^package/.*$ # the folder st deploy writes; it does not exist until a deploy runs
+^example/example\.c$ # a file inside a deploy package
+^cli/config\.local\.toml$ # the per-machine override file, which git ignores
+^third_party/(weight|video)/.*$ # the downloaded checkpoints and clips the inference guide names, which git ignores
+^output/.*$ # the folder the inference pipeline writes
+^.*/img1$ # the frames of a benchmark sequence, which git ignores
+^SushiLog/.*$ # a header of SushiLog, the sibling library the build fetches

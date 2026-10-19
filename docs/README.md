@@ -18,6 +18,7 @@ video inference pipeline.
 | Document | Holds |
 | --- | --- |
 | [Overview](architecture/OVERVIEW.md) | The per-frame pipeline, the motion estimators, the association stages and the track lifecycle |
+| [Motion estimators](architecture/MOTION_ESTIMATORS.md) | The linear Kalman, NSA and IMM estimators and the kinematic regime |
 | [Interfaces](architecture/INTERFACES.md) | Each interface the tracker depends on and its implementations |
 | [Features](architecture/FEATURES.md) | What each optional feature does and which parameter switches it |
 | [Project structure](architecture/PROJECT_STRUCTURE.md) | The tree, folder by folder |

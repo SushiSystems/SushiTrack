@@ -121,6 +121,8 @@ class SushiTrackAdapter:
         return j if iou[j] >= thr else -1
 ```
 
+Source: not compiled
+
 ## Step 3: register the adapter with `model.track()`
 
 No package fork is required: install the adapter through the same callbacks
@@ -149,6 +151,8 @@ for result in model.track(source="video.mp4", stream=True, persist=True):
         xyxy  = boxes.xyxy.tolist()
         # ... your downstream logic ...
 ```
+
+Source: not compiled
 
 Because Ultralytics' built-in `on_predict_postprocess_end` already calls
 `predictor.trackers[i].update(...)` and interprets the returned array, supplying

@@ -83,6 +83,8 @@ for t in tracks:
 tracker.close()
 ```
 
+Source: not compiled
+
 `bindings/python/sushitrack.py` is a `ctypes` binding with no dependency outside the standard
 library. For a project outside this repository, `st build --deploy python` assembles `package/`
 with the binding and the native library side by side; copy its `sushitrack/` directory into your

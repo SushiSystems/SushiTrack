@@ -25,4 +25,4 @@ MOT CSV format:
 
 `seqinfo.ini` is parsed for `frameRate` (used for `dt = 1/frameRate` when `time_aware=1`). If absent, 30 fps is assumed.
 
-Prediction files are written to `<sequence>/pred/<tracker>/<sequence>.txt` after each regression run. `cli/misc/clean_preds.sh` wipes every `pred/` subdirectory.
+Prediction files are written to `<sequence>/pred/<tracker>/<sequence>.txt` by each `st eval` run. `st clean --predictions` removes every `pred/` folder.

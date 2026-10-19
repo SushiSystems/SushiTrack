@@ -98,6 +98,8 @@ tracker = Tracker(frame_rate=30, kalman_type=2)
 tracks  = tracker.update([(x, y, w, h, score, label)], dt=1/30)
 ```
 
+Source: not compiled
+
 The binding looks beside its own module for the library before anywhere else, which is why the
 package needs no configuration. The full search order is in
 [`bindings/python/README.md`](../../bindings/python/README.md#finding-the-library).

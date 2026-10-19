@@ -33,6 +33,8 @@ void Foo::bar()
 }
 ```
 
+Source: not compiled
+
 ### Namespaces
 
 Use nested namespaces (C++17 syntax). Close each namespace with an end-of-line comment.
@@ -43,6 +45,8 @@ namespace SushiTrack::Detail
     // ...
 } // namespace SushiTrack::Detail
 ```
+
+Source: not compiled
 
 All public library code lives in the `SushiTrack` namespace. The C ABI layer in `include/SushiTrack/c_api/sushitrack_c.h` is `extern "C"` with no namespace.
 
@@ -66,6 +70,8 @@ Order: own header first, then standard library, then third-party. Separate group
 
 #include <Eigen/Dense>
 ```
+
+Source: not compiled
 
 ## Documentation
 
@@ -103,6 +109,8 @@ written by `write_license_block.py` and never by hand, followed by the Doxygen f
  * @author Mustafa Garip
  */
 ```
+
+Source: not compiled
 
 Note: `@date` is forbidden; git records dates.
 

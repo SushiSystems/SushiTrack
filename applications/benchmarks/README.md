@@ -10,8 +10,8 @@ with CTest. One engine runs them all; each benchmark folder holds the sequences 
 | `mot20` | The MOT20 train set: 4 sequences, with and without YOLOX detections, 8 folders | `st eval --benchmark mot20` |
 | `dancetrack` | 40 DanceTrack sequences | `st eval --benchmark dancetrack` |
 
-A benchmark is a folder with a `data/` folder of sequences: `<sequence>/det/det.txt`,
-`<sequence>/gt/gt.txt` and `<sequence>/seqinfo.ini`. `st eval` finds every such folder, so a new
+A benchmark is a folder with a `data/` folder of sequences, each a folder that holds
+`det/det.txt`, `gt/gt.txt` and `seqinfo.ini`. `st eval` finds every such folder, so a new
 dataset is a new folder and nothing else.
 
 `mot_engine` takes `--data DIR --settings DIR [--tracker NAME]... [--sequence NAME]...`,

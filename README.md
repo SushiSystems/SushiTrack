@@ -36,6 +36,8 @@ for t in tracks:
 tracker.close()
 ```
 
+Source: not compiled
+
 A detection is `(x, y, width, height, score, label)` with a top-left origin. The C API takes
 the same data as `sushitrack_object_t`; see [docs/reference/C_API.md](docs/reference/C_API.md).
 

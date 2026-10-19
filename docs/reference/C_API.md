@@ -24,6 +24,8 @@ int n = sushitrack_update(hdl, dets, n_dets, tracks, MAX_TRACKS, dt);
 sushitrack_destroy(hdl);
 ```
 
+Source: not compiled
+
 `sushitrack_create` returns `NULL` on failure; `sushitrack_create_ex` returns a `sushitrack_status_t` code and writes the handle through `out_hdl`. `sushitrack_update` returns the number of tracks written. Output tracks are sorted by lifecycle priority (`Tracked` < `Tentative` < `Lost` < `Removed`); the buffer is truncated if too small, with a warning logged.
 
 The track-output `feat` pointer references memory owned by the tracker and is only valid until the next `sushitrack_update` or `sushitrack_destroy`.
