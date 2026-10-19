@@ -21,6 +21,7 @@ video inference pipeline.
 | [Interfaces](architecture/INTERFACES.md) | Each interface the tracker depends on and its implementations |
 | [Features](architecture/FEATURES.md) | What each optional feature does and which parameter switches it |
 | [Project structure](architecture/PROJECT_STRUCTURE.md) | The tree, folder by folder |
+| [Build system](architecture/BUILD_SYSTEM.md) | The CMake layout, symbol visibility, compiler flags and the object twin |
 | [The `st` package](architecture/CLI_PACKAGE.md) | The files of the CLI package and what each owns |
 
 ## Guides

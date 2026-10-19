@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-19 — build: Moved the build policy and the Eigen target into `cmake/` and the library targets into `source/CMakeLists.txt` (`cmake/SushiTrackBuildPolicy.cmake`, `docs/architecture/BUILD_SYSTEM.md`).
 - 2026-10-19 — cli: Renamed the ST_3RDPARTY_DIR variable to ST_THIRD_PARTY_DIR and set SUSHITRACK_CONFIG for the programs st runs (`cli/sushitrack_cli/config.py`, `cli/sushitrack_cli/env.py`).
 - 2026-10-19 — build: Moved the Dockerfile and the conda environment under `.config/`, the default tracker configuration to `assets/`, and added `.clang-format` and `.editorconfig` (`.config/README.md`, `assets/sushitrack.json`).
 - 2026-10-19 — docs: Rewrote the backlog and the known issues as numbered entries with state, acceptance and fix fields (`docs/design/REMAINING_WORK.md`, `docs/reference/KNOWN_ISSUES.md`).
