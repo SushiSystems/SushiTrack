@@ -19,7 +19,7 @@ truth): `numpy==2.4.4`, `pandas==3.0.2`, `scipy==1.17.1`, `pytest==9.0.3`, `absl
 environment built from the file needs the newer `sushicore` installed by hand, as shown under
 [CLI (pipx)](#cli-pipx); the mismatch is in [Known issues](../reference/KNOWN_ISSUES.md).
 
-Compiler flags: MSVC compiles with `/W3 /O2 /Ot /fp:fast /arch:AVX2 /DNDEBUG`; GCC/Clang compile with `-Wall -O3 -ffast-math -funroll-loops -DNDEBUG` (plus `-mavx2` on x86_64, mirroring the MSVC flag). Library is built `SHARED` with hidden-by-default symbol visibility on every platform; only functions carrying `SUSHITRACK_API` (`include/SushiTrack/sushitrack_export.hpp`) are exported, via `__declspec(dllexport)`/`dllimport` on Windows and `__attribute__((visibility("default")))` on GCC/Clang. Outputs are unified under `${CMAKE_BINARY_DIR}/bin` and `${CMAKE_BINARY_DIR}/lib`.
+Compiler flags: MSVC compiles with `/W3 /O2 /Ot /fp:fast /arch:AVX2 /DNDEBUG`; GCC/Clang compile with `-Wall -O3 -ffast-math -funroll-loops -DNDEBUG` (plus `-mavx2` on x86_64, mirroring the MSVC flag). Library is built `SHARED` with hidden-by-default symbol visibility on every platform; only functions carrying `SUSHITRACK_API` (`include/SushiTrack/c_api/sushitrack_export.hpp`) are exported, via `__declspec(dllexport)`/`dllimport` on Windows and `__attribute__((visibility("default")))` on GCC/Clang. Outputs are unified under `${CMAKE_BINARY_DIR}/bin` and `${CMAKE_BINARY_DIR}/lib`.
 
 ## CLI (pipx)
 

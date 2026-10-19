@@ -9,7 +9,7 @@ Defects that stand in the tree. The work that closes each one is in
 
 ### KI-1 A failed update reads as a frame with no tracks
 - Origin: own
-- Where: `source/sushitrack_c.cpp`, `include/SushiTrack/sushitrack_c.h`
+- Where: `source/c_api/sushitrack_c.cpp`, `include/SushiTrack/c_api/sushitrack_c.h`
 - Cause: `sushitrack_update` and `sushitrack_get_tracklets` return 0 on a caught exception and
   on a rejected argument, and the ABI has no status return or last-error call on them
 - Recognise: a frame with detections returns 0 tracks and the log holds an ERROR line
@@ -18,7 +18,7 @@ Defects that stand in the tree. The work that closes each one is in
 
 ### KI-2 A throwing log callback crosses the C boundary
 - Origin: own
-- Where: `source/logger.cpp`, `source/sushitrack_c.cpp`
+- Where: `source/logging/logger.cpp`, `source/c_api/sushitrack_c.cpp`
 - Cause: the handler of a C entry point logs at ERROR level, and a callback that throws there
   throws again from inside the handler
 - Recognise: the process terminates inside a C call while a log callback is installed
@@ -27,7 +27,7 @@ Defects that stand in the tree. The work that closes each one is in
 
 ### KI-3 A late failure in sushitrack_create_ex hands back a handle that is then dropped
 - Origin: own
-- Where: `source/sushitrack_c.cpp`
+- Where: `source/c_api/sushitrack_c.cpp`
 - Cause: `*out_tracker` is set before the last log line, which can throw; a throwing `Tracker`
   constructor leaks the implementation object
 - Recognise: `SUSHITRACK_RUNTIME_ERROR` from `sushitrack_create_ex` with `*out_tracker` not null

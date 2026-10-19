@@ -26,8 +26,8 @@
  */
 
 #include <gtest/gtest.h>
-#include <SushiTrack/assignment_solvers.hpp>
-#include <SushiTrack/cost_matrix.hpp>
+#include <SushiTrack/association/lapjv_solver.hpp>
+#include <SushiTrack/association/cost_matrix.hpp>
 
 #include <algorithm>
 #include <vector>

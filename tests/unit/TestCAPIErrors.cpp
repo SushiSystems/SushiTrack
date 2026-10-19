@@ -26,7 +26,7 @@
  */
 
 #include <gtest/gtest.h>
-#include <SushiTrack/sushitrack_c.h>
+#include <SushiTrack/c_api/sushitrack_c.h>
 #include <cmath>
 #include <cstdint>
 #include <limits>

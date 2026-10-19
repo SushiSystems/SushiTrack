@@ -26,8 +26,8 @@
  */
 
 #include <gtest/gtest.h>
-#include <SushiTrack/tracklet.hpp>
-#include <SushiTrack/kalman_filter.hpp>
+#include <SushiTrack/tracking/tracklet.hpp>
+#include <SushiTrack/filtering/kalman_filter.hpp>
 
 #include <memory>
 #include <vector>

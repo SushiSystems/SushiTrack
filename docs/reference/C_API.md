@@ -1,11 +1,11 @@
 # C API
 
-Header: `include/SushiTrack/sushitrack_c.h`. Link against the compiled `sushitrack` shared library.
+Header: `include/SushiTrack/c_api/sushitrack_c.h`. Link against the compiled `sushitrack` shared library.
 
 Minimal usage:
 
 ```c
-#include "SushiTrack/sushitrack_c.h"
+#include <SushiTrack/c_api/sushitrack_c.h>
 
 sushitrack_params_t params;
 sushitrack_get_default_params(&params);

@@ -21,7 +21,7 @@ A page links to the page that owns a fact and does not repeat it.
 ## Paths and names
 
 A cited file is written from the repository root in backticks, as in
-`include/SushiTrack/tracker.hpp`, and must exist. Headers and sources are `snake_case`; the
+`include/SushiTrack/tracking/tracker.hpp`, and must exist. Headers and sources are `snake_case`; the
 test files under `tests/` are still `PascalCase` and are cited as they are named.
 
 A parameter is written as its key in `sushitrack.json`, as in `kalman_type`. A command is

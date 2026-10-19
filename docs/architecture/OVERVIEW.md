@@ -6,7 +6,7 @@ estimators, the association stages, the track lifecycle, and the configuration
 and integration surfaces. It is a reference for engineers reading or extending
 the code. Parameter names, defaults, and enum values match the code as of
 v1.0.0; the compiled defaults are those set by `sushitrack_get_default_params`
-(`source/sushitrack_c.cpp`) and mirrored in `TrackerConfig` (`include/SushiTrack/tracker_config.hpp`).
+(`source/c_api/sushitrack_c.cpp`) and mirrored in `TrackerConfig` (`include/SushiTrack/tracking/tracker_config.hpp`).
 
 ## Contents
 
@@ -56,7 +56,7 @@ gating, alternative motion models, and observation-centric re-ranking and
 re-update terms.
 
 The library builds as a shared object and exposes a stable C ABI
-(`include/SushiTrack/sushitrack_c.h`). A Python `ctypes` binding, a MOTChallenge/DanceTrack
+(`include/SushiTrack/c_api/sushitrack_c.h`). A Python `ctypes` binding, a MOTChallenge/DanceTrack
 regression harness, a GoogleTest unit and integration suite, and a YOLOX video
 inference pipeline are included.
 
@@ -74,7 +74,7 @@ programmatically gets the compiled defaults instead.
 
 ## Per-frame pipeline
 
-`Tracker::update(objects, dt)` (`source/tracker.cpp`) runs one
+`Tracker::update(objects, dt)` (`source/tracking/tracker.cpp`) runs one
 frame. The steps are:
 
 1. **Timestep resolution.** In frame mode (`time_aware=0`) the internal step is
@@ -115,7 +115,7 @@ caller's buffer, and copies them into the output struct.
 
 The tracker depends on abstract interfaces; concrete implementations are
 constructed by the C-API entry point (`sushitrack_create_ex` in
-`source/sushitrack_c.cpp`) from the resolved `sushitrack_params_t` and injected into
+`source/c_api/sushitrack_c.cpp`) from the resolved `sushitrack_params_t` and injected into
 `Tracker`. The orchestrator references only the interfaces.
 
 | Interface | Responsibility | Implementations |
@@ -139,15 +139,15 @@ the factory.
 
 ## Data model
 
-**`Object`** (`include/SushiTrack/object.hpp`) is one input detection: a `Rect`
+**`Object`** (`include/SushiTrack/detection/object.hpp`) is one input detection: a `Rect`
 box, a class `label`, a confidence `score`, and an optional appearance feature
 vector.
 
-**`Rect<T>`** (`include/SushiTrack/rect.hpp`) is a bounding box templated on the
+**`Rect<T>`** (`include/SushiTrack/detection/rect.hpp`) is a bounding box templated on the
 scalar type. It stores top-left `x, y` plus `width, height` and converts among
 TLWH, TLBR, and XYWH (centroid) forms.
 
-**`Tracklet`** (`include/SushiTrack/tracklet.hpp`) holds one track: the estimator
+**`Tracklet`** (`include/SushiTrack/tracking/tracklet.hpp`) holds one track: the estimator
 state mean/covariance, the current box, lifecycle flags, score (raw and
 EMA-smoothed), identifiers, feature history, the IMM-derived regime, the
 observation-centric direction estimate, and the ORU checkpoint. Detections are
@@ -155,7 +155,7 @@ also wrapped in `Tracklet` instances so the association stages operate on a
 single type. State accessors (`getMean`/`getCovariance`/`getMeasurement`) are
 mutex-protected.
 
-**`sushitrack_track_t`** (`include/SushiTrack/sushitrack_c.h`) is the C output record:
+**`sushitrack_track_t`** (`include/SushiTrack/c_api/sushitrack_c.h`) is the C output record:
 identifier, box, score, label, lifecycle `state`, `kinematic_state`, `age`,
 `hits`, `lost_time`, `frames_since_last_update`, `maneuver_probability`, the
 feature pointer, and activation/confirmation flags. `maneuver_probability` is
@@ -187,12 +187,12 @@ estimator instance and any internal state.
 
 ### Linear Kalman filter
 
-`KalmanFilter` (`source/kalman_filter.cpp`) is a constant-velocity filter over the
+`KalmanFilter` (`source/filtering/kalman_filter.cpp`) is a constant-velocity filter over the
 8-D state. Process and measurement noise scale with the dominant box dimension,
 using the ByteTrack-calibrated compile-time constants
 `kStdWeightPosition = 1/20`, `kStdWeightVelocity = 1/160`,
 `kInitPositionMult = 2.0`, `kInitVelocityMult = 10.0`
-(`include/SushiTrack/kalman_filter.hpp`). Process-noise standard deviations scale
+(`include/SushiTrack/filtering/kalman_filter.hpp`). Process-noise standard deviations scale
 linearly with `dt` (variance proportional to `dt^2`). `initiate` seeds the
 position/size block from the measurement and zeroes velocity, with the initial
 covariance widened by the init multipliers. `project` maps the state to
@@ -215,7 +215,7 @@ scaled. All other behaviour is inherited from `KalmanFilter`.
 
 ### IMM estimator
 
-`IMMFilter` (`source/imm_filter.cpp`, `kalman_type=2`) runs an Interacting Multiple
+`IMMFilter` (`source/filtering/imm_filter.cpp`, `kalman_type=2`) runs an Interacting Multiple
 Model filter over a bank of four motion models. It presents the standard 8-D
 `IKalmanFilter` interface outward while carrying wider mode-specific sub-states
 internally.
@@ -286,7 +286,7 @@ The IMM outputs a continuous `maneuver_probability` (mass on CA + CT), a
 
 ## Kinematic regime
 
-`KinematicState` (`include/SushiTrack/kinematic_state.hpp`) is a discrete
+`KinematicState` (`include/SushiTrack/tracking/kinematic_state.hpp`) is a discrete
 per-track regime: `Stationary`, `Cruising`, `Maneuvering`, `Coasting`. When an
 IMM predictor drives the track, the regime is derived from the mode
 probabilities: NCP mass above 0.5 reads Stationary, CA+CT mass above 0.5 reads
@@ -299,7 +299,7 @@ every regime-aware policy degrade to identity behaviour. The regime and the
 continuous `maneuver_probability` feed:
 
 - association cost shaping (per-row gate scale and appearance/geometry blend,
-  `stateAssocMods` in `source/distance_strategies.cpp`),
+  `stateAssocMods` in `source/association/state_association_modifiers.hpp`),
 - the lost-buffer scale (`cleanupLost`: Stationary 1.5×, Maneuvering 1.2×,
   others 1.0×),
 - the OCM weight (Cruising full weight, Maneuvering scaled, Stationary/Coasting
@@ -430,7 +430,7 @@ are skipped because their stored direction is meaningless.
 
 ## Assignment solver
 
-`LAPJVSolver` (`source/assignment_solvers.cpp`, `source/lapjv.cpp`) solves the linear
+`LAPJVSolver` (`source/association/lapjv_solver.cpp`, `source/association/lapjv.cpp`) solves the linear
 assignment with the Jonker–Volgenant algorithm (column reduction,
 reduction-transfer, augmenting-path search with dual updates). Pairs at or above
 the stage cost limit are treated as non-edges, so the solver returns matches
@@ -443,7 +443,7 @@ frames to avoid per-frame heap allocation.
 
 ### States
 
-`TrackState` (`include/SushiTrack/tracklet.hpp`): `New (0)`, `Tracked (1)`,
+`TrackState` (`include/SushiTrack/tracking/tracklet.hpp`): `New (0)`, `Tracked (1)`,
 `Lost (2)`, `Removed (3)`, `Tentative (4)`. A detection begins as `New`; it
 becomes `Tentative` (when the tentative lifecycle is on) or directly `Tracked`.
 A confirmed track that misses observations becomes `Lost`, is recoverable within
@@ -538,12 +538,12 @@ frame.
 
 Every tunable parameter has three synchronized representations
 (`docs/CONTRIBUTING.md`): the C++ struct `TrackerConfig`
-(`include/SushiTrack/tracker_config.hpp`), the C ABI struct `sushitrack_params_t`
-(`include/SushiTrack/sushitrack_c.h`), and the JSON schema (`sushitrack.json`). The Python
+(`include/SushiTrack/tracking/tracker_config.hpp`), the C ABI struct `sushitrack_params_t`
+(`include/SushiTrack/c_api/sushitrack_c.h`), and the JSON schema (`sushitrack.json`). The Python
 binding's `SushiTrackParams` mirrors the C struct field-for-field in declaration
 order; a missing or reordered field silently corrupts every field after it.
 
-`source/config_loader.cpp` overlays a JSON file onto a seeded `sushitrack_params_t`. The
+`source/configuration/config_loader.cpp` overlays a JSON file onto a seeded `sushitrack_params_t`. The
 schema is layered `basic` / `advanced.<section>`; the outer `"sushitrack"`
 wrapper is optional. Any key absent from the file keeps the compiled default. A
 missing file is non-fatal; a malformed file leaves the parameters untouched and
@@ -560,7 +560,7 @@ control.
 
 ## C API and bindings
 
-`include/SushiTrack/sushitrack_c.h` exposes an opaque `sushitrack_tracker_t` and the entry points
+`include/SushiTrack/c_api/sushitrack_c.h` exposes an opaque `sushitrack_tracker_t` and the entry points
 `sushitrack_get_default_params`, `sushitrack_create`, `sushitrack_create_ex`
 (status-returning), `sushitrack_create_from_config`, `sushitrack_load_params_from_json`,
 `sushitrack_update`, `sushitrack_destroy_tracker`, and `sushitrack_set_log_callback`. The ABI
@@ -586,7 +586,7 @@ README.
 
 ## Logging
 
-`Logger` (`source/logger.cpp`) routes `SUSHITRACK_LOG_DEBUG/INFO/WARN/ERROR` to a
+`Logger` (`source/logging/logger.cpp`) routes `SUSHITRACK_LOG_DEBUG/INFO/WARN/ERROR` to a
 single global callback registered via `sushitrack_set_log_callback`. The callback
 pointer is stored atomically; setting or clearing it is thread-safe. Passing
 `NULL` unregisters.

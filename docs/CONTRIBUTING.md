@@ -44,7 +44,7 @@ namespace SushiTrack::Detail
 } // namespace SushiTrack::Detail
 ```
 
-All public library code lives in the `SushiTrack` namespace. The C ABI layer in `include/SushiTrack/sushitrack_c.h` is `extern "C"` with no namespace.
+All public library code lives in the `SushiTrack` namespace. The C ABI layer in `include/SushiTrack/c_api/sushitrack_c.h` is `extern "C"` with no namespace.
 
 ### Comments
 
@@ -58,7 +58,7 @@ are in [Remaining work](design/REMAINING_WORK.md).
 Order: own header first, then standard library, then third-party. Separate groups with a blank line. Use angle brackets for library headers.
 
 ```cpp
-#include <SushiTrack/tracklet.hpp>
+#include <SushiTrack/tracking/tracklet.hpp>
 
 #include <cstdint>
 #include <memory>
@@ -112,23 +112,23 @@ Every tunable parameter has **three representations** that must always be kept i
 
 | Layer | Location |
 |---|---|
-| C++ struct | `include/SushiTrack/tracker_config.hpp` |
-| C ABI struct | `include/SushiTrack/sushitrack_c.h` → `sushitrack_params_t` |
+| C++ struct | `include/SushiTrack/tracking/tracker_config.hpp` |
+| C ABI struct | `include/SushiTrack/c_api/sushitrack_c.h` → `sushitrack_params_t` |
 | JSON schema | `sushitrack.json` |
 
 When adding or removing a parameter:
 
 1. Add the field to `TrackerConfig` with a default value and a `///<` doc comment.
 2. Add the corresponding field to `sushitrack_params_t` in `sushitrack_c.h` with a `///<` comment.
-3. Propagate the value in `source/sushitrack_c.cpp` (`sushitrack_get_default_params` and `sushitrack_create` mapping).
+3. Propagate the value in `source/c_api/sushitrack_c.cpp` (`sushitrack_get_default_params` and `sushitrack_create` mapping).
 4. Add the key to `sushitrack.json` under the correct section (`basic` or `advanced.*`).
-5. Handle the key in `source/config_loader.cpp`.
+5. Handle the key in `source/configuration/config_loader.cpp`.
 6. Mirror the field in `bindings/python/sushitrack.py` → `SushiTrackParams._fields_` in exact declaration order.
 7. Add a unit test in `tests/unit/TestConfiguration.cpp` verifying that the JSON key loads correctly.
 
 ## C ABI Stability
 
-`include/SushiTrack/sushitrack_c.h` and `sushitrack_params_t` form the public binary interface consumed by the Python binding and external C/C++ integrations.
+`include/SushiTrack/c_api/sushitrack_c.h` and `sushitrack_params_t` form the public binary interface consumed by the Python binding and external C/C++ integrations.
 
 - Never reorder or remove existing fields from `sushitrack_params_t` or `sushitrack_track_t`. New fields may only be appended at the end.
 - Never change the type of an existing field.

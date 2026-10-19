@@ -16,7 +16,7 @@ def test_the_c_example_includes_each_header_on_its_own_line():
     """Writes one `#include` directive per line in example.c."""
     lines = deploy._CPP_EXAMPLE.splitlines()
     assert "#include <stdio.h>" in lines
-    assert '#include "SushiTrack/sushitrack_c.h"' in lines
+    assert '#include <SushiTrack/c_api/sushitrack_c.h>' in lines
     assert not [line for line in lines if line.count("include") > 1]
 
 

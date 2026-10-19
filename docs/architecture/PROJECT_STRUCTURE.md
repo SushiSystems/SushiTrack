@@ -7,39 +7,22 @@ The repository holds one module: public headers under `include/SushiTrack/`, sou
 sushitrack/
 ├── README.md  LICENSE  NOTICE.md  COMMERCIAL.md
 ├── AGENTS.md  CLAUDE.md               # agent instructions
-├── CMakeLists.txt                     # library, vendored trackers, tests
+├── CMakeLists.txt                     # project(), options, add_subdirectory
+├── .clang-format  .editorconfig       # formatting the editors and clang-format find
+├── .config/                           # Dockerfile and conda environment; see .config/README.md
+├── assets/sushitrack.json             # default tracker configuration the package ships
+├── cmake/                             # build policy and the Eigen target; see BUILD_SYSTEM.md
 │
-├── include/SushiTrack/
-│   ├── sushitrack_c.h                 # C API
-│   ├── sushitrack_export.hpp          # SUSHITRACK_API export macro
-│   ├── types.hpp                      # status codes, log levels, type aliases
-│   ├── tracker.hpp                    # core orchestrator
-│   ├── tracker_config.hpp             # C++ config struct, mirror of sushitrack_params_t
-│   ├── config_loader.hpp              # sushitrack.json loading
-│   ├── tracklet.hpp                   # per-track state, lifecycle, feature history
-│   ├── object.hpp                     # detection input
-│   ├── rect.hpp                       # bounding-box template
-│   ├── kalman_filter.hpp              # linear Kalman filter
-│   ├── nsa_kalman_filter.hpp          # noise-scale-adaptive variant
-│   ├── imm_filter.hpp                 # IMM multi-model estimator
-│   ├── kalman_filter_registry.hpp     # plug-in registry
-│   ├── kalman_types.hpp               # Eigen vector and matrix types
-│   ├── kinematic_state.hpp            # motion-regime enum
-│   ├── i_kalman_filter.hpp            # IStatePredictor + IGateValidator
-│   ├── i_kalman_factory.hpp           # predictor factory interface
-│   ├── i_state_predictor.hpp          # predict/update interface
-│   ├── i_gate_validator.hpp           # gating interface and NullGateValidator
-│   ├── i_cost_calculator.hpp          # cost-matrix interface
-│   ├── i_assignment_solver.hpp        # solver interface
-│   ├── i_timing_policy.hpp            # timing interface
-│   ├── distance_strategies.hpp        # every cost calculator
-│   ├── assignment_solvers.hpp         # LAPJVSolver
-│   ├── lapjv.hpp                      # Jonker-Volgenant routine
-│   ├── cost_matrix.hpp                # contiguous 2-D cost storage
-│   ├── timing_policies.hpp            # frame and wall-clock policies
-│   └── logger.hpp                     # log macros and callback dispatch
+├── include/SushiTrack/                # one primary type per header, grouped by area
+│   ├── association/                   # cost matrix, cost calculators and decorators, LAPJV solver
+│   ├── c_api/                         # the C API, its type aliases and the export macro
+│   ├── configuration/                 # sushitrack.json loading
+│   ├── detection/                     # the detection input and the bounding-box template
+│   ├── filtering/                     # Kalman, NSA and IMM estimators, gating, their registry
+│   ├── logging/                       # log macros and callback dispatch
+│   └── tracking/                      # the tracker, tracklets, their states and timing policies
 │
-├── source/                            # twelve .cpp files, named after their headers
+├── source/                            # one .cpp per header, under the same area folders
 │
 ├── bindings/python/                   # ctypes binding; see its README.md
 │

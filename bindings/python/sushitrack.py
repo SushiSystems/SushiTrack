@@ -5,7 +5,7 @@
 # Commercial use requires a licence from Sushi Systems.
 """Python ctypes bindings for the SushiTrack C ABI.
 
-Wraps the native library interface declared in include/SushiTrack/sushitrack_c.h.
+Wraps the native library interface declared in include/SushiTrack/c_api/sushitrack_c.h.
 Exposes Tracker, Track, and lifecycle states for multi-object tracking.
 """
 

@@ -26,7 +26,7 @@
 | TLWH, XYAH | The two box states of the Kalman filter: top-left, width, height; or centre, aspect ratio, height (`enable_xyah`) |
 | Time-aware | `time_aware=1`; `dt` is real seconds and expiry is measured in wall-clock time |
 | Timing policy | An `ITimingPolicy`; it turns `dt` into filter steps and decides when a track expires |
-| C ABI | The binary interface of `include/SushiTrack/sushitrack_c.h`: the `sushitrack_*` functions and structs |
+| C ABI | The binary interface of `include/SushiTrack/c_api/sushitrack_c.h`: the `sushitrack_*` functions and structs |
 | Binding | `bindings/python/sushitrack.py`, the `ctypes` wrapper over the C ABI |
 | Reference tracker | ByteTrack or OC-SORT as vendored under `third_party/`, built only to compare against |
 | Adapter | An `ITrackerAdapter` in `tests/regression/`; it drives one tracker through the common harness |

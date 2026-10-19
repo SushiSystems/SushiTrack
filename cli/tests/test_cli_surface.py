@@ -88,7 +88,7 @@ def test_the_docker_word_is_absent_from_help_and_describe():
 
 def _published_checkout(root: Path) -> None:
     """Writes a SushiTrack root marker, a one-page docs/ tree and a git commit that holds them."""
-    marker = root / "include" / "SushiTrack" / "sushitrack_c.h"
+    marker = root / "include" / "SushiTrack" / "c_api" / "sushitrack_c.h"
     marker.parent.mkdir(parents=True)
     marker.write_text("", encoding="utf-8")
     guides = root / "docs" / "guides"
@@ -133,7 +133,7 @@ def test_docs_bundle_writes_the_archive_of_the_checkout_it_runs_in(
 
 def _broken_checkout(root) -> None:
     """Writes a SushiTrack root marker and a cli/config.toml that is not valid TOML."""
-    marker = root / "include" / "SushiTrack" / "sushitrack_c.h"
+    marker = root / "include" / "SushiTrack" / "c_api" / "sushitrack_c.h"
     marker.parent.mkdir(parents=True)
     marker.write_text("", encoding="utf-8")
     (root / "cli").mkdir()

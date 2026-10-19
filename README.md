@@ -3,7 +3,7 @@
 SushiTrack is a multi-object tracking library in C++17. It takes the detections of one frame and
 returns tracks with stable identities, using the ByteTrack two-stage association with optional
 ReID, Mahalanobis gating, an IMM motion estimator and observation-centric momentum. It is used
-through a C API (`include/SushiTrack/sushitrack_c.h`) or the Python binding in
+through a C API (`include/SushiTrack/c_api/sushitrack_c.h`) or the Python binding in
 `bindings/python/`, and builds on Windows and Linux.
 
 ## Build

@@ -93,8 +93,8 @@ and the order in which the module looks for the library, and
 
 ## How do I use SushiTrack from a C or C++ project?
 
-Through the C API in `include/SushiTrack/sushitrack_c.h`, linked against the compiled `sushitrack`
-shared library. The header includes `SushiTrack/sushitrack_export.hpp`, which holds preprocessor
+Through the C API in `include/SushiTrack/c_api/sushitrack_c.h`, linked against the compiled `sushitrack`
+shared library. The header includes `SushiTrack/c_api/sushitrack_export.hpp`, which holds preprocessor
 macros only, and nothing else from the library, so a C consumer needs no Eigen and no C++ header.
 Fill a `sushitrack_params_t` with `sushitrack_get_default_params`, create the tracker with
 `sushitrack_create_ex`, and call `sushitrack_update` once per frame with an array of

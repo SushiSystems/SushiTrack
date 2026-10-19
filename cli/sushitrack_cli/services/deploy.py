@@ -36,7 +36,7 @@ _CPP_EXAMPLE = """\
  *   ./build/sushitrack_example        (Windows: copy ../bin/sushitrack.dll next to the exe)
  */
 #include <stdio.h>
-#include "SushiTrack/sushitrack_c.h"
+#include <SushiTrack/c_api/sushitrack_c.h>
 
 int main(void)
 {
@@ -92,7 +92,7 @@ Self-contained, ready-to-link build of the SushiTrack tracker (C ABI).
 
 ## Contents
 ```
-include/         Public C headers (SushiTrack/sushitrack_c.h)
+include/         Public C headers (SushiTrack/c_api/sushitrack_c.h)
 lib/             Link library  ({import_lib})
 bin/             Runtime library ({runtime_lib})   [Windows only]
 sushitrack.json  Default runtime configuration (editable, no recompile needed)
@@ -107,7 +107,7 @@ cmake --build build
 ```
 
 ## Integrating into your own project
-- Add `include/` to your include path and include `SushiTrack/sushitrack_c.h`.
+- Add `include/` to your include path and include `SushiTrack/c_api/sushitrack_c.h`.
 - Link against `lib/{import_lib}`.
 - On Windows, ensure `bin/sushitrack.dll` is on the PATH or beside your executable.
 - Edit `sushitrack.json` and create the tracker with `sushitrack_create_tracker("sushitrack.json")`
@@ -192,10 +192,11 @@ def _deploy_cpp(paths, pkg_dir):
     include_dst.mkdir(parents=True, exist_ok=True)
     src_include = getattr(paths, "include", paths.root / "include" / "SushiTrack")
     if src_include.is_dir():
-        for hdr in src_include.glob("*.h"):
-            shutil.copy2(hdr, include_dst / hdr.name)
-        for hdr in src_include.glob("*.hpp"):
-            shutil.copy2(hdr, include_dst / hdr.name)
+        for hdr in sorted(src_include.rglob("*")):
+            if hdr.suffix in (".h", ".hpp"):
+                target = include_dst / hdr.relative_to(src_include)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(hdr, target)
 
     (pkg_dir / "lib").mkdir(parents=True, exist_ok=True)
     shutil.copy2(import_lib, pkg_dir / "lib" / import_lib_name())

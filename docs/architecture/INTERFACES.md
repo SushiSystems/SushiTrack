@@ -1,6 +1,6 @@
 # Interfaces
 
-The runtime is organised around interfaces that the tracker depends on. Concrete implementations are wired up by the C-API entry point (`sushitrack_create_ex` in `source/sushitrack_c.cpp`) based on the `sushitrack_params_t` flags. The core orchestrator `Tracker` (see `include/SushiTrack/tracker.hpp`) consumes only the abstractions.
+The runtime is organised around interfaces that the tracker depends on. Concrete implementations are wired up by the C-API entry point (`sushitrack_create_ex` in `source/c_api/sushitrack_c.cpp`) based on the `sushitrack_params_t` flags. The core orchestrator `Tracker` (see `include/SushiTrack/tracking/tracker.hpp`) consumes only the abstractions.
 
 | Interface | Purpose | Concrete implementations |
 |---|---|---|

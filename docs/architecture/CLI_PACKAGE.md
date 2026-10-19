@@ -28,7 +28,7 @@ The CLI lives in `cli/` as the package `sushitrack-cli`. Its commands are in the
 ### The root marker
 
 `PROFILE` in `cli/sushitrack_cli/config.py` describes SushiTrack to the shared `sushicore`
-machinery. Its root marker is the C API header, `include/SushiTrack/sushitrack_c.h`. A bare
+machinery. Its root marker is the C API header, `include/SushiTrack/c_api/sushitrack_c.h`. A bare
 `CMakeLists.txt` exists in any enclosing checkout, but this path only ever sits at the SushiTrack
 root.
 

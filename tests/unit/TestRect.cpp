@@ -26,7 +26,7 @@
  */
 
 #include <gtest/gtest.h>
-#include <SushiTrack/rect.hpp>
+#include <SushiTrack/detection/rect.hpp>
 
 using namespace SushiTrack;
 

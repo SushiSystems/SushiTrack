@@ -14,11 +14,15 @@ target_compile_definitions(sushitrack PRIVATE SUSHITRACK_EXPORTS)
 target_include_directories(sushitrack PUBLIC
     ${PROJECT_SOURCE_DIR}/include
     ${EIGEN3_INCLUDE_DIR})
-target_include_directories(sushitrack PRIVATE ${PROJECT_SOURCE_DIR}/third_party)
+target_include_directories(sushitrack PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${PROJECT_SOURCE_DIR}/third_party)
 
 add_library(sushitrack_static OBJECT EXCLUDE_FROM_ALL ${SUSHITRACK_SOURCES})
 target_compile_definitions(sushitrack_static PUBLIC SUSHITRACK_STATIC)
 target_include_directories(sushitrack_static PUBLIC
     ${PROJECT_SOURCE_DIR}/include
     ${EIGEN3_INCLUDE_DIR})
-target_include_directories(sushitrack_static PRIVATE ${PROJECT_SOURCE_DIR}/third_party)
+target_include_directories(sushitrack_static PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${PROJECT_SOURCE_DIR}/third_party)

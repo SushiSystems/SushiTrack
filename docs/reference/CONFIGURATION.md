@@ -10,7 +10,7 @@ Each tracker owns a dedicated JSON file:
 | `tests/bytetrack.json` | ByteTrack | regression harness |
 | `tests/ocsort.json` | OCSORT | regression harness |
 
-`sushitrack.json` is bound to the library, not the test harness: the C API parses it directly (`source/config_loader.cpp`), so a compiled `sushitrack.dll`/`.so` is retuned by editing the file with **no recompilation**. Resolution order: the `$SUSHITRACK_CONFIG` environment variable, then an upward search for `sushitrack.json` from the working directory. Inside the repository the file is `assets/sushitrack.json`, which no upward search reaches, so `st run`, `st test`, `st eval` and `st infer` set `SUSHITRACK_CONFIG` to it when the variable is unset. Any missing key falls back to the compiled default from `sushitrack_get_default_params`.
+`sushitrack.json` is bound to the library, not the test harness: the C API parses it directly (`source/configuration/config_loader.cpp`), so a compiled `sushitrack.dll`/`.so` is retuned by editing the file with **no recompilation**. Resolution order: the `$SUSHITRACK_CONFIG` environment variable, then an upward search for `sushitrack.json` from the working directory. Inside the repository the file is `assets/sushitrack.json`, which no upward search reaches, so `st run`, `st test`, `st eval` and `st infer` set `SUSHITRACK_CONFIG` to it when the variable is unset. Any missing key falls back to the compiled default from `sushitrack_get_default_params`.
 
 The schema is layered `basic` / `advanced`. The outer `"sushitrack"` wrapper is optional: a file whose root is already the `basic`/`advanced` object is also accepted:
 
@@ -31,7 +31,7 @@ The schema is layered `basic` / `advanced`. The outer `"sushitrack"` wrapper is 
 }
 ```
 
-C API entry points (`include/SushiTrack/sushitrack_c.h`):
+C API entry points (`include/SushiTrack/c_api/sushitrack_c.h`):
 
 - `sushitrack_load_params_from_json(path, &params)`: overlay a file onto a seeded `sushitrack_params_t` (`path = NULL` uses the resolution order above). A missing file is non-fatal.
 - `sushitrack_create_from_config(path)`: seed defaults, overlay the file, and create in one call.
@@ -41,7 +41,7 @@ The Python binding mirrors this: `Tracker(config="auto")` resolves `sushitrack.j
 
 ## Parameters
 
-All knobs are exposed both on `sushitrack_params_t` (C API, `include/SushiTrack/sushitrack_c.h`) and `SushiTrack::TrackerConfig` (C++, `include/SushiTrack/tracker_config.hpp`). Defaults below are from `sushitrack_get_default_params`.
+All knobs are exposed both on `sushitrack_params_t` (C API, `include/SushiTrack/c_api/sushitrack_c.h`) and `SushiTrack::TrackerConfig` (C++, `include/SushiTrack/tracking/tracker_config.hpp`). Defaults below are from `sushitrack_get_default_params`.
 
 ### Detection thresholds
 
@@ -86,7 +86,7 @@ All knobs are exposed both on `sushitrack_params_t` (C API, `include/SushiTrack/
 
 `kalman_type` is documented under [Motion estimator](#motion-estimator) below.
 
-`KalmanFilter` baseline constants (compile-time, see `include/SushiTrack/kalman_filter.hpp`): `kStdWeightPosition=1/20`, `kStdWeightVelocity=1/160`, `kInitPositionMult=2.0`, `kInitVelocityMult=10.0`. These replace earlier configurable hyper-parameters and match the ByteTrack reference tuning.
+`KalmanFilter` baseline constants (compile-time, see `include/SushiTrack/filtering/kalman_filter.hpp`): `kStdWeightPosition=1/20`, `kStdWeightVelocity=1/160`, `kInitPositionMult=2.0`, `kInitVelocityMult=10.0`. These replace earlier configurable hyper-parameters and match the ByteTrack reference tuning.
 
 ### Association strategy
 

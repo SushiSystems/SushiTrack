@@ -27,10 +27,10 @@
 
 #include <gtest/gtest.h>
 
-#include <SushiTrack/tracklet.hpp>
-#include <SushiTrack/kalman_filter.hpp>
-#include <SushiTrack/kalman_types.hpp>
-#include <SushiTrack/tracker_config.hpp>
+#include <SushiTrack/tracking/tracklet.hpp>
+#include <SushiTrack/filtering/kalman_filter.hpp>
+#include <SushiTrack/filtering/kalman_types.hpp>
+#include <SushiTrack/tracking/tracker_config.hpp>
 
 #include <memory>
 #include <vector>

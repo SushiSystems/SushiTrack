@@ -26,7 +26,7 @@
  */
 
 #include <gtest/gtest.h>
-#include <SushiTrack/cost_matrix.hpp>
+#include <SushiTrack/association/cost_matrix.hpp>
 
 using namespace SushiTrack;
 

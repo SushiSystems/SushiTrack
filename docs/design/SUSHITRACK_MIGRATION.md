@@ -25,7 +25,7 @@ The repository must reflect Sushi Systems standards:
 - **Project Name:** SushiTrack
 - **C++ Namespace:** `SushiTrack`
 - **C API Prefix:** `sushitrack_`
-- **Header Tree:** `<SushiTrack/*.hpp>`, `<SushiTrack/sushitrack_c.h>`
+- **Header Tree:** `<SushiTrack/*.hpp>`, `<SushiTrack/c_api/sushitrack_c.h>`
 - **License:** PolyForm Noncommercial License 1.0.0 (`LICENSE`), commercial terms in `COMMERCIAL.md`
 - **Copyright Holder:** `Copyright (c) 2026 Sushi Systems`
 - **Organization Website:** `https://sushisystems.io`
@@ -87,8 +87,8 @@ All C API declarations use the full prefix `sushitrack_`:
 - `sushitrack_destroy_tracker(sushitrack_tracker_t tracker)`
 - `sushitrack_update(sushitrack_tracker_t tracker, ...)`
 - `sushitrack_get_tracklets(sushitrack_tracker_t tracker, ...)`
-- Header: `include/SushiTrack/sushitrack_c.h`
-- Implementation: `source/sushitrack_c.cpp`
+- Header: `include/SushiTrack/c_api/sushitrack_c.h`
+- Implementation: `source/c_api/sushitrack_c.cpp`
 
 ### 3.5 Developer CLI (`cli/`)
 

@@ -31,11 +31,11 @@
 #include "ITrackerAdapter.h"
 #include "TestInfra.h"
 
-#include <SushiTrack/sushitrack_c.h>
-#include <SushiTrack/tracker.hpp>
-#include <SushiTrack/object.hpp>
-#include <SushiTrack/rect.hpp>
-#include <SushiTrack/tracker_config.hpp>
+#include <SushiTrack/c_api/sushitrack_c.h>
+#include <SushiTrack/tracking/tracker.hpp>
+#include <SushiTrack/detection/object.hpp>
+#include <SushiTrack/detection/rect.hpp>
+#include <SushiTrack/tracking/tracker_config.hpp>
 
 #include <filesystem>
 #include <iostream>

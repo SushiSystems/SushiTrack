@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 2026-10-19 — core: Moved every public header under an area folder, so `SushiTrack/sushitrack_c.h` is now `SushiTrack/c_api/sushitrack_c.h` (`include/SushiTrack/c_api/`, `include/SushiTrack/tracking/`, `include/SushiTrack/filtering/`).
+- 2026-10-19 — core: Split the cost calculators, gate validators, Kalman factories, timing policies and track states into one header and one source per type (`include/SushiTrack/association/`, `source/association/`).
 - 2026-10-19 — build: Moved the build policy and the Eigen target into `cmake/` and the library targets into `source/CMakeLists.txt` (`cmake/SushiTrackBuildPolicy.cmake`, `docs/architecture/BUILD_SYSTEM.md`).
 - 2026-10-19 — cli: Renamed the ST_3RDPARTY_DIR variable to ST_THIRD_PARTY_DIR and set SUSHITRACK_CONFIG for the programs st runs (`cli/sushitrack_cli/config.py`, `cli/sushitrack_cli/env.py`).
 - 2026-10-19 — build: Moved the Dockerfile and the conda environment under `.config/`, the default tracker configuration to `assets/`, and added `.clang-format` and `.editorconfig` (`.config/README.md`, `assets/sushitrack.json`).

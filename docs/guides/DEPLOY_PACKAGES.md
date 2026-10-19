@@ -25,8 +25,8 @@ missing, the deploy fails with an explicit message telling you to build first.
 
 ## `--deploy cpp` layout
 
-Targets a C or C++ consumer through the **C ABI** (`SushiTrack/sushitrack_c.h`). That header
-includes `SushiTrack/sushitrack_export.hpp`, which holds preprocessor macros only, and nothing
+Targets a C or C++ consumer through the **C ABI** (`SushiTrack/c_api/sushitrack_c.h`). That header
+includes `SushiTrack/c_api/sushitrack_export.hpp`, which holds preprocessor macros only, and nothing
 else from the library, so a C consumer needs no Eigen and no C++ header. The package still
 carries every header of `include/SushiTrack/`.
 
@@ -36,7 +36,7 @@ in exactly one place. A second copy could drift from the one `sushitrack_export.
 ```
 package/
 ├── include/
-│   └── SushiTrack/                   # every public header; a C consumer includes SushiTrack/sushitrack_c.h
+│   └── SushiTrack/                   # every public header; a C consumer includes SushiTrack/c_api/sushitrack_c.h
 ├── lib/
 │   └── sushitrack.lib                # Windows import library (Linux: libsushitrack.so)
 ├── bin/
@@ -58,7 +58,7 @@ cmake --build build
 ```
 
 To integrate into your own project: add `package/include` to the include path,
-include `SushiTrack/sushitrack_c.h`, link against `package/lib/sushitrack.lib` (Windows) or
+include `SushiTrack/c_api/sushitrack_c.h`, link against `package/lib/sushitrack.lib` (Windows) or
 `package/lib/libsushitrack.so` (Linux), and ensure the runtime library is
 resolvable at load time (DLL on `PATH`/beside the exe on Windows; RPATH or
 `LD_LIBRARY_PATH` on Linux). Create the tracker with

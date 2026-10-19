@@ -29,7 +29,7 @@
 #ifndef SUSHITRACK_INTEGRATION_HELPERS_H
 #define SUSHITRACK_INTEGRATION_HELPERS_H
 
-#include <SushiTrack/sushitrack_c.h>
+#include <SushiTrack/c_api/sushitrack_c.h>
 
 #include <cmath>
 #include <cstddef>

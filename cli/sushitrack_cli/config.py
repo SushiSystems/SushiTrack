@@ -28,7 +28,7 @@ PROFILE = ModuleProfile(
     name="SushiTrack",
     program="st",
     env_prefix="ST",
-    root_marker="include/SushiTrack/sushitrack_c.h",
+    root_marker="include/SushiTrack/c_api/sushitrack_c.h",
     env_of_interest=("EIGEN", "SUSHITRACK"),
     extra_env_overrides={
         "cmake_exe": "ST_CMAKE",

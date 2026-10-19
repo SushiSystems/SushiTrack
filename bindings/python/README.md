@@ -1,7 +1,7 @@
 # SushiTrack Python binding
 
 `sushitrack.py` is a `ctypes` binding to the public C API
-(`include/SushiTrack/sushitrack_c.h`) with no dependency outside the standard library. It mirrors
+(`include/SushiTrack/c_api/sushitrack_c.h`) with no dependency outside the standard library. It mirrors
 `sushitrack_object_t`, `sushitrack_track_t` and `sushitrack_params_t` field for field and wraps
 the entry points in the `Tracker` class, so a caller never writes `ctypes`. `SushiTrack` is an
 alias of `Tracker`.

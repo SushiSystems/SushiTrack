@@ -57,7 +57,7 @@ st build           # produces build/bin/<cfg>/sushitrack.{dll,so}
 
 Either way the adapter uses the shipped Python binding
 ([`bindings/python/sushitrack.py`](../../bindings/python/README.md)), which wraps the **public C
-API** (`include/SushiTrack/sushitrack_c.h`). It does not use the regression `tracker_bridge`, whose
+API** (`include/SushiTrack/c_api/sushitrack_c.h`). It does not use the regression `tracker_bridge`, whose
 reduced struct omits the state/feature/kinematic fields.
 
 ## Step 2: implement the Ultralytics tracker contract

@@ -26,18 +26,28 @@
  */
 
 #include <gtest/gtest.h>
-#include <SushiTrack/distance_strategies.hpp>
-#include <SushiTrack/tracklet.hpp>
-#include <SushiTrack/kalman_filter.hpp>
-#include <SushiTrack/rect.hpp>
-#include <SushiTrack/cost_matrix.hpp>
-#include <SushiTrack/logger.hpp>
+#include <SushiTrack/association/cosine_cost_calculator.hpp>
+#include <SushiTrack/association/diou_cost_calculator.hpp>
+#include <SushiTrack/association/fuse_score_decorator.hpp>
+#include <SushiTrack/association/fused_cost_calculator.hpp>
+#include <SushiTrack/association/gated_iou_cost_calculator.hpp>
+#include <SushiTrack/association/giou_cost_calculator.hpp>
+#include <SushiTrack/association/iou_cost_calculator.hpp>
+#include <SushiTrack/association/observation_momentum_decorator.hpp>
+#include <SushiTrack/association/pure_reid_cost_calculator.hpp>
+#include <SushiTrack/association/reid_first_cost_calculator.hpp>
+#include <SushiTrack/association/siou_cost_calculator.hpp>
+#include <SushiTrack/filtering/null_gate_validator.hpp>
+#include <SushiTrack/tracking/tracklet.hpp>
+#include <SushiTrack/filtering/kalman_filter.hpp>
+#include <SushiTrack/detection/rect.hpp>
+#include <SushiTrack/association/cost_matrix.hpp>
+#include <SushiTrack/logging/logger.hpp>
 
 #include <memory>
 #include <string>
 #include <vector>
 #include <cmath>
-#include <SushiTrack/i_gate_validator.hpp>
 
 using namespace SushiTrack;
 

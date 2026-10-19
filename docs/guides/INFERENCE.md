@@ -8,7 +8,7 @@
 
 `pipeline.py` appends `cli/` to `sys.path` before it imports `sushitrack_cli.console`. `demo.py` already does that when it imports the module, but `pipeline.py` is also importable on its own, so it repeats the step.
 
-`tests/regression/TrackerRegistry.h` declares the C entry points of the shim for ctypes and exports them with `EXPORT_API`. That macro is a smaller copy of the pattern in `SushiTrack/sushitrack_export.hpp`, not a reuse of `SUSHITRACK_API`. `SUSHITRACK_API` is gated by `SUSHITRACK_EXPORTS`, which is specific to the `sushitrack` target, and `tracker_bridge` is a separate DLL that ctypes loads with `dlopen()` and nothing links against, so it needs no `dllimport` branch.
+`tests/regression/TrackerRegistry.h` declares the C entry points of the shim for ctypes and exports them with `EXPORT_API`. That macro is a smaller copy of the pattern in `SushiTrack/c_api/sushitrack_export.hpp`, not a reuse of `SUSHITRACK_API`. `SUSHITRACK_API` is gated by `SUSHITRACK_EXPORTS`, which is specific to the `sushitrack` target, and `tracker_bridge` is a separate DLL that ctypes loads with `dlopen()` and nothing links against, so it needs no `dllimport` branch.
 
 Example end-to-end run:
 

@@ -26,7 +26,8 @@
  */
 
 #include <gtest/gtest.h>
-#include <SushiTrack/timing_policies.hpp>
+#include <SushiTrack/tracking/frame_timing_policy.hpp>
+#include <SushiTrack/tracking/wall_clock_timing_policy.hpp>
 
 using namespace SushiTrack;
 

@@ -43,13 +43,13 @@ in its license block.
 
 | File | Upstream | Upstream counterpart | Licence |
 | --- | --- | --- | --- |
-| `source/rect.cpp`, `include/SushiTrack/rect.hpp` | ByteTrack-cpp | `src/Rect.cpp`, `include/ByteTrack/Rect.h` | MIT |
-| `source/object.cpp`, `include/SushiTrack/object.hpp` | ByteTrack-cpp | `src/Object.cpp`, `include/ByteTrack/Object.h` | MIT |
-| `source/kalman_filter.cpp`, `include/SushiTrack/kalman_filter.hpp`, `include/SushiTrack/kalman_types.hpp` | ByteTrack-cpp | `src/KalmanFilter.cpp`, `include/ByteTrack/KalmanFilter.h` | MIT |
-| `source/tracklet.cpp`, `include/SushiTrack/tracklet.hpp` | ByteTrack-cpp | `src/STrack.cpp`, `include/ByteTrack/STrack.h` | MIT |
-| `source/tracker.cpp`, `include/SushiTrack/tracker.hpp` | ByteTrack-cpp | `src/BYTETracker.cpp`, `include/ByteTrack/BYTETracker.h` | MIT |
-| `source/assignment_solvers.cpp`, `include/SushiTrack/assignment_solvers.hpp` | ByteTrack-cpp | `linearAssignment` and `execLapjv` in `src/BYTETracker.cpp` | MIT |
-| `source/lapjv.cpp`, `include/SushiTrack/lapjv.hpp` | ByteTrack-cpp, which took the code from gatagat/lap | `src/lapjv.cpp`, `include/ByteTrack/lapjv.h` | MIT and BSD-2-Clause |
+| `source/detection/rect.cpp`, `include/SushiTrack/detection/rect.hpp` | ByteTrack-cpp | `src/Rect.cpp`, `include/ByteTrack/Rect.h` | MIT |
+| `source/detection/object.cpp`, `include/SushiTrack/detection/object.hpp` | ByteTrack-cpp | `src/Object.cpp`, `include/ByteTrack/Object.h` | MIT |
+| `source/filtering/kalman_filter.cpp`, `include/SushiTrack/filtering/kalman_filter.hpp`, `include/SushiTrack/filtering/kalman_types.hpp` | ByteTrack-cpp | `src/KalmanFilter.cpp`, `include/ByteTrack/KalmanFilter.h` | MIT |
+| `source/tracking/tracklet.cpp`, `include/SushiTrack/tracking/tracklet.hpp` | ByteTrack-cpp | `src/STrack.cpp`, `include/ByteTrack/STrack.h` | MIT |
+| `source/tracking/tracker.cpp`, `include/SushiTrack/tracking/tracker.hpp` | ByteTrack-cpp | `src/BYTETracker.cpp`, `include/ByteTrack/BYTETracker.h` | MIT |
+| `source/association/lapjv_solver.cpp`, `include/SushiTrack/association/lapjv_solver.hpp` | ByteTrack-cpp | `linearAssignment` and `execLapjv` in `src/BYTETracker.cpp` | MIT |
+| `source/association/lapjv.cpp`, `include/SushiTrack/association/lapjv.hpp` | ByteTrack-cpp, which took the code from gatagat/lap | `src/lapjv.cpp`, `include/ByteTrack/lapjv.h` | MIT and BSD-2-Clause |
 | `tests/regression/inference/pipeline.py` | YOLOX | `preproc` in `yolox/data/data_augment.py`; the inference steps of `Predictor` in `tools/demo.py` | Apache-2.0 |
 
 Upstream copyright lines: ByteTrack-cpp, Copyright (c) 2022 Vertical Beach (lp6m, medalotte)
@@ -58,8 +58,8 @@ Copyright (c) 2021-2022 Megvii Inc. All rights reserved.
 
 The other files under `source/`, `include/SushiTrack/` and `tests/regression/inference/` were
 read against `third_party/bytetrack`, `third_party/ocsort` and `third_party/yolox` and are not
-ports. The observation-centric momentum and re-update code in `source/tracklet.cpp` and
-`source/distance_strategies.cpp` follows the OC-SORT method and shares no code with OC_SORT_CPP.
+ports. The observation-centric momentum and re-update code in `source/tracking/tracklet.cpp` and
+`source/association/observation_momentum_decorator.cpp` follows the OC-SORT method and shares no code with OC_SORT_CPP.
 
 This command writes every license block in the repository, the upstream lines included:
 
@@ -69,21 +69,21 @@ LAP="$BT;Holds code ported from gatagat/lap (BSD-2-Clause), see NOTICE.md;Copyri
 YX="Holds code ported from YOLOX (Apache-2.0), see NOTICE.md;Copyright (c) 2021-2022 Megvii Inc. All rights reserved."
 python D:/Projects/sushiskills/tools/licensing/write_license_block.py D:/Projects/sushitrack \
     --project "SushiTrack - https://github.com/SushiSystems/SushiTrack" \
-    --upstream "source/rect.cpp=$BT" \
-    --upstream "include/SushiTrack/rect.hpp=$BT" \
-    --upstream "source/object.cpp=$BT" \
-    --upstream "include/SushiTrack/object.hpp=$BT" \
-    --upstream "source/kalman_filter.cpp=$BT" \
-    --upstream "include/SushiTrack/kalman_filter.hpp=$BT" \
-    --upstream "include/SushiTrack/kalman_types.hpp=$BT" \
-    --upstream "source/tracklet.cpp=$BT" \
-    --upstream "include/SushiTrack/tracklet.hpp=$BT" \
-    --upstream "source/tracker.cpp=$BT" \
-    --upstream "include/SushiTrack/tracker.hpp=$BT" \
-    --upstream "source/assignment_solvers.cpp=$BT" \
-    --upstream "include/SushiTrack/assignment_solvers.hpp=$BT" \
-    --upstream "source/lapjv.cpp=$LAP" \
-    --upstream "include/SushiTrack/lapjv.hpp=$LAP" \
+    --upstream "source/detection/rect.cpp=$BT" \
+    --upstream "include/SushiTrack/detection/rect.hpp=$BT" \
+    --upstream "source/detection/object.cpp=$BT" \
+    --upstream "include/SushiTrack/detection/object.hpp=$BT" \
+    --upstream "source/filtering/kalman_filter.cpp=$BT" \
+    --upstream "include/SushiTrack/filtering/kalman_filter.hpp=$BT" \
+    --upstream "include/SushiTrack/filtering/kalman_types.hpp=$BT" \
+    --upstream "source/tracking/tracklet.cpp=$BT" \
+    --upstream "include/SushiTrack/tracking/tracklet.hpp=$BT" \
+    --upstream "source/tracking/tracker.cpp=$BT" \
+    --upstream "include/SushiTrack/tracking/tracker.hpp=$BT" \
+    --upstream "source/association/lapjv_solver.cpp=$BT" \
+    --upstream "include/SushiTrack/association/lapjv_solver.hpp=$BT" \
+    --upstream "source/association/lapjv.cpp=$LAP" \
+    --upstream "include/SushiTrack/association/lapjv.hpp=$LAP" \
     --upstream "tests/regression/inference/pipeline.py=$YX"
 ```
 

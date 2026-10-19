@@ -26,11 +26,11 @@
  */
 
 #include <gtest/gtest.h>
-#include <SushiTrack/kalman_filter.hpp>
-#include <SushiTrack/nsa_kalman_filter.hpp>
-#include <SushiTrack/kalman_types.hpp>
-#include <SushiTrack/kalman_filter_registry.hpp>
-#include <SushiTrack/logger.hpp>
+#include <SushiTrack/filtering/kalman_filter.hpp>
+#include <SushiTrack/filtering/nsa_kalman_filter.hpp>
+#include <SushiTrack/filtering/kalman_types.hpp>
+#include <SushiTrack/filtering/kalman_filter_registry.hpp>
+#include <SushiTrack/logging/logger.hpp>
 
 #include <Eigen/Dense>
 #include <cmath>

@@ -26,8 +26,8 @@
  */
 
 #include <gtest/gtest.h>
-#include <SushiTrack/logger.hpp>
-#include <SushiTrack/types.hpp>
+#include <SushiTrack/logging/logger.hpp>
+#include <SushiTrack/c_api/c_types.hpp>
 #include <atomic>
 #include <string>
 #include <thread>

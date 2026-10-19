@@ -19,7 +19,7 @@ beside it on Windows without a path change.
 ## Symbol visibility
 
 Symbols are hidden by default on every platform. Only declarations that carry `SUSHITRACK_API`
-(`include/SushiTrack/sushitrack_export.hpp`) leave the shared library. Windows does not use
+(`include/SushiTrack/c_api/sushitrack_export.hpp`) leave the shared library. Windows does not use
 `CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS`: every function of the C API carries the macro, so
 `__declspec(dllexport)` does what `visibility("default")` does on GCC and Clang, and a symbol
 that lacks the macro stays hidden on both.
