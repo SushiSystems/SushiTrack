@@ -5,10 +5,6 @@ Next id: RW-24
 The single backlog of this repository. Defects that stand in the tree are in
 [Known issues](../reference/KNOWN_ISSUES.md); each one names the entry here that closes it.
 
-## Next
-
-- RW-9 The Linux build and the tests run nowhere but on a developer machine
-
 ## Decisions waiting for the owner
 
 ### RW-3 Decide where the Python binding lives
@@ -29,13 +25,6 @@ The single backlog of this repository. Defects that stand in the tree are in
 - Done when: `docs/design/SUSHITRACK_MIGRATION.md` carries a `Shipped` status, or a phase
   with work left
 - Source: `docs/design/SUSHITRACK_MIGRATION.md` §5
-
-## Repository
-
-### RW-9 Run st build and st test in CI on Windows and Linux
-- State: open
-- Done when: `.github/workflows/ci.yml` builds and runs the small and medium tests on both
-  systems
 
 ## Tracker
 

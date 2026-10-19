@@ -40,8 +40,8 @@ st test
 ## Status
 
 The library, its C API, the Python binding, the test suites and the MOT17, MOT20 and DanceTrack
-benchmarks under `applications/benchmarks/` build and run on Windows; the Linux build is not run
-in CI yet. The benchmark sequences are not in git; [the data layout](docs/reference/DATA_LAYOUT.md)
+benchmarks under `applications/benchmarks/` build and run on Windows and Linux; CI builds and
+tests both, and runs the small tests under ASan and UBSan. The benchmark sequences are not in git; [the data layout](docs/reference/DATA_LAYOUT.md)
 names their sources. The version numbers of the library, the binding and the CLI disagree.
 [docs/design/REMAINING_WORK.md](docs/design/REMAINING_WORK.md)
 holds the backlog and [docs/reference/KNOWN_ISSUES.md](docs/reference/KNOWN_ISSUES.md) the open
