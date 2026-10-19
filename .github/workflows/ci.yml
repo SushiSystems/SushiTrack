@@ -18,13 +18,5 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: python tools/documentation/check_source_comments.py .
-        run: python tools/documentation/check_source_comments.py .
-      - name: python tools/documentation/check_docs_layout.py .
-        run: python tools/documentation/check_docs_layout.py .
-      - name: python tools/documentation/check_changelog.py .
-        run: python tools/documentation/check_changelog.py .
-      - name: python tools/layering/check_layering.py .
-        run: python tools/layering/check_layering.py .
-      - name: python -m unittest discover -s tools/tests
-        run: python -m unittest discover -s tools/tests
+      - name: python tools/check_all.py .
+        run: python tools/check_all.py .
