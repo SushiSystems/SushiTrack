@@ -1,6 +1,6 @@
 # Remaining work
 
-Next id: RW-22
+Next id: RW-24
 
 The single backlog of this repository. Defects that stand in the tree are in
 [Known issues](../reference/KNOWN_ISSUES.md); each one names the entry here that closes it.
@@ -10,11 +10,6 @@ The single backlog of this repository. Defects that stand in the tree are in
 - RW-9 The Linux build and the tests run nowhere but on a developer machine
 
 ## Decisions waiting for the owner
-
-### RW-2 Decide whether v1.0.0 was a release
-- State: decision
-- Done when: the commit is tagged `v1.0.0`, or the changelog section is renamed
-- Source: `docs/agent/2026_10_05_ESTATE_AUDIT/REPORT.md`
 
 ### RW-3 Decide where the Python binding lives
 - State: decision
@@ -28,11 +23,6 @@ The single backlog of this repository. Defects that stand in the tree are in
 ### RW-6 Decide whether contributions from outside are accepted
 - State: decision
 - Done when: the owner has named the contributor agreement, or ruled contributions out
-
-### RW-21 Decide whether st setup creates the conda environment
-- State: decision
-- Done when: the owner has ruled whether `st setup` builds the environment that `.config/conda/environment.yml`
-  describes, as sushistack RW-10 asks
 
 ### RW-7 Decide whether the SushiTrack migration is closed
 - State: decision
@@ -63,7 +53,19 @@ The single backlog of this repository. Defects that stand in the tree are in
 - State: unmeasured
 - Done when: a benchmark run shows the IMM cost per frame falls with tracking output unchanged
 
+## Inference
+
+### RW-23 Run the inference application on SushiAI and OpenCV
+- State: open
+- Done when: `st infer` detects with a SushiAI model and reads and draws frames with OpenCV,
+  with no PyTorch or YOLOX import left in `applications/inference/`
+
 ## Install and release
+
+### RW-22 Release v0.1.0 with the inference on SushiAI and OpenCV
+- State: blocked
+- Blocked by: RW-17, RW-23
+- Done when: the `chore(release): v0.1.0` commit carries the tag `v0.1.0`
 
 ### RW-16 Take sushicore from one source in every install path
 - State: open

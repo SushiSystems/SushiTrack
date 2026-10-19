@@ -4,8 +4,7 @@ This document describes the internal structure and features of SushiTrack: the
 per-frame processing pipeline, the interfaces that compose it, the motion
 estimators, the association stages, the track lifecycle, and the configuration
 and integration surfaces. It is a reference for engineers reading or extending
-the code. Parameter names, defaults, and enum values match the code as of
-v1.0.0; the compiled defaults are those set by `sushitrack_get_default_params`
+the code. The compiled defaults are those set by `sushitrack_get_default_params`
 (`source/c_api/sushitrack_c.cpp`) and mirrored in `TrackerConfig` (`include/SushiTrack/tracking/tracker_config.hpp`).
 
 ## Contents

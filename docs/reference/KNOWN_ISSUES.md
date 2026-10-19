@@ -33,14 +33,6 @@ Defects that stand in the tree. The work that closes each one is in
 - Workaround: none
 - Fix: RW-17
 
-### KI-7 The changelog has a v1.0.0 section that no tag marks
-- Origin: own
-- Where: `docs/reference/CHANGELOG.md`
-- Cause: the section was written for a release that was never tagged or published
-- Recognise: `git tag` lists nothing
-- Workaround: none
-- Fix: RW-2
-
 ### KI-8 st doctor never looks for GoogleTest
 - Origin: own
 - Where: `cli/sushistack.deps.toml`

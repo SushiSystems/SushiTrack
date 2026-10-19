@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-19 — docs: Folded the untagged v1.0.0 section into Unreleased, since v0.1.0 is the first release, and planned it with the SushiAI and OpenCV inference (`docs/design/REMAINING_WORK.md`).
 - 2026-10-19 — applications: Took the MOT17, MOT20 and DanceTrack sequences out of git; each machine keeps them under the benchmark's `data/` folder (`.gitignore`, `docs/reference/DATA_LAYOUT.md`).
 - 2026-10-19 — c_api: Made `sushitrack_update` and `sushitrack_get_tracklets` return a status and the count through `out_count`, and `sushitrack_create_ex` null its handle on every failure (`include/SushiTrack/c_api/sushitrack_c.h`).
 - 2026-10-19 — docs: Rewrote the root README in the documentation skill's order, with a Status section, and closed the skill alignment work (`README.md`, `docs/agent/2026_10_19_SKILL_ALIGNMENT/REPORT.md`).
@@ -74,10 +75,7 @@
 - 2026-09-22 — build: Took sushicore from PyPI instead of a sibling checkout (`cli/pyproject.toml`).
 - 2026-09-21 — docs: Added the upstream licence and a NOTICE to the vendored trackers and listed every vendored dependency (`third_party/bytetrack`, `third_party/ocsort`, `docs/README.md`).
 - 2026-09-17 — cli: Rewired st onto sushicore's console and config layer and added its package files (`cli/pyproject.toml`, `cli/config.toml`, `cli/sushistack.deps.toml`).
-
-## v1.0.0 — 2026-09-17
-
-- 2026-09-17 — core: Released initial Apache-2.0 open-source version of SushiTrack tracking engine (`LICENSE`).
+- 2026-09-17 — core: Licensed the first version of the SushiTrack tracking engine under Apache-2.0 (`LICENSE`).
 - 2026-09-17 — capi: Established sushitrack_ C ABI layer with unified error codes (`include/SushiTrack/sushitrack_c.h`, `source/sushitrack_c.cpp`).
 - 2026-09-17 — cli: Implemented unified developer toolchain under st and sushitrack (`cli/`).
 - 2026-09-17 — bindings: Delivered native ctypes Python binding with full feature parity (`bindings/python/sushitrack.py`).
