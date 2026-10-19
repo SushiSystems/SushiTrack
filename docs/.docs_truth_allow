@@ -12,4 +12,6 @@
 ^third_party/(weight|video)/.*$ # the downloaded checkpoints and clips the inference guide names, which git ignores
 ^output/.*$ # the folder the inference pipeline writes
 ^.*/img1$ # the frames of a benchmark sequence, which git ignores
+^(det/det|gt/gt)\.txt$ # the files of a benchmark sequence, which git ignores
+^applications/benchmarks/\w+/data/.*$ # a downloaded benchmark sequence, which git ignores
 ^SushiLog/.*$ # a header of SushiLog, the sibling library the build fetches

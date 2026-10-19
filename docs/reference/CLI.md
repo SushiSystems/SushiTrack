@@ -137,8 +137,7 @@ st infer --source 0 --tracker sushitrack --no-save --no-screen --stress
 ```
 
 `--source` also accepts an image-sequence directory (`<path>/img1`), not just a video
-file or camera index. The benchmarks under
-`applications/benchmarks/` hold 76 sequences (MOT17, MOT20, DanceTrack) whose frames work, e.g.
+file or camera index. The frames of a downloaded benchmark sequence work, e.g.
 `applications/benchmarks/mot20/data/MOT20-01/img1` or
 `applications/benchmarks/dancetrack/data/dancetrack0001/img1`.
 

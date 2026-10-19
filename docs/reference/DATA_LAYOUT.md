@@ -1,7 +1,17 @@
 # Data layout
 
 Each benchmark keeps its sequences in its own `data/` folder, and the engine reads one
-benchmark at a time:
+benchmark at a time. Git does not track the `data/` folders: each machine downloads the sequences
+from the sources below and lays them out as shown.
+
+| Benchmark | Source |
+| --- | --- |
+| `mot17` | https://motchallenge.net/data/MOT17/ |
+| `mot20` | https://motchallenge.net/data/MOT20/ |
+| `dancetrack` | https://github.com/DanceTrack/DanceTrack |
+
+A sequence needs `det/det.txt`, `gt/gt.txt` and `seqinfo.ini`; the YOLOX detection sets
+(`MOT17-02-YOLOX`, `MOT20-01-YOLOX`) are folders of their own beside the public ones.
 
 ```
 applications/benchmarks/

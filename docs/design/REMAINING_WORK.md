@@ -21,11 +21,6 @@ The single backlog of this repository. Defects that stand in the tree are in
 - Done when: SushiSkills' `repository-layout` names a home for a language binding and
   `bindings/python/` sits there
 
-### RW-4 Decide whether the benchmark data leaves git
-- State: decision
-- Done when: the MOT and DanceTrack sequences are fetched on demand or kept in Git LFS, or the
-  owner rules that they stay tracked
-
 ### RW-5 Decide which of AGENTS.md and CLAUDE.md is the source of the agent instructions
 - State: decision
 - Done when: one file holds the directives and the other points at it

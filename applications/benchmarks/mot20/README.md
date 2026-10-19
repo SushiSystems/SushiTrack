@@ -8,5 +8,5 @@ YOLOX private ones, 8 folders in `data/`. `st eval --private` keeps the YOLOX fo
 st eval --benchmark mot20 --compare
 ```
 
-The annotations come from https://motchallenge.net and keep their own licence; `NOTICE.md` names
-it.
+Git does not track `data/`. The sequences come from https://motchallenge.net/data/MOT20/ and
+keep their own licence.

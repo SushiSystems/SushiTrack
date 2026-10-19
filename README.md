@@ -41,8 +41,9 @@ st test
 
 The library, its C API, the Python binding, the test suites and the MOT17, MOT20 and DanceTrack
 benchmarks under `applications/benchmarks/` build and run on Windows; the Linux build is not run
-in CI yet. The C API cannot report a failed update as a status, and the version numbers of the
-library, the binding and the CLI disagree. [docs/design/REMAINING_WORK.md](docs/design/REMAINING_WORK.md)
+in CI yet. The benchmark sequences are not in git; [the data layout](docs/reference/DATA_LAYOUT.md)
+names their sources. The version numbers of the library, the binding and the CLI disagree.
+[docs/design/REMAINING_WORK.md](docs/design/REMAINING_WORK.md)
 holds the backlog and [docs/reference/KNOWN_ISSUES.md](docs/reference/KNOWN_ISSUES.md) the open
 defects.
 
@@ -56,5 +57,5 @@ Contributors start at [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
 SushiTrack is source-available, free for non-commercial use under the PolyForm Noncommercial
 License 1.0.0; commercial use needs a licence from Sushi Systems, see
-[COMMERCIAL.md](COMMERCIAL.md). [LICENSE](LICENSE) is the binding text. Third-party code and
-data keep their own licences, listed in [NOTICE.md](NOTICE.md).
+[COMMERCIAL.md](COMMERCIAL.md). [LICENSE](LICENSE) is the binding text. Third-party code keeps
+its own licence, listed in [NOTICE.md](NOTICE.md).

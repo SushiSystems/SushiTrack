@@ -92,23 +92,10 @@ python D:/Projects/sushiskills/tools/licensing/write_license_block.py D:/Project
 
 The repository tracks no binary. `st deploy` builds a package from the public headers, the
 compiled library, the Python binding and `sushitrack.json`; the library in it contains JSON
-for Modern C++, Eigen and the ported files above. `st deploy` copies no licence file, so
-`LICENSE`, this file and `third_party/licenses/` are added by hand before a package leaves the
-machine.
+for Modern C++, Eigen and the ported files above. Each package carries `LICENSE`, this file and
+the licence texts of that code under `licenses/`.
 
-`third_party/weight/` (YOLOX checkpoints) and `third_party/video/` (MOT17 and MOT20 clips) are
-ignored by git and are not distributed. Their terms are unverified.
-
-## Third-party data
-
-`applications/benchmarks/mot17/data/`, `mot20/data/` and `dancetrack/data/` hold 228 tracked files for 76 sequences: `gt/gt.txt`,
-`det/det.txt` and `seqinfo.ini` each. No image is tracked. The repository's licence does not
-cover these files.
-
-| Data set | Sequences | Source | Licence |
-| --- | --- | --- | --- |
-| MOT17 | 28 folders `MOT17-*`: seven train sequences, each with the DPM, FRCNN, SDP and YOLOX detection sets | https://motchallenge.net/data/MOT17/ | unverified; the archived site states no licence, and the audit names CC BY-NC-SA 3.0 |
-| MOT20 | 8 folders `MOT20-*`: four train sequences, each with the public and the YOLOX detection set | https://motchallenge.net/data/MOT20/ | unverified; the archived site states no licence, and the audit names CC BY-NC-SA 3.0 |
-| DanceTrack | 40 folders `dancetrack*` | https://github.com/DanceTrack/DanceTrack | Annotations: CC BY 4.0. The data set is "available for non-commercial research purposes only" |
-
-Where the `det/det.txt` files of the YOLOX sets and of DanceTrack come from is unverified.
+`third_party/weight/` (YOLOX checkpoints), `third_party/video/` (MOT17 and MOT20 clips) and the
+benchmark sequences under `applications/benchmarks/*/data/` are ignored by git and are not
+distributed. `docs/reference/DATA_LAYOUT.md` names where the sequences come from; each keeps its
+own licence.

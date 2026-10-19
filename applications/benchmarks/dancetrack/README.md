@@ -7,5 +7,5 @@ look alike and cross each other, which tests association more than detection.
 st eval --benchmark dancetrack --compare
 ```
 
-The annotations come from https://github.com/DanceTrack/DanceTrack and keep their own licence;
-`NOTICE.md` names it.
+Git does not track `data/`. The sequences come from https://github.com/DanceTrack/DanceTrack and
+keep their own licence.

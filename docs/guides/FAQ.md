@@ -201,6 +201,6 @@ a company, use in paid client work, and use in a product or service that is sold
 write to hello@sushisystems.io with what you want to build and who will use it; see
 [`COMMERCIAL.md`](../../COMMERCIAL.md).
 
-Third-party code and data keep their own licences, listed in [`NOTICE.md`](../../NOTICE.md). The
-repository's licence does not cover the MOT17, MOT20 and DanceTrack files under
-`applications/benchmarks/mot17/data/`, `mot20/data/` and `dancetrack/data/`.
+Third-party code keeps its own licence, listed in [`NOTICE.md`](../../NOTICE.md). The MOT17,
+MOT20 and DanceTrack sequences are not in the repository; each machine downloads them, under their
+own licences, as the [Data layout](../reference/DATA_LAYOUT.md) describes.

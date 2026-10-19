@@ -51,14 +51,14 @@ Defects that stand in the tree. The work that closes each one is in
 
 ## Repository
 
-### KI-10 234 MB of benchmark annotations are tracked in git
+### KI-10 A clone downloads 234 MB of benchmark annotations that the tree no longer holds
 - Origin: own
-- Where: `applications/benchmarks/mot17/data/`, `applications/benchmarks/mot20/data/`,
-  `applications/benchmarks/dancetrack/data/`
-- Cause: the MOT17, MOT20 and DanceTrack sequences were committed beside the evaluator
+- Where: `applications/benchmarks/`, in the git history of each benchmark's data folder
+- Cause: the MOT17, MOT20 and DanceTrack sequences were committed before they left git, and the
+  history keeps them
 - Recognise: a clone takes the 234 MB
 - Workaround: `git clone --filter=blob:none`
-- Fix: RW-4
+- Fix: none, the owner kept the history when the data left git
 
 ### KI-13 The Python binding sits in a root folder the layout does not name
 - Origin: own

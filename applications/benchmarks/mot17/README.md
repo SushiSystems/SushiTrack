@@ -8,5 +8,5 @@ YOLOX folders only and `--public` leaves them out.
 st eval --benchmark mot17 --compare
 ```
 
-The annotations come from https://motchallenge.net and keep their own licence; `NOTICE.md` names
-it.
+Git does not track `data/`. The sequences come from https://motchallenge.net/data/MOT17/ and
+keep their own licence.

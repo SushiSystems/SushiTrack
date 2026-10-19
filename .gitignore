@@ -11,9 +11,8 @@ out/
 # Deploy packages (written by `st deploy`)
 package/
 
-# Benchmark output and frames beside the sequences
-applications/benchmarks/*/data/*/pred/
-applications/benchmarks/*/data/*/img1/
+# Benchmark sequences, kept on each machine; see docs/reference/DATA_LAYOUT.md
+applications/benchmarks/*/data/
 
 # CMake generated files
 CMakeCache.txt

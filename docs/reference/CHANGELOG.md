@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-19 — applications: Took the MOT17, MOT20 and DanceTrack sequences out of git; each machine keeps them under the benchmark's `data/` folder (`.gitignore`, `docs/reference/DATA_LAYOUT.md`).
 - 2026-10-19 — c_api: Made `sushitrack_update` and `sushitrack_get_tracklets` return a status and the count through `out_count`, and `sushitrack_create_ex` null its handle on every failure (`include/SushiTrack/c_api/sushitrack_c.h`).
 - 2026-10-19 — docs: Rewrote the root README in the documentation skill's order, with a Status section, and closed the skill alignment work (`README.md`, `docs/agent/2026_10_19_SKILL_ALIGNMENT/REPORT.md`).
 - 2026-10-19 — docs: Corrected the names and paths the manual cited, marked its uncompiled examples and split two pages under the ceiling (`docs/architecture/MOTION_ESTIMATORS.md`, `docs/.docs_truth_allow`).

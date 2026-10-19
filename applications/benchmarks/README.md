@@ -12,7 +12,8 @@ with CTest. One engine runs them all; each benchmark folder holds the sequences 
 
 A benchmark is a folder with a `data/` folder of sequences, each a folder that holds
 `det/det.txt`, `gt/gt.txt` and `seqinfo.ini`. `st eval` finds every such folder, so a new
-dataset is a new folder and nothing else.
+dataset is a new folder and nothing else. Git does not track the `data/` folders; the
+[Data layout](../../docs/reference/DATA_LAYOUT.md) names where each machine gets them.
 
 `mot_engine` takes `--data DIR --settings DIR [--tracker NAME]... [--sequence NAME]...`,
 writes each tracker's predictions to `<sequence>/pred/<tracker>/<sequence>.txt` and prints one
