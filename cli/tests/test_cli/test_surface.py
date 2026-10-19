@@ -61,6 +61,19 @@ def test_describe_lists_every_visible_command_and_no_hidden_one():
     assert _described() == K_VISIBLE
 
 
+def test_test_with_a_sanitizer_builds_with_it_before_running(monkeypatch):
+    """Builds the tree with the named sanitizer, then runs the tests."""
+    seen: list[object] = []
+    monkeypatch.setattr(cli, "context", lambda: (object(), object()))
+    monkeypatch.setattr(cli.build_svc, "build",
+                        lambda cfg, paths, **options: seen.append(options["sanitizer"]) or 0)
+    monkeypatch.setattr(cli.test_svc, "test",
+                        lambda cfg, paths, **options: seen.append("test") or 0)
+    result = _invoke("test", "--label", "small", "--sanitize", "address")
+    assert result.exit_code == 0, result.output
+    assert seen == [cli.build_svc.Sanitizer.address, "test"]
+
+
 def test_config_and_env_are_the_shared_declarations():
     """Takes `config` and `env` from sushicore's one declaration."""
     group = typer.main.get_command(cli.app)

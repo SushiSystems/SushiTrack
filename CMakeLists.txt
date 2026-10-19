@@ -9,6 +9,7 @@ project(sushitrack VERSION 1.0.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(SushiTrackBuildPolicy)
+include(SushiTrackSanitizers)
 include(SushiTrackEigen)
 include(SushiTrackSushiLog)
 include(SushiTrackTests)

@@ -28,6 +28,18 @@ class BuildType(str, enum.Enum):
     relwithdebinfo = "relwithdebinfo"
     minsizerel = "minsizerel"
 
+
+class Sanitizer(str, enum.Enum):
+    """The `--sanitize` choices; each is a SUSHITRACK_SANITIZE value."""
+
+    address = "address"
+    thread = "thread"
+
+
+def sanitizer_defines(sanitizer: Sanitizer | None) -> list[str]:
+    """Returns the -D option that turns *sanitizer* on, or nothing."""
+    return [f"-DSUSHITRACK_SANITIZE={sanitizer.value}"] if sanitizer is not None else []
+
 LIBRARY_TARGET = "sushitrack"
 # TEST_TARGETS names every target the test build produces.
 TEST_TARGETS = ("sushitrack_tests", "sushitrack_application_tests")
@@ -109,8 +121,11 @@ def _configure_args(cfg, paths, build_type, tests, generator_name, defines):
 
 
 def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
-          defines=()):
+          defines=(), sanitizer=None):
     """Configure when needed, then build st's targets.
+
+    Args:
+        sanitizer: Builds with this sanitizer; the next build without one reconfigures the tree.
 
     Returns:
         The exit code of the failing step, else 0.
@@ -119,6 +134,7 @@ def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
     build_dir = paths.build
     build_type = build_type or normalize_build_type(cfg.build_type)
     generator_name = generator(cfg)
+    defines = (*sanitizer_defines(sanitizer), *defines)
 
     if clean and build_dir.exists():
         console.info(f"Removing build directory: {build_dir}")
@@ -126,7 +142,8 @@ def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
             return 1
 
     console.info(f"Type: {build_type}  |  tests: {'ON' if tests else 'OFF'}"
-                 + (f"  |  generator: {generator_name}" if generator_name else ""))
+                 + (f"  |  generator: {generator_name}" if generator_name else "")
+                 + (f"  |  sanitizer: {sanitizer.value}" if sanitizer else ""))
 
     env = load_build_env(cfg.tool, build_dir)
     # Each pinned Sushi library reaches CMake as -D<NAME>_DIR; CMake never downloads.

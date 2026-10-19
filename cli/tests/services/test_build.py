@@ -48,6 +48,25 @@ def test_a_pinned_sushi_library_reaches_the_configure(tmp_path, runner):
     assert "-DSUSHILOG_DIR=/stack/sushilog" in stamp
 
 
+@pytest.mark.parametrize("sanitizer", list(build_svc.Sanitizer))
+def test_a_sanitizer_reaches_the_configure_and_the_stamp(tmp_path, runner, sanitizer):
+    """Hands the sanitizer to CMake as SUSHITRACK_SANITIZE and records it in the stamp."""
+    paths = SimpleNamespace(root=tmp_path, build=tmp_path / "build")
+    assert build_svc.build(_cfg(), paths, tests=False, sanitizer=sanitizer) == 0
+    define = f"-DSUSHITRACK_SANITIZE={sanitizer.value}"
+    assert define in runner.calls[0]
+    assert define in (paths.build / build_svc.STAMP_NAME).read_text(encoding="utf-8")
+
+
+def test_a_build_without_a_sanitizer_reconfigures_a_sanitized_tree(tmp_path, runner):
+    """Reconfigures when the tree was built with a sanitizer and this build has none."""
+    paths = _configured_tree(tmp_path, "Release|OFF|Ninja|-DSUSHITRACK_SANITIZE=address",
+                             sentinel="build.ninja")
+    assert build_svc.build(_cfg(), paths, tests=False) == 0
+    assert [c[1] for c in runner.calls] == ["-S", "--build"]
+    assert not any("SUSHITRACK_SANITIZE" in arg for arg in runner.calls[0])
+
+
 @pytest.fixture
 def runner(monkeypatch, recorder):
     """Swap in a recording runner and a quiet environment."""

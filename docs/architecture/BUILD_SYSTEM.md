@@ -9,6 +9,7 @@ the commands are in [Building](../getting_started/BUILD.md).
 | --- | --- |
 | `CMakeLists.txt` | `project()`, the options and the `add_subdirectory` calls |
 | `cmake/SushiTrackBuildPolicy.cmake` | The language standard, output folders, symbol visibility and compiler flags |
+| `cmake/SushiTrackSanitizers.cmake` | `SUSHITRACK_SANITIZE` and `sushitrack_apply_sanitizers` |
 | `cmake/SushiTrackEigen.cmake` | The `Eigen3::Eigen` target over the `third_party/eigen` submodule |
 | `source/CMakeLists.txt` | The library `sushitrack` and its object twin `sushitrack_static` |
 | `tests/CMakeLists.txt` | The test programs |
@@ -34,6 +35,16 @@ question, and the C API never exposes `Tracker` to an outside consumer.
 Release builds use `/O2 /Ot /fp:fast /arch:AVX2` on MSVC and `-O3 -ffast-math -funroll-loops
 -mavx2` on GCC and Clang. `-mavx2` is added only on an x86 host, where it matches the MSVC flag;
 on ARM it would fail to compile.
+
+## Sanitizers
+
+`st build --sanitize address` sets `SUSHITRACK_SANITIZE=address`, which compiles and links with
+`-fsanitize=address,undefined`; `thread` uses `-fsanitize=thread`. The two cannot share a build,
+and MSVC is refused at configure time. `sushitrack_apply_sanitizers` adds the flags to the
+project's own targets only: the library, its object twin, the test programs, `tracker_bridge`
+and `mot_engine`. A global flag would also instrument SushiLog and the vendored ByteTrack and
+OC-SORT, code this repository does not test. `bytetrack` and `libocsort` are built with
+position-independent code because both are linked into the shared `tracker_bridge`.
 
 ## The object twin
 

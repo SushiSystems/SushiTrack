@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-19 — cli: Added `--sanitize` to st build and st test, which builds the project's own targets under ASan and UBSan or under TSan (`cmake/SushiTrackSanitizers.cmake`).
 - 2026-10-19 — build: Built ByteTrack and OC-SORT with position-independent code so `tracker_bridge` links on Linux, and fixed the GCC errors and warnings of the tests (`applications/tracker_bridge/CMakeLists.txt`).
 - 2026-10-19 — docs: Folded the untagged v1.0.0 section into Unreleased, since v0.1.0 is the first release, and planned it with the SushiAI and OpenCV inference (`docs/design/REMAINING_WORK.md`).
 - 2026-10-19 — applications: Took the MOT17, MOT20 and DanceTrack sequences out of git; each machine keeps them under the benchmark's `data/` folder (`.gitignore`, `docs/reference/DATA_LAYOUT.md`).

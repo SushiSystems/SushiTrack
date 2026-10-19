@@ -21,3 +21,4 @@ target_link_libraries(tracker_adapters INTERFACE sushitrack bytetrack libocsort)
 
 add_library(tracker_bridge SHARED tracker_bridge.cpp)
 target_link_libraries(tracker_bridge PRIVATE tracker_adapters)
+sushitrack_apply_sanitizers(tracker_bridge)

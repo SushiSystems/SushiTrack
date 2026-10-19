@@ -9,6 +9,8 @@
 add_library(mot_engine_runner STATIC mot_runner.cpp)
 target_include_directories(mot_engine_runner PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(mot_engine_runner PUBLIC tracker_adapters)
+sushitrack_apply_sanitizers(mot_engine_runner)
 
 add_executable(mot_engine main.cpp)
 target_link_libraries(mot_engine PRIVATE mot_engine_runner)
+sushitrack_apply_sanitizers(mot_engine)

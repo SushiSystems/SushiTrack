@@ -38,6 +38,7 @@ prints which layer each value came from.
 | `--clean` | Remove the build directory before configuring |
 | `--jobs, -j <n>` | Parallel build jobs (default: CPU count) |
 | `-D VAR=VALUE` | Extra `-D` option forwarded to cmake (repeatable) |
+| `--sanitize {address,thread}` | Build SushiTrack's own targets with ASan and UBSan, or with TSan; GCC or Clang only. The next build without it reconfigures the tree |
 | `--deploy {cpp,python}` | After a successful build, assemble a redistributable `package/` for the chosen consumer ([details](../guides/DEPLOY_PACKAGES.md)) |
 
 ## `st test`
@@ -53,10 +54,12 @@ is picked up with no CLI change. [Test suites](../guides/TESTING.md) says what e
 | `--repeat, -r <n>` | `ctest --repeat until-fail:<n>`: re-run each test until it fails; flaky-test hunting |
 | `--jobs, -j <n>` | Run up to N tests concurrently (`ctest --parallel`) |
 | `--cli` | Run the pytest suite of the `st` package instead of CTest, with the same labels |
+| `--sanitize {address,thread}` | Build with that sanitizer first, as `st build --sanitize` does |
 
 ```bash
 st test                              # small and medium
 st test --label small
+st test --label small --sanitize address   # under ASan and UBSan
 st test --label small -f 'RectTest'
 st test --label medium --repeat 3
 st test --label large                # needs real hardware

@@ -37,7 +37,7 @@ from .services import label as label_svc
 from .services import runner as run_svc
 from .services import tests as test_svc
 from .services.checks import st_checks
-from .services.build import BuildType
+from .services.build import BuildType, Sanitizer
 from .services.deploy import DeployKind
 from .services.test_label import TestLabel
 
@@ -61,12 +61,19 @@ app = typer.Typer(
 register_root_options(app, distribution=K_DISTRIBUTION)
 
 
+def _sanitize_option() -> typer.models.OptionInfo:
+    """Returns the default of a `--sanitize` parameter."""
+    return typer.Option(None, "--sanitize", case_sensitive=False,
+                        help="Sanitizer build: address (ASan and UBSan) | thread (TSan).")
+
+
 @app.command(
     "build",
     rich_help_panel=K_PROJECT,
     epilog="st build\n"
            "st build --type debug\n"
            "st build --no-test  # Library only\n"
+           "st build --sanitize address  # ASan and UBSan; thread for TSan\n"
            "st build --deploy cpp  # Build, then assemble package/",
 )
 def build(
@@ -87,6 +94,7 @@ def build(
     define: Optional[list[str]] = typer.Option(
         None, "-D", metavar="VAR=VALUE",
         help="Extra -D option passed straight to cmake (repeatable)."),
+    sanitize: Optional[Sanitizer] = _sanitize_option(),
 ):
     """Configure and build the project.
 
@@ -99,7 +107,7 @@ def build(
     code = build_svc.build(
         cfg, paths, build_type=build_type, clean=clean, jobs=jobs,
         tests=not no_test,
-        defines=[f"-D{item}" for item in (define or [])])
+        defines=[f"-D{item}" for item in (define or [])], sanitizer=sanitize)
     if code != 0 or not deploy:
         raise typer.Exit(code)
     raise typer.Exit(deploy_svc.deploy(paths, deploy.value))
@@ -114,6 +122,7 @@ def build(
            "st test --label medium --repeat 3\n"
            "st test --label large  # Needs real hardware\n"
            "st test --label quarantined\n"
+           "st test --label small --sanitize address  # Small tests under ASan and UBSan\n"
            "st test --cli  # The st package's own tests",
 )
 def test(
@@ -133,6 +142,7 @@ def test(
         help="Run up to N tests concurrently (ctest --parallel)."),
     cli_tests: bool = typer.Option(
         False, "--cli", help="Run the pytest suite of the st package instead of CTest."),
+    sanitize: Optional[Sanitizer] = _sanitize_option(),
 ):
     """Run the tests through CTest, selected by size label.
 
@@ -140,6 +150,7 @@ def test(
     st run sushitrack_tests -- --gtest_shuffle --gtest_break_on_failure
 
     --cli runs the pytest suite of the st package instead, with the same labels.
+    --sanitize builds the tree with that sanitizer first.
 
     Metric evaluation and video inference are not CTest suites — see `st eval`
     and `st infer`.
@@ -147,6 +158,10 @@ def test(
     cfg, paths = context()
     if cli_tests:
         raise typer.Exit(test_svc.test_cli(paths, labels=label))
+    if sanitize is not None:
+        code = build_svc.build(cfg, paths, sanitizer=sanitize)
+        if code != 0:
+            raise typer.Exit(code)
     raise typer.Exit(test_svc.test(cfg, paths, labels=label, filter=filter,
                                    repeat=repeat, jobs=jobs))
 
