@@ -90,6 +90,16 @@ RW-20; KI-2, KI-9, KI-11, KI-12, KI-14, KI-15, KI-16, KI-17. KI-13 narrowed to `
 waits on RW-3. Added from other repositories: RW-20 (sushiweb's licence note, found stale in part:
 the ported files kept their notices, the packages did not) and RW-21 (sushistack RW-10).
 
+## History rewrite
+
+On the owner's word, `git filter-repo` replaced the project's former product and company name in
+every commit message, file and path of `main` and `feature/skill_alignment`, and wrote the
+former company's copyright lines as `Mustafa Garip & Sushi Systems`, whose rights the owner
+confirmed. Every commit hash changed and both branches were force-pushed. A tree comparison of
+each branch tip before and after, with the replacements applied to the old side, found 0 files
+missing, added or different (472 on `main`, 604 on the branch). The old commits stay reachable on
+GitHub by hash until GitHub collects them, and in every clone made before the rewrite.
+
 ## Local state
 
 The submodules' git folders stay under `.git/modules/3rdparty/` in this clone, pointed at by the
