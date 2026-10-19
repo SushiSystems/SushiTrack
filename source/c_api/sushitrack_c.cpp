@@ -31,6 +31,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <new>
 #include <utility>
 #include <vector>
 
@@ -72,9 +73,14 @@ using SushiTrack::K_SUSHITRACK_LOG_CATEGORY;
 
 namespace
 {
-    int populate_tracks(sushitrack_tracker_impl_t* impl,
-                        std::vector<std::shared_ptr<SushiTrack::Tracklet>>& results,
-                        sushitrack_track_t* out_tracks, int max_tracks)
+    /**
+     * @brief Sorts results by state priority and writes the first max_tracks into out_tracks.
+     * @return SUCCESS, or BUFFER_OVERFLOW when results did not fit.
+     */
+    sushitrack_status_t populate_tracks(sushitrack_tracker_impl_t* impl,
+                                        std::vector<std::shared_ptr<SushiTrack::Tracklet>>& results,
+                                        sushitrack_track_t* out_tracks, int max_tracks,
+                                        int* out_count)
     {
         std::sort(results.begin(), results.end(),
                   [](const auto& a, const auto& b)
@@ -94,11 +100,13 @@ namespace
                       return priority(a->get_track_state()) < priority(b->get_track_state());
                   });
 
-        if (results.size() > static_cast<std::size_t>(max_tracks))
+        const bool overflow = results.size() > static_cast<std::size_t>(max_tracks);
+        if (overflow)
         {
-            SUSHITRACK_LOG_WARN(
-                K_SUSHITRACK_LOG_CATEGORY,
-                "Output buffer capacity exceeded. Truncating lower priority tracks.");
+            SUSHITRACK_LOG_WARN(K_SUSHITRACK_LOG_CATEGORY,
+                                "{} tracks exceed the output buffer of {}; writing the first {} "
+                                "by state and returning SUSHITRACK_BUFFER_OVERFLOW",
+                                results.size(), max_tracks, max_tracks);
         }
 
         int count = std::min(static_cast<int>(results.size()), max_tracks);
@@ -133,7 +141,16 @@ namespace
                 static_cast<int>(impl->tracker->get_global_frame_id() - res->get_frame_id());
         }
 
-        return count;
+        *out_count = count;
+        return overflow ? SUSHITRACK_BUFFER_OVERFLOW : SUSHITRACK_SUCCESS;
+    }
+
+    /**
+     * @brief Returns whether a track buffer and its capacity agree.
+     */
+    bool is_track_buffer_valid(const sushitrack_track_t* out_tracks, int max_tracks)
+    {
+        return max_tracks >= 0 && (out_tracks != nullptr || max_tracks == 0);
     }
 } // namespace
 
@@ -235,7 +252,10 @@ extern "C"
     sushitrack_status_t sushitrack_create_ex(const sushitrack_params_t* params,
                                              sushitrack_tracker_t* out_tracker)
     {
-        if (!params || !out_tracker)
+        if (!out_tracker)
+            return SUSHITRACK_INVALID_ARGUMENT;
+        *out_tracker = nullptr;
+        if (!params)
             return SUSHITRACK_INVALID_ARGUMENT;
 
         try
@@ -417,17 +437,16 @@ extern "C"
                     config.ocm_max_age, config.ocm_maneuver_weight_scale);
             }
 
-            auto impl = new sushitrack_tracker_impl_t();
+            auto impl = std::make_unique<sushitrack_tracker_impl_t>();
             impl->config = config;
             impl->tracker = std::make_unique<SushiTrack::Tracker>(
                 config, kf_factory, std::move(solver), high_conf_metric, low_conf_metric,
                 tentative_metric, duplicate_metric, lost_recovery_metric);
 
-            *out_tracker = static_cast<sushitrack_tracker_t>(impl);
-
             SUSHITRACK_LOG_INFO(K_SUSHITRACK_LOG_CATEGORY,
                                 "Tracker instance created successfully.");
 
+            *out_tracker = static_cast<sushitrack_tracker_t>(impl.release());
             return SUSHITRACK_SUCCESS;
         }
         catch (const std::bad_alloc&)
@@ -483,21 +502,20 @@ extern "C"
     }
 
     /**
-     * @brief Updates internal track states with new frame detections.
-     * @param tracker Valid tracker instance handle.
-     * @param objects Detection array; NULL when n_objects is zero.
-     * @param out_tracks Pre-allocated buffer receiving active tracks.
-     * @return Count of active tracks written into out_tracks.
+     * @brief Applies one frame of detections and writes the tracks it leaves.
+     * @return SUCCESS, BUFFER_OVERFLOW, INVALID_ARGUMENT, OUT_OF_MEMORY or RUNTIME_ERROR.
      */
-    int sushitrack_update(sushitrack_tracker_t tracker, const sushitrack_object_t* objects,
-                          int n_objects, sushitrack_track_t* out_tracks, int max_tracks, float dt)
+    sushitrack_status_t sushitrack_update(sushitrack_tracker_t tracker,
+                                          const sushitrack_object_t* objects, int n_objects,
+                                          sushitrack_track_t* out_tracks, int max_tracks, float dt,
+                                          int* out_count)
     {
-        if (!tracker || !out_tracks)
-            return 0;
-        if (n_objects > 0 && !objects)
-            return 0;
-        if (n_objects < 0 || max_tracks < 0)
-            return 0;
+        if (!out_count)
+            return SUSHITRACK_INVALID_ARGUMENT;
+        *out_count = 0;
+        if (!tracker || n_objects < 0 || (n_objects > 0 && !objects) ||
+            !is_track_buffer_valid(out_tracks, max_tracks))
+            return SUSHITRACK_INVALID_ARGUMENT;
         auto* impl = static_cast<sushitrack_tracker_impl_t*>(tracker);
 
         try
@@ -518,50 +536,81 @@ extern "C"
             }
 
             impl->last_results = impl->tracker->update(detections, dt);
-            return populate_tracks(impl, impl->last_results, out_tracks, max_tracks);
+            return populate_tracks(impl, impl->last_results, out_tracks, max_tracks, out_count);
+        }
+        catch (const std::bad_alloc&)
+        {
+            *out_count = 0;
+            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
+                                 "Update of {} detections failed: out of memory; returning "
+                                 "SUSHITRACK_OUT_OF_MEMORY",
+                                 n_objects);
+            return SUSHITRACK_OUT_OF_MEMORY;
         }
         catch (const std::exception& e)
         {
-            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY, "Update failed: {}", e.what());
-            return 0;
+            *out_count = 0;
+            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
+                                 "Update of {} detections failed: {}; returning "
+                                 "SUSHITRACK_RUNTIME_ERROR",
+                                 n_objects, e.what());
+            return SUSHITRACK_RUNTIME_ERROR;
         }
         catch (...)
         {
+            *out_count = 0;
             SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
-                                 "Update failed: unknown exception; returning zero tracks.");
-            return 0;
+                                 "Update of {} detections failed: unknown exception; returning "
+                                 "SUSHITRACK_RUNTIME_ERROR",
+                                 n_objects);
+            return SUSHITRACK_RUNTIME_ERROR;
         }
     }
 
     /**
-     * @brief Retrieves currently managed tracklets from the tracker.
-     * @param tracker Handle to tracker instance.
-     * @param out_tracks Array to receive output track state structures.
-     * @param max_tracks Maximum capacity of out_tracks array.
-     * @return Number of tracklets written to output array.
+     * @brief Writes the tracks the tracker holds, in the order sushitrack_update writes them.
+     * @return SUCCESS, BUFFER_OVERFLOW, INVALID_ARGUMENT, OUT_OF_MEMORY or RUNTIME_ERROR.
      */
-    int sushitrack_get_tracklets(sushitrack_tracker_t tracker, sushitrack_track_t* out_tracks,
-                                 int max_tracks)
+    sushitrack_status_t sushitrack_get_tracklets(sushitrack_tracker_t tracker,
+                                                 sushitrack_track_t* out_tracks, int max_tracks,
+                                                 int* out_count)
     {
-        if (!tracker || !out_tracks || max_tracks <= 0)
-            return 0;
+        if (!out_count)
+            return SUSHITRACK_INVALID_ARGUMENT;
+        *out_count = 0;
+        if (!tracker || !is_track_buffer_valid(out_tracks, max_tracks))
+            return SUSHITRACK_INVALID_ARGUMENT;
         auto* impl = static_cast<sushitrack_tracker_impl_t*>(tracker);
 
         try
         {
             auto tracks = impl->tracker->get_tracks();
-            return populate_tracks(impl, tracks, out_tracks, max_tracks);
+            return populate_tracks(impl, tracks, out_tracks, max_tracks, out_count);
+        }
+        catch (const std::bad_alloc&)
+        {
+            *out_count = 0;
+            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
+                                 "Reading the tracklets failed: out of memory; returning "
+                                 "SUSHITRACK_OUT_OF_MEMORY");
+            return SUSHITRACK_OUT_OF_MEMORY;
         }
         catch (const std::exception& e)
         {
-            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY, "Get tracklets failed: {}", e.what());
-            return 0;
+            *out_count = 0;
+            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
+                                 "Reading the tracklets failed: {}; returning "
+                                 "SUSHITRACK_RUNTIME_ERROR",
+                                 e.what());
+            return SUSHITRACK_RUNTIME_ERROR;
         }
         catch (...)
         {
+            *out_count = 0;
             SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
-                                 "Get tracklets failed: unknown exception; returning zero tracks.");
-            return 0;
+                                 "Reading the tracklets failed: unknown exception; returning "
+                                 "SUSHITRACK_RUNTIME_ERROR");
+            return SUSHITRACK_RUNTIME_ERROR;
         }
     }
 

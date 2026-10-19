@@ -35,6 +35,8 @@
 
 #include <SushiTrack/c_api/sushitrack_c.h>
 
+#include <c_detection_builders.hpp>
+
 namespace
 {
 
@@ -452,7 +454,7 @@ TEST(Medium_ConfigLoaderTrackerSmokeTest, LoadedParamsSurviveSingleDetectionUpda
     d.score = 0.9f;
     d.label = 1;
     std::vector<sushitrack_track_t> out(4);
-    int n = sushitrack_update(hdl, &d, 1, out.data(), 4, 0.04f);
+    int n = CDetections::update_frame(hdl, &d, 1, out.data(), 4, 0.04f);
     EXPECT_GE(n, 0);
 
     sushitrack_destroy(hdl);

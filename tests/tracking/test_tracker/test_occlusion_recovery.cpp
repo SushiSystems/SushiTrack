@@ -88,7 +88,7 @@ namespace
                     out_x = x0 + vx * static_cast<float>(i);
                     out_y = y0 + vy * static_cast<float>(i);
                     sushitrack_object_t d = make_det(out_x, out_y);
-                    int n = sushitrack_update(hdl_, &d, 1, out.data(), 8, 0.04f);
+                    int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 8, 0.04f);
                     EXPECT_GE(n, 1);
                     if (n >= 1)
                         id = out[0].track_id;
@@ -116,13 +116,13 @@ namespace
         // Occlude for 3 frames. The Kalman prediction keeps propagating position velocity for Lost tracks, so the predicted box stays on the trajectory.
         constexpr int K_GAP = 3;
         for (int i = 0; i < K_GAP; ++i)
-            sushitrack_update(hdl_, nullptr, 0, out.data(), 8, 0.04f);
+            CDetections::update_frame(hdl_, nullptr, 0, out.data(), 8, 0.04f);
 
         // Reappear at the extrapolated position so the detection overlaps the propagated prediction.
         const float reappear_x = last_x + vx * static_cast<float>(K_GAP + 1);
         const float reappear_y = last_y + vy * static_cast<float>(K_GAP + 1);
         sushitrack_object_t back = make_det(reappear_x, reappear_y);
-        int n = sushitrack_update(hdl_, &back, 1, out.data(), 8, 0.04f);
+        int n = CDetections::update_frame(hdl_, &back, 1, out.data(), 8, 0.04f);
         ASSERT_GE(n, 1);
 
         const sushitrack_track_t* recovered = find_by_id(out, n, id);
@@ -148,11 +148,11 @@ namespace
 
         // Gap far exceeding the 5-frame buffer: the lost track must be removed by cleanup_lost before the object returns.
         for (int i = 0; i < 20; ++i)
-            sushitrack_update(hdl_, nullptr, 0, out.data(), 8, 0.04f);
+            CDetections::update_frame(hdl_, nullptr, 0, out.data(), 8, 0.04f);
 
         // Reappear somewhere unrelated. A retired identity cannot be reclaimed.
         sushitrack_object_t back = make_det(600.0f, 200.0f);
-        int n = sushitrack_update(hdl_, &back, 1, out.data(), 8, 0.04f);
+        int n = CDetections::update_frame(hdl_, &back, 1, out.data(), 8, 0.04f);
         ASSERT_GE(n, 1);
 
         const sushitrack_track_t* stale = find_by_id(out, n, id);
@@ -191,7 +191,7 @@ namespace
             sushitrack_object_t top = make_det(100.0f + 5.0f * i, 100.0f);
             sushitrack_object_t bot = make_det(100.0f + 5.0f * i, 400.0f);
             sushitrack_object_t dets[2] = {top, bot};
-            int n = sushitrack_update(hdl_, dets, 2, out.data(), 8, 0.04f);
+            int n = CDetections::update_frame(hdl_, dets, 2, out.data(), 8, 0.04f);
             ASSERT_GE(n, 2);
             for (int k = 0; k < n; ++k)
             {
@@ -210,7 +210,7 @@ namespace
         for (int i = 0; i < 2; ++i)
         {
             sushitrack_object_t bot = make_det(100.0f + 5.0f * (6 + i), 400.0f);
-            int n = sushitrack_update(hdl_, &bot, 1, out.data(), 8, 0.04f);
+            int n = CDetections::update_frame(hdl_, &bot, 1, out.data(), 8, 0.04f);
             ASSERT_GE(n, 1);
             const sushitrack_track_t* b = find_by_id(out, n, id_bot);
             ASSERT_NE(b, nullptr) << "Visible object lost its id while its neighbour was occluded.";
@@ -221,7 +221,7 @@ namespace
         sushitrack_object_t top = make_det(100.0f + 5.0f * 8, 100.0f);
         sushitrack_object_t bot = make_det(100.0f + 5.0f * 8, 400.0f);
         sushitrack_object_t dets[2] = {top, bot};
-        int n = sushitrack_update(hdl_, dets, 2, out.data(), 8, 0.04f);
+        int n = CDetections::update_frame(hdl_, dets, 2, out.data(), 8, 0.04f);
         ASSERT_GE(n, 2);
 
         const sushitrack_track_t* b = find_by_id(out, n, id_bot);

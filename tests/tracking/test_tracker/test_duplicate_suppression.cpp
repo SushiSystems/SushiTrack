@@ -119,7 +119,7 @@ namespace
         for (int i = 0; i < 6; ++i)
         {
             sushitrack_object_t d = make_det(100.0f, 200.0f);
-            int n = sushitrack_update(hdl_, &d, 1, out.data(), 8, 0.04f);
+            int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 8, 0.04f);
             ASSERT_GE(n, 1);
             expect_no_overlapping_tracked_pair(out, n);
         }
@@ -129,7 +129,7 @@ namespace
             sushitrack_object_t d1 = make_det(100.0f, 200.0f);
             sushitrack_object_t d2 = make_det(103.0f, 200.0f); // 3 px offset -> IoU > 0.85
             sushitrack_object_t dets[2] = {d1, d2};
-            int n = sushitrack_update(hdl_, dets, 2, out.data(), 8, 0.04f);
+            int n = CDetections::update_frame(hdl_, dets, 2, out.data(), 8, 0.04f);
             ASSERT_GE(n, 1);
         }
 
@@ -138,7 +138,7 @@ namespace
         for (int i = 0; i < 4; ++i)
         {
             sushitrack_object_t d = make_det(100.0f, 200.0f);
-            int n = sushitrack_update(hdl_, &d, 1, out.data(), 8, 0.04f);
+            int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 8, 0.04f);
             ASSERT_GE(n, 1);
             expect_no_overlapping_tracked_pair(out, n);
             final_tracked = count_tracked(out, n);
@@ -161,14 +161,14 @@ namespace
         sushitrack_object_t s1 = make_det(250.0f, 250.0f);
         sushitrack_object_t s2 = make_det(253.0f, 250.0f);
         sushitrack_object_t seed[2] = {s1, s2};
-        int n0 = sushitrack_update(hdl_, seed, 2, out.data(), 8, 0.04f);
+        int n0 = CDetections::update_frame(hdl_, seed, 2, out.data(), 8, 0.04f);
         ASSERT_GE(n0, 1);
 
         int final_tracked = 0;
         for (int i = 0; i < 6; ++i)
         {
             sushitrack_object_t d = make_det(250.0f, 250.0f);
-            int n = sushitrack_update(hdl_, &d, 1, out.data(), 8, 0.04f);
+            int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 8, 0.04f);
             ASSERT_GE(n, 1);
             expect_no_overlapping_tracked_pair(out, n);
             final_tracked = count_tracked(out, n);

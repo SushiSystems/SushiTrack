@@ -53,7 +53,7 @@ namespace
         std::vector<sushitrack_track_t> out(4);
 
         sushitrack_object_t d0 = make_det(100.0f, 200.0f);
-        int n0 = sushitrack_update(hdl, &d0, 1, out.data(), 4, 0.04f);
+        int n0 = CDetections::update_frame(hdl, &d0, 1, out.data(), 4, 0.04f);
         ASSERT_GE(n0, 1) << "[" << label << "] failed to seed a track.";
         const int64_t id = out[0].track_id;
 
@@ -63,7 +63,7 @@ namespace
             const float x = 100.0f + 3.0f * k + 0.05f * k * k;
             const float y = 200.0f + 8.0f * std::sin(0.2f * k);
             sushitrack_object_t d = make_det(x, y);
-            int n = sushitrack_update(hdl, &d, 1, out.data(), 4, 0.04f);
+            int n = CDetections::update_frame(hdl, &d, 1, out.data(), 4, 0.04f);
             ASSERT_GE(n, 1) << "[" << label << "] dropped the object at step " << k;
 
             const sushitrack_track_t* t = find_by_id(out, n, id);
@@ -123,7 +123,7 @@ namespace
 
         std::vector<sushitrack_track_t> out(4);
         sushitrack_object_t d0 = make_det(100.0f, 200.0f, 0.9f, 50.0f, 100.0f);
-        int n0 = sushitrack_update(hdl, &d0, 1, out.data(), 4, 0.04f);
+        int n0 = CDetections::update_frame(hdl, &d0, 1, out.data(), 4, 0.04f);
         ASSERT_GE(n0, 1);
         const int64_t id = out[0].track_id;
 
@@ -133,7 +133,7 @@ namespace
             const float w = 50.0f + 1.5f * k;
             const float h = 100.0f + 2.0f * k;
             sushitrack_object_t d = make_det(100.0f + 3.0f * k, 200.0f, 0.9f, w, h);
-            int n = sushitrack_update(hdl, &d, 1, out.data(), 4, 0.04f);
+            int n = CDetections::update_frame(hdl, &d, 1, out.data(), 4, 0.04f);
             ASSERT_GE(n, 1);
             const sushitrack_track_t* t = find_by_id(out, n, id);
             ASSERT_NE(t, nullptr) << "XYAH track churned at step " << k;
@@ -161,7 +161,7 @@ namespace
 
         std::vector<sushitrack_track_t> out(4);
         sushitrack_object_t d0 = make_det(100.0f, 200.0f, 0.95f);
-        int n0 = sushitrack_update(hdl, &d0, 1, out.data(), 4, 0.04f);
+        int n0 = CDetections::update_frame(hdl, &d0, 1, out.data(), 4, 0.04f);
         ASSERT_GE(n0, 1);
         const int64_t id = out[0].track_id;
 
@@ -170,7 +170,7 @@ namespace
         for (float s : scores)
         {
             sushitrack_object_t d = make_det(100.0f + 4.0f * k, 200.0f + 1.0f * k, s);
-            int n = sushitrack_update(hdl, &d, 1, out.data(), 4, 0.04f);
+            int n = CDetections::update_frame(hdl, &d, 1, out.data(), 4, 0.04f);
             ASSERT_GE(n, 1);
             const sushitrack_track_t* t = find_by_id(out, n, id);
             ASSERT_NE(t, nullptr) << "NSA track churned at step " << k << " (score " << s << ")";

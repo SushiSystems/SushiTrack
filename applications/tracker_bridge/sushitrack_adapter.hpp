@@ -90,9 +90,17 @@ namespace TrackerBridge
                                        static_cast<int>(d.feature.size())});
                 }
 
-                const int count =
+                int count = 0;
+                const sushitrack_status_t status =
                     sushitrack_update(handle_, objects.data(), static_cast<int>(objects.size()),
-                                      tracks_.data(), static_cast<int>(tracks_.size()), dt);
+                                      tracks_.data(), static_cast<int>(tracks_.size()), dt, &count);
+                if (status != SUSHITRACK_SUCCESS)
+                {
+                    throw std::runtime_error("sushitrack_update returned status " +
+                                             std::to_string(status) + " for " +
+                                             std::to_string(dets.size()) + " detections");
+                }
+
                 std::vector<TrackResult> results;
                 for (int i = 0; i < count; ++i)
                 {

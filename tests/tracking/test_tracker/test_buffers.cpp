@@ -31,6 +31,8 @@
 
 #include <SushiTrack/c_api/sushitrack_c.h>
 
+#include <c_detection_builders.hpp>
+
 // Small_TrackerBuffersTest — standard 0.08 s buffer window
 
 /**
@@ -83,9 +85,9 @@ class Small_TrackerBuffersTest : public ::testing::Test
          */
         void confirm_track(std::vector<sushitrack_track_t>& out)
         {
-            sushitrack_update(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
-            sushitrack_update(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
-            sushitrack_update(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
+            CDetections::update_frame(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
+            CDetections::update_frame(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
+            CDetections::update_frame(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
             ASSERT_EQ(out[0].state, 1) << "Precondition: track must be Tracked before buffer tests";
         }
 };
@@ -99,7 +101,7 @@ TEST_F(Small_TrackerBuffersTest, TrackedTransitionsToLostOnFirstMiss)
     std::vector<sushitrack_track_t> out(10);
     confirm_track(out);
 
-    int n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 2);
     EXPECT_FLOAT_EQ(out[0].lost_time, 0.04f);
@@ -113,8 +115,8 @@ TEST_F(Small_TrackerBuffersTest, LostTimeAccumulatesAcrossMissedFrames)
     std::vector<sushitrack_track_t> out(10);
     confirm_track(out);
 
-    sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
-    int n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
 
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 2);
@@ -130,10 +132,10 @@ TEST_F(Small_TrackerBuffersTest, LostTrackRemovedAfterBufferExpiry)
     std::vector<sushitrack_track_t> out(10);
     confirm_track(out);
 
-    sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
-    sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
 
-    int n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 2.0f);
+    int n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 2.0f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 3);
 }
@@ -147,11 +149,11 @@ TEST_F(Small_TrackerBuffersTest, LostTrackRecoveredWhenReassociated)
     std::vector<sushitrack_track_t> out(10);
     confirm_track(out);
 
-    sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
     ASSERT_EQ(out[0].state, 2) << "Precondition: track must be Lost before recovery test";
 
     sushitrack_object_t recovery = det(105.0f, 202.0f);
-    int n = sushitrack_update(hdl_, &recovery, 1, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, &recovery, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 1);
     EXPECT_FLOAT_EQ(out[0].lost_time, 0.0f);
@@ -166,13 +168,13 @@ TEST_F(Small_TrackerBuffersTest, RemovedTrackAbsentFromNextFrameOutput)
     std::vector<sushitrack_track_t> out(10);
     confirm_track(out);
 
-    sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
 
-    int n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 2.0f);
+    int n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 2.0f);
     ASSERT_EQ(n, 1);
     ASSERT_EQ(out[0].state, 3) << "Precondition: track must reach Removed state";
 
-    int n2 = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 1.0f);
+    int n2 = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 1.0f);
     EXPECT_EQ(n2, 0);
 }
 
@@ -188,9 +190,9 @@ TEST_F(Small_TrackerBuffersTest, MultipleTracksRetainIndependentIds)
     dets[0] = det(100.0f, 200.0f);
     dets[1] = det(600.0f, 400.0f);
 
-    sushitrack_update(hdl_, dets, 2, out.data(), 10, 0.04f);
-    sushitrack_update(hdl_, dets, 2, out.data(), 10, 0.04f);
-    int n = sushitrack_update(hdl_, dets, 2, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, dets, 2, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, dets, 2, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, dets, 2, out.data(), 10, 0.04f);
 
     ASSERT_EQ(n, 2);
     EXPECT_EQ(out[0].state, 1);
@@ -213,17 +215,17 @@ TEST_F(Small_TrackerBuffersTest, MultipleTrackIndependentLostState)
     dets[0] = det(100.0f, 200.0f);
     dets[1] = det(600.0f, 400.0f);
 
-    sushitrack_update(hdl_, dets, 2, out.data(), 10, 0.04f);
-    sushitrack_update(hdl_, dets, 2, out.data(), 10, 0.04f);
-    sushitrack_update(hdl_, dets, 2, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, dets, 2, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, dets, 2, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, dets, 2, out.data(), 10, 0.04f);
 
-    int n_lost = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    int n_lost = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
     ASSERT_EQ(n_lost, 2);
     for (int i = 0; i < 2; ++i)
         EXPECT_EQ(out[i].state, 2);
 
     sushitrack_object_t single = det(100.0f, 200.0f);
-    int n_mixed = sushitrack_update(hdl_, &single, 1, out.data(), 10, 0.04f);
+    int n_mixed = CDetections::update_frame(hdl_, &single, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n_mixed, 2);
 
     int tracked_count = 0;
@@ -291,9 +293,9 @@ class Small_TrackerBuffersLargeBufferTest : public ::testing::Test
          */
         void confirm_track(std::vector<sushitrack_track_t>& out)
         {
-            sushitrack_update(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
-            sushitrack_update(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
-            sushitrack_update(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
+            CDetections::update_frame(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
+            CDetections::update_frame(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
+            CDetections::update_frame(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
             ASSERT_EQ(out[0].state, 1) << "Precondition: track must be Tracked";
         }
 };
@@ -312,7 +314,7 @@ TEST_F(Small_TrackerBuffersLargeBufferTest, DifferentBufferWindowAffectsExpiry)
 
     int n = 0;
     for (int i = 0; i < 5; ++i)
-        n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+        n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
 
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 2);

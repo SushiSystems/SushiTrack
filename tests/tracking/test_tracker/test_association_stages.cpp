@@ -31,6 +31,8 @@
 
 #include <SushiTrack/c_api/sushitrack_c.h>
 
+#include <c_detection_builders.hpp>
+
 namespace
 {
 
@@ -96,12 +98,12 @@ TEST_F(Small_TrackerHighConfidenceTest, LAPJVModeAssociatesClosedDetectionToTrac
     std::vector<sushitrack_track_t> out(10);
     sushitrack_object_t d0 = make_det(100.0f, 200.0f);
 
-    sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, &d0, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(out[0].state, 1);
     int64_t id0 = out[0].track_id;
 
     sushitrack_object_t d1 = make_det(102.0f, 202.0f);
-    int n = sushitrack_update(hdl_, &d1, 1, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, &d1, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].track_id, id0);
     EXPECT_EQ(out[0].state, 1);
@@ -145,12 +147,12 @@ TEST_F(Small_TrackerHighConfidenceAgeCascadeTest,
     std::vector<sushitrack_track_t> out(10);
     sushitrack_object_t d0 = make_det(100.0f, 200.0f);
 
-    sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, &d0, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(out[0].state, 1);
     int64_t id0 = out[0].track_id;
 
     sushitrack_object_t d1 = make_det(102.0f, 202.0f);
-    int n = sushitrack_update(hdl_, &d1, 1, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, &d1, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].track_id, id0);
     EXPECT_EQ(out[0].state, 1);
@@ -202,10 +204,10 @@ TEST_F(Small_TrackerLowConfidenceTest, UnmatchedTrackedTrackTransitionsToLost)
     std::vector<sushitrack_track_t> out(10);
     sushitrack_object_t d0 = make_det(100.0f, 200.0f, 0.9f);
 
-    sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, &d0, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(out[0].state, 1);
 
-    int n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 2);
 }
@@ -249,14 +251,14 @@ TEST_F(Small_TrackerLostRecoveryTest, LostTrackRecoveredByReassociation)
     std::vector<sushitrack_track_t> out(10);
     sushitrack_object_t d0 = make_det(100.0f, 200.0f);
 
-    sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, &d0, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(out[0].state, 1);
 
-    sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
     ASSERT_EQ(out[0].state, 2);
 
     sushitrack_object_t d1 = make_det(102.0f, 202.0f);
-    int n = sushitrack_update(hdl_, &d1, 1, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, &d1, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 1);
     EXPECT_FLOAT_EQ(out[0].lost_time, 0.0f);
@@ -310,10 +312,10 @@ TEST_F(Small_TrackerDuplicateTest, OverlappingTracksDeduplicatedToOne)
     sushitrack_object_t second = make_det(101.0f, 201.0f);
     sushitrack_object_t pair[2] = {first, second};
 
-    sushitrack_update(hdl_, pair, 2, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, pair, 2, out.data(), 10, 0.04f);
 
     sushitrack_object_t single = make_det(100.5f, 200.5f);
-    int n = sushitrack_update(hdl_, &single, 1, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, &single, 1, out.data(), 10, 0.04f);
 
     int tracked_count = 0;
     for (int i = 0; i < n; ++i)
@@ -373,14 +375,14 @@ TEST_F(Small_TrackerTentativeTiersTest, HighScoreDetectionPromotesAfterOneConfir
 
     // Frame 1: the high-score detection creates a Tentative track.
     sushitrack_object_t d0 = make_det(100.0f, 200.0f, 0.9f);
-    int n = sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, &d0, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 4);
     EXPECT_EQ(out[0].is_confirmed, 0);
 
     // Frame 2: the confirming match promotes the tentative to Tracked under the fast tier (tentative_fast_hits=1, score still above fast_thresh).
     sushitrack_object_t d1 = make_det(102.0f, 202.0f, 0.9f);
-    n = sushitrack_update(hdl_, &d1, 1, out.data(), 10, 0.04f);
+    n = CDetections::update_frame(hdl_, &d1, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 1);
     EXPECT_EQ(out[0].is_confirmed, 1);
@@ -401,13 +403,13 @@ TEST_F(Small_TrackerTentativeTiersTest, StandardScoreDetectionRequiresConfirmHit
     sushitrack_object_t d1 = make_det(102.0f, 202.0f, 0.5f);
     sushitrack_object_t d2 = make_det(104.0f, 204.0f, 0.5f);
 
-    sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, &d0, 1, out.data(), 10, 0.04f);
     EXPECT_EQ(out[0].state, 4);
 
-    sushitrack_update(hdl_, &d1, 1, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, &d1, 1, out.data(), 10, 0.04f);
     EXPECT_EQ(out[0].state, 4);
 
-    int n = sushitrack_update(hdl_, &d2, 1, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, &d2, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 1);
     EXPECT_EQ(out[0].is_confirmed, 1);
@@ -449,7 +451,7 @@ class Small_TrackerZeroDetectionTest : public ::testing::Test
 TEST_F(Small_TrackerZeroDetectionTest, ZeroDetectionsOnEmptyTrackerReturnsZero)
 {
     std::vector<sushitrack_track_t> out(10);
-    int n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
     EXPECT_EQ(n, 0);
 }
 
@@ -465,6 +467,6 @@ TEST_F(Small_TrackerZeroDetectionTest, NDetectionsProduceNTracks)
     dets[2] = make_det(500.0f, 200.0f);
     dets[3] = make_det(700.0f, 200.0f);
 
-    int n = sushitrack_update(hdl_, dets, 4, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, dets, 4, out.data(), 10, 0.04f);
     EXPECT_EQ(n, 4);
 }

@@ -21,7 +21,7 @@
 
 /**
  * @file c_detection_builders.hpp
- * @brief Declares the C API detections and track lookups the tracker scenario tests build on.
+ * @brief Declares the C API detections, frame calls and lookups the tracker scenario tests use.
  * @author Mustafa Garip
  */
 
@@ -30,6 +30,8 @@
 #include <cmath>
 #include <cstddef>
 #include <vector>
+
+#include <gtest/gtest.h>
 
 #include <SushiTrack/c_api/sushitrack_c.h>
 
@@ -75,6 +77,44 @@ namespace CDetections
         o.feat = feat;
         o.feat_dim = feat_dim;
         return o;
+    }
+
+    /**
+     * @brief Applies one frame through sushitrack_update and returns the tracks written.
+     * @return The count, or -1 after recording a test failure for any status but SUCCESS and
+     *         BUFFER_OVERFLOW.
+     */
+    inline int update_frame(sushitrack_tracker_t tracker, const sushitrack_object_t* objects,
+                            int n_objects, sushitrack_track_t* out_tracks, int max_tracks, float dt)
+    {
+        int count = 0;
+        const sushitrack_status_t status =
+            sushitrack_update(tracker, objects, n_objects, out_tracks, max_tracks, dt, &count);
+        if (status != SUSHITRACK_SUCCESS && status != SUSHITRACK_BUFFER_OVERFLOW)
+        {
+            ADD_FAILURE() << "sushitrack_update returned status " << status;
+            return -1;
+        }
+        return count;
+    }
+
+    /**
+     * @brief Reads the tracker's tracks through sushitrack_get_tracklets and returns the count.
+     * @return The count, or -1 after recording a test failure for any status but SUCCESS and
+     *         BUFFER_OVERFLOW.
+     */
+    inline int read_tracklets(sushitrack_tracker_t tracker, sushitrack_track_t* out_tracks,
+                              int max_tracks)
+    {
+        int count = 0;
+        const sushitrack_status_t status =
+            sushitrack_get_tracklets(tracker, out_tracks, max_tracks, &count);
+        if (status != SUSHITRACK_SUCCESS && status != SUSHITRACK_BUFFER_OVERFLOW)
+        {
+            ADD_FAILURE() << "sushitrack_get_tracklets returned status " << status;
+            return -1;
+        }
+        return count;
     }
 
     /**

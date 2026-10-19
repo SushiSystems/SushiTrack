@@ -95,7 +95,7 @@ namespace
             sushitrack_object_t a = make_det_with_feat(ax, ay, feat_a_.data(), K_DIM, 0.9f);
             sushitrack_object_t b = make_det_with_feat(bx, by, feat_b_.data(), K_DIM, 0.9f);
             sushitrack_object_t dets[2] = {a, b};
-            return sushitrack_update(hdl_, dets, 2, out.data(), 8, 0.04f);
+            return CDetections::update_frame(hdl_, dets, 2, out.data(), 8, 0.04f);
         };
 
         // Confirmation + sustained tracking over several frames
@@ -143,7 +143,7 @@ namespace
         for (int i = 0; i < K_GAP; ++i)
         {
             sushitrack_object_t b = make_det_with_feat(bx, by, feat_b_.data(), K_DIM, 0.9f);
-            int n = sushitrack_update(hdl_, &b, 1, out.data(), 8, 0.04f);
+            int n = CDetections::update_frame(hdl_, &b, 1, out.data(), 8, 0.04f);
             ASSERT_GE(n, 1);
             const sushitrack_track_t* tb = find_by_id(out, n, id_b);
             ASSERT_NE(tb, nullptr) << "Visible object B lost identity during A's occlusion.";
@@ -177,7 +177,7 @@ namespace
         std::vector<sushitrack_track_t> out(4);
 
         sushitrack_object_t d0 = make_det_with_feat(100.0f, 200.0f, feat_a_.data(), K_DIM, 0.95f);
-        int n0 = sushitrack_update(hdl_, &d0, 1, out.data(), 4, 0.04f);
+        int n0 = CDetections::update_frame(hdl_, &d0, 1, out.data(), 4, 0.04f);
         ASSERT_GE(n0, 1);
         int64_t id = out[0].track_id;
 
@@ -189,7 +189,7 @@ namespace
             y += 4.0f * std::sin(0.1f * k);                                 // weaving
             const float score = 0.4f + 0.5f * std::abs(std::sin(0.3f * k)); // fluctuates
             sushitrack_object_t d = make_det_with_feat(x, y, feat_a_.data(), K_DIM, score);
-            int n = sushitrack_update(hdl_, &d, 1, out.data(), 4, 0.04f);
+            int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 4, 0.04f);
             ASSERT_GE(n, 1) << "Full-stack tracker dropped the object at frame " << k;
 
             // Re-anchor the id when confirmed (handles the tentative->Tracked transition without assuming the frame it occurs on).

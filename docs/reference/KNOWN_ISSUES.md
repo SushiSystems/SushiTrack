@@ -5,26 +5,6 @@ Next id: KI-18
 Defects that stand in the tree. The work that closes each one is in
 [Remaining work](../design/REMAINING_WORK.md).
 
-## C ABI
-
-### KI-1 A failed update reads as a frame with no tracks
-- Origin: own
-- Where: `source/c_api/sushitrack_c.cpp`, `include/SushiTrack/c_api/sushitrack_c.h`
-- Cause: `sushitrack_update` and `sushitrack_get_tracklets` return 0 on a caught exception and
-  on a rejected argument, and the ABI has no status return or last-error call on them
-- Recognise: a frame with detections returns 0 tracks and the log holds an ERROR line
-- Workaround: install a log callback and treat an ERROR line during the call as a failure
-- Fix: RW-13
-
-### KI-3 A late failure in sushitrack_create_ex hands back a handle that is then dropped
-- Origin: own
-- Where: `source/c_api/sushitrack_c.cpp`
-- Cause: `*out_tracker` is set before the last log line, which can throw; a throwing `Tracker`
-  constructor leaks the implementation object
-- Recognise: `SUSHITRACK_RUNTIME_ERROR` from `sushitrack_create_ex` with `*out_tracker` not null
-- Workaround: none
-- Fix: RW-15
-
 ## Installing and versions
 
 ### KI-4 An environment built from environment.yml cannot run st

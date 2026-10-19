@@ -10,7 +10,7 @@
 
 /**
  * @brief Runs the example; build it with `cmake -B build && cmake --build build` in example/.
- * @return 0 when the tracker ran, 1 when it could not be created.
+ * @return 0 when the tracker ran, 1 when it could not be created or an update failed.
  */
 int main(void)
 {
@@ -27,7 +27,14 @@ int main(void)
     for (int frame = 0; frame < 5; ++frame)
     {
         dets[0].x += 5.f;
-        int n = sushitrack_update(tracker, dets, 1, out, 64, 1.0f / 30.0f);
+        int n = 0;
+        sushitrack_status_t status = sushitrack_update(tracker, dets, 1, out, 64, 1.0f / 30.0f, &n);
+        if (status != SUSHITRACK_SUCCESS)
+        {
+            fprintf(stderr, "update failed with status %d\n", (int)status);
+            sushitrack_destroy_tracker(tracker);
+            return 1;
+        }
         printf("frame %d: %d track(s)\n", frame, n);
         for (int i = 0; i < n; ++i)
             printf("  id=%lld  (%.1f, %.1f, %.1f, %.1f)  state=%d\n",

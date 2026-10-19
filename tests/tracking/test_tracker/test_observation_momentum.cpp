@@ -77,7 +77,7 @@ namespace
             v = std::min(5.0f, v + 0.25f);
             x += v;
             sushitrack_object_t d = make_det(x, 200.0f);
-            int n = sushitrack_update(hdl, &d, 1, out.data(), 4, 0.04f);
+            int n = CDetections::update_frame(hdl, &d, 1, out.data(), 4, 0.04f);
             ASSERT_GE(n, 1);
 
             for (int k = 0; k < n; ++k)
@@ -114,7 +114,7 @@ namespace
             for (int i = 0; i < K_FRAMES; ++i)
             {
                 sushitrack_object_t d = make_det(100.0f, 200.0f);
-                int n = sushitrack_update(hdl, &d, 1, out.data(), 4, 0.04f);
+                int n = CDetections::update_frame(hdl, &d, 1, out.data(), 4, 0.04f);
                 EXPECT_GE(n, 1);
                 boxes.push_back({out[0].x, out[0].y, out[0].width, out[0].height});
             }
@@ -154,7 +154,7 @@ namespace
             xa += v;
             xb += v;
             sushitrack_object_t d[2] = {make_det(xa, 200.0f), make_det(xb, 500.0f)};
-            int n = sushitrack_update(hdl, d, 2, out.data(), 8, 0.04f);
+            int n = CDetections::update_frame(hdl, d, 2, out.data(), 8, 0.04f);
             ASSERT_GE(n, 2);
 
             if (i >= 20)

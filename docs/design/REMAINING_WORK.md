@@ -8,7 +8,6 @@ The single backlog of this repository. Defects that stand in the tree are in
 ## Next
 
 - RW-9 The Linux build and the tests run nowhere but on a developer machine
-- RW-13 A caller cannot tell a failed update from a frame with no tracks
 
 ## Decisions waiting for the owner
 
@@ -68,18 +67,6 @@ The single backlog of this repository. Defects that stand in the tree are in
 ### RW-12 Run the coordinated-turn update only under a manoeuvre
 - State: unmeasured
 - Done when: a benchmark run shows the IMM cost per frame falls with tracking output unchanged
-
-## C ABI
-
-### RW-13 Report a failure from sushitrack_update and sushitrack_get_tracklets
-- State: open
-- Done when: both calls return a `sushitrack_status_t` a caller can tell from a frame with no
-  tracks
-
-### RW-15 Release the tracker when sushitrack_create_ex fails late
-- State: open
-- Done when: `sushitrack_create_ex` leaves `*out_tracker` null on every failure and a throwing
-  `Tracker` constructor leaks nothing
 
 ## Install and release
 

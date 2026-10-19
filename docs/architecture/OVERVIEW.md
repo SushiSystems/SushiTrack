@@ -102,8 +102,9 @@ frame. The steps are:
 
 `update` returns all tracklets across states (Tracked, Lost, Tentative, Removed
 for the current frame). The C API layer (`sushitrack_update`) sorts them by
-lifecycle priority (Tracked < Tentative < Lost < Removed), truncates to the
-caller's buffer, and copies them into the output struct.
+lifecycle priority (Tracked < Tentative < Lost < Removed), copies as many as
+the caller's buffer holds into the output struct, and returns
+`SUSHITRACK_BUFFER_OVERFLOW` when some did not fit.
 
 ---
 

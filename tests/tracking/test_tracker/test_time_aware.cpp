@@ -86,7 +86,7 @@ namespace
                 for (int i = 0; i < frames; ++i)
                 {
                     sushitrack_object_t d = make_det(x, y);
-                    int n = sushitrack_update(hdl_, &d, 1, out.data(), 8, dt);
+                    int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 8, dt);
                     EXPECT_GE(n, 1);
                     if (n >= 1)
                         id = out[0].track_id;
@@ -110,10 +110,10 @@ namespace
 
         // Three empty frames at 0.2 s each => 0.6 s of lost time, well under 1.2 s.
         for (int i = 0; i < 3; ++i)
-            sushitrack_update(hdl_, nullptr, 0, out.data(), 8, 0.2f);
+            CDetections::update_frame(hdl_, nullptr, 0, out.data(), 8, 0.2f);
 
         sushitrack_object_t back = make_det(x, y);
-        int n = sushitrack_update(hdl_, &back, 1, out.data(), 8, 0.2f);
+        int n = CDetections::update_frame(hdl_, &back, 1, out.data(), 8, 0.2f);
         ASSERT_GE(n, 1);
 
         const sushitrack_track_t* recovered = find_by_id(out, n, id);
@@ -138,10 +138,10 @@ namespace
 
         // Four empty frames at 0.5 s each => 2.0 s of lost time, past the 1.2 s budget.
         for (int i = 0; i < 4; ++i)
-            sushitrack_update(hdl_, nullptr, 0, out.data(), 8, 0.5f);
+            CDetections::update_frame(hdl_, nullptr, 0, out.data(), 8, 0.5f);
 
         sushitrack_object_t back = make_det(x, y);
-        int n = sushitrack_update(hdl_, &back, 1, out.data(), 8, 0.5f);
+        int n = CDetections::update_frame(hdl_, &back, 1, out.data(), 8, 0.5f);
         ASSERT_GE(n, 1);
 
         const sushitrack_track_t* stale = find_by_id(out, n, id);
@@ -168,7 +168,7 @@ namespace
         std::vector<sushitrack_track_t> out(4);
 
         sushitrack_object_t d0 = make_det(100.0f, 200.0f);
-        int n0 = sushitrack_update(hdl_, &d0, 1, out.data(), 4, 0.04f);
+        int n0 = CDetections::update_frame(hdl_, &d0, 1, out.data(), 4, 0.04f);
         ASSERT_GE(n0, 1);
         int64_t id = out[0].track_id;
 
@@ -181,7 +181,7 @@ namespace
         {
             x += vx * dt;
             sushitrack_object_t d = make_det(x, 200.0f);
-            int n = sushitrack_update(hdl_, &d, 1, out.data(), 4, dt);
+            int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 4, dt);
             ASSERT_GE(n, 1) << "Object dropped at irregular step " << k;
 
             if (out[0].state == K_TRACKED)
@@ -209,7 +209,7 @@ namespace
 
         // One enormous interval with the object still present at the same spot. The 5-KF-step cap must keep the propagated covariance/state finite.
         sushitrack_object_t stall = make_det(x, y);
-        int n = sushitrack_update(hdl_, &stall, 1, out.data(), 4, 10.0f);
+        int n = CDetections::update_frame(hdl_, &stall, 1, out.data(), 4, 10.0f);
         ASSERT_GE(n, 1);
         const sushitrack_track_t* t = find_by_id(out, n, id);
         ASSERT_NE(t, nullptr) << "Object lost across a capped large-dt frame.";
@@ -219,7 +219,7 @@ namespace
         for (int i = 1; i <= 4; ++i)
         {
             sushitrack_object_t d = make_det(x, y);
-            int m = sushitrack_update(hdl_, &d, 1, out.data(), 4, 0.04f);
+            int m = CDetections::update_frame(hdl_, &d, 1, out.data(), 4, 0.04f);
             ASSERT_GE(m, 1);
             const sushitrack_track_t* tt = find_by_id(out, m, id);
             ASSERT_NE(tt, nullptr) << "Identity lost after the capped stall, step " << i;

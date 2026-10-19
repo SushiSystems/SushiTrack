@@ -83,7 +83,7 @@ namespace
         for (int i = 0; i < 4; ++i)
         {
             sushitrack_object_t d = make_det(100.0f + 4.0f * i, 200.0f, /*score=*/0.9f);
-            int n = sushitrack_update(hdl_, &d, 1, out.data(), 8, 0.04f);
+            int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 8, 0.04f);
             ASSERT_GE(n, 1);
             id = out[0].track_id;
         }
@@ -93,7 +93,7 @@ namespace
         for (int i = 0; i < 3; ++i)
         {
             sushitrack_object_t d_low = make_det(116.0f + 4.0f * i, 200.0f, /*score=*/0.35f);
-            int n = sushitrack_update(hdl_, &d_low, 1, out.data(), 8, 0.04f);
+            int n = CDetections::update_frame(hdl_, &d_low, 1, out.data(), 8, 0.04f);
             ASSERT_GE(n, 1);
 
             const sushitrack_track_t* t = find_by_id(out, n, id);
@@ -111,7 +111,7 @@ namespace
 
         // Score recovers: the object returns to the high pool under the same id.
         sushitrack_object_t d_high = make_det(130.0f, 200.0f, /*score=*/0.9f);
-        int n = sushitrack_update(hdl_, &d_high, 1, out.data(), 8, 0.04f);
+        int n = CDetections::update_frame(hdl_, &d_high, 1, out.data(), 8, 0.04f);
         ASSERT_GE(n, 1);
         const sushitrack_track_t* t = find_by_id(out, n, id);
         ASSERT_NE(t, nullptr) << "Track lost its identity on return to high confidence.";
@@ -130,7 +130,7 @@ namespace
         for (int i = 0; i < 5; ++i)
         {
             sushitrack_object_t d_low = make_det(300.0f, 300.0f, /*score=*/0.3f);
-            int n = sushitrack_update(hdl_, &d_low, 1, out.data(), 8, 0.04f);
+            int n = CDetections::update_frame(hdl_, &d_low, 1, out.data(), 8, 0.04f);
             EXPECT_EQ(count_tracked(out, n), 0)
                 << "Low-confidence detection seeded a track at frame " << i << ".";
         }
@@ -149,14 +149,14 @@ namespace
         for (int i = 0; i < 4; ++i)
         {
             sushitrack_object_t d = make_det(300.0f, 300.0f, /*score=*/0.55f);
-            int n = sushitrack_update(hdl_, &d, 1, out.data(), 8, 0.04f);
+            int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 8, 0.04f);
             EXPECT_EQ(count_tracked(out, n), 0)
                 << "A sub-high_thresh detection seeded a track at frame " << i << ".";
         }
 
         // Raising the score above high_thresh finally seeds the identity.
         sushitrack_object_t d_high = make_det(300.0f, 300.0f, /*score=*/0.9f);
-        int n = sushitrack_update(hdl_, &d_high, 1, out.data(), 8, 0.04f);
+        int n = CDetections::update_frame(hdl_, &d_high, 1, out.data(), 8, 0.04f);
         ASSERT_GE(n, 1);
         EXPECT_GE(count_tracked(out, n), 1)
             << "A high-confidence detection failed to seed a track.";

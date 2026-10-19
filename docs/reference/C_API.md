@@ -19,14 +19,27 @@ if (s != SUSHITRACK_SUCCESS) { /* handle */ }
 
 sushitrack_object_t  dets[MAX_DETS];   /* fill in per frame */
 sushitrack_track_t   tracks[MAX_TRACKS];
-int n = sushitrack_update(hdl, dets, n_dets, tracks, MAX_TRACKS, dt);
+int n = 0;
+s = sushitrack_update(hdl, dets, n_dets, tracks, MAX_TRACKS, dt, &n);
+if (s != SUSHITRACK_SUCCESS && s != SUSHITRACK_BUFFER_OVERFLOW) { /* handle */ }
 
 sushitrack_destroy(hdl);
 ```
 
 Source: not compiled
 
-`sushitrack_create` returns `NULL` on failure; `sushitrack_create_ex` returns a `sushitrack_status_t` code and writes the handle through `out_hdl`. `sushitrack_update` returns the number of tracks written. Output tracks are sorted by lifecycle priority (`Tracked` < `Tentative` < `Lost` < `Removed`); the buffer is truncated if too small, with a warning logged.
+`sushitrack_create` returns `NULL` on failure. `sushitrack_create_ex` returns a `sushitrack_status_t` and writes the handle through `out_tracker`, which it sets to `NULL` on every failure.
+
+`sushitrack_update` and `sushitrack_get_tracklets` return a `sushitrack_status_t` and write the number of tracks through `out_count`. Output tracks are sorted by lifecycle priority (`Tracked` < `Tentative` < `Lost` < `Removed`). `out_tracks` may be `NULL` only when `max_tracks` is 0.
+
+| Status | Meaning for `sushitrack_update` | `out_count` |
+|---|---|---|
+| `SUSHITRACK_SUCCESS` | The frame was applied and every track written | Tracks written |
+| `SUSHITRACK_BUFFER_OVERFLOW` | The frame was applied; tracks past `max_tracks` were left out, lowest priority first, and a warning logged | `max_tracks` |
+| `SUSHITRACK_INVALID_ARGUMENT` | A null handle or `out_count`, a negative count, or a null array with a positive count; nothing was applied | 0 |
+| `SUSHITRACK_OUT_OF_MEMORY`, `SUSHITRACK_RUNTIME_ERROR` | The update failed and logged an error; the frame may be partly applied | 0 |
+
+`sushitrack_get_tracklets` reports the same statuses for the tracks the tracker holds.
 
 The track-output `feat` pointer references memory owned by the tracker and is only valid until the next `sushitrack_update` or `sushitrack_destroy`.
 

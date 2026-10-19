@@ -75,7 +75,10 @@ namespace
         for (int i = 0; i < n_frames; ++i)
         {
             sushitrack_object_t d = make_det(100.0f + 2.0f * i, 200.0f + 2.0f * i);
-            sushitrack_update(hdl, &d, 1, out.data(), static_cast<int>(out.size()), dt);
+            int count = 0;
+            EXPECT_EQ(
+                sushitrack_update(hdl, &d, 1, out.data(), static_cast<int>(out.size()), dt, &count),
+                SUSHITRACK_SUCCESS);
         }
     }
 
@@ -135,75 +138,118 @@ TEST(Small_SushiTrackCInvalidArgumentStandaloneTest, CreateWithNullParamsAutoLoa
 }
 
 /**
- * @brief CreateEx with a null params pointer must report INVALID_ARGUMENT and
- *        leave the out handle untouched (or null).
+ * @brief CreateEx with a null params pointer reports INVALID_ARGUMENT and sets the out handle to
+ *        null.
  */
-TEST(Small_SushiTrackCInvalidArgumentStandaloneTest, CreateExNullParamsPropagatesStatusViaOutHandle)
+TEST(Small_SushiTrackCInvalidArgumentStandaloneTest, CreateExNullParamsSetsTheOutHandleToNull)
 {
     sushitrack_tracker_t hdl =
         reinterpret_cast<sushitrack_tracker_t>(static_cast<uintptr_t>(0xDEADBEEFul));
     sushitrack_status_t status = sushitrack_create_ex(nullptr, &hdl);
     EXPECT_EQ(status, SUSHITRACK_INVALID_ARGUMENT);
+    EXPECT_EQ(hdl, nullptr);
 }
 
 /**
- * @brief Update with a null tracker handle must not crash; the returned count
- *        must be non-positive (zero or a negative status indicator).
+ * @brief Update with a null tracker handle reports INVALID_ARGUMENT and writes no track.
  */
-TEST_F(Small_SushiTrackCInvalidArgumentTest, UpdateWithNullHandleReturnsNonPositive)
+TEST_F(Small_SushiTrackCInvalidArgumentTest, UpdateWithNullHandleReturnsInvalidArgument)
 {
     std::vector<sushitrack_track_t> out(4);
     sushitrack_object_t d = make_det(10.0f, 20.0f);
-    int n = sushitrack_update(nullptr, &d, 1, out.data(), static_cast<int>(out.size()), 0.04f);
-    EXPECT_LE(n, 0);
+    int count = -1;
+    EXPECT_EQ(
+        sushitrack_update(nullptr, &d, 1, out.data(), static_cast<int>(out.size()), 0.04f, &count),
+        SUSHITRACK_INVALID_ARGUMENT);
+    EXPECT_EQ(count, 0);
 }
 
 /**
- * @brief Update with a null detection array and positive n_objects must be
- *        treated as misuse; the returned count must be non-positive.
+ * @brief Update with a null detection array and a positive n_objects reports INVALID_ARGUMENT.
  */
 TEST_F(Small_SushiTrackCInvalidArgumentTest,
-       UpdateWithNullDetectionsAndPositiveCountReturnsNonPositive)
+       UpdateWithNullDetectionsAndPositiveCountReturnsInvalidArgument)
 {
     std::vector<sushitrack_track_t> out(4);
-    int n = sushitrack_update(hdl_, nullptr, 1, out.data(), static_cast<int>(out.size()), 0.04f);
-    EXPECT_LE(n, 0);
+    int count = -1;
+    EXPECT_EQ(sushitrack_update(hdl_, nullptr, 1, out.data(), static_cast<int>(out.size()), 0.04f,
+                                &count),
+              SUSHITRACK_INVALID_ARGUMENT);
+    EXPECT_EQ(count, 0);
 }
 
 /**
- * @brief Update with a null output buffer and positive max_tracks must be
- *        treated as misuse; the returned count must be non-positive.
+ * @brief Update with a null output buffer and a positive max_tracks reports INVALID_ARGUMENT.
  */
 TEST_F(Small_SushiTrackCInvalidArgumentTest,
-       UpdateWithNullOutputBufferAndPositiveMaxReturnsNonPositive)
+       UpdateWithNullOutputBufferAndPositiveMaxReturnsInvalidArgument)
 {
     sushitrack_object_t d = make_det(10.0f, 20.0f);
-    int n = sushitrack_update(hdl_, &d, 1, nullptr, 4, 0.04f);
-    EXPECT_LE(n, 0);
+    int count = -1;
+    EXPECT_EQ(sushitrack_update(hdl_, &d, 1, nullptr, 4, 0.04f, &count),
+              SUSHITRACK_INVALID_ARGUMENT);
+    EXPECT_EQ(count, 0);
 }
 
 /**
- * @brief Update with a negative n_objects must not crash; the returned count
- *        must be non-positive.
+ * @brief Update with a negative n_objects reports INVALID_ARGUMENT.
  */
-TEST_F(Small_SushiTrackCInvalidArgumentTest, UpdateWithNegativeObjectCountReturnsNonPositive)
+TEST_F(Small_SushiTrackCInvalidArgumentTest, UpdateWithNegativeObjectCountReturnsInvalidArgument)
 {
     std::vector<sushitrack_track_t> out(4);
     sushitrack_object_t d = make_det(10.0f, 20.0f);
-    int n = sushitrack_update(hdl_, &d, -1, out.data(), static_cast<int>(out.size()), 0.04f);
-    EXPECT_LE(n, 0);
+    int count = -1;
+    EXPECT_EQ(
+        sushitrack_update(hdl_, &d, -1, out.data(), static_cast<int>(out.size()), 0.04f, &count),
+        SUSHITRACK_INVALID_ARGUMENT);
+    EXPECT_EQ(count, 0);
 }
 
 /**
- * @brief Update with a negative max_tracks must not crash; the returned count
- *        must be non-positive.
+ * @brief Update with a negative max_tracks reports INVALID_ARGUMENT.
  */
-TEST_F(Small_SushiTrackCInvalidArgumentTest, UpdateWithNegativeMaxTracksReturnsNonPositive)
+TEST_F(Small_SushiTrackCInvalidArgumentTest, UpdateWithNegativeMaxTracksReturnsInvalidArgument)
 {
     std::vector<sushitrack_track_t> out(4);
     sushitrack_object_t d = make_det(10.0f, 20.0f);
-    int n = sushitrack_update(hdl_, &d, 1, out.data(), -1, 0.04f);
-    EXPECT_LE(n, 0);
+    int count = -1;
+    EXPECT_EQ(sushitrack_update(hdl_, &d, 1, out.data(), -1, 0.04f, &count),
+              SUSHITRACK_INVALID_ARGUMENT);
+    EXPECT_EQ(count, 0);
+}
+
+/**
+ * @brief Update with a null out_count reports INVALID_ARGUMENT.
+ */
+TEST_F(Small_SushiTrackCInvalidArgumentTest, UpdateWithNullOutCountReturnsInvalidArgument)
+{
+    std::vector<sushitrack_track_t> out(4);
+    sushitrack_object_t d = make_det(10.0f, 20.0f);
+    EXPECT_EQ(
+        sushitrack_update(hdl_, &d, 1, out.data(), static_cast<int>(out.size()), 0.04f, nullptr),
+        SUSHITRACK_INVALID_ARGUMENT);
+}
+
+/**
+ * @brief GetTracklets with a null tracker handle reports INVALID_ARGUMENT and writes no track.
+ */
+TEST_F(Small_SushiTrackCInvalidArgumentTest, GetTrackletsWithNullHandleReturnsInvalidArgument)
+{
+    std::vector<sushitrack_track_t> out(4);
+    int count = -1;
+    EXPECT_EQ(sushitrack_get_tracklets(nullptr, out.data(), static_cast<int>(out.size()), &count),
+              SUSHITRACK_INVALID_ARGUMENT);
+    EXPECT_EQ(count, 0);
+}
+
+/**
+ * @brief GetTracklets with a null out_count reports INVALID_ARGUMENT.
+ */
+TEST_F(Small_SushiTrackCInvalidArgumentTest, GetTrackletsWithNullOutCountReturnsInvalidArgument)
+{
+    std::vector<sushitrack_track_t> out(4);
+    EXPECT_EQ(sushitrack_get_tracklets(hdl_, out.data(), static_cast<int>(out.size()), nullptr),
+              SUSHITRACK_INVALID_ARGUMENT);
 }
 
 // Small_SushiTrackCParameterRangeTest
@@ -243,8 +289,11 @@ TEST_F(Small_SushiTrackCParameterRangeTest, ZeroFrameRateIsRejectedOrInert)
     ASSERT_NE(hdl, nullptr);
     std::vector<sushitrack_track_t> out(4);
     sushitrack_object_t d = make_det(10.0f, 20.0f, 0.9f);
-    int n = sushitrack_update(hdl, &d, 1, out.data(), static_cast<int>(out.size()), 0.04f);
-    EXPECT_GE(n, 0);
+    int count = -1;
+    EXPECT_EQ(
+        sushitrack_update(hdl, &d, 1, out.data(), static_cast<int>(out.size()), 0.04f, &count),
+        SUSHITRACK_SUCCESS);
+    EXPECT_GE(count, 0);
     sushitrack_destroy(hdl);
 }
 
@@ -313,8 +362,11 @@ TEST_F(Small_SushiTrackCParameterRangeTest, TrackThreshGreaterThanHighThreshDoes
 
     std::vector<sushitrack_track_t> out(4);
     sushitrack_object_t d = make_det(10.0f, 20.0f, 0.5f);
-    int n = sushitrack_update(hdl, &d, 1, out.data(), static_cast<int>(out.size()), 0.04f);
-    EXPECT_GE(n, 0);
+    int count = -1;
+    EXPECT_EQ(
+        sushitrack_update(hdl, &d, 1, out.data(), static_cast<int>(out.size()), 0.04f, &count),
+        SUSHITRACK_SUCCESS);
+    EXPECT_GE(count, 0);
 
     sushitrack_destroy(hdl);
 }
@@ -346,22 +398,27 @@ class Small_SushiTrackCBufferCapacityTest : public ::testing::Test
 };
 
 /**
- * @brief max_tracks=0 must produce a zero result regardless of detection count;
- *        the tracker cannot legally write to a zero-capacity buffer.
+ * @brief A null buffer of capacity zero is accepted: the frame is applied and the track it makes
+ *        is reported through BUFFER_OVERFLOW with nothing written.
  */
-TEST_F(Small_SushiTrackCBufferCapacityTest, ZeroMaxTracksProducesZeroReturn)
+TEST_F(Small_SushiTrackCBufferCapacityTest, ZeroMaxTracksAppliesTheFrameAndReportsOverflow)
 {
     sushitrack_object_t d = make_det(10.0f, 20.0f);
-    sushitrack_track_t dummy{};
-    int n = sushitrack_update(hdl_, &d, 1, &dummy, 0, 0.04f);
-    EXPECT_LE(n, 0);
+    int count = -1;
+    EXPECT_EQ(sushitrack_update(hdl_, &d, 1, nullptr, 0, 0.04f, &count),
+              SUSHITRACK_BUFFER_OVERFLOW);
+    EXPECT_EQ(count, 0);
+
+    std::vector<sushitrack_track_t> out(4);
+    EXPECT_EQ(sushitrack_get_tracklets(hdl_, out.data(), static_cast<int>(out.size()), &count),
+              SUSHITRACK_SUCCESS);
+    EXPECT_EQ(count, 1);
 }
 
 /**
- * @brief The returned count must never exceed the capacity passed in
- *        max_tracks, even when many detections promote simultaneously.
+ * @brief More tracks than the buffer holds fill it and return BUFFER_OVERFLOW.
  */
-TEST_F(Small_SushiTrackCBufferCapacityTest, ReturnedCountIsBoundedByCapacity)
+TEST_F(Small_SushiTrackCBufferCapacityTest, TracksPastTheCapacityReturnBufferOverflow)
 {
     constexpr int K_DETECTIONS = 12;
     constexpr int K_CAPACITY = 3;
@@ -372,23 +429,30 @@ TEST_F(Small_SushiTrackCBufferCapacityTest, ReturnedCountIsBoundedByCapacity)
         dets.push_back(make_det(50.0f + 200.0f * i, 50.0f + 200.0f * i));
 
     std::vector<sushitrack_track_t> out(K_CAPACITY);
-    int n = sushitrack_update(hdl_, dets.data(), K_DETECTIONS, out.data(), K_CAPACITY, 0.04f);
-
-    EXPECT_LE(n, K_CAPACITY);
-    EXPECT_GE(n, 0);
+    int count = -1;
+    EXPECT_EQ(
+        sushitrack_update(hdl_, dets.data(), K_DETECTIONS, out.data(), K_CAPACITY, 0.04f, &count),
+        SUSHITRACK_BUFFER_OVERFLOW);
+    EXPECT_EQ(count, K_CAPACITY);
 }
 
 /**
- * @brief DISABLED. Documents the desired BUFFER_OVERFLOW semantics for future
- *        work: when the internal active-track count exceeds max_tracks, an
- *        accompanying status channel should signal SUSHITRACK_BUFFER_OVERFLOW
- *        rather than silently truncating.
- *
+ * @brief Tracks that fit the buffer return SUCCESS with every track written.
  */
-TEST_F(Small_SushiTrackCBufferCapacityTest, DISABLED_BufferOverflowReturnsErrorCode)
+TEST_F(Small_SushiTrackCBufferCapacityTest, TracksWithinTheCapacityReturnSuccess)
 {
-    // Note: Wire sushitrack_update_ex with status pointer; assert *status == SUSHITRACK_BUFFER_OVERFLOW when truncation occurs.
-    FAIL() << "Pending sushitrack_update_ex with status channel.";
+    constexpr int K_DETECTIONS = 3;
+
+    std::vector<sushitrack_object_t> dets;
+    for (int i = 0; i < K_DETECTIONS; ++i)
+        dets.push_back(make_det(50.0f + 200.0f * i, 50.0f + 200.0f * i));
+
+    std::vector<sushitrack_track_t> out(K_DETECTIONS);
+    int count = -1;
+    EXPECT_EQ(
+        sushitrack_update(hdl_, dets.data(), K_DETECTIONS, out.data(), K_DETECTIONS, 0.04f, &count),
+        SUSHITRACK_SUCCESS);
+    EXPECT_EQ(count, K_DETECTIONS);
 }
 
 // Small_SushiTrackCLifecycleSafetyTest
@@ -435,12 +499,12 @@ TEST(Small_SushiTrackCStatusCodeCoverageTest, DISABLED_InitFailureReturnsInitial
 
 /**
  * @brief DISABLED. Documents the desired propagation path for
- *        SUSHITRACK_RUNTIME_ERROR via a future UpdateEx variant.
+ *        SUSHITRACK_RUNTIME_ERROR from sushitrack_update.
  */
 TEST(Small_SushiTrackCStatusCodeCoverageTest, DISABLED_RuntimeErrorReturnsRuntimeErrorCode)
 {
-    // Note: When sushitrack_update_ex is added, assert that an exception caught inside the C bridge surfaces as SUSHITRACK_RUNTIME_ERROR.
-    FAIL() << "Pending sushitrack_update_ex with status channel.";
+    // Note: Inject an exception into Tracker::update and assert sushitrack_update returns SUSHITRACK_RUNTIME_ERROR with a count of 0.
+    FAIL() << "Pending a fault-injection hook inside the tracker.";
 }
 
 /**
@@ -508,10 +572,12 @@ TEST_F(Small_SushiTrackCBoundaryExceptionTest, UpdateSurvivesAThrowingSink)
     std::vector<sushitrack_track_t> out(4);
     sushitrack_object_t d = make_det(10.0f, 20.0f);
 
-    int n = -1;
-    EXPECT_NO_THROW(
-        n = sushitrack_update(hdl_, &d, 1, out.data(), static_cast<int>(out.size()), 0.04f));
-    EXPECT_EQ(n, 1);
+    int count = -1;
+    sushitrack_status_t status = SUSHITRACK_RUNTIME_ERROR;
+    EXPECT_NO_THROW(status = sushitrack_update(hdl_, &d, 1, out.data(),
+                                               static_cast<int>(out.size()), 0.04f, &count));
+    EXPECT_EQ(status, SUSHITRACK_SUCCESS);
+    EXPECT_EQ(count, 1);
 }
 
 /**
@@ -525,11 +591,15 @@ TEST_F(Small_SushiTrackCBoundaryExceptionTest, GetTrackletsSurvivesAThrowingSink
         dets.push_back(make_det(50.0f + 400.0f * i, 50.0f + 400.0f * i));
 
     std::vector<sushitrack_track_t> out(8);
-    sushitrack_update(hdl_, dets.data(), 3, out.data(), static_cast<int>(out.size()), 0.04f);
+    int count = -1;
+    EXPECT_EQ(sushitrack_update(hdl_, dets.data(), 3, out.data(), static_cast<int>(out.size()),
+                                0.04f, &count),
+              SUSHITRACK_SUCCESS);
 
-    int n = -1;
-    EXPECT_NO_THROW(n = sushitrack_get_tracklets(hdl_, out.data(), 1));
-    EXPECT_EQ(n, 1);
+    sushitrack_status_t status = SUSHITRACK_RUNTIME_ERROR;
+    EXPECT_NO_THROW(status = sushitrack_get_tracklets(hdl_, out.data(), 1, &count));
+    EXPECT_EQ(status, SUSHITRACK_BUFFER_OVERFLOW);
+    EXPECT_EQ(count, 1);
 }
 
 /**

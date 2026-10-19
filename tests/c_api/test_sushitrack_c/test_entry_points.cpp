@@ -33,6 +33,8 @@
 
 #include <SushiTrack/c_api/sushitrack_c.h>
 
+#include <c_detection_builders.hpp>
+
 #include <captured_log.hpp>
 
 /**
@@ -172,9 +174,9 @@ class Small_SushiTrackCUpdateTest : public ::testing::Test
          */
         void confirm_track(std::vector<sushitrack_track_t>& out)
         {
-            sushitrack_update(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
-            sushitrack_update(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
-            sushitrack_update(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
+            CDetections::update_frame(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
+            CDetections::update_frame(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
+            CDetections::update_frame(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
             ASSERT_EQ(out[0].state, 1) << "Precondition: track must reach Tracked state";
         }
 };
@@ -185,7 +187,7 @@ class Small_SushiTrackCUpdateTest : public ::testing::Test
 TEST_F(Small_SushiTrackCUpdateTest, ZeroDetectionsOnEmptyTrackerReturnsZero)
 {
     std::vector<sushitrack_track_t> out(10);
-    int n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
     EXPECT_EQ(n, 0);
 }
 
@@ -196,7 +198,7 @@ TEST_F(Small_SushiTrackCUpdateTest, ReturnValueDoesNotExceedMaxTracks)
 {
     std::vector<sushitrack_track_t> out(1);
     sushitrack_object_t d0 = det(100.0f, 200.0f);
-    int n = sushitrack_update(hdl_, &d0, 1, out.data(), 1, 0.04f);
+    int n = CDetections::update_frame(hdl_, &d0, 1, out.data(), 1, 0.04f);
     EXPECT_LE(n, 1);
 }
 
@@ -207,7 +209,7 @@ TEST_F(Small_SushiTrackCUpdateTest, NewDetectionProducesNonZeroTrackId)
 {
     std::vector<sushitrack_track_t> out(10);
     sushitrack_object_t d0 = det(100.0f, 200.0f);
-    sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, &d0, 1, out.data(), 10, 0.04f);
     EXPECT_NE(out[0].track_id, 0);
 }
 
@@ -230,13 +232,13 @@ TEST_F(Small_SushiTrackCUpdateTest, RemovedTrackAbsentFromNextUpdate)
     std::vector<sushitrack_track_t> out(10);
     confirm_track(out);
 
-    sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
 
-    int n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 5.0f);
+    int n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 5.0f);
     ASSERT_EQ(n, 1);
     ASSERT_EQ(out[0].state, 3) << "Precondition: track must reach Removed state";
 
-    int n2 = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    int n2 = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
     EXPECT_EQ(n2, 0);
 }
 

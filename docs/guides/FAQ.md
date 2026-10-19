@@ -99,7 +99,8 @@ shared library. The header includes `SushiTrack/c_api/sushitrack_export.hpp`, wh
 macros only, and nothing else from the library, so a C consumer needs no Eigen and no C++ header.
 Fill a `sushitrack_params_t` with `sushitrack_get_default_params`, create the tracker with
 `sushitrack_create_ex`, and call `sushitrack_update` once per frame with an array of
-`sushitrack_object_t`; it returns the number of `sushitrack_track_t` records written. The
+`sushitrack_object_t`; it returns a `sushitrack_status_t` and writes the number of
+`sushitrack_track_t` records through its last argument. The
 [C API reference](../reference/C_API.md) has the status codes and the track fields.
 
 `st build --deploy cpp` assembles `package/` with the headers, the library, a default
@@ -184,12 +185,10 @@ The manual states these limits:
 - The C API does not report which input detection produced each track.
 - No Ultralytics adapter is shipped. [Ultralytics integration](ULTRALYTICS_INTEGRATION.md) is a
   recipe whose snippets you copy into your own project.
-- No built Docker image is published, and `st deploy` copies no licence file into `package/`.
+- No built Docker image is published.
 
 Contributions from outside Sushi Systems are not accepted yet. Recorded defects are in
-[Known issues](../reference/KNOWN_ISSUES.md); among them, `sushitrack_update` returns 0 both on a
-caught exception and on a rejected argument, which a caller cannot tell from a frame with no
-tracks, and no CI workflow exists.
+[Known issues](../reference/KNOWN_ISSUES.md).
 
 ## How is SushiTrack licensed?
 

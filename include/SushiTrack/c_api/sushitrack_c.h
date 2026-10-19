@@ -192,9 +192,9 @@ extern "C"
     SUSHITRACK_API sushitrack_tracker_t sushitrack_create_from_config(const char* path);
 
     /**
-     * @brief Extended instantiation providing status code feedback.
+     * @brief Instantiates a tracker and reports why it could not.
      * @param params Pointer to configuration structure.
-     * @param out_tracker Pointer to receive initialized tracker handle.
+     * @param out_tracker Receives the tracker handle; set to NULL on every failure.
      * @return Status code indicating success or failure reason.
      */
     SUSHITRACK_API sushitrack_status_t sushitrack_create_ex(const sushitrack_params_t* params,
@@ -213,25 +213,29 @@ extern "C"
     SUSHITRACK_API void sushitrack_destroy_tracker(sushitrack_tracker_t tracker);
 
     /**
-     * @brief Updates internal track states with new frame detections.
-     * @param tracker Valid tracker instance handle.
-     * @param objects Detection array; NULL when n_objects is zero.
-     * @param out_tracks Pre-allocated buffer receiving active tracks.
-     * @return Count of active tracks written into out_tracks.
+     * @brief Applies one frame of detections and writes the tracks it leaves.
+     * @param objects Detection array; NULL only when n_objects is zero.
+     * @param out_tracks Track buffer; NULL only when max_tracks is zero.
+     * @param out_count Receives the tracks written; 0 unless the status is SUCCESS or
+     *        BUFFER_OVERFLOW, which means the frame was applied and lower-priority tracks left out.
+     * @return SUCCESS, BUFFER_OVERFLOW, INVALID_ARGUMENT, OUT_OF_MEMORY or RUNTIME_ERROR.
      */
-    SUSHITRACK_API int sushitrack_update(sushitrack_tracker_t tracker,
-                                         const sushitrack_object_t* objects, int n_objects,
-                                         sushitrack_track_t* out_tracks, int max_tracks, float dt);
+    SUSHITRACK_API sushitrack_status_t sushitrack_update(sushitrack_tracker_t tracker,
+                                                         const sushitrack_object_t* objects,
+                                                         int n_objects,
+                                                         sushitrack_track_t* out_tracks,
+                                                         int max_tracks, float dt, int* out_count);
 
     /**
-     * @brief Retrieves currently managed tracklets from the tracker.
-     * @param tracker Handle to tracker instance.
-     * @param out_tracks Array to receive output track state structures.
-     * @param max_tracks Maximum capacity of out_tracks array.
-     * @return Number of tracklets written to output array.
+     * @brief Writes the tracks the tracker holds, in the order sushitrack_update writes them.
+     * @param out_tracks Track buffer; NULL only when max_tracks is zero.
+     * @param out_count Receives the tracks written; 0 unless the status is SUCCESS or
+     *        BUFFER_OVERFLOW, which means lower-priority tracks were left out.
+     * @return SUCCESS, BUFFER_OVERFLOW, INVALID_ARGUMENT, OUT_OF_MEMORY or RUNTIME_ERROR.
      */
-    SUSHITRACK_API int sushitrack_get_tracklets(sushitrack_tracker_t tracker,
-                                                sushitrack_track_t* out_tracks, int max_tracks);
+    SUSHITRACK_API sushitrack_status_t sushitrack_get_tracklets(sushitrack_tracker_t tracker,
+                                                                sushitrack_track_t* out_tracks,
+                                                                int max_tracks, int* out_count);
 
     /**
      * @brief Overlays a JSON configuration file onto a parameters structure.

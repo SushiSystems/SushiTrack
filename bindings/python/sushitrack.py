@@ -319,6 +319,7 @@ class _NativeBindings:
                 POINTER(SushiTrackTrack),
                 c_int,
                 c_float,
+                POINTER(c_int),
             ]
             self.update.restype = c_int
 
@@ -407,7 +408,13 @@ class Tracker:
         self._out = (SushiTrackTrack * self._cap)()
 
     def update(self, detections: Iterable[Sequence[Any]], dt: float = 1.0) -> list[Track]:
-        """Processes one frame of detections and returns active tracks."""
+        """Processes one frame of detections and returns active tracks.
+
+        Returns at most max_tracks tracks, the lowest-priority ones left out.
+
+        Raises:
+            SushiTrackError: The native update returned a failure status.
+        """
         if self._hdl is None or not self._hdl.value:
             raise SushiTrackError("update() called on an uninitialized or closed tracker")
 
@@ -434,10 +441,13 @@ class Tracker:
                 item.feat = None
                 item.feat_dim = 0
 
-        written = self._bind.update(
-            self._hdl, arr, n, self._out, self._cap, c_float(dt)
+        written = c_int(0)
+        status = self._bind.update(
+            self._hdl, arr, n, self._out, self._cap, c_float(dt), C.byref(written)
         )
-        return [self._to_track(self._out[i]) for i in range(written)]
+        if status not in (Status.SUCCESS, Status.BUFFER_OVERFLOW):
+            raise SushiTrackError(f"update() of {n} detections failed: {Status(status).name}")
+        return [self._to_track(self._out[i]) for i in range(written.value)]
 
     @staticmethod
     def _to_track(t: SushiTrackTrack) -> Track:

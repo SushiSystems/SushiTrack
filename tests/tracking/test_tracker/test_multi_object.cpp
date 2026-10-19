@@ -99,8 +99,8 @@ namespace
 
         // Frame 0: seed.
         auto f0 = build_frame(0);
-        int n0 = sushitrack_update(hdl_, f0.data(), K_COUNT, out.data(),
-                                   static_cast<int>(out.size()), 0.04f);
+        int n0 = CDetections::update_frame(hdl_, f0.data(), K_COUNT, out.data(),
+                                           static_cast<int>(out.size()), 0.04f);
         ASSERT_EQ(n0, K_COUNT) << "Not every object produced a track on seed frame.";
 
         std::set<int64_t> seed_ids;
@@ -113,8 +113,8 @@ namespace
         for (int frame = 1; frame < K_FRAMES; ++frame)
         {
             auto f = build_frame(frame);
-            int n = sushitrack_update(hdl_, f.data(), K_COUNT, out.data(),
-                                      static_cast<int>(out.size()), 0.04f);
+            int n = CDetections::update_frame(hdl_, f.data(), K_COUNT, out.data(),
+                                              static_cast<int>(out.size()), 0.04f);
             ASSERT_EQ(n, K_COUNT) << "Object count changed at frame " << frame;
 
             std::set<int64_t> ids;
@@ -147,7 +147,7 @@ namespace
         sushitrack_object_t l0 = make_det(lx, y_left);
         sushitrack_object_t r0 = make_det(rx, y_right);
         sushitrack_object_t d0[2] = {l0, r0};
-        int n0 = sushitrack_update(hdl_, d0, 2, out.data(), 8, 0.04f);
+        int n0 = CDetections::update_frame(hdl_, d0, 2, out.data(), 8, 0.04f);
         ASSERT_GE(n0, 2);
 
         int64_t id_left = -1, id_right = -1;
@@ -171,7 +171,7 @@ namespace
             sushitrack_object_t l = make_det(lx, y_left);
             sushitrack_object_t r = make_det(rx, y_right);
             sushitrack_object_t d[2] = {l, r};
-            int n = sushitrack_update(hdl_, d, 2, out.data(), 8, 0.04f);
+            int n = CDetections::update_frame(hdl_, d, 2, out.data(), 8, 0.04f);
             ASSERT_GE(n, 2);
 
             const sushitrack_track_t* tl = find_by_id(out, n, id_left);
@@ -206,14 +206,15 @@ namespace
         for (int f = 0; f < 3; ++f)
         {
             auto d = frame(f);
-            int n = sushitrack_update(hdl_, d.data(), K_OBJECTS, out.data(), K_OBJECTS, 0.04f);
+            int n =
+                CDetections::update_frame(hdl_, d.data(), K_OBJECTS, out.data(), K_OBJECTS, 0.04f);
             ASSERT_GE(n, 1);
         }
 
         // Now request the same frame but only allow room for half the tracks.
         constexpr int K_CAP = 3;
         auto d = frame(3);
-        int n = sushitrack_update(hdl_, d.data(), K_OBJECTS, out.data(), K_CAP, 0.04f);
+        int n = CDetections::update_frame(hdl_, d.data(), K_OBJECTS, out.data(), K_CAP, 0.04f);
 
         EXPECT_LE(n, K_CAP) << "Update wrote more tracks than max_tracks permitted.";
         EXPECT_EQ(n, K_CAP) << "With six active tracks and capacity three, exactly "

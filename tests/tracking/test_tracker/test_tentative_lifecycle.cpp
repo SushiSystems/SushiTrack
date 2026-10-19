@@ -31,6 +31,8 @@
 
 #include <SushiTrack/c_api/sushitrack_c.h>
 
+#include <c_detection_builders.hpp>
+
 // Small_TrackerTentativeInitSuppressTest — tentative_init_suppress_iou (#8)
 
 namespace
@@ -68,9 +70,9 @@ namespace
     /** @brief Confirms a single track over three matched frames at (100,200)->(104,204). */
     void confirm_track(sushitrack_tracker_t hdl, std::vector<sushitrack_track_t>& out)
     {
-        sushitrack_update(hdl, &obj(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
-        sushitrack_update(hdl, &obj(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
-        int n = sushitrack_update(hdl, &obj(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
+        CDetections::update_frame(hdl, &obj(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
+        CDetections::update_frame(hdl, &obj(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
+        int n = CDetections::update_frame(hdl, &obj(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
         ASSERT_EQ(n, 1);
         ASSERT_EQ(out[0].state, 1);
     }
@@ -138,18 +140,18 @@ TEST_F(Small_TrackerTentativeTest, AgesOutViaSecondsBudgetWhenTimeAware)
     std::vector<sushitrack_track_t> out(10);
     sushitrack_object_t d0 = det(100.0f, 200.0f);
 
-    int n = sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, &d0, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 4);
     EXPECT_EQ(out[0].is_confirmed, 0);
     EXPECT_EQ(out[0].hits, 1);
 
-    n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f); // lost_time 0.04
+    n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f); // lost_time 0.04
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 4);
     EXPECT_FLOAT_EQ(out[0].lost_time, 0.04f);
 
-    n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.05f); // lost_time 0.09 > 0.08
+    n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.05f); // lost_time 0.09 > 0.08
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 3);
     EXPECT_FLOAT_EQ(out[0].lost_time, 0.09f);
@@ -188,19 +190,19 @@ TEST(Small_TrackerTentativeFrameBudgetTest, AgesOutViaFrameBudgetWhenFrameAware)
     o.score = 0.9f;
     o.label = 1;
 
-    int n = sushitrack_update(hdl, &o, 1, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl, &o, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 4);
 
-    n = sushitrack_update(hdl, nullptr, 0, out.data(), 10, 0.05f); // 1st miss, dt ignored
+    n = CDetections::update_frame(hdl, nullptr, 0, out.data(), 10, 0.05f); // 1st miss, dt ignored
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 4);
 
-    n = sushitrack_update(hdl, nullptr, 0, out.data(), 10, 0.50f); // 2nd miss, dt ignored
+    n = CDetections::update_frame(hdl, nullptr, 0, out.data(), 10, 0.50f); // 2nd miss, dt ignored
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 4);
 
-    n = sushitrack_update(hdl, nullptr, 0, out.data(), 10, 0.01f); // 3rd miss, removed
+    n = CDetections::update_frame(hdl, nullptr, 0, out.data(), 10, 0.01f); // 3rd miss, removed
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 3);
 
@@ -217,10 +219,10 @@ TEST_F(Small_TrackerTentativeTest, PromotedToTrackedAtHitThreshold)
 {
     std::vector<sushitrack_track_t> out(10);
 
-    sushitrack_update(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
-    sushitrack_update(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
 
-    int n = sushitrack_update(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 1);
     EXPECT_EQ(out[0].is_confirmed, 1);
@@ -240,18 +242,18 @@ TEST_F(Small_TrackerTentativeTest, PartialHitSequenceResetsLostTimeOnMatch)
     std::vector<sushitrack_track_t> out(10);
     sushitrack_object_t d0 = det(100.0f, 200.0f);
 
-    int n = sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, &d0, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 4);
     EXPECT_EQ(out[0].hits, 1);
     EXPECT_FLOAT_EQ(out[0].lost_time, 0.0f);
 
-    n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 4);
     EXPECT_FLOAT_EQ(out[0].lost_time, 0.04f);
 
-    n = sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
+    n = CDetections::update_frame(hdl_, &d0, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 4);
     EXPECT_EQ(out[0].hits, 2);
@@ -270,9 +272,9 @@ TEST_F(Small_TrackerTentativeTest, SingleMissDoesNotExpire)
     std::vector<sushitrack_track_t> out(10);
     sushitrack_object_t d0 = det(100.0f, 200.0f);
 
-    sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, &d0, 1, out.data(), 10, 0.04f);
 
-    int n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.08f);
+    int n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.08f);
     ASSERT_EQ(n, 1);
     EXPECT_NE(out[0].state, 1);
     EXPECT_FLOAT_EQ(out[0].lost_time, 0.08f);
@@ -293,11 +295,11 @@ TEST_F(Small_TrackerTentativeTest, TwoSimultaneousTentativeTracksIndependent)
     both[0] = det(100.0f, 200.0f);
     both[1] = det(700.0f, 500.0f);
 
-    int n = sushitrack_update(hdl_, both, 2, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, both, 2, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 2);
 
     sushitrack_object_t first = det(100.0f, 200.0f);
-    n = sushitrack_update(hdl_, &first, 1, out.data(), 10, 0.04f);
+    n = CDetections::update_frame(hdl_, &first, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 2);
 
     int hits2_count = 0;
@@ -321,14 +323,14 @@ TEST_F(Small_TrackerTentativeTest, TentativePromotedTrackPersistsAfterPromotion)
 {
     std::vector<sushitrack_track_t> out(10);
 
-    sushitrack_update(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
-    sushitrack_update(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
-    int n = sushitrack_update(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 1);
     int64_t promoted_id = out[0].track_id;
 
-    n = sushitrack_update(hdl_, &det(106.0f, 206.0f), 1, out.data(), 10, 0.04f);
+    n = CDetections::update_frame(hdl_, &det(106.0f, 206.0f), 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].track_id, promoted_id);
     EXPECT_EQ(out[0].state, 1);
@@ -353,7 +355,7 @@ TEST(Small_TrackerTentativeInitSuppressTest, OverlappingDetectionDoesNotInitNewT
     confirm_track(hdl, out);
 
     sushitrack_object_t pair[2] = {obj(106.0f, 206.0f), obj(111.0f, 206.0f)};
-    int n = sushitrack_update(hdl, pair, 2, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl, pair, 2, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 1);
 
@@ -378,7 +380,7 @@ TEST(Small_TrackerTentativeInitSuppressTest, OverlappingDetectionInitsTentativeW
     confirm_track(hdl, out);
 
     sushitrack_object_t pair[2] = {obj(106.0f, 206.0f), obj(111.0f, 206.0f)};
-    int n = sushitrack_update(hdl, pair, 2, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl, pair, 2, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 2);
 
     int confirmed = 0, tentative = 0;
@@ -451,7 +453,7 @@ TEST_F(Small_TrackerTentativeDisabledTest, WithTentativeDisabledNewTrackIsImmedi
     std::vector<sushitrack_track_t> out(10);
     sushitrack_object_t d0 = det(100.0f, 200.0f);
 
-    int n = sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, &d0, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 1);
     EXPECT_EQ(out[0].is_confirmed, 1);

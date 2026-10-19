@@ -98,7 +98,7 @@ namespace
         for (int i = 0; i < 10; ++i)
         {
             sushitrack_object_t d = make_det(100.0f, 200.0f); // never moves
-            int n = sushitrack_update(hdl_, &d, 1, out.data(), 4, 0.04f);
+            int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 4, 0.04f);
             ASSERT_GE(n, 1);
             id = out[0].track_id;
             last_state = out[0].kinematic_state;
@@ -128,7 +128,7 @@ namespace
             v = std::min(5.0f, v + 0.25f);
             x += v;
             sushitrack_object_t d = make_det(x, 200.0f);
-            int n = sushitrack_update(hdl_, &d, 1, out.data(), 4, 0.04f);
+            int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 4, 0.04f);
             ASSERT_GE(n, 1);
             id = out[0].track_id;
             last_state = out[0].kinematic_state;
@@ -150,7 +150,7 @@ namespace
         for (int i = 0; i < 6; ++i)
         {
             sushitrack_object_t d = make_det(100.0f, 200.0f);
-            int n = sushitrack_update(hdl_, &d, 1, out.data(), 4, 0.04f);
+            int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 4, 0.04f);
             ASSERT_GE(n, 1);
         }
 
@@ -161,7 +161,7 @@ namespace
         {
             x += 15.0f;
             sushitrack_object_t d = make_det(x, 200.0f);
-            int n = sushitrack_update(hdl_, &d, 1, out.data(), 4, 0.04f);
+            int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 4, 0.04f);
             ASSERT_GE(n, 1);
             if (out[0].kinematic_state == K_MANEUVERING)
                 saw_maneuver = true;
@@ -185,7 +185,7 @@ namespace
         for (int i = 0; i < 8; ++i)
         {
             sushitrack_object_t d = make_det(x, 200.0f);
-            int n = sushitrack_update(hdl_, &d, 1, out.data(), 8, 0.04f);
+            int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 8, 0.04f);
             ASSERT_GE(n, 1);
             id = out[0].track_id;
             x += 4.0f;
@@ -196,7 +196,7 @@ namespace
         int coasting_state = -1;
         for (int i = 0; i < 3; ++i)
         {
-            int n = sushitrack_update(hdl_, nullptr, 0, out.data(), 8, 0.04f);
+            int n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 8, 0.04f);
             const sushitrack_track_t* t = find_by_id(out, n, id);
             ASSERT_NE(t, nullptr) << "Lost track dropped from output during occlusion.";
             coasting_state = t->kinematic_state;

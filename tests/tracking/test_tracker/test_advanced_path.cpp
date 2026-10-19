@@ -32,6 +32,8 @@
 
 #include <SushiTrack/c_api/sushitrack_c.h>
 
+#include <c_detection_builders.hpp>
+
 namespace
 {
 
@@ -106,7 +108,7 @@ TEST_F(Small_TrackerAdvancedPathTest, ReIDAndMahalanobisEndToEnd)
     {
         sushitrack_object_t d =
             make_det_with_feat(100.0f, 100.0f + i * 5.0f, target_feat_.data(), 512, 0.9f);
-        int n = sushitrack_update(hdl_, &d, 1, out.data(), 8, 0.04f);
+        int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 8, 0.04f);
         ASSERT_GE(n, 1);
         if (i == 2)
         {
@@ -124,7 +126,7 @@ TEST_F(Small_TrackerAdvancedPathTest, ReIDAndMahalanobisEndToEnd)
     sushitrack_object_t target = make_det_with_feat(110.0f, 115.0f, target_feat_.data(), 512, 0.9f);
 
     sushitrack_object_t dets_f4[2] = {decoy, target};
-    int n4 = sushitrack_update(hdl_, dets_f4, 2, out.data(), 8, 0.04f);
+    int n4 = CDetections::update_frame(hdl_, dets_f4, 2, out.data(), 8, 0.04f);
     ASSERT_GE(n4, 1);
 
     // Check if the true object retained the target_id
