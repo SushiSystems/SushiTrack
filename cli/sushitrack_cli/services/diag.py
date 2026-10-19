@@ -26,7 +26,7 @@ _ENV_OF_INTEREST = ("PATH", "CC", "CXX", "CMAKE", "NINJA", "INCLUDE", "LIB",
                     "VIRTUAL_ENV", "CONDA", "VSINSTALLDIR", "VSCMD",
                     "VCINSTALLDIR", "VCTOOLS", "WINDOWSSDK")
 
-_TEST_BINARIES = ("unit_test", "integration_test", "regression_test")
+_TEST_BINARIES = ("sushitrack_tests", "regression_test")
 
 
 def _mtime(path):

@@ -4,15 +4,17 @@
 # Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
 # Commercial use requires a licence from Sushi Systems.
 
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.22)
 project(sushitrack VERSION 1.0.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(SushiTrackBuildPolicy)
 include(SushiTrackEigen)
 include(SushiTrackSushiLog)
+include(SushiTrackTests)
 
-option(BUILD_MOT_TEST "Deprecated alias for BUILD_REGRESSION_TEST" OFF)
+option(SUSHITRACK_BUILD_TESTS "Build sushitrack_tests from the mirror under tests/" ON)
+option(BUILD_REGRESSION_TEST "Build the MOT regression runner and tracker_bridge" OFF)
 
 add_subdirectory(source)
 add_subdirectory(third_party/bytetrack ${PROJECT_BINARY_DIR}/bytetrack)

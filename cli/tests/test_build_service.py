@@ -73,12 +73,11 @@ def test_a_fresh_tree_is_configured_then_built(tmp_path, runner):
     assert build_svc.build(_cfg(), paths, build_type="Debug", jobs=3) == 0
     configure, compile_ = runner.calls
     assert configure == ["cmake", "-S", str(tmp_path), "-B", str(paths.build),
-                         "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Debug", "-DBUILD_MOT_TEST=OFF",
-                         "-DBUILD_UNIT_TEST=ON", "-DBUILD_REGRESSION_TEST=ON",
-                         "-DBUILD_INTEGRATION_TEST=ON"]
+                         "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Debug",
+                         "-DSUSHITRACK_BUILD_TESTS=ON", "-DBUILD_REGRESSION_TEST=ON"]
     assert compile_ == ["cmake", "--build", str(paths.build), "--config", "Debug",
                         "--parallel", "3", "--target", "sushitrack",
-                        "--target", "unit_test", "--target", "integration_test",
+                        "--target", "sushitrack_tests",
                         "--target", "regression_test", "--target", "tracker_bridge"]
 
 

@@ -15,7 +15,7 @@ from __future__ import annotations
 import sys
 import types
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import List, Optional, Sequence
 
 import typer
 from sushicore import entry as core_entry
@@ -39,7 +39,7 @@ from .services import tests as test_svc
 from .services.checks import st_checks
 from .services.build import BuildType
 from .services.deploy import DeployKind
-from .services.tests import Suite
+from .services.test_label import TestLabel
 
 K_PROJECT = "Project"
 K_BENCHMARK = "Benchmark"
@@ -108,17 +108,18 @@ def build(
 @app.command(
     "test",
     rich_help_panel=K_PROJECT,
-    epilog="st test  # functional: unit + integration + regression\n"
-           "st test --suite unit\n"
-           "st test --suite unit -f 'RectTest'\n"
-           "st test --suite integration --repeat 3\n"
-           "st test --suite all -j 8",
+    epilog="st test  # small and medium\n"
+           "st test --label small\n"
+           "st test --label small -f 'RectTest'\n"
+           "st test --label medium --repeat 3\n"
+           "st test --label large  # Needs real hardware\n"
+           "st test --label quarantined",
 )
 def test(
-    suite: Suite = typer.Option(
-        Suite(test_svc.DEFAULT_SUITE), "--suite", "-s", case_sensitive=False,
-        help="CTest label group to run ('all' runs every test). "
-             f"Default: {test_svc.DEFAULT_SUITE}."),
+    label: Optional[List[TestLabel]] = typer.Option(
+        None, "--label", "-l", case_sensitive=False,
+        help="Size label to run, repeatable: small, medium, large or quarantined. "
+             "Default: small and medium; quarantined tests run only when named."),
     filter: Optional[str] = typer.Option(
         None, "--filter", "-f", metavar="REGEX",
         help="ctest -R regex over 'Suite.Case' test names."),
@@ -130,16 +131,16 @@ def test(
         None, "--jobs", "-j", metavar="N",
         help="Run up to N tests concurrently (ctest --parallel)."),
 ):
-    """Run the test suites via CTest labels.
+    """Run the tests through CTest, selected by size label.
 
     For GTest-level knobs (shuffle, break-on-failure) run the binary directly:
-    st run unit_test -- --gtest_shuffle --gtest_break_on_failure
+    st run sushitrack_tests -- --gtest_shuffle --gtest_break_on_failure
 
     Metric evaluation and video inference are not CTest suites — see `st eval`
     and `st infer`.
     """
     cfg, paths = context()
-    raise typer.Exit(test_svc.test(cfg, paths, suite=suite.value, filter=filter,
+    raise typer.Exit(test_svc.test(cfg, paths, labels=label, filter=filter,
                                    repeat=repeat, jobs=jobs))
 
 
@@ -148,8 +149,8 @@ def test(
     rich_help_panel=K_PROJECT,
     context_settings=K_FORWARDING,
     epilog="st run  # Pick from a list\n"
-           "st run unit_test\n"
-           "st run unit_test -- --gtest_filter='TrackletTest.*'",
+           "st run sushitrack_tests\n"
+           "st run sushitrack_tests -- --gtest_filter='Small_TrackletTest.*'",
 )
 def run(
     ctx: typer.Context,

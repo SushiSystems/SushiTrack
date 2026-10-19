@@ -3,35 +3,14 @@
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
 # Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
 # Commercial use requires a licence from Sushi Systems.
-"""Test execution through CTest labels."""
-
-import enum
+"""Runs the tests of the build tree through CTest, selected by size label."""
 
 from sushicore import cmake_cache
 
 from .. import console
 from ..env import load_build_env
 from . import build as build_svc
-
-# Maps each suite to the anchored label regex `ctest -L` selects it with.
-SUITE_LABELS = {
-    "unit": "^unit$",
-    "integration": "^integration$",
-    "regression": "^regression$",
-    "functional": "^(unit|integration|regression)$",
-}
-SUITES = (*SUITE_LABELS, "all")
-DEFAULT_SUITE = "functional"
-
-
-class Suite(str, enum.Enum):
-    """The `--suite` choices for `st test`."""
-
-    unit = "unit"
-    integration = "integration"
-    regression = "regression"
-    functional = "functional"
-    all = "all"
+from .test_label import select_labels
 
 
 def _config_flag(cfg, build_dir):
@@ -41,8 +20,11 @@ def _config_flag(cfg, build_dir):
     return build_svc.normalize_build_type(cfg.build_type)
 
 
-def test(cfg, paths, suite=DEFAULT_SUITE, filter=None, repeat=0, jobs=None):
-    """Run a suite via CTest.
+def test(cfg, paths, labels=None, filter=None, repeat=0, jobs=None):
+    """Run the tests whose labels the selection names.
+
+    Args:
+        labels: The TestLabel values to run; none runs small and medium.
 
     Returns:
         ctest's exit code, or 1 when the tree is absent or stale.
@@ -59,12 +41,15 @@ def test(cfg, paths, suite=DEFAULT_SUITE, filter=None, repeat=0, jobs=None):
             f"  - run `st build --clean` to reconfigure it cleanly first.")
         return 1
 
-    console.info(f"Suite: {suite}")
+    selection = select_labels(labels)
+    console.info("Labels: " + ", ".join(
+        [size.value for size in selection.sizes] + (["quarantined"] if selection.quarantined else [])))
     code = build_svc.DRIVER.ctest_run(
-        cfg.tool, build_dir, load_build_env(cfg.tool, build_dir),
-        label_regex=None if suite == "all" else SUITE_LABELS[suite],
+        cfg.tool, build_dir, load_build_env(cfg.tool, build_dir, paths.config),
+        label_regex=selection.ctest_include(),
+        exclude_label_regex=selection.ctest_exclude(),
         filter=filter, repeat=repeat, jobs=jobs,
         config=_config_flag(cfg, build_dir))
     if code != 0:
-        console.error(f"Suite '{suite}' failed (exit {code}).")
+        console.error(f"Tests failed (exit {code}).")
     return code

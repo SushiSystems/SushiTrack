@@ -1,51 +1,39 @@
 # Building
 
-The build uses CMake with three options:
-
-| Option | Default | Effect |
-|---|---|---|
-| `BUILD_UNIT_TEST` | OFF | Compiles `unit_test` GTest executable |
-| `BUILD_REGRESSION_TEST` | OFF | Compiles `regression_test` executable and `tracker_bridge` shared library |
-| `BUILD_INTEGRATION_TEST` | OFF | Compiles `integration_test` GTest executable |
-
-Direct CMake invocation:
+`st build` configures and builds the library and, by default, the test programs. Builds go
+through `st` only: it hands CMake the pinned SushiLog and sets the paths the programs need at run
+time.
 
 ```bash
-cmake -B build -S . -G Ninja -DBUILD_UNIT_TEST=ON -DBUILD_REGRESSION_TEST=ON -DBUILD_INTEGRATION_TEST=ON
-cmake --build build --config Release
-```
-
-Each test target registers with CTest under one label (`unit`,
-`integration` or `regression`), set on its `gtest_discover_tests` call, and
-`enable_testing()` at the top level makes the root `CTestTestfile.cmake` recurse
-into the test directories. So `ctest` works from the build root:
-
-```bash
-ctest --test-dir build -L '^unit$' --output-on-failure     # what `st test --suite unit` runs
-ctest --test-dir build --print-labels
-```
-
-Through the CLI (preferred). Test targets are built **by default**; there is no
-per-suite build flag. What runs is selected at test time by CTest label:
-
-```bash
-st build                      # library + every test target (default)
+st build                      # library + test programs (default)
 st build --no-test            # library only
 st build --type debug         # release (default) | debug | relwithdebinfo | minsizerel
 st build --clean              # wipe build/ first; combinable with the above
-st build -j 8                 # parallel jobs (default: CPU count)
+st build -j 4                 # parallel jobs (default: CPU count)
 st build -D CMAKE_UNITY_BUILD=ON   # extra -D passed straight to cmake
 st build --deploy cpp         # build, then assemble package/ for C/C++ consumers
 st build --deploy python      # build, then assemble package/ for Python consumers
 ```
 
-cmake configure runs only when the requested configuration (build type,
-tests on/off, generator, extra defines) differs from what the tree was configured
-with, which `build/.sushitrack_config` records. A configuration change reconfigures
-from scratch, because a single-config generator bakes the build type into its
-cache and would otherwise silently hand back the previous one.
+The CMake options `st build` sets:
 
-Artefacts: `build/bin/{Release,Debug}/sushitrack.{dll,so}`, `build/bin/.../unit_test{,.exe}`, `build/bin/.../regression_test{,.exe}`, `build/bin/.../integration_test{,.exe}`, `build/bin/.../tracker_bridge.{dll,so}`.
+| Option | Default | Effect |
+|---|---|---|
+| `SUSHITRACK_BUILD_TESTS` | ON | Builds `sushitrack_tests` from the mirror under `tests/`; `--no-test` turns it off |
+| `BUILD_REGRESSION_TEST` | OFF | Builds the `regression_test` runner and the `tracker_bridge` library; `st build` turns it on with the tests |
+| `SUSHITRACK_ENABLE_LOGGING` | ON | Compiles log calls below ERROR; OFF keeps ERROR and FATAL only |
+| `SUSHILOG_DIR` | set by `st` | The SushiLog checkout `cli/sushistack.deps.toml` pins |
+
+cmake configure runs only when the requested configuration (build type, tests on/off,
+generator, extra defines, the SushiLog path) differs from what the tree was configured with,
+which `build/.sushitrack_config` records. A configuration change reconfigures from scratch,
+because a single-config generator bakes the build type into its cache and would otherwise
+silently hand back the previous one.
+
+Artefacts land in `build/bin`: `sushitrack.{dll,so}`, `sushilog.{dll,so}`,
+`sushitrack_tests{,.exe}`, `regression_test{,.exe}` and `tracker_bridge.{dll,so}`. How the tests
+run is in [Test suites](../guides/TESTING.md); how the tree is laid out is in
+[Build system](../architecture/BUILD_SYSTEM.md).
 
 `--deploy` additionally assembles a self-contained, redistributable `package/`
 directory at the repository root; see [Deploy packages](../guides/DEPLOY_PACKAGES.md).

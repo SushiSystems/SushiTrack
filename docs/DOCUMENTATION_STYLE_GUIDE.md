@@ -25,7 +25,7 @@ A cited file is written from the repository root in backticks, as in
 test files under `tests/` are still `PascalCase` and are cited as they are named.
 
 A parameter is written as its key in `sushitrack.json`, as in `kalman_type`. A command is
-written as the user types it, as in `st test --suite unit`.
+written as the user types it, as in `st test --label small`.
 
 ## Words
 

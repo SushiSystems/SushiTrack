@@ -30,11 +30,10 @@ class BuildType(str, enum.Enum):
 
 LIBRARY_TARGET = "sushitrack"
 # TEST_TARGETS names every target the test build produces.
-TEST_TARGETS = ("unit_test", "integration_test", "regression_test",
+TEST_TARGETS = ("sushitrack_tests", "regression_test",
                 "tracker_bridge")
 # The CMake options those targets are gated behind.
-TEST_OPTIONS = ("BUILD_UNIT_TEST", "BUILD_REGRESSION_TEST",
-                "BUILD_INTEGRATION_TEST")
+TEST_OPTIONS = ("SUSHITRACK_BUILD_TESTS", "BUILD_REGRESSION_TEST")
 
 # The stamp file records the configuration the build tree was configured with.
 STAMP_NAME = ".sushitrack_config"
@@ -103,7 +102,7 @@ def _configure_args(cfg, paths, build_type, tests, generator_name, defines):
     args = [DRIVER.cmake(cfg.tool), "-S", str(paths.root), "-B", str(paths.build)]
     if generator_name:
         args += ["-G", generator_name]
-    args += [f"-DCMAKE_BUILD_TYPE={build_type}", "-DBUILD_MOT_TEST=OFF"]
+    args += [f"-DCMAKE_BUILD_TYPE={build_type}"]
     args += [f"-D{option}={'ON' if tests else 'OFF'}" for option in TEST_OPTIONS]
     return args + list(defines)
 

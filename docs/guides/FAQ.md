@@ -65,8 +65,7 @@ compiles the library only. The build type is `release` unless `--type` names `de
 `relwithdebinfo` or `minsizerel`. The library lands at
 `build/bin/{Release,Debug}/sushitrack.{dll,so}`.
 
-`st test` runs the `functional` suite, which is the unit, integration and regression suites
-together. `st test --suite unit` runs one of them. [Building](../getting_started/BUILD.md) holds
+`st test` runs the small and medium tests together. `st test --label small` runs one size. [Building](../getting_started/BUILD.md) holds
 the CMake options and the [command line reference](../reference/CLI.md) holds every flag.
 
 ## How do I use SushiTrack from Python?

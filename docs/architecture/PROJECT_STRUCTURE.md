@@ -34,10 +34,10 @@ sushitrack/
 │   └── weight/  video/                # model weights and sample clips, ignored
 │
 ├── tests/
-│   ├── CMakeLists.txt                 # BUILD_UNIT_TEST, BUILD_REGRESSION_TEST, BUILD_INTEGRATION_TEST
+│   ├── CMakeLists.txt                 # sushitrack_tests, by size label
+│   ├── README.md  *.hpp               # the helpers the tests share
+│   ├── <area>/test_<name>.cpp         # one file per public header, or a folder per unit
 │   ├── bytetrack.json  ocsort.json    # reference tracker configs
-│   ├── unit/                          # unit_test: UnitTest.cpp and seventeen Test*.cpp files
-│   ├── integration/                   # integration_test: Main.cpp, Helpers.h, ten Test*.cpp files
 │   └── regression/
 │       ├── RegressionTest.cpp         # GTest entry over (scenario x tracker)
 │       ├── ScenarioList.h             # MOT17, MOT20 and DanceTrack scenarios

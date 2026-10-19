@@ -124,7 +124,7 @@ When adding or removing a parameter:
 4. Add the key to `sushitrack.json` under the correct section (`basic` or `advanced.*`).
 5. Handle the key in `source/configuration/config_loader.cpp`.
 6. Mirror the field in `bindings/python/sushitrack.py` → `SushiTrackParams._fields_` in exact declaration order.
-7. Add a unit test in `tests/unit/TestConfiguration.cpp` verifying that the JSON key loads correctly.
+7. Add a test in `tests/configuration/test_config_loader.cpp` verifying that the JSON key loads correctly.
 
 ## C ABI Stability
 
@@ -176,11 +176,10 @@ machine.
 Execute all operations exclusively through the repository CLI:
 
 ```bash
-st build                       # library + test targets
-st test                        # runs all test suites
-st test --suite unit
-st test --suite integration
-st test --suite regression
+st build                       # library + test programs
+st test                        # small and medium tests
+st test --label small
+st eval                        # the MOT benchmark
 ```
 
 `st` is installed with pipx from `cli/` (see [Installing](getting_started/INSTALL.md)); it is not run as a bare script.

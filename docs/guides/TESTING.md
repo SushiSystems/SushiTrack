@@ -1,73 +1,55 @@
 # Test suites
 
-## Unit tests (`unit_test`)
+Every C++ test sits in one program, `sushitrack_tests`, built from the mirror of the public
+headers under `tests/`. The test of `include/SushiTrack/<area>/<name>.hpp` is
+`tests/<area>/test_<name>.cpp`; the tracker and the tracklet keep their tests in a folder each,
+`tests/tracking/test_tracker/` and `tests/tracking/test_tracklet/`, one file per aspect, and the
+C API in `tests/c_api/test_sushitrack_c/`. The helpers the tests share are listed in
+[`tests/README.md`](../../tests/README.md).
 
-GTest-based, deterministic, no external data. Targets compiled when `-DBUILD_UNIT_TEST=ON`. Cover:
+## Sizes
 
-- `TestKalmanFilter`: initiate/predict/update, Mahalanobis distance, gate flags, LLT cache
-- `TestTracklet`: lifecycle transitions, feature EMA
-- `TestRect`: TLWH/TLBR/XYWH conversions
-- `TestReID`: cosine similarity, max-history lookup
-- `TestCostMatrix`: resize semantics, sentinel preservation
-- `TestTimingPolicies`: frame vs wall-clock conversion and expiry symmetry
-- `TestDistanceStrategies`: each cost calculator (IoU/DIoU/GIoU/SIoU/Cosine/ReIDFirst/PureReID/Fused/GatedIoU/FuseScoreDecorator)
-- `TestAssignmentSolvers`: LAPJV correctness on dense and sparse matrices
-- `TestTrackerTentative`: adaptive confirmation logic
-- `TestTrackerBuffers`: track_buffer expiry under both timing modes
-- `TestLogger`: the SushiLog front: record fields, the level gate, `SUSHITRACK_THROW`
-- `TestSushiTrackC` / `TestCAPIErrors`: C-API surface and error codes
-- `TestTracker` / `TestIntegration`: end-to-end flow
-- `TestBoundaryConditions`: empty inputs, oversized output buffer, null args
-- `TestConfiguration`: config-driven parameter parsing
+A suite's name opens with its size, and the size is the CTest label the build gives it, with its
+timeout:
 
-Direct invocation:
+| Size | The test may use | Timeout |
+| --- | --- | --- |
+| `small` | One process and one thread, no file outside the build tree | 60 s |
+| `medium` | Threads, files such as `assets/sushitrack.json` | 300 s |
+| `large` | Real hardware, or a run longer than `medium` allows | 900 s |
+
+A suite whose name has no size stops the configure. A test that fails now and then is fixed or
+quarantined: it keeps its size and also carries the label `quarantined`, which takes it out of
+every run that does not name it, and it has an entry in
+[Known issues](../reference/KNOWN_ISSUES.md).
+
+Today the configuration loader and the logger's two-thread test are `medium`; every other suite
+is `small`.
+
+## Running
 
 ```bash
-st run unit_test
-st run unit_test -- --gtest_filter="TrackletTest.*"
-st test --suite unit                    # ctest --test-dir build -L '^unit$'
+st test                              # small and medium, the quarantine left out
+st test --label small                # one size
+st test --label small -f 'RectTest'  # a ctest -R regex over Suite.Case names
+st test --label medium --repeat 3    # re-run until the first failure
+st test --label quarantined          # only the quarantined tests
+st run sushitrack_tests -- --gtest_filter='Small_TrackletTest.*'
 ```
 
-## Regression tests (`regression_test`)
+`st test` and the build set `SUSHITRACK_CONFIG` to `assets/sushitrack.json` for the tests.
 
-Parameterised GTest binary that iterates over `Scenario × tracker_factory`. For each pair it:
+## Regression runner (`regression_test`)
+
+A parameterised GoogleTest program that iterates over `Scenario × tracker`. For each pair it:
 
 1. Reads `det.txt` frames via `MOTRunner`.
 2. Drives the tracker through `TrackerAdapter` (`SushiTrackAdapter`, `ByteTrackAdapter`, `OCSORTAdapter`).
 3. Writes predictions to `<sequence>/pred/<tracker>/<sequence>.txt`.
 4. Emits a `[ PERF <tracker> ] <sequence>: <us/frame> us/frame` line read back by the CLI (`cli/sushitrack_cli/services/label.py`).
 
-Config resolution: SushiTrack loads `sushitrack.json` through the library (`$SUSHITRACK_CONFIG`, then an upward search); ByteTrack and OCSORT read `tests/bytetrack.json` and `tests/ocsort.json`.
-
-Direct invocation:
-
-```bash
-./build/bin/Release/regression_test
-./build/bin/Release/regression_test --gtest_filter="*MOT17_04_DPM_sushitrack*"
-SUSHITRACK_CONFIG=./assets/sushitrack.json ./build/bin/Release/regression_test
-```
-
-## Integration tests (`integration_test`)
-
-GTest binary that drives the tracker end-to-end exclusively through the C API, as a downstream FFI consumer would. Targets compiled when `-DBUILD_INTEGRATION_TEST=ON`. Cover:
-
-- `TestByteAssociation`: two-stage BYTE association: low-confidence sustain, new-track seeding rules
-- `TestOcclusionRecovery`: lost-track buffering, within/beyond-buffer recovery, no id transfer
-- `TestMultiObject`: identity separation, counter-moving pass, output capacity/priority contract
-- `TestConfigVariations`: IoU variant sweep, XYAH coordinates, NSA Kalman
-- `TestAdvancedPath`: ReID + Mahalanobis gating
-- `TestFullStack`: full advanced stack enabled at once
-- `TestKinematicState`: IMM-derived regime reported end-to-end (Stationary/Cruising/Maneuvering/Coasting)
-- `TestObservationMomentum`: observation-centric momentum re-ranking and ORU recovery
-- `TestDuplicateSuppression`: cross-pool duplicate removal by track lifetime
-- `TestTimeAware`: wall-clock (`time_aware`) stepping and expiry
-
-Direct invocation:
-
-```bash
-st run integration_test
-st test --suite integration             # ctest --test-dir build -L '^integration$'
-```
+`st eval` runs it. SushiTrack loads `assets/sushitrack.json` through `SUSHITRACK_CONFIG`; ByteTrack
+and OCSORT read `tests/bytetrack.json` and `tests/ocsort.json`.
 
 ## CLI tests (`cli/tests/`)
 
@@ -85,8 +67,6 @@ command works from either.
 Nothing in the fixtures reaches the machine. A test that runs a real tool, prints through the
 shared console, or reads the developer's own project says something different on someone else's
 machine.
-
-Direct invocation:
 
 ```bash
 python -m pytest cli/tests -q

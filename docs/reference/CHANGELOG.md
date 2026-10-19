@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- 2026-10-19 — cli: Replaced `st test --suite` with `--label small, medium, large, quarantined`, running small and medium by default (`cli/sushitrack_cli/services/test_label.py`, `cli/sushitrack_cli/services/tests.py`).
+- 2026-10-19 — tests: Added tests for the 18 headers that had none, such as each cost calculator's matrix shape and each Kalman type's gate (`tests/association/test_cost_calculator.cpp`, `tests/filtering/test_gated_state_predictor.cpp`).
+- 2026-10-19 — tests: Moved every test into a mirror of the public headers, built as `sushitrack_tests` and labelled by the size its suite name opens with (`tests/CMakeLists.txt`, `cmake/SushiTrackTests.cmake`, `tests/README.md`).
 - 2026-10-19 — cli: Passed the pinned SushiLog to CMake as SUSHILOG_DIR and shipped its runtime library in both deploy packages (`cli/sushistack.deps.toml`, `cli/sushitrack_cli/services/build.py`, `cli/sushitrack_cli/services/deploy.py`).
 - 2026-10-19 — bindings: Made `Tracker.set_log_callback` set SushiLog's sink and numbered `LogLevel` as SushiLog does, TRACE 0 to FATAL 5 (`bindings/python/sushitrack.py`).
 - 2026-10-19 — c_api: Removed `sushitrack_set_log_callback`, `sushitrack_log_level_t` and `sushitrack_log_callback_t`; a host takes records through SushiLog's sink (`include/SushiTrack/c_api/sushitrack_c.h`).

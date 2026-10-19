@@ -33,7 +33,7 @@
 | `tracker_bridge` | The shared library built from `tests/regression/TrackerRegistry.cpp`; the inference pipeline loads the reference trackers through it |
 | Scenario | One sequence the regression binary runs, registered in `tests/regression/ScenarioList.h` |
 | Sequence | One folder under `tests/regression/evaluator/data/` with `det/det.txt`, `gt/gt.txt` and `seqinfo.ini` |
-| Suite | A CTest label group `st test --suite` selects: `unit`, `integration`, `regression`, `functional` or `all` |
+| Size | The label of a test, `small`, `medium` or `large`, taken from its suite's prefix; `st test --label` selects by it |
 | Private, public detections | In `st eval`, the `-YOLOX` sequences and the other MOT sequences |
 | TrackEval | The MOTChallenge evaluator under `third_party/TrackEval`; it computes HOTA, CLEAR and Identity metrics |
 | HOTA, DetA, AssA | Higher-order tracking accuracy and its detection and association parts |

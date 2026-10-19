@@ -607,21 +607,10 @@ mutex-protected. The `KalmanFilter` projected-LLT cache is mutex-protected. A si
 
 ## Testing and evaluation
 
-- **Unit tests** (`tests/unit/`, `-DBUILD_UNIT_TEST=ON`): deterministic
-  GoogleTest coverage of the estimators, cost calculators, LAPJV, timing
-  policies, tracklet lifecycle, tentative logic, configuration round-trips, the
-  C API surface, and boundary conditions.
-- **Integration tests** (`tests/integration/`, `-DBUILD_INTEGRATION_TEST=ON`):
-  end-to-end coverage driven exclusively through the C API, as an FFI consumer
-  would use it.
-- **Regression tests** (`tests/regression/`, `-DBUILD_REGRESSION_TEST=ON`): a
-  parameterized harness over `(scenario × tracker)` that reads MOT-format
-  detections, drives SushiTrack/ByteTrack/OC-SORT through a common adapter,
-  writes predictions, and reports per-frame timing. The Python evaluator wraps
-  TrackEval to produce HOTA/CLEAR/Identity metrics; the CLI chains the binary
-  and the evaluator (`st eval`).
-- **Inference pipeline** (`tests/regression/inference/`): a YOLOX-driven video
-  pipeline that drives SushiTrack through the public Python binding.
+The tests mirror the public headers under `tests/` and build into one program, each suite labelled
+by its size; [Test suites](../guides/TESTING.md) describes them. The MOT benchmark and its
+TrackEval metrics are in [Evaluation pipeline](../guides/EVALUATION.md), and the YOLOX video
+pipeline in [Inference pipeline](../guides/INFERENCE.md).
 
 ## Future work
 

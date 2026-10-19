@@ -6,7 +6,7 @@ Commands are flat: `st <command> [flags]`, with `st container <action>` and
 | Command | Purpose |
 |---|---|
 | `st build` | Configure + build; test targets built by default (`--no-test` to skip) |
-| `st test` | Run a CTest label group: `--suite unit / integration / regression / functional / all` |
+| `st test` | Run the tests by size label: `--label small / medium / large / quarantined` |
 | `st eval` | MOT label benchmark + TrackEval metrics (not a CTest suite) |
 | `st infer` | YOLOX video inference pipeline through `tracker_bridge` |
 | `st run` | Run a built executable, by name or from a picker |
@@ -42,37 +42,30 @@ prints which layer each value came from.
 
 ## `st test`
 
-Runs tests through CTest labels. Each test target carries one label, assigned in
-`tests/*/CMakeLists.txt` on its `gtest_discover_tests` call, so a new test file,
-or a whole target, is picked up with no CLI change.
-
-| Suite | Label selection | Contents |
-|---|---|---|
-| `unit` | `-L '^unit$'` | `unit_test`: deterministic component tests, no external data |
-| `integration` | `-L '^integration$'` | `integration_test`: end-to-end coverage through the C API |
-| `regression` | `-L '^regression$'` | `regression_test`: MOT scenarios, pass/fail only (metrics: `st eval`) |
-| `functional` | `-L '^(unit\|integration\|regression)$'` | all three; **the default** |
-| `all` | no `-L` | every registered test |
+Runs the tests through CTest, selected by size label. Every GoogleTest suite opens with its size,
+`Small_`, `Medium_` or `Large_`, and the build registers it under that label, so a new test file
+is picked up with no CLI change. [Test suites](../guides/TESTING.md) says what each size may use.
 
 | Flag | Effect |
 |---|---|
-| `--suite, -s <name>` | Label group to run (default `functional`) |
+| `--label, -l <label>` | `small`, `medium`, `large` or `quarantined`; repeatable. Default: `small` and `medium`. Quarantined tests run only when named |
 | `--filter, -f <regex>` | `ctest -R` over `Suite.Case` test names |
 | `--repeat, -r <n>` | `ctest --repeat until-fail:<n>`: re-run each test until it fails; flaky-test hunting |
 | `--jobs, -j <n>` | Run up to N tests concurrently (`ctest --parallel`) |
 
 ```bash
-st test                              # functional: unit + integration + regression
-st test --suite unit
-st test --suite unit -f 'RectTest'
-st test --suite integration --repeat 3
-st test --suite all -j 8
+st test                              # small and medium
+st test --label small
+st test --label small -f 'RectTest'
+st test --label medium --repeat 3
+st test --label large                # needs real hardware
+st test --label quarantined
 ```
 
 For GTest-level knobs (shuffle, break-on-failure) run the binary directly instead:
 
 ```bash
-st run unit_test -- --gtest_shuffle --gtest_break_on_failure
+st run sushitrack_tests -- --gtest_shuffle --gtest_break_on_failure
 ```
 
 ## `st eval`
@@ -80,8 +73,7 @@ st run unit_test -- --gtest_shuffle --gtest_break_on_failure
 The MOT label benchmark. Not a CTest suite: it runs `regression_test` over
 det.txt-backed scenarios, parses the per-sequence `[ PERF ]` timings out of its
 output, then runs TrackEval and prints a metrics table (HOTA / DetA / AssA /
-MOTA / IDF1 / IDSW / FP / FN / Lat). `st test --suite regression` answers only
-pass/fail for the same binary.
+MOTA / IDF1 / IDSW / FP / FN / Lat).
 
 | Flag | Effect |
 |---|---|
@@ -174,8 +166,8 @@ which one to run. Arguments after `--` go to the executable.
 
 ```bash
 st run
-st run unit_test
-st run unit_test -- --gtest_filter='TrackletTest.*'
+st run sushitrack_tests
+st run sushitrack_tests -- --gtest_filter='Small_TrackletTest.*'
 ```
 
 ## `st deploy`
