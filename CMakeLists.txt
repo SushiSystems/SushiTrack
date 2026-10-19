@@ -14,7 +14,7 @@ include(SushiTrackSushiLog)
 include(SushiTrackTests)
 
 option(SUSHITRACK_BUILD_TESTS "Build sushitrack_tests from the mirror under tests/" ON)
-option(SUSHITRACK_BUILD_APPLICATIONS "Build tracker_bridge and the mot_evaluation benchmark" ON)
+option(SUSHITRACK_BUILD_APPLICATIONS "Build tracker_bridge and the mot_engine benchmark" ON)
 
 add_subdirectory(source)
 if(SUSHITRACK_BUILD_APPLICATIONS)
