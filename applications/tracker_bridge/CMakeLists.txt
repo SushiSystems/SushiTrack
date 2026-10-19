@@ -8,6 +8,8 @@
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/third_party/bytetrack ${PROJECT_BINARY_DIR}/bytetrack)
 add_subdirectory(${PROJECT_SOURCE_DIR}/third_party/ocsort ${PROJECT_BINARY_DIR}/ocsort)
+# Both static libraries end up inside the shared tracker_bridge, which needs PIC on Linux.
+set_target_properties(bytetrack libocsort PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 add_library(tracker_adapters INTERFACE)
 target_include_directories(tracker_adapters INTERFACE

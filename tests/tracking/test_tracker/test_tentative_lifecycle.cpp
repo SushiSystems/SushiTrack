@@ -70,9 +70,9 @@ namespace
     /** @brief Confirms a single track over three matched frames at (100,200)->(104,204). */
     void confirm_track(sushitrack_tracker_t hdl, std::vector<sushitrack_track_t>& out)
     {
-        CDetections::update_frame(hdl, &obj(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
-        CDetections::update_frame(hdl, &obj(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
-        int n = CDetections::update_frame(hdl, &obj(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
+        CDetections::update_frame(hdl, obj(100.0f, 200.0f), out.data(), 10, 0.04f);
+        CDetections::update_frame(hdl, obj(102.0f, 202.0f), out.data(), 10, 0.04f);
+        int n = CDetections::update_frame(hdl, obj(104.0f, 204.0f), out.data(), 10, 0.04f);
         ASSERT_EQ(n, 1);
         ASSERT_EQ(out[0].state, 1);
     }
@@ -219,10 +219,10 @@ TEST_F(Small_TrackerTentativeTest, PromotedToTrackedAtHitThreshold)
 {
     std::vector<sushitrack_track_t> out(10);
 
-    CDetections::update_frame(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
-    CDetections::update_frame(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, det(100.0f, 200.0f), out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, det(102.0f, 202.0f), out.data(), 10, 0.04f);
 
-    int n = CDetections::update_frame(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, det(104.0f, 204.0f), out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 1);
     EXPECT_EQ(out[0].is_confirmed, 1);
@@ -323,14 +323,14 @@ TEST_F(Small_TrackerTentativeTest, TentativePromotedTrackPersistsAfterPromotion)
 {
     std::vector<sushitrack_track_t> out(10);
 
-    CDetections::update_frame(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
-    CDetections::update_frame(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
-    int n = CDetections::update_frame(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, det(100.0f, 200.0f), out.data(), 10, 0.04f);
+    CDetections::update_frame(hdl_, det(102.0f, 202.0f), out.data(), 10, 0.04f);
+    int n = CDetections::update_frame(hdl_, det(104.0f, 204.0f), out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 1);
     int64_t promoted_id = out[0].track_id;
 
-    n = CDetections::update_frame(hdl_, &det(106.0f, 206.0f), 1, out.data(), 10, 0.04f);
+    n = CDetections::update_frame(hdl_, det(106.0f, 206.0f), out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].track_id, promoted_id);
     EXPECT_EQ(out[0].state, 1);

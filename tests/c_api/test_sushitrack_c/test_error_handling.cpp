@@ -61,27 +61,6 @@ namespace
         return o;
     }
 
-    /**
-     * @brief Drives N consecutive frames of a single moving detection through the
-     *        tracker; convenience helper for tests that need an established track.
-     * @param hdl        Tracker handle.
-     * @param n_frames   Number of update cycles to execute.
-     * @param out        Output buffer; must have capacity >= 1.
-     * @param dt         Time delta passed to each Update call.
-     */
-    void drive_frames(sushitrack_tracker_t hdl, int n_frames, std::vector<sushitrack_track_t>& out,
-                      float dt = 0.04f)
-    {
-        for (int i = 0; i < n_frames; ++i)
-        {
-            sushitrack_object_t d = make_det(100.0f + 2.0f * i, 200.0f + 2.0f * i);
-            int count = 0;
-            EXPECT_EQ(
-                sushitrack_update(hdl, &d, 1, out.data(), static_cast<int>(out.size()), dt, &count),
-                SUSHITRACK_SUCCESS);
-        }
-    }
-
 } // namespace
 
 // Small_SushiTrackCInvalidArgumentTest

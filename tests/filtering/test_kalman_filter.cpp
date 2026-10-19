@@ -83,9 +83,13 @@ TEST(Small_KalmanFilterTest, InitiateCovarianceIsDiagonalAndPositive)
     {
         EXPECT_GT(cov(r, r), 0.f) << "diagonal entry (" << r << "," << r << ") not positive";
         for (int c = 0; c < 8; ++c)
+        {
             if (r != c)
+            {
                 EXPECT_FLOAT_EQ(cov(r, c), 0.f)
                     << "off-diagonal entry (" << r << "," << c << ") is non-zero";
+            }
+        }
     }
 }
 

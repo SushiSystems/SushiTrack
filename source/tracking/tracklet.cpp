@@ -86,11 +86,11 @@ namespace SushiTrack
           tracklet_len_(0),
           hits_(0),
           consecutive_hits_(0),
+          max_feature_history_(static_cast<size_t>(max_feature_history)),
+          ocm_delta_t_(std::max(1, ocm_delta_t)),
           alpha_(alpha),
           enable_xyah_(enable_xyah),
-          enable_oru_(enable_oru),
-          max_feature_history_(static_cast<size_t>(max_feature_history)),
-          ocm_delta_t_(std::max(1, ocm_delta_t))
+          enable_oru_(enable_oru)
     {
         if (!feat.empty())
         {

@@ -66,9 +66,11 @@ namespace
                 const sushitrack_track_t& a = out[static_cast<std::size_t>(i)];
                 const sushitrack_track_t& b = out[static_cast<std::size_t>(j)];
                 if (a.state == K_TRACKED && b.state == K_TRACKED)
+                {
                     EXPECT_LE(track_io_u(a, b), 0.85f)
                         << "Two Tracked tracks (" << a.track_id << ", " << b.track_id
                         << ") survived with > 0.85 IoU — duplicate not suppressed.";
+                }
             }
     }
 

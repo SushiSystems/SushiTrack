@@ -99,6 +99,15 @@ namespace CDetections
     }
 
     /**
+     * @brief Applies a frame of one detection through sushitrack_update and returns the count.
+     */
+    inline int update_frame(sushitrack_tracker_t tracker, const sushitrack_object_t& object,
+                            sushitrack_track_t* out_tracks, int max_tracks, float dt)
+    {
+        return update_frame(tracker, &object, 1, out_tracks, max_tracks, dt);
+    }
+
+    /**
      * @brief Reads the tracker's tracks through sushitrack_get_tracklets and returns the count.
      * @return The count, or -1 after recording a test failure for any status but SUCCESS and
      *         BUFFER_OVERFLOW.

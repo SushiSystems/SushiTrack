@@ -85,9 +85,9 @@ class Small_TrackerBuffersTest : public ::testing::Test
          */
         void confirm_track(std::vector<sushitrack_track_t>& out)
         {
-            CDetections::update_frame(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
-            CDetections::update_frame(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
-            CDetections::update_frame(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
+            CDetections::update_frame(hdl_, det(100.0f, 200.0f), out.data(), 10, 0.04f);
+            CDetections::update_frame(hdl_, det(102.0f, 202.0f), out.data(), 10, 0.04f);
+            CDetections::update_frame(hdl_, det(104.0f, 204.0f), out.data(), 10, 0.04f);
             ASSERT_EQ(out[0].state, 1) << "Precondition: track must be Tracked before buffer tests";
         }
 };
@@ -293,9 +293,9 @@ class Small_TrackerBuffersLargeBufferTest : public ::testing::Test
          */
         void confirm_track(std::vector<sushitrack_track_t>& out)
         {
-            CDetections::update_frame(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
-            CDetections::update_frame(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
-            CDetections::update_frame(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
+            CDetections::update_frame(hdl_, det(100.0f, 200.0f), out.data(), 10, 0.04f);
+            CDetections::update_frame(hdl_, det(102.0f, 202.0f), out.data(), 10, 0.04f);
+            CDetections::update_frame(hdl_, det(104.0f, 204.0f), out.data(), 10, 0.04f);
             ASSERT_EQ(out[0].state, 1) << "Precondition: track must be Tracked";
         }
 };
