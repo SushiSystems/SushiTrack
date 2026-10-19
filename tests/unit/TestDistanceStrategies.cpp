@@ -25,8 +25,15 @@
  * @author Mustafa Garip
  */
 
+#include <cmath>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include <gtest/gtest.h>
+
 #include <SushiTrack/association/cosine_cost_calculator.hpp>
+#include <SushiTrack/association/cost_matrix.hpp>
 #include <SushiTrack/association/diou_cost_calculator.hpp>
 #include <SushiTrack/association/fuse_score_decorator.hpp>
 #include <SushiTrack/association/fused_cost_calculator.hpp>
@@ -37,43 +44,31 @@
 #include <SushiTrack/association/pure_reid_cost_calculator.hpp>
 #include <SushiTrack/association/reid_first_cost_calculator.hpp>
 #include <SushiTrack/association/siou_cost_calculator.hpp>
-#include <SushiTrack/filtering/null_gate_validator.hpp>
-#include <SushiTrack/tracking/tracklet.hpp>
-#include <SushiTrack/filtering/kalman_filter.hpp>
 #include <SushiTrack/detection/rect.hpp>
-#include <SushiTrack/association/cost_matrix.hpp>
+#include <SushiTrack/filtering/kalman_filter.hpp>
+#include <SushiTrack/filtering/null_gate_validator.hpp>
 #include <SushiTrack/logging/logger.hpp>
-
-#include <memory>
-#include <string>
-#include <vector>
-#include <cmath>
+#include <SushiTrack/tracking/tracklet.hpp>
 
 using namespace SushiTrack;
 
 // Helpers
 
 /** @brief Returns a Tracklet with TLWH (x, y, w, h) at score s. */
-static std::shared_ptr<Tracklet> makeT(float x, float y, float w, float h,
-                                       float score = 0.9f,
-                                       std::vector<float> feat = {})
+static std::shared_ptr<Tracklet> make_t(float x, float y, float w, float h, float score = 0.9f,
+                                        std::vector<float> feat = {})
 {
-    return std::make_shared<Tracklet>(
-        std::make_unique<KalmanFilter>(),
-        Rect<float>(x, y, w, h),
-        /*label=*/1, score,
-        std::move(feat)
-    );
+    return std::make_shared<Tracklet>(std::make_unique<KalmanFilter>(), Rect<float>(x, y, w, h),
+                                      /*label=*/1, score, std::move(feat));
 }
 
 /** @brief Returns a unit-feature Tracklet along the given basis axis. */
-static std::shared_ptr<Tracklet> makeFeatT(float x, float y,
-                                           int feat_dim, int axis,
-                                           float score = 0.9f)
+static std::shared_ptr<Tracklet> make_feat_t(float x, float y, int feat_dim, int axis,
+                                             float score = 0.9f)
 {
     std::vector<float> feat(feat_dim, 0.f);
     feat[axis] = 1.f;
-    return makeT(x, y, 50.f, 80.f, score, std::move(feat));
+    return make_t(x, y, 50.f, 80.f, score, std::move(feat));
 }
 
 // IoUCostCalculator
@@ -82,8 +77,8 @@ static std::shared_ptr<Tracklet> makeFeatT(float x, float y,
 TEST(IoUCostCalculatorTest, IdenticalBoxesCostIsZero)
 {
     IoUCostCalculator calc;
-    auto a = makeT(100.f, 100.f, 50.f, 80.f);
-    auto b = makeT(100.f, 100.f, 50.f, 80.f);
+    auto a = make_t(100.f, 100.f, 50.f, 80.f);
+    auto b = make_t(100.f, 100.f, 50.f, 80.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -96,8 +91,8 @@ TEST(IoUCostCalculatorTest, IdenticalBoxesCostIsZero)
 TEST(IoUCostCalculatorTest, NonOverlappingBoxesCostIsOne)
 {
     IoUCostCalculator calc;
-    auto a = makeT(  0.f, 0.f, 50.f, 50.f);
-    auto b = makeT(200.f, 0.f, 50.f, 50.f);
+    auto a = make_t(0.f, 0.f, 50.f, 50.f);
+    auto b = make_t(200.f, 0.f, 50.f, 50.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -111,8 +106,8 @@ TEST(IoUCostCalculatorTest, PartialOverlapCostInRange)
 {
     IoUCostCalculator calc;
     // 50×50 boxes with 25-pixel horizontal shift → intersection = 25×50.
-    auto a = makeT( 0.f, 0.f, 50.f, 50.f);
-    auto b = makeT(25.f, 0.f, 50.f, 50.f);
+    auto a = make_t(0.f, 0.f, 50.f, 50.f);
+    auto b = make_t(25.f, 0.f, 50.f, 50.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -127,8 +122,8 @@ TEST(IoUCostCalculatorTest, AreaRatioViolationIsSentinel)
 {
     IoUCostCalculator calc(4.0f);
     // Area ratio = (200*200)/(10*10) = 400, far above 4.
-    auto big   = makeT(0.f, 0.f, 200.f, 200.f);
-    auto small_ = makeT(0.f, 0.f,  10.f,  10.f);
+    auto big = make_t(0.f, 0.f, 200.f, 200.f);
+    auto small_ = make_t(0.f, 0.f, 10.f, 10.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{big}, bv{small_};
     CostMatrix m;
@@ -141,7 +136,7 @@ TEST(IoUCostCalculatorTest, AreaRatioViolationIsSentinel)
 TEST(IoUCostCalculatorTest, EmptyBCollectionProducesEmptyMatrix)
 {
     IoUCostCalculator calc;
-    auto a = makeT(0.f, 0.f, 50.f, 50.f);
+    auto a = make_t(0.f, 0.f, 50.f, 50.f);
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv;
     CostMatrix m;
     calc.calculate(av, bv, m);
@@ -153,8 +148,8 @@ TEST(IoUCostCalculatorTest, EmptyBCollectionProducesEmptyMatrix)
 TEST(IoUCostCalculatorTest, SingleMatchesBatch)
 {
     IoUCostCalculator calc;
-    auto a = makeT(0.f, 0.f, 100.f, 100.f);
-    auto b = makeT(50.f, 0.f, 100.f, 100.f);
+    auto a = make_t(0.f, 0.f, 100.f, 100.f);
+    auto b = make_t(50.f, 0.f, 100.f, 100.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -170,8 +165,8 @@ TEST(IoUCostCalculatorTest, SingleMatchesBatch)
 TEST(DIoUCostCalculatorTest, IdenticalBoxesCostIsZero)
 {
     DIoUCostCalculator calc;
-    auto a = makeT(50.f, 50.f, 80.f, 80.f);
-    auto b = makeT(50.f, 50.f, 80.f, 80.f);
+    auto a = make_t(50.f, 50.f, 80.f, 80.f);
+    auto b = make_t(50.f, 50.f, 80.f, 80.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -184,8 +179,8 @@ TEST(DIoUCostCalculatorTest, IdenticalBoxesCostIsZero)
 TEST(DIoUCostCalculatorTest, SeparatedBoxesCostPositive)
 {
     DIoUCostCalculator calc;
-    auto a = makeT(  0.f, 0.f, 50.f, 50.f);
-    auto b = makeT(300.f, 0.f, 50.f, 50.f);
+    auto a = make_t(0.f, 0.f, 50.f, 50.f);
+    auto b = make_t(300.f, 0.f, 50.f, 50.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -198,8 +193,8 @@ TEST(DIoUCostCalculatorTest, SeparatedBoxesCostPositive)
 TEST(DIoUCostCalculatorTest, SingleMatchesBatch)
 {
     DIoUCostCalculator calc;
-    auto a = makeT(0.f, 0.f, 100.f, 100.f);
-    auto b = makeT(40.f, 40.f, 100.f, 100.f);
+    auto a = make_t(0.f, 0.f, 100.f, 100.f);
+    auto b = make_t(40.f, 40.f, 100.f, 100.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -214,8 +209,8 @@ TEST(DIoUCostCalculatorTest, SingleMatchesBatch)
 TEST(CosineCostCalculatorTest, IdenticalFeaturesCostIsZero)
 {
     CosineCostCalculator calc;
-    auto a = makeFeatT(0.f, 0.f, 3, 0);
-    auto b = makeFeatT(0.f, 0.f, 3, 0);
+    auto a = make_feat_t(0.f, 0.f, 3, 0);
+    auto b = make_feat_t(0.f, 0.f, 3, 0);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -228,8 +223,8 @@ TEST(CosineCostCalculatorTest, IdenticalFeaturesCostIsZero)
 TEST(CosineCostCalculatorTest, OrthogonalFeaturesCostIsOne)
 {
     CosineCostCalculator calc;
-    auto a = makeFeatT(0.f, 0.f, 3, 0);  // [1, 0, 0]
-    auto b = makeFeatT(0.f, 0.f, 3, 1);  // [0, 1, 0]
+    auto a = make_feat_t(0.f, 0.f, 3, 0); // [1, 0, 0]
+    auto b = make_feat_t(0.f, 0.f, 3, 1); // [0, 1, 0]
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -242,8 +237,8 @@ TEST(CosineCostCalculatorTest, OrthogonalFeaturesCostIsOne)
 TEST(CosineCostCalculatorTest, MissingFeatureOnAProducesCostOne)
 {
     CosineCostCalculator calc;
-    auto a = makeT(0.f, 0.f, 50.f, 80.f);              // no feature
-    auto b = makeFeatT(0.f, 0.f, 3, 0);
+    auto a = make_t(0.f, 0.f, 50.f, 80.f); // no feature
+    auto b = make_feat_t(0.f, 0.f, 3, 0);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -256,8 +251,8 @@ TEST(CosineCostCalculatorTest, MissingFeatureOnAProducesCostOne)
 TEST(CosineCostCalculatorTest, SingleMatchesBatch)
 {
     CosineCostCalculator calc;
-    auto a = makeFeatT(0.f, 0.f, 4, 2);
-    auto b = makeFeatT(0.f, 0.f, 4, 2);
+    auto a = make_feat_t(0.f, 0.f, 4, 2);
+    auto b = make_feat_t(0.f, 0.f, 4, 2);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -275,8 +270,8 @@ TEST(FuseScoreDecoratorTest, HighScoreLowersCost)
     auto inner = std::make_shared<IoUCostCalculator>();
     FuseScoreDecorator dec(inner);
 
-    auto a = makeT(0.f, 0.f, 50.f, 80.f, /*score=*/0.9f);
-    auto b = makeT(0.f, 0.f, 50.f, 80.f, /*score=*/0.8f);  // score on b (detection)
+    auto a = make_t(0.f, 0.f, 50.f, 80.f, /*score=*/0.9f);
+    auto b = make_t(0.f, 0.f, 50.f, 80.f, /*score=*/0.8f); // score on b (detection)
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -293,8 +288,8 @@ TEST(FuseScoreDecoratorTest, ScoreOnePreservesCost)
     FuseScoreDecorator dec(inner);
 
     // Partially overlapping boxes: cost will be some value c.
-    auto a = makeT(  0.f, 0.f, 100.f, 100.f, 0.9f);
-    auto b = makeT( 50.f, 0.f, 100.f, 100.f, 1.0f);
+    auto a = make_t(0.f, 0.f, 100.f, 100.f, 0.9f);
+    auto b = make_t(50.f, 0.f, 100.f, 100.f, 1.0f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix raw_m, fused_m;
@@ -312,8 +307,8 @@ TEST(FuseScoreDecoratorTest, SentinelCellsPreserved)
     FuseScoreDecorator dec(inner);
 
     // Area ratio >> 4 → sentinel in the inner matrix.
-    auto big   = makeT(0.f, 0.f, 300.f, 300.f, 0.9f);
-    auto small_ = makeT(0.f, 0.f,  10.f,  10.f, 0.5f);
+    auto big = make_t(0.f, 0.f, 300.f, 300.f, 0.9f);
+    auto small_ = make_t(0.f, 0.f, 10.f, 10.f, 0.5f);
 
     std::vector<std::shared_ptr<Tracklet>> av{big}, bv{small_};
     CostMatrix m;
@@ -328,8 +323,8 @@ TEST(FuseScoreDecoratorTest, SingleMatchesBatch)
     auto inner = std::make_shared<IoUCostCalculator>();
     FuseScoreDecorator dec(inner);
 
-    auto a = makeT(  0.f, 0.f, 100.f, 100.f, 0.9f);
-    auto b = makeT( 30.f, 0.f, 100.f, 100.f, 0.7f);
+    auto a = make_t(0.f, 0.f, 100.f, 100.f, 0.9f);
+    auto b = make_t(30.f, 0.f, 100.f, 100.f, 0.7f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -345,11 +340,11 @@ TEST(FuseScoreDecoratorTest, SingleMatchesBatch)
  */
 TEST(GatedIoUCostCalculatorTest, NullGatePassesAllCellsFillsIoUCost)
 {
-    auto iou  = std::make_shared<IoUCostCalculator>();
-    GatedIoUCostCalculator calc(9.4877f, NullGateValidator::getInstance(), iou);
+    auto iou = std::make_shared<IoUCostCalculator>();
+    GatedIoUCostCalculator calc(9.4877f, NullGateValidator::get_instance(), iou);
 
-    auto a = makeT(100.f, 100.f, 50.f, 80.f);
-    auto b = makeT(100.f, 100.f, 50.f, 80.f);
+    auto a = make_t(100.f, 100.f, 50.f, 80.f);
+    auto b = make_t(100.f, 100.f, 50.f, 80.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -364,10 +359,10 @@ TEST(GatedIoUCostCalculatorTest, NullGatePassesAllCellsFillsIoUCost)
 TEST(GatedIoUCostCalculatorTest, NullGateNonOverlappingProducesCostOne)
 {
     auto iou = std::make_shared<IoUCostCalculator>();
-    GatedIoUCostCalculator calc(9.4877f, NullGateValidator::getInstance(), iou);
+    GatedIoUCostCalculator calc(9.4877f, NullGateValidator::get_instance(), iou);
 
-    auto a = makeT(  0.f, 0.f, 50.f, 50.f);
-    auto b = makeT(200.f, 0.f, 50.f, 50.f);
+    auto a = make_t(0.f, 0.f, 50.f, 50.f);
+    auto b = make_t(200.f, 0.f, 50.f, 50.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -385,11 +380,11 @@ TEST(GatedIoUCostCalculatorTest, FailedGateProducesSentinel)
     auto iou = std::make_shared<IoUCostCalculator>();
     GatedIoUCostCalculator calc(9.4877f, std::make_shared<KalmanFilter>(), iou);
 
-    auto a = makeT(100.f, 100.f, 50.f, 80.f);
+    auto a = make_t(100.f, 100.f, 50.f, 80.f);
     a->activate(std::make_unique<KalmanFilter>(), 1, 1);
     a->predict();
 
-    auto b = makeT(5100.f, 100.f, 50.f, 80.f);
+    auto b = make_t(5100.f, 100.f, 50.f, 80.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -404,9 +399,9 @@ TEST(GatedIoUCostCalculatorTest, FailedGateProducesSentinel)
 TEST(GatedIoUCostCalculatorTest, EmptyCollectionProducesEmptyMatrix)
 {
     auto iou = std::make_shared<IoUCostCalculator>();
-    GatedIoUCostCalculator calc(9.4877f, NullGateValidator::getInstance(), iou);
+    GatedIoUCostCalculator calc(9.4877f, NullGateValidator::get_instance(), iou);
 
-    auto a = makeT(0.f, 0.f, 50.f, 50.f);
+    auto a = make_t(0.f, 0.f, 50.f, 50.f);
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv;
     CostMatrix m;
     calc.calculate(av, bv, m);
@@ -420,10 +415,10 @@ TEST(GatedIoUCostCalculatorTest, EmptyCollectionProducesEmptyMatrix)
 TEST(GatedIoUCostCalculatorTest, SingleMatchesBatch)
 {
     auto iou = std::make_shared<IoUCostCalculator>();
-    GatedIoUCostCalculator calc(9.4877f, NullGateValidator::getInstance(), iou);
+    GatedIoUCostCalculator calc(9.4877f, NullGateValidator::get_instance(), iou);
 
-    auto a = makeT(  0.f, 0.f, 100.f, 100.f);
-    auto b = makeT( 30.f, 0.f, 100.f, 100.f);
+    auto a = make_t(0.f, 0.f, 100.f, 100.f);
+    auto b = make_t(30.f, 0.f, 100.f, 100.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -440,14 +435,13 @@ TEST(GatedIoUCostCalculatorTest, SingleMatchesBatch)
  */
 TEST(FusedCostCalculatorTest, NullGateIdenticalFeaturesDirectAssignment)
 {
-    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto iou = std::make_shared<IoUCostCalculator>();
     auto cosine = std::make_shared<CosineCostCalculator>();
-    FusedCostCalculator calc(0.5f, 0.3f, 9.4877f,
-                             NullGateValidator::getInstance(),
-                             iou, cosine, /*reid_direct_assignment_weight=*/0.5f);
+    FusedCostCalculator calc(0.5f, 0.3f, 9.4877f, NullGateValidator::get_instance(), iou, cosine,
+                             /*reid_direct_assignment_weight=*/0.5f);
 
-    auto a = makeFeatT(100.f, 100.f, 4, 0);
-    auto b = makeFeatT(100.f, 100.f, 4, 0);
+    auto a = make_feat_t(100.f, 100.f, 4, 0);
+    auto b = make_feat_t(100.f, 100.f, 4, 0);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -462,17 +456,15 @@ TEST(FusedCostCalculatorTest, NullGateIdenticalFeaturesDirectAssignment)
  */
 TEST(FusedCostCalculatorTest, NullGateSentinelPreservedWhenGateFails)
 {
-    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto iou = std::make_shared<IoUCostCalculator>();
     auto cosine = std::make_shared<CosineCostCalculator>();
-    FusedCostCalculator calc(0.5f, 0.3f, 9.4877f,
-                             std::make_shared<KalmanFilter>(),
-                             iou, cosine);
+    FusedCostCalculator calc(0.5f, 0.3f, 9.4877f, std::make_shared<KalmanFilter>(), iou, cosine);
 
-    auto a = makeT(100.f, 100.f, 50.f, 80.f);
+    auto a = make_t(100.f, 100.f, 50.f, 80.f);
     a->activate(std::make_unique<KalmanFilter>(), 1, 1);
     a->predict();
 
-    auto b = makeT(5100.f, 100.f, 50.f, 80.f);
+    auto b = make_t(5100.f, 100.f, 50.f, 80.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -486,13 +478,11 @@ TEST(FusedCostCalculatorTest, NullGateSentinelPreservedWhenGateFails)
  */
 TEST(FusedCostCalculatorTest, EmptyCollectionProducesEmptyMatrix)
 {
-    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto iou = std::make_shared<IoUCostCalculator>();
     auto cosine = std::make_shared<CosineCostCalculator>();
-    FusedCostCalculator calc(0.5f, 0.3f, 9.4877f,
-                             NullGateValidator::getInstance(),
-                             iou, cosine);
+    FusedCostCalculator calc(0.5f, 0.3f, 9.4877f, NullGateValidator::get_instance(), iou, cosine);
 
-    auto a = makeFeatT(0.f, 0.f, 4, 0);
+    auto a = make_feat_t(0.f, 0.f, 4, 0);
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv;
     CostMatrix m;
     calc.calculate(av, bv, m);
@@ -505,14 +495,13 @@ TEST(FusedCostCalculatorTest, EmptyCollectionProducesEmptyMatrix)
  */
 TEST(FusedCostCalculatorTest, SingleMatchesBatch)
 {
-    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto iou = std::make_shared<IoUCostCalculator>();
     auto cosine = std::make_shared<CosineCostCalculator>();
-    FusedCostCalculator calc(0.5f, 0.3f, 9.4877f,
-                             NullGateValidator::getInstance(),
-                             iou, cosine, 0.5f);
+    FusedCostCalculator calc(0.5f, 0.3f, 9.4877f, NullGateValidator::get_instance(), iou, cosine,
+                             0.5f);
 
-    auto a = makeFeatT(  0.f, 0.f, 4, 1);
-    auto b = makeFeatT( 30.f, 0.f, 4, 1);
+    auto a = make_feat_t(0.f, 0.f, 4, 1);
+    auto b = make_feat_t(30.f, 0.f, 4, 1);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -529,12 +518,12 @@ TEST(FusedCostCalculatorTest, SingleMatchesBatch)
  */
 TEST(ReIDFirstCostCalculatorTest, DirectAssignmentWhenBothHaveFeaturesAndCloseReID)
 {
-    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto iou = std::make_shared<IoUCostCalculator>();
     auto cosine = std::make_shared<CosineCostCalculator>();
     ReIDFirstCostCalculator calc(0.3f, 0.3f, 0.2f, iou, cosine);
 
-    auto a = makeFeatT(100.f, 100.f, 4, 0);
-    auto b = makeFeatT(100.f, 100.f, 4, 0);
+    auto a = make_feat_t(100.f, 100.f, 4, 0);
+    auto b = make_feat_t(100.f, 100.f, 4, 0);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -549,12 +538,12 @@ TEST(ReIDFirstCostCalculatorTest, DirectAssignmentWhenBothHaveFeaturesAndCloseRe
  */
 TEST(ReIDFirstCostCalculatorTest, BlendedPathWhenNoFeatures)
 {
-    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto iou = std::make_shared<IoUCostCalculator>();
     auto cosine = std::make_shared<CosineCostCalculator>();
     ReIDFirstCostCalculator calc(0.3f, 0.3f, 0.2f, iou, cosine);
 
-    auto a = makeT(100.f, 100.f, 50.f, 80.f);
-    auto b = makeT(100.f, 100.f, 50.f, 80.f);
+    auto a = make_t(100.f, 100.f, 50.f, 80.f);
+    auto b = make_t(100.f, 100.f, 50.f, 80.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -570,12 +559,12 @@ TEST(ReIDFirstCostCalculatorTest, BlendedPathWhenNoFeatures)
  */
 TEST(ReIDFirstCostCalculatorTest, MissingFeatureOnBProducesFallback)
 {
-    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto iou = std::make_shared<IoUCostCalculator>();
     auto cosine = std::make_shared<CosineCostCalculator>();
     ReIDFirstCostCalculator calc(0.3f, 0.3f, 0.2f, iou, cosine);
 
-    auto a = makeFeatT(100.f, 100.f, 4, 0);
-    auto b = makeT(100.f, 100.f, 50.f, 80.f);
+    auto a = make_feat_t(100.f, 100.f, 4, 0);
+    auto b = make_t(100.f, 100.f, 50.f, 80.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -589,11 +578,11 @@ TEST(ReIDFirstCostCalculatorTest, MissingFeatureOnBProducesFallback)
  */
 TEST(ReIDFirstCostCalculatorTest, EmptyCollectionProducesEmptyMatrix)
 {
-    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto iou = std::make_shared<IoUCostCalculator>();
     auto cosine = std::make_shared<CosineCostCalculator>();
     ReIDFirstCostCalculator calc(0.3f, 0.3f, 0.2f, iou, cosine);
 
-    auto a = makeFeatT(0.f, 0.f, 4, 0);
+    auto a = make_feat_t(0.f, 0.f, 4, 0);
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv;
     CostMatrix m;
     calc.calculate(av, bv, m);
@@ -606,12 +595,12 @@ TEST(ReIDFirstCostCalculatorTest, EmptyCollectionProducesEmptyMatrix)
  */
 TEST(ReIDFirstCostCalculatorTest, SingleMatchesBatch)
 {
-    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto iou = std::make_shared<IoUCostCalculator>();
     auto cosine = std::make_shared<CosineCostCalculator>();
     ReIDFirstCostCalculator calc(0.3f, 0.3f, 0.2f, iou, cosine);
 
-    auto a = makeFeatT(  0.f, 0.f, 4, 2);
-    auto b = makeFeatT( 30.f, 0.f, 4, 2);
+    auto a = make_feat_t(0.f, 0.f, 4, 2);
+    auto b = make_feat_t(30.f, 0.f, 4, 2);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -627,10 +616,10 @@ TEST(ReIDFirstCostCalculatorTest, SingleMatchesBatch)
  */
 TEST(PureReIDCostCalculatorTest, NullGateIdenticalFeaturesPassesThreshold)
 {
-    PureReIDCostCalculator calc(0.4f, 9.4877f, NullGateValidator::getInstance());
+    PureReIDCostCalculator calc(0.4f, 9.4877f, NullGateValidator::get_instance());
 
-    auto a = makeFeatT(100.f, 100.f, 4, 0);
-    auto b = makeFeatT(100.f, 100.f, 4, 0);
+    auto a = make_feat_t(100.f, 100.f, 4, 0);
+    auto b = make_feat_t(100.f, 100.f, 4, 0);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -644,10 +633,10 @@ TEST(PureReIDCostCalculatorTest, NullGateIdenticalFeaturesPassesThreshold)
  */
 TEST(PureReIDCostCalculatorTest, NullGateOrthogonalFeaturesExceedsThreshold)
 {
-    PureReIDCostCalculator calc(0.4f, 9.4877f, NullGateValidator::getInstance());
+    PureReIDCostCalculator calc(0.4f, 9.4877f, NullGateValidator::get_instance());
 
-    auto a = makeFeatT(100.f, 100.f, 4, 0);
-    auto b = makeFeatT(100.f, 100.f, 4, 1);
+    auto a = make_feat_t(100.f, 100.f, 4, 0);
+    auto b = make_feat_t(100.f, 100.f, 4, 1);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -664,11 +653,11 @@ TEST(PureReIDCostCalculatorTest, FailedGateProducesSentinel)
 {
     PureReIDCostCalculator calc(0.4f, 9.4877f, std::make_shared<KalmanFilter>());
 
-    auto a = makeFeatT(100.f, 100.f, 4, 0);
+    auto a = make_feat_t(100.f, 100.f, 4, 0);
     a->activate(std::make_unique<KalmanFilter>(), 1, 1);
     a->predict();
 
-    auto b = makeFeatT(5100.f, 100.f, 4, 0);
+    auto b = make_feat_t(5100.f, 100.f, 4, 0);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -682,9 +671,9 @@ TEST(PureReIDCostCalculatorTest, FailedGateProducesSentinel)
  */
 TEST(PureReIDCostCalculatorTest, EmptyCollectionProducesEmptyMatrix)
 {
-    PureReIDCostCalculator calc(0.4f, 9.4877f, NullGateValidator::getInstance());
+    PureReIDCostCalculator calc(0.4f, 9.4877f, NullGateValidator::get_instance());
 
-    auto a = makeFeatT(0.f, 0.f, 4, 0);
+    auto a = make_feat_t(0.f, 0.f, 4, 0);
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv;
     CostMatrix m;
     calc.calculate(av, bv, m);
@@ -698,10 +687,10 @@ TEST(PureReIDCostCalculatorTest, EmptyCollectionProducesEmptyMatrix)
  */
 TEST(PureReIDCostCalculatorTest, SingleMatchesBatch)
 {
-    PureReIDCostCalculator calc(0.4f, 9.4877f, NullGateValidator::getInstance());
+    PureReIDCostCalculator calc(0.4f, 9.4877f, NullGateValidator::get_instance());
 
-    auto a = makeFeatT(  0.f, 0.f, 4, 3);
-    auto b = makeFeatT( 30.f, 0.f, 4, 3);
+    auto a = make_feat_t(0.f, 0.f, 4, 3);
+    auto b = make_feat_t(30.f, 0.f, 4, 3);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -719,8 +708,8 @@ TEST(FuseScoreDecoratorTest, ScoreZeroProducesCostOne)
     auto inner = std::make_shared<IoUCostCalculator>();
     FuseScoreDecorator dec(inner);
 
-    auto a = makeT(0.f, 0.f, 50.f, 80.f, 0.9f);
-    auto b = makeT(0.f, 0.f, 50.f, 80.f, 0.0f);
+    auto a = make_t(0.f, 0.f, 50.f, 80.f, 0.9f);
+    auto b = make_t(0.f, 0.f, 50.f, 80.f, 0.0f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -731,16 +720,16 @@ TEST(FuseScoreDecoratorTest, ScoreZeroProducesCostOne)
 
 /**
  * @brief DIoU cost for a misaligned contained box is strictly GREATER
- * than the corresponding plain IoU cost because the center-distance 
+ * than the corresponding plain IoU cost because the center-distance
  * penalty reduces the DIoU score, thus increasing the cost.
  */
 TEST(DIoUCostCalculatorTest, ContainedMisalignedBoxCostGreaterThanIoUCost)
 {
-    IoUCostCalculator  iou_calc;
+    IoUCostCalculator iou_calc;
     DIoUCostCalculator diou_calc;
 
-    auto outer = makeT(0.f, 0.f, 100.f, 100.f);
-    auto inner = makeT(10.f, 10.f, 50.f, 50.f);
+    auto outer = make_t(0.f, 0.f, 100.f, 100.f);
+    auto inner = make_t(10.f, 10.f, 50.f, 50.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{outer}, bv{inner};
     CostMatrix iou_m, diou_m;
@@ -759,8 +748,8 @@ TEST(DIoUCostCalculatorTest, ContainedMisalignedBoxCostGreaterThanIoUCost)
 TEST(CosineCostCalculatorTest, MissingFeatureOnBProducesCostOne)
 {
     CosineCostCalculator calc;
-    auto a = makeFeatT(0.f, 0.f, 3, 0);
-    auto b = makeT(0.f, 0.f, 50.f, 80.f);
+    auto a = make_feat_t(0.f, 0.f, 3, 0);
+    auto b = make_t(0.f, 0.f, 50.f, 80.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -775,8 +764,8 @@ TEST(CosineCostCalculatorTest, MissingFeatureOnBProducesCostOne)
 TEST(GIoUCostCalculatorTest, IdenticalBoxesCostIsZero)
 {
     GIoUCostCalculator calc;
-    auto a = makeT(50.f, 50.f, 80.f, 80.f);
-    auto b = makeT(50.f, 50.f, 80.f, 80.f);
+    auto a = make_t(50.f, 50.f, 80.f, 80.f);
+    auto b = make_t(50.f, 50.f, 80.f, 80.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -789,8 +778,8 @@ TEST(GIoUCostCalculatorTest, IdenticalBoxesCostIsZero)
 TEST(GIoUCostCalculatorTest, SeparatedBoxesCostPositive)
 {
     GIoUCostCalculator calc;
-    auto a = makeT(  0.f, 0.f, 50.f, 50.f);
-    auto b = makeT(300.f, 0.f, 50.f, 50.f);
+    auto a = make_t(0.f, 0.f, 50.f, 50.f);
+    auto b = make_t(300.f, 0.f, 50.f, 50.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -803,8 +792,8 @@ TEST(GIoUCostCalculatorTest, SeparatedBoxesCostPositive)
 TEST(GIoUCostCalculatorTest, SingleMatchesBatch)
 {
     GIoUCostCalculator calc;
-    auto a = makeT(0.f, 0.f, 100.f, 100.f);
-    auto b = makeT(40.f, 40.f, 100.f, 100.f);
+    auto a = make_t(0.f, 0.f, 100.f, 100.f);
+    auto b = make_t(40.f, 40.f, 100.f, 100.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -819,8 +808,8 @@ TEST(GIoUCostCalculatorTest, SingleMatchesBatch)
 TEST(SIoUCostCalculatorTest, IdenticalBoxesCostIsZero)
 {
     SIoUCostCalculator calc;
-    auto a = makeT(50.f, 50.f, 80.f, 80.f);
-    auto b = makeT(50.f, 50.f, 80.f, 80.f);
+    auto a = make_t(50.f, 50.f, 80.f, 80.f);
+    auto b = make_t(50.f, 50.f, 80.f, 80.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -833,8 +822,8 @@ TEST(SIoUCostCalculatorTest, IdenticalBoxesCostIsZero)
 TEST(SIoUCostCalculatorTest, SeparatedBoxesCostPositive)
 {
     SIoUCostCalculator calc;
-    auto a = makeT(  0.f, 0.f, 50.f, 50.f);
-    auto b = makeT(300.f, 0.f, 50.f, 50.f);
+    auto a = make_t(0.f, 0.f, 50.f, 50.f);
+    auto b = make_t(300.f, 0.f, 50.f, 50.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -847,8 +836,8 @@ TEST(SIoUCostCalculatorTest, SeparatedBoxesCostPositive)
 TEST(SIoUCostCalculatorTest, SingleMatchesBatch)
 {
     SIoUCostCalculator calc;
-    auto a = makeT(0.f, 0.f, 100.f, 100.f);
-    auto b = makeT(40.f, 40.f, 100.f, 100.f);
+    auto a = make_t(0.f, 0.f, 100.f, 100.f);
+    auto b = make_t(40.f, 40.f, 100.f, 100.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
@@ -862,7 +851,7 @@ TEST(SIoUCostCalculatorTest, SingleMatchesBatch)
 namespace
 {
     /** @brief Inner calculator returning a fixed cost, isolating the momentum term. */
-    class ConstCost : public ICostCalculator
+    class ConstCost : public CostCalculator
     {
         public:
             explicit ConstCost(float c) : c_(c) {}
@@ -872,48 +861,53 @@ namespace
             {
                 m.resize(a.size(), b.size(), c_);
             }
-            float calculate_single(const TrackletPtr&, const TrackletPtr&) const override { return c_; }
+            float calculate_single(const TrackletPtr&, const TrackletPtr&) const override
+            {
+                return c_;
+            }
+
         private:
             float c_;
     };
 
     /** @brief Builds a track cruising in +x at the given per-frame step; no IMM, so it reports Cruising. */
-    std::shared_ptr<Tracklet> makeCruiser(float start_x, float y, float step, int steps)
+    std::shared_ptr<Tracklet> make_cruiser(float start_x, float y, float step, int steps)
     {
-        auto t = makeT(start_x, y, 50.f, 80.f);
+        auto t = make_t(start_x, y, 50.f, 80.f);
         t->activate(std::make_unique<KalmanFilter>(), 1, 1);
         float x = start_x;
         for (int f = 2; f <= steps + 1; ++f)
         {
             t->predict(1.0f);
             x += step;
-            auto obs = makeT(x, y, 50.f, 80.f);
+            auto obs = make_t(x, y, 50.f, 80.f);
             t->update(*obs, static_cast<size_t>(f), true, false);
         }
         return t;
     }
 
     /** @brief Detection whose box centre sits exactly at (cx, cy). */
-    std::shared_ptr<Tracklet> detAtCenter(float cx, float cy)
+    std::shared_ptr<Tracklet> det_at_center(float cx, float cy)
     {
-        return makeT(cx - 25.f, cy - 40.f, 50.f, 80.f);
+        return make_t(cx - 25.f, cy - 40.f, 50.f, 80.f);
     }
 
     /** @brief Centre of a track's last raw observation. */
-    void lastObsCenter(const std::shared_ptr<Tracklet>& t, float& cx, float& cy)
+    void last_obs_center(const std::shared_ptr<Tracklet>& t, float& cx, float& cy)
     {
-        const auto& lo = t->getLastObservation();
-        cx = lo.x() + lo.width()  * 0.5f;
+        const auto& lo = t->get_last_observation();
+        cx = lo.x() + lo.width() * 0.5f;
         cy = lo.y() + lo.height() * 0.5f;
     }
-}
+} // namespace
 
 /** @brief A detection straight ahead along travel has its cost reduced by the full weight. */
 TEST(ObservationMomentumDecoratorTest, AlignedDetectionGetsLowerCost)
 {
-    auto t = makeCruiser(100.f, 200.f, 10.f, 5);
-    float cx, cy; lastObsCenter(t, cx, cy);
-    auto ahead = detAtCenter(cx + 100.f, cy);
+    auto t = make_cruiser(100.f, 200.f, 10.f, 5);
+    float cx, cy;
+    last_obs_center(t, cx, cy);
+    auto ahead = det_at_center(cx + 100.f, cy);
 
     ObservationMomentumDecorator dec(std::make_shared<ConstCost>(0.5f), 0.2f, 0.5f, 5);
     std::vector<std::shared_ptr<Tracklet>> av{t}, bv{ahead};
@@ -926,9 +920,10 @@ TEST(ObservationMomentumDecoratorTest, AlignedDetectionGetsLowerCost)
 /** @brief A detection directly behind travel has its cost raised by the full weight. */
 TEST(ObservationMomentumDecoratorTest, OpposingDetectionGetsHigherCost)
 {
-    auto t = makeCruiser(100.f, 200.f, 10.f, 5);
-    float cx, cy; lastObsCenter(t, cx, cy);
-    auto behind = detAtCenter(cx - 100.f, cy);
+    auto t = make_cruiser(100.f, 200.f, 10.f, 5);
+    float cx, cy;
+    last_obs_center(t, cx, cy);
+    auto behind = det_at_center(cx - 100.f, cy);
 
     ObservationMomentumDecorator dec(std::make_shared<ConstCost>(0.5f), 0.2f, 0.5f, 5);
     std::vector<std::shared_ptr<Tracklet>> av{t}, bv{behind};
@@ -941,9 +936,10 @@ TEST(ObservationMomentumDecoratorTest, OpposingDetectionGetsHigherCost)
 /** @brief A detection perpendicular to travel leaves the cost unchanged (cos = 0). */
 TEST(ObservationMomentumDecoratorTest, PerpendicularDetectionUnchanged)
 {
-    auto t = makeCruiser(100.f, 200.f, 10.f, 5);
-    float cx, cy; lastObsCenter(t, cx, cy);
-    auto side = detAtCenter(cx, cy + 100.f);
+    auto t = make_cruiser(100.f, 200.f, 10.f, 5);
+    float cx, cy;
+    last_obs_center(t, cx, cy);
+    auto side = det_at_center(cx, cy + 100.f);
 
     ObservationMomentumDecorator dec(std::make_shared<ConstCost>(0.5f), 0.2f, 0.5f, 5);
     std::vector<std::shared_ptr<Tracklet>> av{t}, bv{side};
@@ -956,9 +952,10 @@ TEST(ObservationMomentumDecoratorTest, PerpendicularDetectionUnchanged)
 /** @brief Sentinel cells from the inner calculator are passed through untouched. */
 TEST(ObservationMomentumDecoratorTest, SentinelPairsArePreserved)
 {
-    auto t = makeCruiser(100.f, 200.f, 10.f, 5);
-    float cx, cy; lastObsCenter(t, cx, cy);
-    auto ahead = detAtCenter(cx + 100.f, cy);
+    auto t = make_cruiser(100.f, 200.f, 10.f, 5);
+    float cx, cy;
+    last_obs_center(t, cx, cy);
+    auto ahead = det_at_center(cx + 100.f, cy);
 
     ObservationMomentumDecorator dec(std::make_shared<ConstCost>(1e4f), 0.2f, 0.5f, 5);
     std::vector<std::shared_ptr<Tracklet>> av{t}, bv{ahead};
@@ -971,9 +968,10 @@ TEST(ObservationMomentumDecoratorTest, SentinelPairsArePreserved)
 /** @brief A track slower than min_velocity contributes no momentum. */
 TEST(ObservationMomentumDecoratorTest, SlowTrackIsGatedOff)
 {
-    auto t = makeCruiser(100.f, 200.f, 0.2f, 5);
-    float cx, cy; lastObsCenter(t, cx, cy);
-    auto ahead = detAtCenter(cx + 100.f, cy);
+    auto t = make_cruiser(100.f, 200.f, 0.2f, 5);
+    float cx, cy;
+    last_obs_center(t, cx, cy);
+    auto ahead = det_at_center(cx + 100.f, cy);
 
     ObservationMomentumDecorator dec(std::make_shared<ConstCost>(0.5f), 0.2f, 0.5f, 5);
     std::vector<std::shared_ptr<Tracklet>> av{t}, bv{ahead};
@@ -986,12 +984,13 @@ TEST(ObservationMomentumDecoratorTest, SlowTrackIsGatedOff)
 /** @brief A track whose last observation is older than max_age contributes no momentum. */
 TEST(ObservationMomentumDecoratorTest, StaleTrackIsGatedOff)
 {
-    auto t = makeCruiser(100.f, 200.f, 10.f, 5);
+    auto t = make_cruiser(100.f, 200.f, 10.f, 5);
     t->predict(1.0f);
-    t->predict(1.0f);   // frames-since-observation now 2, beyond max_age = 1
+    t->predict(1.0f); // frames-since-observation now 2, beyond max_age = 1
 
-    float cx, cy; lastObsCenter(t, cx, cy);
-    auto ahead = detAtCenter(cx + 100.f, cy);
+    float cx, cy;
+    last_obs_center(t, cx, cy);
+    auto ahead = det_at_center(cx + 100.f, cy);
 
     ObservationMomentumDecorator dec(std::make_shared<ConstCost>(0.5f), 0.2f, 0.5f, 1);
     std::vector<std::shared_ptr<Tracklet>> av{t}, bv{ahead};
@@ -1004,11 +1003,12 @@ TEST(ObservationMomentumDecoratorTest, StaleTrackIsGatedOff)
 /** @brief A track with only one observation has no direction and contributes no momentum. */
 TEST(ObservationMomentumDecoratorTest, TrackWithoutVelocityIsGatedOff)
 {
-    auto t = makeT(100.f, 200.f, 50.f, 80.f);
+    auto t = make_t(100.f, 200.f, 50.f, 80.f);
     t->activate(std::make_unique<KalmanFilter>(), 1, 1);
 
-    float cx, cy; lastObsCenter(t, cx, cy);
-    auto ahead = detAtCenter(cx + 100.f, cy);
+    float cx, cy;
+    last_obs_center(t, cx, cy);
+    auto ahead = det_at_center(cx + 100.f, cy);
 
     ObservationMomentumDecorator dec(std::make_shared<ConstCost>(0.5f), 0.2f, 0.5f, 5);
     std::vector<std::shared_ptr<Tracklet>> av{t}, bv{ahead};
@@ -1021,9 +1021,10 @@ TEST(ObservationMomentumDecoratorTest, TrackWithoutVelocityIsGatedOff)
 /** @brief calculate_single agrees with the batch path. */
 TEST(ObservationMomentumDecoratorTest, SingleMatchesBatch)
 {
-    auto t = makeCruiser(100.f, 200.f, 10.f, 5);
-    float cx, cy; lastObsCenter(t, cx, cy);
-    auto ahead = detAtCenter(cx + 100.f, cy);
+    auto t = make_cruiser(100.f, 200.f, 10.f, 5);
+    float cx, cy;
+    last_obs_center(t, cx, cy);
+    auto ahead = det_at_center(cx + 100.f, cy);
 
     ObservationMomentumDecorator dec(std::make_shared<ConstCost>(0.5f), 0.2f, 0.5f, 5);
     std::vector<std::shared_ptr<Tracklet>> av{t}, bv{ahead};
@@ -1039,19 +1040,20 @@ TEST(ObservationMomentumDecoratorTest, SingleMatchesBatch)
  */
 TEST(ObservationMomentumDecoratorTest, ManeuverScaleDoesNotAffectCruisingTrack)
 {
-    auto t = makeCruiser(100.f, 200.f, 10.f, 5);  // no IMM -> reports Cruising
-    float cx, cy; lastObsCenter(t, cx, cy);
-    auto ahead = detAtCenter(cx + 100.f, cy);
+    auto t = make_cruiser(100.f, 200.f, 10.f, 5); // no IMM -> reports Cruising
+    float cx, cy;
+    last_obs_center(t, cx, cy);
+    auto ahead = det_at_center(cx + 100.f, cy);
     std::vector<std::shared_ptr<Tracklet>> av{t}, bv{ahead};
 
     ObservationMomentumDecorator off(std::make_shared<ConstCost>(0.5f), 0.2f, 0.5f, 5, 0.0f);
-    ObservationMomentumDecorator on (std::make_shared<ConstCost>(0.5f), 0.2f, 0.5f, 5, 0.5f);
+    ObservationMomentumDecorator on(std::make_shared<ConstCost>(0.5f), 0.2f, 0.5f, 5, 0.5f);
     CostMatrix mo, mn;
     off.calculate(av, bv, mo);
     on.calculate(av, bv, mn);
 
     EXPECT_FLOAT_EQ(mo(0, 0), mn(0, 0));
-    EXPECT_NEAR(mn(0, 0), 0.3f, 1e-3f);  // full 0.2 bonus, not scaled
+    EXPECT_NEAR(mn(0, 0), 0.3f, 1e-3f); // full 0.2 bonus, not scaled
 }
 
 // GatingLogVolumeTest
@@ -1059,61 +1061,58 @@ TEST(ObservationMomentumDecoratorTest, ManeuverScaleDoesNotAffectCruisingTrack)
 namespace
 {
 
-static int         g_gating_lines = 0;
-static std::string g_last_gating_line;
+    static int g_gating_lines = 0;
+    static std::string g_last_gating_line;
 
-/**
- * @brief Counts the log lines that report gated pairs and keeps the last one.
- * @param message Formatted message forwarded from the logger.
- */
-void countGatingLines(sushitrack_log_level_t, const char* message)
-{
-    const std::string line = message ? message : "";
-    if (line.find("gated out") == std::string::npos)
-        return;
+    /**
+     * @brief Counts the log lines that report gated pairs and keeps the last one.
+     * @param message Formatted message forwarded from the logger.
+     */
+    void count_gating_lines(sushitrack_log_level_t, const char* message)
+    {
+        const std::string line = message ? message : "";
+        if (line.find("gated out") == std::string::npos)
+            return;
 
-    ++g_gating_lines;
-    g_last_gating_line = line;
-}
+        ++g_gating_lines;
+        g_last_gating_line = line;
+    }
 
-}
+} // namespace
 
 /**
  * @brief Fixture that counts gating log lines for one track and three far detections.
  */
 class GatingLogVolumeTest : public ::testing::Test
 {
-protected:
-    void SetUp() override
-    {
-        g_gating_lines = 0;
-        g_last_gating_line.clear();
-        Logger::setCallback(countGatingLines);
-    }
+    protected:
+        void SetUp() override
+        {
+            g_gating_lines = 0;
+            g_last_gating_line.clear();
+            Logger::set_callback(count_gating_lines);
+        }
 
-    void TearDown() override
-    {
-        Logger::setCallback(nullptr);
-    }
+        void TearDown() override { Logger::set_callback(nullptr); }
 
-    /** @brief Activates and predicts a track so that its Kalman gate is live. */
-    static std::shared_ptr<Tracklet> live(std::shared_ptr<Tracklet> track)
-    {
-        track->activate(std::make_unique<KalmanFilter>(), 1, 1);
-        track->predict();
-        return track;
-    }
+        /** @brief Activates and predicts a track so that its Kalman gate is live. */
+        static std::shared_ptr<Tracklet> live(std::shared_ptr<Tracklet> track)
+        {
+            track->activate(std::make_unique<KalmanFilter>(), 1, 1);
+            track->predict();
+            return track;
+        }
 
-    /** @brief Expects three sentinel cells and one log line that counts all three pairs. */
-    static void expectOneLineForThreeGatedPairs(const CostMatrix& m)
-    {
-        for (size_t j = 0; j < 3; ++j)
-            EXPECT_GE(m(0, j), 1e3f);
+        /** @brief Expects three sentinel cells and one log line that counts all three pairs. */
+        static void expect_one_line_for_three_gated_pairs(const CostMatrix& m)
+        {
+            for (size_t j = 0; j < 3; ++j)
+                EXPECT_GE(m(0, j), 1e3f);
 
-        EXPECT_EQ(g_gating_lines, 1);
-        EXPECT_NE(g_last_gating_line.find("3 of 3"), std::string::npos)
-            << "logged: " << g_last_gating_line;
-    }
+            EXPECT_EQ(g_gating_lines, 1);
+            EXPECT_NE(g_last_gating_line.find("3 of 3"), std::string::npos)
+                << "logged: " << g_last_gating_line;
+        }
 };
 
 /**
@@ -1124,15 +1123,15 @@ TEST_F(GatingLogVolumeTest, GatedIoULogsOneLinePerCall)
     auto iou = std::make_shared<IoUCostCalculator>();
     GatedIoUCostCalculator calc(9.4877f, std::make_shared<KalmanFilter>(), iou);
 
-    std::vector<std::shared_ptr<Tracklet>> av{live(makeT(100.f, 100.f, 50.f, 80.f))};
+    std::vector<std::shared_ptr<Tracklet>> av{live(make_t(100.f, 100.f, 50.f, 80.f))};
     std::vector<std::shared_ptr<Tracklet>> bv;
     for (int k = 0; k < 3; ++k)
-        bv.push_back(makeT(5100.f + 200.f * k, 100.f, 50.f, 80.f));
+        bv.push_back(make_t(5100.f + 200.f * k, 100.f, 50.f, 80.f));
 
     CostMatrix m;
     calc.calculate(av, bv, m);
 
-    expectOneLineForThreeGatedPairs(m);
+    expect_one_line_for_three_gated_pairs(m);
 }
 
 /**
@@ -1140,21 +1139,19 @@ TEST_F(GatingLogVolumeTest, GatedIoULogsOneLinePerCall)
  */
 TEST_F(GatingLogVolumeTest, FusedLogsOneLinePerCall)
 {
-    auto iou    = std::make_shared<IoUCostCalculator>();
+    auto iou = std::make_shared<IoUCostCalculator>();
     auto cosine = std::make_shared<CosineCostCalculator>();
-    FusedCostCalculator calc(0.5f, 0.3f, 9.4877f,
-                             std::make_shared<KalmanFilter>(),
-                             iou, cosine);
+    FusedCostCalculator calc(0.5f, 0.3f, 9.4877f, std::make_shared<KalmanFilter>(), iou, cosine);
 
-    std::vector<std::shared_ptr<Tracklet>> av{live(makeT(100.f, 100.f, 50.f, 80.f))};
+    std::vector<std::shared_ptr<Tracklet>> av{live(make_t(100.f, 100.f, 50.f, 80.f))};
     std::vector<std::shared_ptr<Tracklet>> bv;
     for (int k = 0; k < 3; ++k)
-        bv.push_back(makeT(5100.f + 200.f * k, 100.f, 50.f, 80.f));
+        bv.push_back(make_t(5100.f + 200.f * k, 100.f, 50.f, 80.f));
 
     CostMatrix m;
     calc.calculate(av, bv, m);
 
-    expectOneLineForThreeGatedPairs(m);
+    expect_one_line_for_three_gated_pairs(m);
 }
 
 /**
@@ -1164,13 +1161,13 @@ TEST_F(GatingLogVolumeTest, PureReIDLogsOneLinePerCall)
 {
     PureReIDCostCalculator calc(0.4f, 9.4877f, std::make_shared<KalmanFilter>());
 
-    std::vector<std::shared_ptr<Tracklet>> av{live(makeFeatT(100.f, 100.f, 4, 0))};
+    std::vector<std::shared_ptr<Tracklet>> av{live(make_feat_t(100.f, 100.f, 4, 0))};
     std::vector<std::shared_ptr<Tracklet>> bv;
     for (int k = 0; k < 3; ++k)
-        bv.push_back(makeFeatT(5100.f + 200.f * k, 100.f, 4, 0));
+        bv.push_back(make_feat_t(5100.f + 200.f * k, 100.f, 4, 0));
 
     CostMatrix m;
     calc.calculate(av, bv, m);
 
-    expectOneLineForThreeGatedPairs(m);
+    expect_one_line_for_three_gated_pairs(m);
 }

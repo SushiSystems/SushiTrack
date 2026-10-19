@@ -63,7 +63,7 @@ The single backlog of this repository. Defects that stand in the tree are in
 
 ### RW-10 Suppress duplicates within the tracked pool
 - State: unmeasured
-- Done when: a benchmark run shows `removeDuplicateTracklets` over the tracked pool drops the
+- Done when: a benchmark run shows `remove_duplicate_tracklets` over the tracked pool drops the
   same-object duplicate identities of dense scenes without losing HOTA
 
 ### RW-11 Gate the IMM on the mixture innovation covariance

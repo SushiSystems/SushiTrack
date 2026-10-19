@@ -37,7 +37,7 @@ namespace SushiTrack
     /**
      * @brief Contiguous 2D matrix storage with reallocatable buffer.
      */
-    class CostMatrix
+    class CostMatrix final
     {
         public:
             /**
@@ -87,16 +87,19 @@ namespace SushiTrack
                 return data_[r * cols_ + c];
             }
 
-            std::size_t rows() const    { return rows_; }        ///< Row count.
-            std::size_t cols() const    { return cols_; }        ///< Column count.
-            float* data()               { return data_.data(); } ///< Pointer to internal buffer.
-            const float* data() const   { return data_.data(); } ///< Constant pointer to internal buffer.
+            [[nodiscard]] std::size_t rows() const { return rows_; } ///< Row count.
+            [[nodiscard]] std::size_t cols() const { return cols_; } ///< Column count.
+            [[nodiscard]] float* data() { return data_.data(); } ///< Pointer to internal buffer.
+            [[nodiscard]] const float* data() const
+            {
+                return data_.data();
+            } ///< Constant pointer to internal buffer.
 
             /**
              * @brief Checks if the matrix has zero dimensions.
              * @return True if either rows or columns is zero.
              */
-            bool empty() const          { return rows_ == 0 || cols_ == 0; }
+            [[nodiscard]] bool empty() const { return rows_ == 0 || cols_ == 0; }
 
         private:
             std::vector<float> data_;

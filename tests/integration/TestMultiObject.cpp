@@ -25,195 +25,203 @@
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-#include "Helpers.h"
-
 #include <set>
 #include <vector>
+
+#include <gtest/gtest.h>
+
+#include "Helpers.h"
 
 using namespace sushitrack_it;
 
 namespace
 {
 
-class MultiObjectTest : public ::testing::Test
-{
-protected:
-    sushitrack_tracker_t     hdl_    = nullptr;
-    sushitrack_params_t params_ = {};
-
-    void SetUp() override
+    class MultiObjectTest : public ::testing::Test
     {
-        sushitrack_get_default_params(&params_);
-        params_.time_aware         = 0;
-        params_.enable_tentative   = 0;
-        params_.primary_assoc_mode = 1;
-        params_.frame_rate         = 25;
-        params_.track_buffer       = 30;
-        params_.track_thresh       = 0.2f;
-        params_.high_thresh        = 0.5f;
-        params_.match_thresh       = 0.9f;
+        protected:
+            sushitrack_tracker_t hdl_ = nullptr;
+            sushitrack_params_t params_ = {};
 
-        hdl_ = sushitrack_create(&params_);
-        ASSERT_NE(hdl_, nullptr);
-    }
-
-    void TearDown() override { if (hdl_) sushitrack_destroy(hdl_); }
-};
-
-/**
- * @brief A crowded grid of 25 well-separated objects moving uniformly: every
- *        object keeps a stable, unique identity across the run with sane
- *        geometry on every frame.
- */
-TEST_F(MultiObjectTest, CrowdedSceneKeepsDistinctStableIdentities)
-{
-    constexpr int kCols   = 5;
-    constexpr int kRows   = 5;
-    constexpr int kCount  = kCols * kRows;
-    constexpr int kFrames = 20;
-    constexpr float kSpacing = 200.0f; // wide separation -> unambiguous association
-
-    std::vector<sushitrack_track_t> out(static_cast<std::size_t>(kCount) + 8);
-
-    auto buildFrame = [&](int frame) {
-        std::vector<sushitrack_object_t> dets;
-        dets.reserve(kCount);
-        for (int r = 0; r < kRows; ++r)
-            for (int c = 0; c < kCols; ++c)
+            void SetUp() override
             {
-                const float x = 100.0f + c * kSpacing + 3.0f * frame; // drift right
-                const float y = 100.0f + r * kSpacing + 1.0f * frame; // drift down
-                dets.push_back(makeDet(x, y));
+                sushitrack_get_default_params(&params_);
+                params_.time_aware = 0;
+                params_.enable_tentative = 0;
+                params_.primary_assoc_mode = 1;
+                params_.frame_rate = 25;
+                params_.track_buffer = 30;
+                params_.track_thresh = 0.2f;
+                params_.high_thresh = 0.5f;
+                params_.match_thresh = 0.9f;
+
+                hdl_ = sushitrack_create(&params_);
+                ASSERT_NE(hdl_, nullptr);
             }
-        return dets;
+
+            void TearDown() override
+            {
+                if (hdl_)
+                    sushitrack_destroy(hdl_);
+            }
     };
 
-    // Frame 0: seed.
-    auto f0 = buildFrame(0);
-    int n0 = sushitrack_update(hdl_, f0.data(), kCount, out.data(),
-                              static_cast<int>(out.size()), 0.04f);
-    ASSERT_EQ(n0, kCount) << "Not every object produced a track on seed frame.";
-
-    std::set<int64_t> seed_ids;
-    for (int i = 0; i < n0; ++i)
-        seed_ids.insert(out[static_cast<std::size_t>(i)].track_id);
-    ASSERT_EQ(static_cast<int>(seed_ids.size()), kCount)
-        << "Duplicate ids assigned on the seed frame.";
-
-    // Drive the scene and require the id set to remain exactly the seed set.
-    for (int frame = 1; frame < kFrames; ++frame)
+    /**
+     * @brief A crowded grid of 25 well-separated objects moving uniformly: every
+     *        object keeps a stable, unique identity across the run with sane
+     *        geometry on every frame.
+     */
+    TEST_F(MultiObjectTest, CrowdedSceneKeepsDistinctStableIdentities)
     {
-        auto f = buildFrame(frame);
-        int n = sushitrack_update(hdl_, f.data(), kCount, out.data(),
-                                 static_cast<int>(out.size()), 0.04f);
-        ASSERT_EQ(n, kCount) << "Object count changed at frame " << frame;
+        constexpr int K_COLS = 5;
+        constexpr int K_ROWS = 5;
+        constexpr int K_COUNT = K_COLS * K_ROWS;
+        constexpr int K_FRAMES = 20;
+        constexpr float K_SPACING = 200.0f; // wide separation -> unambiguous association
 
-        std::set<int64_t> ids;
-        for (int i = 0; i < n; ++i)
+        std::vector<sushitrack_track_t> out(static_cast<std::size_t>(K_COUNT) + 8);
+
+        auto build_frame = [&](int frame)
+        {
+            std::vector<sushitrack_object_t> dets;
+            dets.reserve(K_COUNT);
+            for (int r = 0; r < K_ROWS; ++r)
+                for (int c = 0; c < K_COLS; ++c)
+                {
+                    const float x = 100.0f + c * K_SPACING + 3.0f * frame; // drift right
+                    const float y = 100.0f + r * K_SPACING + 1.0f * frame; // drift down
+                    dets.push_back(make_det(x, y));
+                }
+            return dets;
+        };
+
+        // Frame 0: seed.
+        auto f0 = build_frame(0);
+        int n0 = sushitrack_update(hdl_, f0.data(), K_COUNT, out.data(),
+                                   static_cast<int>(out.size()), 0.04f);
+        ASSERT_EQ(n0, K_COUNT) << "Not every object produced a track on seed frame.";
+
+        std::set<int64_t> seed_ids;
+        for (int i = 0; i < n0; ++i)
+            seed_ids.insert(out[static_cast<std::size_t>(i)].track_id);
+        ASSERT_EQ(static_cast<int>(seed_ids.size()), K_COUNT)
+            << "Duplicate ids assigned on the seed frame.";
+
+        // Drive the scene and require the id set to remain exactly the seed set.
+        for (int frame = 1; frame < K_FRAMES; ++frame)
+        {
+            auto f = build_frame(frame);
+            int n = sushitrack_update(hdl_, f.data(), K_COUNT, out.data(),
+                                      static_cast<int>(out.size()), 0.04f);
+            ASSERT_EQ(n, K_COUNT) << "Object count changed at frame " << frame;
+
+            std::set<int64_t> ids;
+            for (int i = 0; i < n; ++i)
+            {
+                const sushitrack_track_t& t = out[static_cast<std::size_t>(i)];
+                EXPECT_TRUE(geometry_is_sane(t)) << "Insane geometry at frame " << frame;
+                ids.insert(t.track_id);
+            }
+            EXPECT_EQ(ids, seed_ids)
+                << "Identity set drifted at frame " << frame << " (a track churned or swapped).";
+        }
+    }
+
+    /**
+     * @brief Two objects in distinct lanes (held 150 px apart in y so their boxes
+     *        never overlap) moving in opposite x directions pass each other without
+     *        exchanging identities.
+     */
+    TEST_F(MultiObjectTest, CounterMovingSeparableObjectsDoNotSwapIds)
+    {
+        std::vector<sushitrack_track_t> out(8);
+
+        // Lane separation 150 px, box height 100 -> no vertical overlap at any time.
+        const float y_left = 150.0f;
+        const float y_right = 300.0f;
+        float lx = 100.0f, rx = 500.0f;
+        const float speed = 40.0f;
+
+        sushitrack_object_t l0 = make_det(lx, y_left);
+        sushitrack_object_t r0 = make_det(rx, y_right);
+        sushitrack_object_t d0[2] = {l0, r0};
+        int n0 = sushitrack_update(hdl_, d0, 2, out.data(), 8, 0.04f);
+        ASSERT_GE(n0, 2);
+
+        int64_t id_left = -1, id_right = -1;
+        for (int i = 0; i < n0; ++i)
         {
             const sushitrack_track_t& t = out[static_cast<std::size_t>(i)];
-            EXPECT_TRUE(geometryIsSane(t)) << "Insane geometry at frame " << frame;
-            ids.insert(t.track_id);
+            if (t.y < 225.0f)
+                id_left = t.track_id;
+            else
+                id_right = t.track_id;
         }
-        EXPECT_EQ(ids, seed_ids)
-            << "Identity set drifted at frame " << frame
-            << " (a track churned or swapped).";
+        ASSERT_NE(id_left, -1);
+        ASSERT_NE(id_right, -1);
+        ASSERT_NE(id_left, id_right);
+
+        // March them past each other in x (they overlap in x mid-run, never in y).
+        for (int k = 1; k <= 10; ++k)
+        {
+            lx += speed;
+            rx -= speed;
+            sushitrack_object_t l = make_det(lx, y_left);
+            sushitrack_object_t r = make_det(rx, y_right);
+            sushitrack_object_t d[2] = {l, r};
+            int n = sushitrack_update(hdl_, d, 2, out.data(), 8, 0.04f);
+            ASSERT_GE(n, 2);
+
+            const sushitrack_track_t* tl = find_by_id(out, n, id_left);
+            const sushitrack_track_t* tr = find_by_id(out, n, id_right);
+            ASSERT_NE(tl, nullptr) << "Left-lane id vanished at step " << k;
+            ASSERT_NE(tr, nullptr) << "Right-lane id vanished at step " << k;
+            // Each id must stay anchored to its own lane.
+            EXPECT_LT(tl->y, 225.0f) << "Left id jumped lanes at step " << k;
+            EXPECT_GT(tr->y, 225.0f) << "Right id jumped lanes at step " << k;
+        }
     }
-}
 
-/**
- * @brief Two objects in distinct lanes (held 150 px apart in y so their boxes
- *        never overlap) moving in opposite x directions pass each other without
- *        exchanging identities.
- */
-TEST_F(MultiObjectTest, CounterMovingSeparableObjectsDoNotSwapIds)
-{
-    std::vector<sushitrack_track_t> out(8);
-
-    // Lane separation 150 px, box height 100 -> no vertical overlap at any time.
-    const float y_left  = 150.0f;
-    const float y_right = 300.0f;
-    float lx = 100.0f, rx = 500.0f;
-    const float speed = 40.0f;
-
-    sushitrack_object_t l0 = makeDet(lx, y_left);
-    sushitrack_object_t r0 = makeDet(rx, y_right);
-    sushitrack_object_t d0[2] = { l0, r0 };
-    int n0 = sushitrack_update(hdl_, d0, 2, out.data(), 8, 0.04f);
-    ASSERT_GE(n0, 2);
-
-    int64_t id_left = -1, id_right = -1;
-    for (int i = 0; i < n0; ++i)
+    /**
+     * @brief The output-capacity contract: with more active objects than the
+     *        supplied buffer can hold, Update returns exactly max_tracks and every
+     *        returned entry is a Tracked track (the highest output priority).
+     */
+    TEST_F(MultiObjectTest, OutputRespectsMaxTracksCapacityAndPriority)
     {
-        const sushitrack_track_t& t = out[static_cast<std::size_t>(i)];
-        if (t.y < 225.0f) id_left = t.track_id;
-        else              id_right = t.track_id;
+        constexpr int K_OBJECTS = 6;
+        std::vector<sushitrack_track_t> out(K_OBJECTS);
+
+        auto frame = [&](int f)
+        {
+            std::vector<sushitrack_object_t> dets;
+            for (int i = 0; i < K_OBJECTS; ++i)
+                dets.push_back(make_det(100.0f + i * 200.0f + 2.0f * f, 200.0f));
+            return dets;
+        };
+
+        // Establish all six objects with a generous buffer.
+        for (int f = 0; f < 3; ++f)
+        {
+            auto d = frame(f);
+            int n = sushitrack_update(hdl_, d.data(), K_OBJECTS, out.data(), K_OBJECTS, 0.04f);
+            ASSERT_GE(n, 1);
+        }
+
+        // Now request the same frame but only allow room for half the tracks.
+        constexpr int K_CAP = 3;
+        auto d = frame(3);
+        int n = sushitrack_update(hdl_, d.data(), K_OBJECTS, out.data(), K_CAP, 0.04f);
+
+        EXPECT_LE(n, K_CAP) << "Update wrote more tracks than max_tracks permitted.";
+        EXPECT_EQ(n, K_CAP) << "With six active tracks and capacity three, exactly "
+                               "three should be returned.";
+        for (int i = 0; i < n; ++i)
+        {
+            EXPECT_EQ(out[static_cast<std::size_t>(i)].state, K_TRACKED)
+                << "Truncated output should retain Tracked tracks ahead of others.";
+            EXPECT_TRUE(geometry_is_sane(out[static_cast<std::size_t>(i)]));
+        }
     }
-    ASSERT_NE(id_left, -1);
-    ASSERT_NE(id_right, -1);
-    ASSERT_NE(id_left, id_right);
-
-    // March them past each other in x (they overlap in x mid-run, never in y).
-    for (int k = 1; k <= 10; ++k)
-    {
-        lx += speed;
-        rx -= speed;
-        sushitrack_object_t l = makeDet(lx, y_left);
-        sushitrack_object_t r = makeDet(rx, y_right);
-        sushitrack_object_t d[2] = { l, r };
-        int n = sushitrack_update(hdl_, d, 2, out.data(), 8, 0.04f);
-        ASSERT_GE(n, 2);
-
-        const sushitrack_track_t* tl = findById(out, n, id_left);
-        const sushitrack_track_t* tr = findById(out, n, id_right);
-        ASSERT_NE(tl, nullptr) << "Left-lane id vanished at step " << k;
-        ASSERT_NE(tr, nullptr) << "Right-lane id vanished at step " << k;
-        // Each id must stay anchored to its own lane.
-        EXPECT_LT(tl->y, 225.0f) << "Left id jumped lanes at step " << k;
-        EXPECT_GT(tr->y, 225.0f) << "Right id jumped lanes at step " << k;
-    }
-}
-
-/**
- * @brief The output-capacity contract: with more active objects than the
- *        supplied buffer can hold, Update returns exactly max_tracks and every
- *        returned entry is a Tracked track (the highest output priority).
- */
-TEST_F(MultiObjectTest, OutputRespectsMaxTracksCapacityAndPriority)
-{
-    constexpr int kObjects = 6;
-    std::vector<sushitrack_track_t> out(kObjects);
-
-    auto frame = [&](int f) {
-        std::vector<sushitrack_object_t> dets;
-        for (int i = 0; i < kObjects; ++i)
-            dets.push_back(makeDet(100.0f + i * 200.0f + 2.0f * f, 200.0f));
-        return dets;
-    };
-
-    // Establish all six objects with a generous buffer.
-    for (int f = 0; f < 3; ++f)
-    {
-        auto d = frame(f);
-        int n = sushitrack_update(hdl_, d.data(), kObjects, out.data(), kObjects, 0.04f);
-        ASSERT_GE(n, 1);
-    }
-
-    // Now request the same frame but only allow room for half the tracks.
-    constexpr int kCap = 3;
-    auto d = frame(3);
-    int n = sushitrack_update(hdl_, d.data(), kObjects, out.data(), kCap, 0.04f);
-
-    EXPECT_LE(n, kCap) << "Update wrote more tracks than max_tracks permitted.";
-    EXPECT_EQ(n, kCap) << "With six active tracks and capacity three, exactly "
-                          "three should be returned.";
-    for (int i = 0; i < n; ++i)
-    {
-        EXPECT_EQ(out[static_cast<std::size_t>(i)].state, kTracked)
-            << "Truncated output should retain Tracked tracks ahead of others.";
-        EXPECT_TRUE(geometryIsSane(out[static_cast<std::size_t>(i)]));
-    }
-}
 
 } // namespace

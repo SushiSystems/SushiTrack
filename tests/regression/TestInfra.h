@@ -28,6 +28,7 @@
 #pragma once
 
 #include <chrono>
+#include <exception>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -35,10 +36,9 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <exception>
 
 #ifdef _WIN32
-#   include <intrin.h>
+#include <intrin.h>
 #endif
 
 #include <nlohmann/json.hpp>
@@ -50,13 +50,13 @@ namespace TestInfrastructure
      */
     struct MOTDetection
     {
-        float x;     ///< Horizontal coordinate.
-        float y;     ///< Vertical coordinate.
-        float w;     ///< Dimension width.
-        float h;     ///< Dimension height.
-        float score; ///< Detection confidence.
-        int   label; ///< Classification label.
-        std::vector<float> feature; ///< Visual appearance embedding.
+            float x;                    ///< Horizontal coordinate.
+            float y;                    ///< Vertical coordinate.
+            float w;                    ///< Dimension width.
+            float h;                    ///< Dimension height.
+            float score;                ///< Detection confidence.
+            int label;                  ///< Classification label.
+            std::vector<float> feature; ///< Visual appearance embedding.
     };
 
     /**
@@ -64,12 +64,12 @@ namespace TestInfrastructure
      */
     struct TrackResult
     {
-        int   track_id; ///< Identity identifier.
-        float x;        ///< Horizontal coordinate.
-        float y;        ///< Vertical coordinate.
-        float w;        ///< Dimension width.
-        float h;        ///< Dimension height.
-        float score;    ///< Identity confidence.
+            int track_id; ///< Identity identifier.
+            float x;      ///< Horizontal coordinate.
+            float y;      ///< Vertical coordinate.
+            float w;      ///< Dimension width.
+            float h;      ///< Dimension height.
+            float score;  ///< Identity confidence.
     };
 
     /**
@@ -90,7 +90,7 @@ namespace TestInfrastructure
 
             /**
              * @brief Calculates elapsed time since the last reset.
-             * 
+             *
              * @return Elapsed time in microseconds.
              */
             double elapsed_us() const
@@ -100,57 +100,57 @@ namespace TestInfrastructure
             }
 
         private:
-            std::chrono::time_point<std::chrono::high_resolution_clock> start_; ///< Start timestamp.
+            std::chrono::time_point<std::chrono::high_resolution_clock>
+                start_; ///< Start timestamp.
     };
 
     /**
      * @brief Detects and prints system CPU information.
      */
-    inline void printHardwareInfo()
+    inline void print_hardware_info()
     {
-            std::cout << "\n[ HARDWARE ]\n";
+        std::cout << "\n[ HARDWARE ]\n";
 
-        #if defined(_WIN32)
-            int  cpuInfo[4]  = {-1};
-            char brand[0x40] = {0};
-            __cpuid(cpuInfo, 0x80000000);
-            int n = cpuInfo[0];
-            for (int i = 0x80000002; i <= n && i <= 0x80000004; ++i)
+#if defined(_WIN32)
+        int cpu_info[4] = {-1};
+        char brand[0x40] = {0};
+        __cpuid(cpu_info, 0x80000000);
+        int n = cpu_info[0];
+        for (int i = 0x80000002; i <= n && i <= 0x80000004; ++i)
+        {
+            __cpuid(cpu_info, i);
+            std::memcpy(brand + (i - 0x80000002) * 16, cpu_info, 16);
+        }
+        std::cout << "  CPU : " << brand << "\n";
+#elif defined(__linux__)
+        std::ifstream f("/proc/cpuinfo");
+        std::string line;
+        while (std::getline(f, line))
+        {
+            if (line.find("model name") == 0)
             {
-                __cpuid(cpuInfo, i);
-                std::memcpy(brand + (i - 0x80000002) * 16, cpuInfo, 16);
+                auto pos = line.find(':');
+                if (pos != std::string::npos)
+                    std::cout << "  CPU : " << line.substr(pos + 2) << "\n";
+                break;
             }
-            std::cout << "  CPU : " << brand << "\n";
-        #elif defined(__linux__)
-            std::ifstream f("/proc/cpuinfo");
-            std::string   line;
-            while (std::getline(f, line))
-            {
-                if (line.find("model name") == 0)
-                {
-                    auto pos = line.find(':');
-                    if (pos != std::string::npos)
-                        std::cout << "  CPU : " << line.substr(pos + 2) << "\n";
-                    break;
-                }
-            }
-        #elif defined(__APPLE__)
-            std::cout << "  CPU : ";
-            std::fflush(stdout);
-            std::system("sysctl -n machdep.cpu.brand_string");
-        #endif
+        }
+#elif defined(__APPLE__)
+        std::cout << "  CPU : ";
+        std::fflush(stdout);
+        std::system("sysctl -n machdep.cpu.brand_string");
+#endif
 
-            std::cout << "------------------------------\n";
+        std::cout << "------------------------------\n";
     }
 
     /**
      * @brief Parses a MOT format detection file.
-     * 
+     *
      * @param filepath Path to the input detection text file.
      * @return Map of frame identifiers to detection collections.
      */
-    inline std::map<int, std::vector<MOTDetection>>
-    load_mot_detections(const std::string& filepath)
+    inline std::map<int, std::vector<MOTDetection>> load_mot_detections(const std::string& filepath)
     {
         std::map<int, std::vector<MOTDetection>> result;
         std::ifstream file(filepath);
@@ -163,23 +163,30 @@ namespace TestInfrastructure
             if (line.empty() || line[0] == '#')
                 continue;
 
-            std::stringstream  ss(line);
-            std::string        token;
+            std::stringstream ss(line);
+            std::string token;
             std::vector<float> row;
             while (std::getline(ss, token, ','))
             {
-                try { row.push_back(std::stof(token)); }
-                catch (...) { break; }
+                try
+                {
+                    row.push_back(std::stof(token));
+                }
+                catch (...)
+                {
+                    break;
+                }
             }
 
-            if (row.size() < 7) continue;
+            if (row.size() < 7)
+                continue;
 
-            int          frame_id = static_cast<int>(row[0]);
+            int frame_id = static_cast<int>(row[0]);
             MOTDetection det;
-            det.x     = row[2];
-            det.y     = row[3];
-            det.w     = row[4];
-            det.h     = row[5];
+            det.x = row[2];
+            det.y = row[3];
+            det.w = row[4];
+            det.h = row[5];
             det.score = row[6];
             det.label = (row.size() > 7) ? static_cast<int>(row[7]) : 1;
             result[frame_id].push_back(det);
@@ -189,11 +196,11 @@ namespace TestInfrastructure
     }
 
     using JsonSection = nlohmann::json;
-    using JsonDoc     = nlohmann::json;
+    using JsonDoc = nlohmann::json;
 
     /**
      * @brief Minimalist JSON parser for configuration loading.
-     * 
+     *
      * @param filepath Path to the input JSON file.
      * @return Map representing the JSON structure.
      */
@@ -201,22 +208,23 @@ namespace TestInfrastructure
     {
         JsonDoc result = nlohmann::json::object();
         std::ifstream file(filepath);
-        if (!file.is_open()) return result;
-        
-        try 
+        if (!file.is_open())
+            return result;
+
+        try
         {
             result = nlohmann::json::parse(file, nullptr, true, true);
-        } 
-        catch (const nlohmann::json::parse_error& e) 
+        }
+        catch (const nlohmann::json::parse_error& e)
         {
-            std::cerr << "[ JSON ERROR ] Parse failed in " << filepath 
-                      << " at byte " << e.byte << ": " << e.what() << "\n";
-        } 
-        catch (const std::exception& e) 
+            std::cerr << "[ JSON ERROR ] Parse failed in " << filepath << " at byte " << e.byte
+                      << ": " << e.what() << "\n";
+        }
+        catch (const std::exception& e)
         {
             std::cerr << "[ JSON ERROR ] Error parsing " << filepath << ": " << e.what() << "\n";
-        } 
-        catch (...) 
+        }
+        catch (...)
         {
             std::cerr << "[ JSON ERROR ] Unknown error parsing " << filepath << "\n";
         }
@@ -238,5 +246,4 @@ namespace TestInfrastructure
         return def;
     }
 
-    
 } // namespace TestInfrastructure

@@ -27,11 +27,12 @@
 
 #pragma once
 
-#include <SushiTrack/filtering/i_kalman_filter.hpp>
-#include <SushiTrack/filtering/kalman_filter.hpp>
-
 #include <array>
+#include <cstdint>
 #include <memory>
+
+#include <SushiTrack/filtering/gated_state_predictor.hpp>
+#include <SushiTrack/filtering/kalman_filter.hpp>
 
 namespace SushiTrack
 {
@@ -41,7 +42,7 @@ namespace SushiTrack
      * Combines constant-velocity, constant-acceleration, coordinated-turn,
      * and near-constant-position modes through an IMM Markov mixing cycle.
      */
-    class IMMFilter : public IKalmanFilter
+    class IMMFilter final : public GatedStatePredictor
     {
         public:
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -57,72 +58,98 @@ namespace SushiTrack
             void initiate(KalmanTypes::StateMean& mean, KalmanTypes::StateCov& covariance,
                           const KalmanTypes::DetectBox& measurement, float score = 0.0f) override;
 
-            void predict(KalmanTypes::StateMean& mean, KalmanTypes::StateCov& covariance, float dt) override;
+            void predict(KalmanTypes::StateMean& mean, KalmanTypes::StateCov& covariance,
+                         float dt) override;
 
             void update(KalmanTypes::StateMean& mean, KalmanTypes::StateCov& covariance,
                         const KalmanTypes::DetectBox& measurement, float score = 0.0f) override;
 
             /** @brief No-op: per-mode process noise is intrinsic to the IMM model bank. */
-            void setNoiseMultipliers(float pos_mult, float size_mult, float vel_mult) override;
+            void set_noise_multipliers(float pos_mult, float size_mult, float vel_mult) override;
 
-            bool isInGate(const KalmanTypes::StateMean& mean, const KalmanTypes::StateCov& covariance,
-                          const KalmanTypes::DetectBox& measurement, float chi2_thresh,
-                          float score = 0.0f) const override;
+            [[nodiscard]] bool is_in_gate(const KalmanTypes::StateMean& mean,
+                                          const KalmanTypes::StateCov& covariance,
+                                          const KalmanTypes::DetectBox& measurement,
+                                          float chi2_thresh, float score = 0.0f) const override;
 
-            std::vector<bool> getGateFlags(const KalmanTypes::StateMean& mean,
-                                           const KalmanTypes::StateCov& covariance,
-                                           const KalmanTypes::DetectBoxVector& measurements,
-                                           float chi2_thresh,
-                                           const std::vector<float>& scores = {}) const override;
+            [[nodiscard]] std::vector<bool>
+            get_gate_flags(const KalmanTypes::StateMean& mean,
+                           const KalmanTypes::StateCov& covariance,
+                           const KalmanTypes::DetectBoxVector& measurements, float chi2_thresh,
+                           const std::vector<float>& scores = {}) const override;
 
-            std::vector<float> getGateSqDistances(const KalmanTypes::StateMean& mean,
-                                                  const KalmanTypes::StateCov& covariance,
-                                                  const KalmanTypes::DetectBoxVector& measurements,
-                                                  const std::vector<float>& scores = {}) const override;
+            [[nodiscard]] std::vector<float>
+            get_gate_sq_distances(const KalmanTypes::StateMean& mean,
+                                  const KalmanTypes::StateCov& covariance,
+                                  const KalmanTypes::DetectBoxVector& measurements,
+                                  const std::vector<float>& scores = {}) const override;
 
             /**
              * @brief Probability mass on the manoeuvring models (CA + CT).
              *
              * Continuous regime signal for association cost shaping and OCM weighting.
              */
-            float maneuverProbability() const override { return maneuver_probability_; }
+            [[nodiscard]] float maneuver_probability() const override
+            {
+                return maneuver_probability_;
+            }
 
             /** @brief Probability mass on the near-constant-position model. */
-            float stationaryProbability() const override { return stationary_probability_; }
+            [[nodiscard]] float stationary_probability() const override
+            {
+                return stationary_probability_;
+            }
 
             /** @brief Snapshots the full mode bank (states, covariances, probabilities) for ORU rollback. */
-            void saveCheckpoint() override;
+            void save_checkpoint() override;
 
-            /** @brief Restores the mode bank captured by the last saveCheckpoint(). */
-            void restoreCheckpoint() override;
+            /** @brief Restores the mode bank captured by the last save_checkpoint(). */
+            void restore_checkpoint() override;
 
         private:
             /**
              * @brief Mode indices into the model bank.
              */
-            enum Mode { CV = 0, CA = 1, NCP = 2, CT = 3 };
-            static constexpr int kNumModes = 4;
-            static constexpr int kDim = 11;   ///< [cx cy w h  vx vy vw vh  ax ay  omega]
+            enum class Mode : std::uint8_t
+            {
+                CV = 0,  /**< Constant velocity. */
+                CA = 1,  /**< Constant acceleration. */
+                NCP = 2, /**< Nearly constant position. */
+                CT = 3,  /**< Coordinated turn. */
+            };
 
-            using Vec11 = Eigen::Matrix<float, kDim, 1>;
-            using Mat11 = Eigen::Matrix<float, kDim, kDim>;
-            using MatH  = Eigen::Matrix<float, 4, kDim>;   ///< Measurement map: state -> [cx, cy, w, h].
-            using Mat4  = Eigen::Matrix<float, 4, 4>;
+            /// @brief Returns the position of a mode in the model bank.
+            [[nodiscard]] static constexpr int index(Mode mode) noexcept
+            {
+                return static_cast<int>(mode);
+            }
+            static constexpr int K_NUM_MODES = 4;
+            static constexpr int K_DIM = 11; ///< [cx cy w h  vx vy vw vh  ax ay  omega]
 
-            bool  enable_xyah_;
-            bool  initialized_ = false;
+            using Vec11 = Eigen::Matrix<float, K_DIM, 1>;
+            using Mat11 = Eigen::Matrix<float, K_DIM, K_DIM>;
+            using MatH =
+                Eigen::Matrix<float, 4, K_DIM>; ///< Measurement map: state -> [cx, cy, w, h].
+            using Mat4 = Eigen::Matrix<float, 4, 4>;
+
+            bool enable_xyah_;
+            bool initialized_ = false;
             float maneuver_probability_ = 0.0f;
             float stationary_probability_ = 0.0f;
 
-            std::array<Vec11, kNumModes> x_;      ///< Per-mode state mean (11-D).
-            std::array<Mat11, kNumModes> P_;      ///< Per-mode state covariance.
-            Eigen::Matrix<float, kNumModes, 1> mu_;    ///< Posterior mode probabilities.
-            Eigen::Matrix<float, kNumModes, 1> cbar_;  ///< Predicted mode probabilities (mixing normalisers); carried predict -> update.
-            Eigen::Matrix<float, kNumModes, kNumModes> Pi_; ///< Markov mode-transition matrix (p_ij = i -> j).
+            std::array<Vec11, K_NUM_MODES> x_;        ///< Per-mode state mean (11-D).
+            std::array<Mat11, K_NUM_MODES> p_;        ///< Per-mode state covariance.
+            Eigen::Matrix<float, K_NUM_MODES, 1> mu_; ///< Posterior mode probabilities.
+            Eigen::Matrix<float, K_NUM_MODES, 1>
+                cbar_; ///< Predicted mode probabilities (mixing normalisers); carried predict -> update.
+            Eigen::Matrix<float, K_NUM_MODES, K_NUM_MODES>
+                pi_; ///< Markov mode-transition matrix (p_ij = i -> j).
 
-            KalmanTypes::StateMean last_combined_; ///< Last combined 8-D mean written out; anchor for the delta re-sync of Tracklet's external pokes.
+            KalmanTypes::StateMean
+                last_combined_; ///< Last combined 8-D mean written out; anchor for the delta re-sync of Tracklet's external pokes.
 
-            std::unique_ptr<KalmanFilter> gate_kf_; ///< Stateless helper used only for gating on the combined estimate.
+            std::unique_ptr<KalmanFilter>
+                gate_kf_; ///< Stateless helper used only for gating on the combined estimate.
 
             /**
              * @brief Full mode-bank snapshot for ORU rollback.
@@ -131,30 +158,32 @@ namespace SushiTrack
              */
             struct Checkpoint
             {
-                std::array<Vec11, kNumModes>       x;
-                std::array<Mat11, kNumModes>       P;
-                Eigen::Matrix<float, kNumModes, 1> mu;
-                Eigen::Matrix<float, kNumModes, 1> cbar;
-                KalmanTypes::StateMean             last_combined;
-                bool                               initialized = false;
-                bool                               valid       = false;
+                    std::array<Vec11, K_NUM_MODES> x;
+                    std::array<Mat11, K_NUM_MODES> cov;
+                    Eigen::Matrix<float, K_NUM_MODES, 1> mu;
+                    Eigen::Matrix<float, K_NUM_MODES, 1> cbar;
+                    KalmanTypes::StateMean last_combined;
+                    bool initialized = false;
+                    bool valid = false;
             };
             Checkpoint checkpoint_;
 
-            MatH measurementMatrix() const;
-            Mat4 measurementNoise(float height, float width) const;
-            Mat11 transitionMatrix(Mode m, float dt) const;
-            Vec11 processNoiseDiag(Mode m, float dt, float width, float height) const;
+            [[nodiscard]] MatH measurement_matrix() const;
+            [[nodiscard]] Mat4 measurement_noise(float height, float width) const;
+            [[nodiscard]] Mat11 transition_matrix(Mode m, float dt) const;
+            [[nodiscard]] Vec11 process_noise_diag(Mode m, float dt, float width,
+                                                   float height) const;
 
             /** @brief Nonlinear coordinated-turn time update for a single state. */
-            Vec11 ctTransition(const Vec11& x, float dt) const;
+            [[nodiscard]] Vec11 ct_transition(const Vec11& x, float dt) const;
 
             /** @brief Unscented (sigma-point) time update used by the coordinated-turn mode. */
-            void ukfPredict(const Vec11& x0, const Mat11& P0, float dt,
-                            Vec11& x_out, Mat11& P_out) const;
+            void ukf_predict(const Vec11& x0, const Mat11& prior_cov, float dt, Vec11& x_out,
+                             Mat11& out_cov) const;
 
             /** @brief IMM step 1: mode-conditioned mixing of the prior estimates. */
-            void mix(std::array<Vec11, kNumModes>& x0, std::array<Mat11, kNumModes>& P0) const;
+            void mix(std::array<Vec11, K_NUM_MODES>& x0,
+                     std::array<Mat11, K_NUM_MODES>& prior_cov) const;
 
             /** @brief IMM step 4: collapse the mode bank into the external 8-D estimate. */
             void combine(KalmanTypes::StateMean& mean, KalmanTypes::StateCov& covariance);
@@ -162,7 +191,7 @@ namespace SushiTrack
             /** @brief Re-applies any external mutation of the shared 8-D mean onto every mode. */
             void reanchor(const KalmanTypes::StateMean& external_mean);
 
-            static void symmetrize(Mat11& P) { P = 0.5f * (P + P.transpose().eval()); }
+            static void symmetrize(Mat11& cov) { cov = 0.5f * (cov + cov.transpose().eval()); }
     };
 
 } // namespace SushiTrack

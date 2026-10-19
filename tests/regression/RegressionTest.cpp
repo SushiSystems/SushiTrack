@@ -25,16 +25,6 @@
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-
-#include "TestInfra.h"
-#include "ITrackerAdapter.h"
-#include "MOTRunner.h"
-#include "ScenarioList.h"
-#include "SushiTrackAdapter.h"
-#include "ByteTrackAdapter.h"
-#include "OCSORTAdapter.h"
-
 #include <algorithm>
 #include <cstdlib>
 #include <filesystem>
@@ -42,6 +32,16 @@
 #include <memory>
 #include <string>
 #include <vector>
+
+#include <gtest/gtest.h>
+
+#include "ByteTrackAdapter.h"
+#include "MOTRunner.h"
+#include "OCSORTAdapter.h"
+#include "ScenarioList.h"
+#include "SushiTrackAdapter.h"
+#include "TestInfra.h"
+#include "TrackerAdapter.h"
 
 using namespace TestInfrastructure;
 namespace fs = std::filesystem;
@@ -55,45 +55,59 @@ namespace fs = std::filesystem;
  * bytetrack.json and ocsort.json under tests/). A binary launched from build/bin
  * still finds them by ascending through parent directories.
  */
-static std::string resolveConfigUp(const std::string& rel)
+static std::string resolve_config_up(const std::string& rel)
 {
     std::error_code ec;
     fs::path dir = fs::current_path(ec);
     for (int depth = 0; depth < 8 && !dir.empty(); ++depth)
     {
         fs::path candidate = dir / rel;
-        if (fs::exists(candidate, ec)) return candidate.string();
+        if (fs::exists(candidate, ec))
+            return candidate.string();
 
-        if (!dir.has_parent_path()) break;
+        if (!dir.has_parent_path())
+            break;
         fs::path parent = dir.parent_path();
-        if (parent == dir) break;
+        if (parent == dir)
+            break;
         dir = parent;
     }
     return "";
 }
 
 // SushiTrack resolves its own sushitrack.json inside the library (SUSHITRACK_CONFIG env var, then an upward search), so its factory passes an empty path and lets the loader decide. The reference trackers are configured here from their own files under tests/.
-static const std::string kByteTrackConfig = resolveConfigUp("tests/bytetrack.json");
-static const std::string kOCSortConfig    = resolveConfigUp("tests/ocsort.json");
+static const std::string K_BYTE_TRACK_CONFIG = resolve_config_up("tests/bytetrack.json");
+static const std::string K_OC_SORT_CONFIG = resolve_config_up("tests/ocsort.json");
 
 // Adapter factories
 
-using AdapterFactory = std::function<std::unique_ptr<ITrackerAdapter>()>;
+using AdapterFactory = std::function<std::unique_ptr<TrackerAdapter>()>;
 
 /**
  * @brief Associates a tracker name with its adapter factory.
  */
 struct NamedFactory
 {
-    std::string    tracker_name; ///< Human-readable tracker identifier.
-    AdapterFactory factory;      ///< Factory function returning a fresh adapter.
+        std::string tracker_name; ///< Human-readable tracker identifier.
+        AdapterFactory factory;   ///< Factory function returning a fresh adapter.
 };
 
-static const NamedFactory kFactories[] =
-{
-    { "sushitrack", []() { return std::make_unique<SushiTrackAdapter>("");               } },
-    { "bytetrack", []() { return std::make_unique<ByteTrackAdapter>(kByteTrackConfig); } },
-    { "ocsort",    []() { return std::make_unique<OCSORTAdapter>(kOCSortConfig);        } },
+static const NamedFactory K_FACTORIES[] = {
+    {"sushitrack",
+     []()
+     {
+         return std::make_unique<SushiTrackAdapter>("");
+     }},
+    {"bytetrack",
+     []()
+     {
+         return std::make_unique<ByteTrackAdapter>(K_BYTE_TRACK_CONFIG);
+     }},
+    {"ocsort",
+     []()
+     {
+         return std::make_unique<OCSORTAdapter>(K_OC_SORT_CONFIG);
+     }},
 };
 
 // Parameterised test
@@ -103,9 +117,9 @@ static const NamedFactory kFactories[] =
  */
 struct RegressionParams
 {
-    Scenario        scenario;      ///< MOT sequence descriptor.
-    std::string     tracker_name;  ///< Tracker identifier string.
-    AdapterFactory  factory;       ///< Adapter factory for this tracker.
+        Scenario scenario;        ///< MOT sequence descriptor.
+        std::string tracker_name; ///< Tracker identifier string.
+        AdapterFactory factory;   ///< Adapter factory for this tracker.
 };
 
 /**
@@ -116,14 +130,11 @@ struct RegressionParams
  */
 class RegressionTest : public ::testing::TestWithParam<RegressionParams>
 {
-protected:
-    /** @brief Instantiates the tracker adapter before each test. */
-    void SetUp() override
-    {
-        adapter_ = GetParam().factory();
-    }
+    protected:
+        /** @brief Instantiates the tracker adapter before each test. */
+        void SetUp() override { adapter_ = GetParam().factory(); }
 
-    std::unique_ptr<ITrackerAdapter> adapter_; ///< Tracker under test.
+        std::unique_ptr<TrackerAdapter> adapter_; ///< Tracker under test.
 };
 
 /**
@@ -164,25 +175,22 @@ TEST_P(RegressionTest, LabelInference)
  * @brief Builds the cross-product of scenarios and tracker factories.
  * @return All (scenario, tracker) pairs for parameterised instantiation.
  */
-static std::vector<RegressionParams> buildParams()
+static std::vector<RegressionParams> build_params()
 {
     std::vector<RegressionParams> params;
-    for (const auto& sc : kScenarios)
-        for (const auto& nf : kFactories)
+    for (const auto& sc : K_SCENARIOS)
+        for (const auto& nf : K_FACTORIES)
             params.push_back({sc, nf.tracker_name, nf.factory});
     return params;
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    MOT,
-    RegressionTest,
-    ::testing::ValuesIn(buildParams()),
-    [](const ::testing::TestParamInfo<RegressionParams>& info)
-    {
-        std::string sc = info.param.scenario.name;
-        std::replace(sc.begin(), sc.end(), '-', '_');
-        return sc + "_" + info.param.tracker_name;
-    });
+INSTANTIATE_TEST_SUITE_P(MOT, RegressionTest, ::testing::ValuesIn(build_params()),
+                         [](const ::testing::TestParamInfo<RegressionParams>& info)
+                         {
+                             std::string sc = info.param.scenario.name;
+                             std::replace(sc.begin(), sc.end(), '-', '_');
+                             return sc + "_" + info.param.tracker_name;
+                         });
 
 // Entry point
 
@@ -195,13 +203,14 @@ INSTANTIATE_TEST_SUITE_P(
  */
 int main(int argc, char** argv)
 {
-    printHardwareInfo();
+    print_hardware_info();
 
-    std::cout << "[ CONFIG ] SushiTrack: resolved by the library (SUSHITRACK_CONFIG / sushitrack.json)\n";
+    std::cout
+        << "[ CONFIG ] SushiTrack: resolved by the library (SUSHITRACK_CONFIG / sushitrack.json)\n";
     std::cout << "[ CONFIG ] ByteTrack: "
-              << (kByteTrackConfig.empty() ? "defaults" : kByteTrackConfig) << "\n";
+              << (K_BYTE_TRACK_CONFIG.empty() ? "defaults" : K_BYTE_TRACK_CONFIG) << "\n";
     std::cout << "[ CONFIG ] OCSORT   : "
-              << (kOCSortConfig.empty() ? "defaults" : kOCSortConfig) << "\n\n";
+              << (K_OC_SORT_CONFIG.empty() ? "defaults" : K_OC_SORT_CONFIG) << "\n\n";
 
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

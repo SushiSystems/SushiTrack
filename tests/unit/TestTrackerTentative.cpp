@@ -25,9 +25,11 @@
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-#include <SushiTrack/c_api/sushitrack_c.h>
 #include <vector>
+
+#include <gtest/gtest.h>
+
+#include <SushiTrack/c_api/sushitrack_c.h>
 
 // TrackerTentativeTest
 
@@ -41,39 +43,42 @@
  */
 class TrackerTentativeTest : public ::testing::Test
 {
-protected:
-    sushitrack_tracker_t     hdl_    = nullptr;
-    sushitrack_params_t params_ = {};
+    protected:
+        sushitrack_tracker_t hdl_ = nullptr;
+        sushitrack_params_t params_ = {};
 
-    void SetUp() override
-    {
-        sushitrack_get_default_params(&params_);
-        params_.time_aware                = 1;
-        params_.enable_tentative          = 1;
-        params_.tentative_confirm_hits    = 3;
-        params_.tentative_max_age_seconds = 0.08f;
-        params_.track_buffer              = 2;
-        params_.frame_rate                = 25;
-        params_.tentative_match_thresh    = 0.9f;
-        params_.track_thresh              = 0.1f;
-        params_.high_thresh               = 0.2f;
-        params_.tentative_fast_thresh     = 1.0f;
+        void SetUp() override
+        {
+            sushitrack_get_default_params(&params_);
+            params_.time_aware = 1;
+            params_.enable_tentative = 1;
+            params_.tentative_confirm_hits = 3;
+            params_.tentative_max_age_seconds = 0.08f;
+            params_.track_buffer = 2;
+            params_.frame_rate = 25;
+            params_.tentative_match_thresh = 0.9f;
+            params_.track_thresh = 0.1f;
+            params_.high_thresh = 0.2f;
+            params_.tentative_fast_thresh = 1.0f;
 
-        hdl_ = sushitrack_create(&params_);
-        ASSERT_NE(hdl_, nullptr);
-    }
+            hdl_ = sushitrack_create(&params_);
+            ASSERT_NE(hdl_, nullptr);
+        }
 
-    void TearDown() override { sushitrack_destroy(hdl_); }
+        void TearDown() override { sushitrack_destroy(hdl_); }
 
-    /** @brief Returns a detection with the given top-left position. */
-    sushitrack_object_t det(float x, float y) const
-    {
-        sushitrack_object_t o{};
-        o.x = x; o.y = y;
-        o.width = 50.0f; o.height = 100.0f;
-        o.score = 0.9f;  o.label  = 1;
-        return o;
-    }
+        /** @brief Returns a detection with the given top-left position. */
+        sushitrack_object_t det(float x, float y) const
+        {
+            sushitrack_object_t o{};
+            o.x = x;
+            o.y = y;
+            o.width = 50.0f;
+            o.height = 100.0f;
+            o.score = 0.9f;
+            o.label = 1;
+            return o;
+        }
 };
 
 /**
@@ -90,9 +95,9 @@ TEST_F(TrackerTentativeTest, AgesOutViaSecondsBudgetWhenTimeAware)
 
     int n = sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
-    EXPECT_EQ(out[0].state,        4);
+    EXPECT_EQ(out[0].state, 4);
     EXPECT_EQ(out[0].is_confirmed, 0);
-    EXPECT_EQ(out[0].hits,         1);
+    EXPECT_EQ(out[0].hits, 1);
 
     n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f); // lost_time 0.04
     ASSERT_EQ(n, 1);
@@ -116,22 +121,27 @@ TEST(TrackerTentativeFrameBudgetTest, AgesOutViaFrameBudgetWhenFrameAware)
 {
     sushitrack_params_t params = {};
     sushitrack_get_default_params(&params);
-    params.time_aware                = 0;
-    params.enable_tentative          = 1;
-    params.tentative_confirm_hits    = 3;
+    params.time_aware = 0;
+    params.enable_tentative = 1;
+    params.tentative_confirm_hits = 3;
     params.tentative_max_miss_frames = 2;
-    params.frame_rate                = 25;
-    params.tentative_match_thresh    = 0.9f;
-    params.track_thresh              = 0.1f;
-    params.high_thresh               = 0.2f;
-    params.tentative_fast_thresh     = 1.0f;
+    params.frame_rate = 25;
+    params.tentative_match_thresh = 0.9f;
+    params.track_thresh = 0.1f;
+    params.high_thresh = 0.2f;
+    params.tentative_fast_thresh = 1.0f;
 
     sushitrack_tracker_t hdl = sushitrack_create(&params);
     ASSERT_NE(hdl, nullptr);
 
     std::vector<sushitrack_track_t> out(10);
     sushitrack_object_t o{};
-    o.x = 100.0f; o.y = 200.0f; o.width = 50.0f; o.height = 100.0f; o.score = 0.9f; o.label = 1;
+    o.x = 100.0f;
+    o.y = 200.0f;
+    o.width = 50.0f;
+    o.height = 100.0f;
+    o.score = 0.9f;
+    o.label = 1;
 
     int n = sushitrack_update(hdl, &o, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
@@ -167,9 +177,9 @@ TEST_F(TrackerTentativeTest, PromotedToTrackedAtHitThreshold)
 
     int n = sushitrack_update(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
-    EXPECT_EQ(out[0].state,        1);
+    EXPECT_EQ(out[0].state, 1);
     EXPECT_EQ(out[0].is_confirmed, 1);
-    EXPECT_EQ(out[0].hits,         3);
+    EXPECT_EQ(out[0].hits, 3);
 }
 
 /**
@@ -188,7 +198,7 @@ TEST_F(TrackerTentativeTest, PartialHitSequenceResetsLostTimeOnMatch)
     int n = sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 4);
-    EXPECT_EQ(out[0].hits,  1);
+    EXPECT_EQ(out[0].hits, 1);
     EXPECT_FLOAT_EQ(out[0].lost_time, 0.0f);
 
     n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
@@ -199,7 +209,7 @@ TEST_F(TrackerTentativeTest, PartialHitSequenceResetsLostTimeOnMatch)
     n = sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 4);
-    EXPECT_EQ(out[0].hits,  2);
+    EXPECT_EQ(out[0].hits, 2);
     EXPECT_FLOAT_EQ(out[0].lost_time, 0.0f);
 }
 
@@ -245,7 +255,7 @@ TEST_F(TrackerTentativeTest, TwoSimultaneousTentativeTracksIndependent)
     n = sushitrack_update(hdl_, &first, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 2);
 
-    int hits2_count      = 0;
+    int hits2_count = 0;
     int hits1_lost_count = 0;
     for (int i = 0; i < n; ++i)
     {
@@ -254,7 +264,7 @@ TEST_F(TrackerTentativeTest, TwoSimultaneousTentativeTracksIndependent)
         else if (out[i].hits == 1 && out[i].lost_time > 0.0f)
             ++hits1_lost_count;
     }
-    EXPECT_EQ(hits2_count,      1);
+    EXPECT_EQ(hits2_count, 1);
     EXPECT_EQ(hits1_lost_count, 1);
 }
 
@@ -276,8 +286,8 @@ TEST_F(TrackerTentativeTest, TentativePromotedTrackPersistsAfterPromotion)
     n = sushitrack_update(hdl_, &det(106.0f, 206.0f), 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].track_id, promoted_id);
-    EXPECT_EQ(out[0].state,    1);
-    EXPECT_EQ(out[0].hits,     4);
+    EXPECT_EQ(out[0].state, 1);
+    EXPECT_EQ(out[0].hits, 4);
 }
 
 // TrackerTentativeInitSuppressTest — tentative_init_suppress_iou (#8)
@@ -285,18 +295,18 @@ TEST_F(TrackerTentativeTest, TentativePromotedTrackPersistsAfterPromotion)
 namespace
 {
     /** @brief Builds params with tentative enabled and the given init-suppression IoU. */
-    sushitrack_params_t suppressParams(float suppress_iou)
+    sushitrack_params_t suppress_params(float suppress_iou)
     {
         sushitrack_params_t p = {};
         sushitrack_get_default_params(&p);
-        p.time_aware                 = 1;
-        p.enable_tentative           = 1;
-        p.tentative_confirm_hits     = 3;
-        p.tentative_fast_thresh      = 1.0f;
-        p.tentative_match_thresh     = 0.9f;
-        p.track_thresh               = 0.1f;
-        p.high_thresh                = 0.2f;
-        p.frame_rate                 = 25;
+        p.time_aware = 1;
+        p.enable_tentative = 1;
+        p.tentative_confirm_hits = 3;
+        p.tentative_fast_thresh = 1.0f;
+        p.tentative_match_thresh = 0.9f;
+        p.track_thresh = 0.1f;
+        p.high_thresh = 0.2f;
+        p.frame_rate = 25;
         p.tentative_init_suppress_iou = suppress_iou;
         return p;
     }
@@ -305,12 +315,17 @@ namespace
     sushitrack_object_t obj(float x, float y)
     {
         sushitrack_object_t o{};
-        o.x = x; o.y = y; o.width = 50.0f; o.height = 100.0f; o.score = 0.9f; o.label = 1;
+        o.x = x;
+        o.y = y;
+        o.width = 50.0f;
+        o.height = 100.0f;
+        o.score = 0.9f;
+        o.label = 1;
         return o;
     }
 
     /** @brief Confirms a single track over three matched frames at (100,200)->(104,204). */
-    void confirmTrack(sushitrack_tracker_t hdl, std::vector<sushitrack_track_t>& out)
+    void confirm_track(sushitrack_tracker_t hdl, std::vector<sushitrack_track_t>& out)
     {
         sushitrack_update(hdl, &obj(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
         sushitrack_update(hdl, &obj(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
@@ -318,7 +333,7 @@ namespace
         ASSERT_EQ(n, 1);
         ASSERT_EQ(out[0].state, 1);
     }
-}
+} // namespace
 
 /**
  * @brief A detection overlapping a confirmed track does not spawn a new tentative.
@@ -330,14 +345,14 @@ namespace
  */
 TEST(TrackerTentativeInitSuppressTest, OverlappingDetectionDoesNotInitNewTentative)
 {
-    sushitrack_params_t params = suppressParams(0.7f);
+    sushitrack_params_t params = suppress_params(0.7f);
     sushitrack_tracker_t hdl = sushitrack_create(&params);
     ASSERT_NE(hdl, nullptr);
 
     std::vector<sushitrack_track_t> out(10);
-    confirmTrack(hdl, out);
+    confirm_track(hdl, out);
 
-    sushitrack_object_t pair[2] = { obj(106.0f, 206.0f), obj(111.0f, 206.0f) };
+    sushitrack_object_t pair[2] = {obj(106.0f, 206.0f), obj(111.0f, 206.0f)};
     int n = sushitrack_update(hdl, pair, 2, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 1);
@@ -355,22 +370,24 @@ TEST(TrackerTentativeInitSuppressTest, OverlappingDetectionDoesNotInitNewTentati
  */
 TEST(TrackerTentativeInitSuppressTest, OverlappingDetectionInitsTentativeWhenGateDisabled)
 {
-    sushitrack_params_t params = suppressParams(2.0f);
+    sushitrack_params_t params = suppress_params(2.0f);
     sushitrack_tracker_t hdl = sushitrack_create(&params);
     ASSERT_NE(hdl, nullptr);
 
     std::vector<sushitrack_track_t> out(10);
-    confirmTrack(hdl, out);
+    confirm_track(hdl, out);
 
-    sushitrack_object_t pair[2] = { obj(106.0f, 206.0f), obj(111.0f, 206.0f) };
+    sushitrack_object_t pair[2] = {obj(106.0f, 206.0f), obj(111.0f, 206.0f)};
     int n = sushitrack_update(hdl, pair, 2, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 2);
 
     int confirmed = 0, tentative = 0;
     for (int i = 0; i < n; ++i)
     {
-        if (out[i].state == 1) ++confirmed;
-        else if (out[i].state == 4) ++tentative;
+        if (out[i].state == 1)
+            ++confirmed;
+        else if (out[i].state == 4)
+            ++tentative;
     }
     EXPECT_EQ(confirmed, 1);
     EXPECT_EQ(tentative, 1);
@@ -388,38 +405,41 @@ TEST(TrackerTentativeInitSuppressTest, OverlappingDetectionInitsTentativeWhenGat
  */
 class TrackerTentativeDisabledTest : public ::testing::Test
 {
-protected:
-    sushitrack_tracker_t     hdl_    = nullptr;
-    sushitrack_params_t params_ = {};
+    protected:
+        sushitrack_tracker_t hdl_ = nullptr;
+        sushitrack_params_t params_ = {};
 
-    void SetUp() override
-    {
-        sushitrack_get_default_params(&params_);
-        params_.time_aware                = 1;
-        params_.enable_tentative          = 0;
-        params_.tentative_confirm_hits    = 3;
-        params_.tentative_max_age_seconds = 0.08f;
-        params_.track_buffer              = 2;
-        params_.frame_rate                = 25;
-        params_.tentative_match_thresh    = 0.9f;
-        params_.track_thresh              = 0.1f;
-        params_.high_thresh               = 0.2f;
+        void SetUp() override
+        {
+            sushitrack_get_default_params(&params_);
+            params_.time_aware = 1;
+            params_.enable_tentative = 0;
+            params_.tentative_confirm_hits = 3;
+            params_.tentative_max_age_seconds = 0.08f;
+            params_.track_buffer = 2;
+            params_.frame_rate = 25;
+            params_.tentative_match_thresh = 0.9f;
+            params_.track_thresh = 0.1f;
+            params_.high_thresh = 0.2f;
 
-        hdl_ = sushitrack_create(&params_);
-        ASSERT_NE(hdl_, nullptr);
-    }
+            hdl_ = sushitrack_create(&params_);
+            ASSERT_NE(hdl_, nullptr);
+        }
 
-    void TearDown() override { sushitrack_destroy(hdl_); }
+        void TearDown() override { sushitrack_destroy(hdl_); }
 
-    /** @brief Returns a detection at the given top-left position. */
-    sushitrack_object_t det(float x, float y) const
-    {
-        sushitrack_object_t o{};
-        o.x = x; o.y = y;
-        o.width = 50.0f; o.height = 100.0f;
-        o.score = 0.9f;  o.label  = 1;
-        return o;
-    }
+        /** @brief Returns a detection at the given top-left position. */
+        sushitrack_object_t det(float x, float y) const
+        {
+            sushitrack_object_t o{};
+            o.x = x;
+            o.y = y;
+            o.width = 50.0f;
+            o.height = 100.0f;
+            o.score = 0.9f;
+            o.label = 1;
+            return o;
+        }
 };
 
 /**
@@ -433,6 +453,6 @@ TEST_F(TrackerTentativeDisabledTest, WithTentativeDisabledNewTrackIsImmediatelyT
 
     int n = sushitrack_update(hdl_, &d0, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
-    EXPECT_EQ(out[0].state,        1);
+    EXPECT_EQ(out[0].state, 1);
     EXPECT_EQ(out[0].is_confirmed, 1);
 }

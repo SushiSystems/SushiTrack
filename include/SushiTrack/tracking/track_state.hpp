@@ -31,18 +31,19 @@
 
 #pragma once
 
+#include <cstdint>
 
 namespace SushiTrack
 {
     /**
      * @brief Internal states for track lifecycle management.
      */
-    enum class TrackState
+    enum class TrackState : std::uint8_t
     {
-        New       = 0,  ///< Initial state for detected entities.
-        Tracked   = 1,  ///< Active state for verified tracks.
-        Lost      = 2,  ///< State for tracks missing observations within persistence limits.
-        Removed   = 3,  ///< Terminal state for track termination.
-        Tentative = 4   ///< Intermediate state for tracks awaiting confirmation.
+        New = 0,      ///< Initial state for detected entities.
+        Tracked = 1,  ///< Active state for verified tracks.
+        Lost = 2,     ///< State for tracks missing observations within persistence limits.
+        Removed = 3,  ///< Terminal state for track termination.
+        Tentative = 4 ///< Intermediate state for tracks awaiting confirmation.
     };
 } // namespace SushiTrack

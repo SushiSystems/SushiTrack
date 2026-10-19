@@ -31,7 +31,7 @@
 #include <memory>
 #include <vector>
 
-#include <SushiTrack/association/i_cost_calculator.hpp>
+#include <SushiTrack/association/cost_calculator.hpp>
 
 namespace SushiTrack
 {
@@ -41,27 +41,27 @@ namespace SushiTrack
      * Applies a bounded subtractive re-ranking term rewarding detections
      * aligned with recent observed motion direction.
      */
-    class ObservationMomentumDecorator : public ICostCalculator
+    class ObservationMomentumDecorator final : public CostCalculator
     {
         public:
             /**
-              * @brief Wraps an inner cost calculator with momentum re-ranking.
-              * @param inner Cost calculator whose output matrix is re-ranked.
-              * @param vdc_weight Strength and bound of the momentum contribution.
-              * @param min_velocity Minimum observed speed for the term to apply.
-              * @param max_age Maximum frames since last observation to apply.
-              * @param maneuver_weight_scale Weight scale applied to Maneuvering tracks.
-              */
-            ObservationMomentumDecorator(std::shared_ptr<ICostCalculator> inner,
-                                         float vdc_weight,
-                                         float min_velocity,
-                                         int max_age,
+             * @brief Wraps an inner cost calculator with momentum re-ranking.
+             * @param inner Cost calculator whose output matrix is re-ranked.
+             * @param vdc_weight Strength and bound of the momentum contribution.
+             * @param min_velocity Minimum observed speed for the term to apply.
+             * @param max_age Maximum frames since last observation to apply.
+             * @param maneuver_weight_scale Weight scale applied to Maneuvering tracks.
+             */
+            ObservationMomentumDecorator(std::shared_ptr<CostCalculator> inner, float vdc_weight,
+                                         float min_velocity, int max_age,
                                          float maneuver_weight_scale = 0.0f)
                 : inner_(std::move(inner)),
                   vdc_weight_(vdc_weight),
                   min_velocity_(min_velocity),
                   max_age_(max_age),
-                  maneuver_weight_scale_(std::clamp(maneuver_weight_scale, 0.0f, 1.0f)) {}
+                  maneuver_weight_scale_(std::clamp(maneuver_weight_scale, 0.0f, 1.0f))
+            {
+            }
 
             /**
              * @brief Computes inner costs and applies the momentum re-ranking in place.
@@ -71,8 +71,8 @@ namespace SushiTrack
              * @param out_matrix Output cost matrix to be populated and re-ranked.
              */
             void calculate(const std::vector<TrackletPtr>& __restrict a,
-                        const std::vector<TrackletPtr>& __restrict b,
-                        CostMatrix& __restrict out_matrix) override;
+                           const std::vector<TrackletPtr>& __restrict b,
+                           CostMatrix& __restrict out_matrix) override;
             /**
              * @brief Computes the momentum-adjusted association cost for a single pair.
              *
@@ -80,7 +80,8 @@ namespace SushiTrack
              * @param b Candidate tracklet for association.
              * @return float Re-ranked association cost.
              */
-            float calculate_single(const TrackletPtr& a, const TrackletPtr& b) const override;
+            [[nodiscard]] float calculate_single(const TrackletPtr& a,
+                                                 const TrackletPtr& b) const override;
 
         private:
             /**
@@ -91,7 +92,8 @@ namespace SushiTrack
              * @param weight Effective bound for this track (full for Cruising, scaled for Maneuvering).
              * @return Value in [-weight, +weight]; positive when aligned with travel.
              */
-            float momentumBonus(const TrackletPtr& track, const TrackletPtr& det, float weight) const;
+            [[nodiscard]] float momentum_bonus(const TrackletPtr& track, const TrackletPtr& det,
+                                               float weight) const;
 
             /**
              * @brief Per-track effective momentum weight, or 0 when the track must be skipped.
@@ -100,12 +102,12 @@ namespace SushiTrack
              * Maneuvering (0 disables that case), and 0 for Stationary/Coasting and any
              * track failing the velocity/age/observation gates.
              */
-            float effectiveWeight(const TrackletPtr& track) const;
+            [[nodiscard]] float effective_weight(const TrackletPtr& track) const;
 
-            std::shared_ptr<ICostCalculator> inner_;
+            std::shared_ptr<CostCalculator> inner_;
             float vdc_weight_;
             float min_velocity_;
-            int   max_age_;
+            int max_age_;
             float maneuver_weight_scale_;
     };
 } // namespace SushiTrack

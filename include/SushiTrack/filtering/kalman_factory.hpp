@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* i_timing_policy.hpp                                                    */
+/* kalman_factory.hpp                                                     */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -20,40 +20,34 @@
 /**************************************************************************/
 
 /**
- * @file i_timing_policy.hpp
- * @brief Interface definition for time-interval normalization and track expiration.
+ * @file kalman_factory.hpp
+ * @brief Declares the interface that creates state predictors.
  * @author Mustafa Garip
  */
 
 #pragma once
 
+#include <memory>
+
+#include <SushiTrack/filtering/state_predictor.hpp>
+
 namespace SushiTrack
 {
     /**
-     * @brief Strategy interface for time-interval normalization and track expiration.
+     * @brief Interface for instantiating StatePredictor objects.
      */
-    class ITimingPolicy
+    class KalmanFactory
     {
-    public:
-        /**
-         * @brief Virtual destructor for the interface.
-         */
-        virtual ~ITimingPolicy() = default;
+        public:
+            /**
+             * @brief Virtual destructor for the interface.
+             */
+            virtual ~KalmanFactory() = default;
 
-        /**
-         * @brief Normalizes a raw time interval for use in state prediction.
-         * @param raw_dt Input time interval provided by the caller.
-         * @return Normalized interval compatible with state predictor calibration.
-         */
-        virtual float toKfDt(float raw_dt) const = 0;
-
-        /**
-         * @brief Determines if a track has exceeded its maximum persistence limit.
-         * @param accumulated Time interval or frame count elapsed since last update.
-         * @param limit_units Configured maximum persistence threshold in frames.
-         * @return True if the track is qualified for removal.
-         */
-        virtual bool isExpired(float accumulated, int limit_units) const = 0;
+            /**
+             * @brief Creates and returns a new state predictor instance.
+             * @return Unique pointer to the newly initialized state predictor.
+             */
+            [[nodiscard]] virtual std::unique_ptr<StatePredictor> create() const = 0;
     };
-
 } // namespace SushiTrack

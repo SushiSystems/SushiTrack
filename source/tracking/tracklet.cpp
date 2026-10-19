@@ -45,7 +45,7 @@ namespace SushiTrack
      * @brief Performs L2 normalization on a feature vector.
      * @param v Reference to the vector to be normalized.
      */
-    void Tracklet::normalizeL2(std::vector<float>& v)
+    void Tracklet::normalize_l_2(std::vector<float>& v)
     {
         float norm = 0.f;
         for (float f : v)
@@ -67,40 +67,34 @@ namespace SushiTrack
      * @param kf State predictor instance (Kalman Filter).
      * @param rect Initial geometric bounding box.
      */
-    Tracklet::Tracklet(std::unique_ptr<IStatePredictor> kf,
-                    const Rect<float>& rect,
-                    int label, float score,
-                    std::vector<float> feat,
-                    float alpha,
-                    bool enable_xyah,
-                    int max_feature_history,
-                    int ocm_delta_t,
-                    bool enable_oru)
+    Tracklet::Tracklet(std::unique_ptr<StatePredictor> kf, const Rect<float>& rect, int label,
+                       float score, std::vector<float> feat, float alpha, bool enable_xyah,
+                       int max_feature_history, int ocm_delta_t, bool enable_oru)
         : kf_(std::move(kf)),
-        mean_(KalmanTypes::StateMean::Zero()),
-        covariance_(KalmanTypes::StateCov::Zero()),
-        rect_(rect),
-        state_(TrackState::New),
-        is_activated_(false),
-        is_confirmed_(false),
-        score_(score),
-        score_smooth_(score),
-        label_(label),
-        track_id_(0),
-        frame_id_(0),
-        start_frame_id_(0),
-        tracklet_len_(0),
-        hits_(0),
-        consecutive_hits_(0),
-        alpha_(alpha),
-        enable_xyah_(enable_xyah),
-        enable_oru_(enable_oru),
-        max_feature_history_(static_cast<size_t>(max_feature_history)),
-        ocm_delta_t_(std::max(1, ocm_delta_t))
+          mean_(KalmanTypes::StateMean::Zero()),
+          covariance_(KalmanTypes::StateCov::Zero()),
+          rect_(rect),
+          state_(TrackState::New),
+          is_activated_(false),
+          is_confirmed_(false),
+          score_(score),
+          score_smooth_(score),
+          label_(label),
+          track_id_(0),
+          frame_id_(0),
+          start_frame_id_(0),
+          tracklet_len_(0),
+          hits_(0),
+          consecutive_hits_(0),
+          alpha_(alpha),
+          enable_xyah_(enable_xyah),
+          enable_oru_(enable_oru),
+          max_feature_history_(static_cast<size_t>(max_feature_history)),
+          ocm_delta_t_(std::max(1, ocm_delta_t))
     {
         if (!feat.empty())
         {
-            updateFeatures(std::move(feat));
+            update_features(std::move(feat));
         }
     }
 
@@ -110,12 +104,12 @@ namespace SushiTrack
      * @param frame_id Current global frame identifier.
      * @param track_id Unique identifier for the track.
      */
-    void Tracklet::activate(std::unique_ptr<IStatePredictor> kf, size_t frame_id, size_t track_id)
+    void Tracklet::activate(std::unique_ptr<StatePredictor> kf, size_t frame_id, size_t track_id)
     {
         kf_ = std::move(kf);
-        const KalmanTypes::DetectBox initial_meas = getMeasurement();
+        const KalmanTypes::DetectBox initial_meas = get_measurement();
         kf_->initiate(mean_, covariance_, initial_meas, score_);
-        updateRect();
+        update_rect();
         state_ = TrackState::Tracked;
         is_activated_ = (frame_id == 1);
         is_confirmed_ = (frame_id == 1);
@@ -127,8 +121,8 @@ namespace SushiTrack
         consecutive_hits_ = 1;
         score_smooth_ = score_;
         accumulated_lost_time_ = 0.0f;
-        recordObservation(rect_, frame_id);
-        captureCheckpoint();
+        record_observation(rect_, frame_id);
+        capture_checkpoint();
     }
 
     /**
@@ -137,12 +131,13 @@ namespace SushiTrack
      * @param frame_id Current frame identifier.
      * @param initial_id Initial tracking identifier (may be zero).
      */
-    void Tracklet::activateTentative(std::unique_ptr<IStatePredictor> kf, size_t frame_id, size_t initial_id)
+    void Tracklet::activate_tentative(std::unique_ptr<StatePredictor> kf, size_t frame_id,
+                                      size_t initial_id)
     {
         kf_ = std::move(kf);
-        const KalmanTypes::DetectBox initial_meas = getMeasurement();
+        const KalmanTypes::DetectBox initial_meas = get_measurement();
         kf_->initiate(mean_, covariance_, initial_meas, score_);
-        updateRect();
+        update_rect();
         state_ = TrackState::Tentative;
         is_activated_ = false;
         is_confirmed_ = false;
@@ -154,8 +149,8 @@ namespace SushiTrack
         consecutive_hits_ = 1;
         score_smooth_ = score_;
         accumulated_lost_time_ = 0.0f;
-        recordObservation(rect_, frame_id);
-        captureCheckpoint();
+        record_observation(rect_, frame_id);
+        capture_checkpoint();
     }
 
     /**
@@ -181,31 +176,32 @@ namespace SushiTrack
      * @param frame_id Current frame identifier.
      * @param new_track_id New tracking identifier (optional).
      */
-    void Tracklet::reActivate(const Tracklet& new_track, size_t frame_id, int new_track_id)
+    void Tracklet::re_activate(const Tracklet& new_track, size_t frame_id, int new_track_id)
     {
-        const KalmanTypes::DetectBox new_meas = new_track.getMeasurement();
+        const KalmanTypes::DetectBox new_meas = new_track.get_measurement();
 
         // Hold state mutex for mutation so readers never see torn mean or covariance.
         std::lock_guard<std::mutex> lock(state_mutex_);
 
         // Bridge unobserved gap along virtual trajectory; fall back on small gaps.
         const int gap = frames_since_observation_;
-        if (!recoveryReupdate(new_meas, gap, new_track.getScore()))
+        if (!recovery_reupdate(new_meas, gap, new_track.get_score()))
         {
-            kf_->update(mean_, covariance_, new_meas, new_track.getScore());
+            kf_->update(mean_, covariance_, new_meas, new_track.get_score());
         }
 
-        updateRect();
+        update_rect();
         state_ = TrackState::Tracked;
         is_activated_ = true;
         is_confirmed_ = true;
-        score_ = new_track.getScore();
-        score_smooth_ = kScoreSmoothingMomentum * score_smooth_ + (1.f - kScoreSmoothingMomentum) * score_;
-        label_ = new_track.getLabel();
+        score_ = new_track.get_score();
+        score_smooth_ = K_SCORE_SMOOTHING_MOMENTUM * score_smooth_ +
+                        (1.f - K_SCORE_SMOOTHING_MOMENTUM) * score_;
+        label_ = new_track.get_label();
 
-        if (!new_track.getCurrFeat().empty())
+        if (!new_track.get_curr_feat().empty())
         {
-            updateFeatures(new_track.getCurrFeat());
+            update_features(new_track.get_curr_feat());
         }
 
         if (new_track_id >= 0)
@@ -218,10 +214,10 @@ namespace SushiTrack
         consecutive_hits_++;
         tracklet_len_ = frame_id - start_frame_id_ + 1;
         accumulated_lost_time_ = 0.0f;
-        recordObservation(new_track.getRect(), frame_id);
-        captureCheckpoint();
+        record_observation(new_track.get_rect(), frame_id);
+        capture_checkpoint();
 
-        refreshRegime(false);
+        refresh_regime(false);
     }
 
     /**
@@ -249,14 +245,14 @@ namespace SushiTrack
             }
         }
 
-        const float kf_dt = timing_policy_ ? timing_policy_->toKfDt(dt) : 1.0f;
+        const float kf_dt = timing_policy_ ? timing_policy_->to_kf_dt(dt) : 1.0f;
         kf_->predict(mean_, covariance_, kf_dt);
-        updateRect();
+        update_rect();
 
         // Drive the IMM regime into Coasting on an unobserved frame.
         if (state_ == TrackState::Lost)
         {
-            refreshRegime(true);
+            refresh_regime(true);
         }
 
         if (state_ == TrackState::Lost || state_ == TrackState::Tentative)
@@ -272,14 +268,14 @@ namespace SushiTrack
      * @param update_features Flag for updating visual features with observation.
      * @param keep_state When true, suppresses the lifecycle flag transition.
      */
-    void Tracklet::update(const Tracklet& new_track, size_t frame_id,
-                          bool update_features, bool keep_state)
+    void Tracklet::update(const Tracklet& new_track, size_t frame_id, bool update_features,
+                          bool keep_state)
     {
-        const KalmanTypes::DetectBox new_meas = new_track.getMeasurement();
+        const KalmanTypes::DetectBox new_meas = new_track.get_measurement();
 
         std::lock_guard<std::mutex> lock(state_mutex_);
-        kf_->update(mean_, covariance_, new_meas, new_track.getScore());
-        updateRect();
+        kf_->update(mean_, covariance_, new_meas, new_track.get_score());
+        update_rect();
 
         if (!keep_state)
         {
@@ -288,13 +284,14 @@ namespace SushiTrack
             is_confirmed_ = true;
         }
 
-        score_ = new_track.getScore();
-        score_smooth_ = kScoreSmoothingMomentum * score_smooth_ + (1.f - kScoreSmoothingMomentum) * score_;
-        label_ = new_track.getLabel();
+        score_ = new_track.get_score();
+        score_smooth_ = K_SCORE_SMOOTHING_MOMENTUM * score_smooth_ +
+                        (1.f - K_SCORE_SMOOTHING_MOMENTUM) * score_;
+        label_ = new_track.get_label();
 
-        if (update_features && !new_track.getCurrFeat().empty())
+        if (update_features && !new_track.get_curr_feat().empty())
         {
-            this->updateFeatures(new_track.getCurrFeat());
+            this->update_features(new_track.get_curr_feat());
         }
 
         frame_id_ = frame_id;
@@ -302,17 +299,17 @@ namespace SushiTrack
         consecutive_hits_++;
         tracklet_len_ = frame_id - start_frame_id_ + 1;
         accumulated_lost_time_ = 0.0f;
-        recordObservation(new_track.getRect(), frame_id);
-        captureCheckpoint();
+        record_observation(new_track.get_rect(), frame_id);
+        capture_checkpoint();
 
-        refreshRegime(false);
+        refresh_regime(false);
     }
 
     /**
      * @brief Retrieves the current state mean vector.
      * @return State mean vector.
      */
-    KalmanTypes::StateMean Tracklet::getMean() const 
+    KalmanTypes::StateMean Tracklet::get_mean() const
     {
         std::lock_guard<std::mutex> lock(state_mutex_);
         return mean_;
@@ -322,7 +319,7 @@ namespace SushiTrack
      * @brief Retrieves the current state covariance matrix.
      * @return State covariance matrix.
      */
-    KalmanTypes::StateCov Tracklet::getCovariance() const 
+    KalmanTypes::StateCov Tracklet::get_covariance() const
     {
         std::lock_guard<std::mutex> lock(state_mutex_);
         return covariance_;
@@ -332,26 +329,28 @@ namespace SushiTrack
      * @brief Marks the tracklet as lost.
      * @param dt Time interval of the frame triggering the transition.
      */
-    void Tracklet::markAsLost(float dt)
+    void Tracklet::mark_as_lost(float dt)
     {
         state_ = TrackState::Lost;
         is_activated_ = false;
         accumulated_lost_time_ = dt;
-        refreshRegime(true);
+        refresh_regime(true);
     }
 
     /**
      * @brief Refreshes the IMM-derived motion regime from the predictor.
      * @param is_lost True when the track currently has no observation.
      */
-    void Tracklet::refreshRegime(bool is_lost)
+    void Tracklet::refresh_regime(bool is_lost)
     {
-        if (!kf_) return;
-        const float m = kf_->maneuverProbability();
-        if (m < 0.0f) return;
+        if (!kf_)
+            return;
+        const float m = kf_->maneuver_probability();
+        if (m < 0.0f)
+            return;
 
-        maneuver_prob_   = m;
-        stationary_prob_ = kf_->stationaryProbability();
+        maneuver_prob_ = m;
+        stationary_prob_ = kf_->stationary_probability();
 
         if (is_lost)
         {
@@ -369,11 +368,12 @@ namespace SushiTrack
         const float height = std::max(1e-2f, mean_(3));
         const float speed_frac = std::sqrt(vx * vx + vy * vy) / height;
 
-        if (stationary_prob_ > kRegimeStationaryProb || speed_frac < kRegimeStationarySpeedFrac)
+        if (stationary_prob_ > K_REGIME_STATIONARY_PROB ||
+            speed_frac < K_REGIME_STATIONARY_SPEED_FRAC)
         {
             imm_state_ = KinematicState::Stationary;
         }
-        else if (maneuver_prob_ > kRegimeManeuverProb)
+        else if (maneuver_prob_ > K_REGIME_MANEUVER_PROB)
         {
             imm_state_ = KinematicState::Maneuvering;
         }
@@ -386,7 +386,7 @@ namespace SushiTrack
     /**
      * @brief Marks the tracklet for removal from the tracking pool.
      */
-    void Tracklet::markAsRemoved()
+    void Tracklet::mark_as_removed()
     {
         state_ = TrackState::Removed;
         is_activated_ = false;
@@ -396,24 +396,24 @@ namespace SushiTrack
      * @brief Updates the tracklet's visual feature history and smoothed feature.
      * @param feat New observation feature vector.
      */
-    void Tracklet::updateFeatures(std::vector<float> feat) 
+    void Tracklet::update_features(std::vector<float> feat)
     {
         curr_feat_ = std::move(feat);
-        normalizeL2(curr_feat_);
+        normalize_l_2(curr_feat_);
 
-        addFeatureToHistory(curr_feat_);
+        add_feature_to_history(curr_feat_);
 
         if (smooth_feat_.empty() || smooth_feat_.size() != curr_feat_.size())
         {
             smooth_feat_ = curr_feat_;
         }
         else
-        { 
+        {
             for (size_t i = 0; i < smooth_feat_.size(); ++i)
             {
                 smooth_feat_[i] = alpha_ * smooth_feat_[i] + (1.f - alpha_) * curr_feat_[i];
             }
-            normalizeL2(smooth_feat_);
+            normalize_l_2(smooth_feat_);
         }
     }
 
@@ -422,15 +422,17 @@ namespace SushiTrack
      * @param detection_feat Input feature vector for comparison.
      * @return Maximum similarity score in the range [0, 1].
      */
-    float Tracklet::getMaxFeatureSimilarity(const std::vector<float>& detection_feat) const
+    float Tracklet::get_max_feature_similarity(const std::vector<float>& detection_feat) const
     {
-        if (feature_history_.empty() && smooth_feat_.empty()) return 1.0f;
+        if (feature_history_.empty() && smooth_feat_.empty())
+            return 1.0f;
 
         float max_similarity = 0.0f;
 
-        for (const auto& hist_feat : feature_history_) 
+        for (const auto& hist_feat : feature_history_)
         {
-            if (hist_feat.size() != detection_feat.size()) continue;
+            if (hist_feat.size() != detection_feat.size())
+                continue;
 
             float dot = 0.0f;
             for (size_t i = 0; i < hist_feat.size(); ++i)
@@ -441,7 +443,7 @@ namespace SushiTrack
             max_similarity = std::max(max_similarity, dot);
         }
 
-        if (!smooth_feat_.empty() && smooth_feat_.size() == detection_feat.size()) 
+        if (!smooth_feat_.empty() && smooth_feat_.size() == detection_feat.size())
         {
             float dot = 0.0f;
             for (size_t i = 0; i < smooth_feat_.size(); ++i)
@@ -459,13 +461,13 @@ namespace SushiTrack
      * @param obs_rect Raw detection box of the matched observation.
      * @param frame_id Frame in which the observation occurred.
      */
-    void Tracklet::recordObservation(const Rect<float>& obs_rect, size_t frame_id)
+    void Tracklet::record_observation(const Rect<float>& obs_rect, size_t frame_id)
     {
-        last_observation_     = obs_rect;
+        last_observation_ = obs_rect;
         has_last_observation_ = true;
         frames_since_observation_ = 0;
 
-        const float cx = obs_rect.x() + obs_rect.width()  * 0.5f;
+        const float cx = obs_rect.x() + obs_rect.width() * 0.5f;
         const float cy = obs_rect.y() + obs_rect.height() * 0.5f;
 
         obs_history_.push_back({frame_id, cx, cy});
@@ -504,11 +506,12 @@ namespace SushiTrack
     /**
      * @brief Captures the estimator state at an observation for ORU rollback.
      */
-    void Tracklet::captureCheckpoint()
+    void Tracklet::capture_checkpoint()
     {
-        last_obs_mean_  = mean_;
-        last_obs_cov_   = covariance_;
-        if (kf_) kf_->saveCheckpoint();
+        last_obs_mean_ = mean_;
+        last_obs_cov_ = covariance_;
+        if (kf_)
+            kf_->save_checkpoint();
         has_checkpoint_ = true;
     }
 
@@ -519,20 +522,21 @@ namespace SushiTrack
      * @param score Recovery detection confidence.
      * @return True when ORU ran; false to signal the caller to do a plain update.
      */
-    bool Tracklet::recoveryReupdate(const KalmanTypes::DetectBox& new_meas, int gap, float score)
+    bool Tracklet::recovery_reupdate(const KalmanTypes::DetectBox& new_meas, int gap, float score)
     {
-        if (!enable_oru_ || !has_checkpoint_ || !kf_ || gap < 2) return false;
+        if (!enable_oru_ || !has_checkpoint_ || !kf_ || gap < 2)
+            return false;
 
-        mean_       = last_obs_mean_;
+        mean_ = last_obs_mean_;
         covariance_ = last_obs_cov_;
-        kf_->restoreCheckpoint();
+        kf_->restore_checkpoint();
 
-        const KalmanTypes::DetectBox z1 = toMeasurement(last_observation_);
+        const KalmanTypes::DetectBox z1 = to_measurement(last_observation_);
         const KalmanTypes::DetectBox z2 = new_meas;
 
         // Spread the accumulated lost time evenly across the unobserved gap.
         const float per_frame_dt = accumulated_lost_time_ / static_cast<float>(gap);
-        const float step_kf_dt   = timing_policy_ ? timing_policy_->toKfDt(per_frame_dt) : 1.0f;
+        const float step_kf_dt = timing_policy_ ? timing_policy_->to_kf_dt(per_frame_dt) : 1.0f;
 
         // Replay predict and update steps along the virtual linear path.
         for (int i = 1; i <= gap; ++i)
@@ -548,59 +552,59 @@ namespace SushiTrack
     /**
      * @brief Converts a box to the predictor's measurement vector.
      */
-    KalmanTypes::DetectBox Tracklet::toMeasurement(const Rect<float>& r) const
+    KalmanTypes::DetectBox Tracklet::to_measurement(const Rect<float>& r) const
     {
         if (enable_xyah_)
         {
             float cx = r.x() + r.width() * 0.5f;
             float cy = r.y() + r.height() * 0.5f;
-            float h  = r.height();
-            float a  = r.width() / std::max(1e-6f, h);
+            float h = r.height();
+            float a = r.width() / std::max(1e-6f, h);
             KalmanTypes::DetectBox m;
             m << cx, cy, a, h;
             return m;
         }
-        return r.getXywh();
+        return r.get_xywh();
     }
 
     /**
      * @brief Synchronizes the geometric rectangle with the current state mean.
      */
-    void Tracklet::updateRect()
+    void Tracklet::update_rect()
     {
         if (enable_xyah_)
         {
-            updateRectXyah();
+            update_rect_xyah();
             return;
         }
-        rect_.width()  = std::max(1.0f, mean_[2]);
+        rect_.width() = std::max(1.0f, mean_[2]);
         rect_.height() = std::max(1.0f, mean_[3]);
-        rect_.x()      = mean_[0] - rect_.width()  * 0.5f;
-        rect_.y()      = mean_[1] - rect_.height() * 0.5f;
+        rect_.x() = mean_[0] - rect_.width() * 0.5f;
+        rect_.y() = mean_[1] - rect_.height() * 0.5f;
     }
 
     /**
      * @brief Synchronizes the rectangle using the xyah coordinate system.
      */
-    void Tracklet::updateRectXyah()
+    void Tracklet::update_rect_xyah()
     {
         float h = std::max(1.0f, mean_[3]);
         float a = std::max(0.01f, mean_[2]);
         float w = a * h;
-        rect_.width()  = w;
+        rect_.width() = w;
         rect_.height() = h;
-        rect_.x()      = mean_[0] - w * 0.5f;
-        rect_.y()      = mean_[1] - h * 0.5f;
+        rect_.x() = mean_[0] - w * 0.5f;
+        rect_.y() = mean_[1] - h * 0.5f;
     }
 
     /**
      * @brief Formats the current state as a measurement vector for the predictor.
      * @return Measurement vector in the configured coordinate format.
      */
-    KalmanTypes::DetectBox Tracklet::getMeasurement() const
+    KalmanTypes::DetectBox Tracklet::get_measurement() const
     {
         std::lock_guard<std::mutex> lock(state_mutex_);
-        return toMeasurement(rect_);
+        return to_measurement(rect_);
     }
 
 } // namespace SushiTrack

@@ -31,8 +31,9 @@
 
 #pragma once
 
-#include <Eigen/Dense>
 #include <vector>
+
+#include <Eigen/Dense>
 
 namespace SushiTrack
 {
@@ -41,12 +42,17 @@ namespace SushiTrack
      */
     struct KalmanTypes
     {
-        using DetectBox = Eigen::Matrix<float, 1, 4, Eigen::RowMajor>; ///< 1x4 vector for observation coordinates.
-        using StateMean = Eigen::Matrix<float, 1, 8, Eigen::RowMajor>; ///< 1x8 vector for state mean components.
-        using StateCov  = Eigen::Matrix<float, 8, 8, Eigen::RowMajor>; ///< 8x8 matrix for state covariance.
+            using DetectBox =
+                Eigen::Matrix<float, 1, 4,
+                              Eigen::RowMajor>; ///< 1x4 vector for observation coordinates.
+            using StateMean =
+                Eigen::Matrix<float, 1, 8,
+                              Eigen::RowMajor>; ///< 1x8 vector for state mean components.
+            using StateCov =
+                Eigen::Matrix<float, 8, 8, Eigen::RowMajor>; ///< 8x8 matrix for state covariance.
 
-        /** @brief Aligned vector for observation coordinates. */
-        using DetectBoxVector = std::vector<DetectBox, Eigen::aligned_allocator<DetectBox>>;
+            /** @brief Aligned vector for observation coordinates. */
+            using DetectBoxVector = std::vector<DetectBox, Eigen::aligned_allocator<DetectBox>>;
     };
 
 } // namespace SushiTrack

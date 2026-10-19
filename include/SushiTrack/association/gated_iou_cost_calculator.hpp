@@ -30,8 +30,8 @@
 #include <memory>
 #include <vector>
 
-#include <SushiTrack/association/i_cost_calculator.hpp>
-#include <SushiTrack/filtering/i_gate_validator.hpp>
+#include <SushiTrack/association/cost_calculator.hpp>
+#include <SushiTrack/filtering/gate_validator.hpp>
 #include <SushiTrack/filtering/kalman_types.hpp>
 
 namespace SushiTrack
@@ -42,7 +42,7 @@ namespace SushiTrack
      * Calculates IoU costs and applies penalties based on Mahalanobis distance
      * validation gates.
      */
-    class GatedIoUCostCalculator : public ICostCalculator
+    class GatedIoUCostCalculator final : public CostCalculator
     {
         public:
             /**
@@ -54,36 +54,39 @@ namespace SushiTrack
              * @param motion_cost_weight Weighting factor for motion-based distance penalty.
              */
             GatedIoUCostCalculator(float gating_thresh,
-                                std::shared_ptr<IGateValidator> gate_validator,
-                                std::shared_ptr<ICostCalculator> iou_calc,
-                                float motion_cost_weight = 0.0f);
+                                   std::shared_ptr<GateValidator> gate_validator,
+                                   std::shared_ptr<CostCalculator> iou_calc,
+                                   float motion_cost_weight = 0.0f);
 
             /**
              * @brief Populates the cost matrix with spatial overlap and motion constraints.
-             * 
+             *
              * @param a Collection of source tracklets.
              * @param b Collection of target tracklets (observations).
              * @param out_matrix Output cost matrix to be populated.
              */
             void calculate(const std::vector<TrackletPtr>& __restrict a,
-                        const std::vector<TrackletPtr>& __restrict b,
-                        CostMatrix& __restrict out_matrix) override;
+                           const std::vector<TrackletPtr>& __restrict b,
+                           CostMatrix& __restrict out_matrix) override;
             /**
              * @brief Computes the association cost for a single pair.
-             * 
+             *
              * @param a Source tracklet for association.
              * @param b Candidate tracklet for association.
              * @return float Calculated association cost.
              */
-            float calculate_single(const TrackletPtr& a, const TrackletPtr& b) const override;
+            [[nodiscard]] float calculate_single(const TrackletPtr& a,
+                                                 const TrackletPtr& b) const override;
 
         private:
             float gating_thresh_;
             float motion_cost_weight_;
-            std::shared_ptr<IGateValidator> gate_validator_;
-            std::shared_ptr<ICostCalculator> iou_calc_;
+            std::shared_ptr<GateValidator> gate_validator_;
+            std::shared_ptr<CostCalculator> iou_calc_;
 
-            KalmanTypes::DetectBoxVector meas_workspace_; ///< Pre-allocated buffer for measurement vectors to reduce heap churn.
-            std::vector<float>           score_workspace_; ///< Pre-allocated buffer for per-detection scores (NSA gating).
+            KalmanTypes::DetectBoxVector
+                meas_workspace_; ///< Pre-allocated buffer for measurement vectors to reduce heap churn.
+            std::vector<float>
+                score_workspace_; ///< Pre-allocated buffer for per-detection scores (NSA gating).
     };
 } // namespace SushiTrack

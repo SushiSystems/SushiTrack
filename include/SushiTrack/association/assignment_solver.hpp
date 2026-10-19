@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* i_assignment_solver.hpp                                                */
+/* assignment_solver.hpp                                                  */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -20,40 +20,39 @@
 /**************************************************************************/
 
 /**
- * @file i_assignment_solver.hpp
+ * @file assignment_solver.hpp
  * @brief Interface definition for linear assignment problem solvers.
  * @author Mustafa Garip
  */
 
 #pragma once
 
-#include <SushiTrack/association/cost_matrix.hpp>
-
 #include <vector>
+
+#include <SushiTrack/association/cost_matrix.hpp>
 
 namespace SushiTrack
 {
     /**
      * @brief Interface for solving linear assignment problems.
      */
-    class IAssignmentSolver
+    class AssignmentSolver
     {
-    public:
-        /**
-         * @brief Virtual destructor for the interface.
-         */
-        virtual ~IAssignmentSolver() = default;
+        public:
+            /**
+             * @brief Virtual destructor for the interface.
+             */
+            virtual ~AssignmentSolver() = default;
 
-        /**
-         * @brief Computes optimal assignments from a cost matrix.
-         * @param cost Input matrix containing cost values.
-         * @param thresh Cost threshold for assignment validity.
-         */
-        virtual void solve(const CostMatrix& __restrict cost,
-                           int n_rows, int n_cols, float thresh,
-                           std::vector<std::vector<int>>& __restrict matches,
-                           std::vector<int>& __restrict a_unmatched,
-                           std::vector<int>& __restrict b_unmatched) = 0;
+            /**
+             * @brief Computes optimal assignments from a cost matrix.
+             * @param cost Input matrix containing cost values.
+             * @param thresh Cost threshold for assignment validity.
+             */
+            virtual void solve(const CostMatrix& __restrict cost, int n_rows, int n_cols,
+                               float thresh, std::vector<std::vector<int>>& __restrict matches,
+                               std::vector<int>& __restrict a_unmatched,
+                               std::vector<int>& __restrict b_unmatched) = 0;
     };
 
 } // namespace SushiTrack

@@ -30,7 +30,7 @@
 #include <memory>
 #include <vector>
 
-#include <SushiTrack/association/i_cost_calculator.hpp>
+#include <SushiTrack/association/cost_calculator.hpp>
 
 namespace SushiTrack
 {
@@ -41,7 +41,7 @@ namespace SushiTrack
      * receive proportionally lower association cost:
      * fused_cost(i, j) = 1 - (1 - inner_cost(i, j)) * detection_score(j).
      */
-    class FuseScoreDecorator : public ICostCalculator
+    class FuseScoreDecorator final : public CostCalculator
     {
         public:
             /**
@@ -49,8 +49,10 @@ namespace SushiTrack
              *
              * @param inner Cost calculator whose output matrix will be rescaled.
              */
-            explicit FuseScoreDecorator(std::shared_ptr<ICostCalculator> inner)
-                : inner_(std::move(inner)) {}
+            explicit FuseScoreDecorator(std::shared_ptr<CostCalculator> inner)
+                : inner_(std::move(inner))
+            {
+            }
 
             /**
              * @brief Computes inner costs and applies score fusion in-place.
@@ -60,18 +62,19 @@ namespace SushiTrack
              * @param out_matrix Output cost matrix to be populated.
              */
             void calculate(const std::vector<TrackletPtr>& __restrict a,
-                        const std::vector<TrackletPtr>& __restrict b,
-                        CostMatrix& __restrict out_matrix) override;
+                           const std::vector<TrackletPtr>& __restrict b,
+                           CostMatrix& __restrict out_matrix) override;
             /**
              * @brief Computes the association cost for a single pair.
-             * 
+             *
              * @param a Source tracklet for association.
              * @param b Candidate tracklet for association.
              * @return float Calculated association cost.
              */
-            float calculate_single(const TrackletPtr& a, const TrackletPtr& b) const override;
+            [[nodiscard]] float calculate_single(const TrackletPtr& a,
+                                                 const TrackletPtr& b) const override;
 
         private:
-            std::shared_ptr<ICostCalculator> inner_;
+            std::shared_ptr<CostCalculator> inner_;
     };
 } // namespace SushiTrack

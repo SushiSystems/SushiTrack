@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* i_kalman_factory.hpp                                                   */
+/* gated_state_predictor.hpp                                              */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -20,34 +20,28 @@
 /**************************************************************************/
 
 /**
- * @file i_kalman_factory.hpp
- * @brief Declares the interface that creates state predictors.
+ * @file gated_state_predictor.hpp
+ * @brief Unified interface for Kalman filter variants.
  * @author Mustafa Garip
  */
 
 #pragma once
 
-#include <memory>
-
-#include <SushiTrack/filtering/i_state_predictor.hpp>
+#include <SushiTrack/filtering/gate_validator.hpp>
+#include <SushiTrack/filtering/state_predictor.hpp>
 
 namespace SushiTrack
 {
     /**
-     * @brief Interface for instantiating IStatePredictor objects.
+     * @brief Unified interface combining state prediction and gate validation.
      */
-    class IKalmanFactory
+    class GatedStatePredictor : public StatePredictor, public GateValidator
     {
-    public:
-        /**
-         * @brief Virtual destructor for the interface.
-         */
-        virtual ~IKalmanFactory() = default;
-
-        /**
-         * @brief Creates and returns a new state predictor instance.
-         * @return Unique pointer to the newly initialized state predictor.
-         */
-        virtual std::unique_ptr<IStatePredictor> create() const = 0;
+        public:
+            /**
+             * @brief Virtual destructor for the interface.
+             */
+            virtual ~GatedStatePredictor() = default;
     };
+
 } // namespace SushiTrack

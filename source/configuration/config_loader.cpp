@@ -34,18 +34,18 @@
 
 #include <nlohmann/json.hpp>
 
-#include <SushiTrack/logging/logger.hpp>
 #include <SushiTrack/c_api/sushitrack_c.h>
+#include <SushiTrack/logging/logger.hpp>
 
 namespace fs = std::filesystem;
 
 namespace
 {
-    constexpr const char* kDefaultConfigName = "sushitrack.json";
-    constexpr int kMaxSearchDepth = 8;
+    constexpr const char* K_DEFAULT_CONFIG_NAME = "sushitrack.json";
+    constexpr int K_MAX_SEARCH_DEPTH = 8;
 
     template <typename T>
-    T getInt(const nlohmann::json& sec, const char* key, T def)
+    T get_int(const nlohmann::json& sec, const char* key, T def)
     {
         auto it = sec.find(key);
         if (it == sec.end())
@@ -63,7 +63,7 @@ namespace
         return def;
     }
 
-    float getFloat(const nlohmann::json& sec, const char* key, float def)
+    float get_float(const nlohmann::json& sec, const char* key, float def)
     {
         auto it = sec.find(key);
         if (it == sec.end() || !it->is_number())
@@ -76,23 +76,22 @@ namespace
     template <typename ParamsT>
     void overlay(const nlohmann::json& doc, ParamsT& p)
     {
-        const nlohmann::json& st =
-            doc.contains("sushitrack") ? doc.at("sushitrack") : doc;
+        const nlohmann::json& st = doc.contains("sushitrack") ? doc.at("sushitrack") : doc;
 
         if (st.contains("basic"))
         {
             const auto& b = st.at("basic");
-            p.time_aware                 = getInt(b, "time_aware",                 p.time_aware);
-            p.frame_rate                 = getInt(b, "frame_rate",                 p.frame_rate);
-            p.track_buffer               = getInt(b, "track_buffer",               p.track_buffer);
-            p.track_thresh               = getFloat(b, "track_thresh",             p.track_thresh);
-            p.high_thresh                = getFloat(b, "high_thresh",              p.high_thresh);
-            p.match_thresh               = getFloat(b, "match_thresh",             p.match_thresh);
-            p.enable_tentative           = getInt(b, "enable_tentative",           p.enable_tentative);
-            p.enable_reid                = getInt(b, "enable_reid",                p.enable_reid);
-            p.enable_mahalanobis         = getInt(b, "enable_mahalanobis",         p.enable_mahalanobis);
-            p.enable_ocm                 = getInt(b, "enable_ocm",                 p.enable_ocm);
-            p.enable_oru                 = getInt(b, "enable_oru",                 p.enable_oru);
+            p.time_aware = get_int(b, "time_aware", p.time_aware);
+            p.frame_rate = get_int(b, "frame_rate", p.frame_rate);
+            p.track_buffer = get_int(b, "track_buffer", p.track_buffer);
+            p.track_thresh = get_float(b, "track_thresh", p.track_thresh);
+            p.high_thresh = get_float(b, "high_thresh", p.high_thresh);
+            p.match_thresh = get_float(b, "match_thresh", p.match_thresh);
+            p.enable_tentative = get_int(b, "enable_tentative", p.enable_tentative);
+            p.enable_reid = get_int(b, "enable_reid", p.enable_reid);
+            p.enable_mahalanobis = get_int(b, "enable_mahalanobis", p.enable_mahalanobis);
+            p.enable_ocm = get_int(b, "enable_ocm", p.enable_ocm);
+            p.enable_oru = get_int(b, "enable_oru", p.enable_oru);
         }
 
         if (!st.contains("advanced"))
@@ -104,66 +103,78 @@ namespace
         if (adv.contains("association"))
         {
             const auto& s = adv.at("association");
-            p.primary_assoc_mode     = getInt(s, "primary_assoc_mode",     p.primary_assoc_mode);
-            p.fuse_score             = getInt(s, "fuse_score",             p.fuse_score);
-            p.iou_match_thresh       = getFloat(s, "iou_match_thresh",       p.iou_match_thresh);
-            p.unconfirmed_iou_thresh = getFloat(s, "unconfirmed_iou_thresh", p.unconfirmed_iou_thresh);
-            p.duplicate_iou_thresh   = getFloat(s, "duplicate_iou_thresh",   p.duplicate_iou_thresh);
+            p.primary_assoc_mode = get_int(s, "primary_assoc_mode", p.primary_assoc_mode);
+            p.fuse_score = get_int(s, "fuse_score", p.fuse_score);
+            p.iou_match_thresh = get_float(s, "iou_match_thresh", p.iou_match_thresh);
+            p.unconfirmed_iou_thresh =
+                get_float(s, "unconfirmed_iou_thresh", p.unconfirmed_iou_thresh);
+            p.duplicate_iou_thresh = get_float(s, "duplicate_iou_thresh", p.duplicate_iou_thresh);
         }
 
         if (adv.contains("coordinate_system"))
         {
             const auto& s = adv.at("coordinate_system");
-            p.enable_xyah  = getInt(s, "enable_xyah",  p.enable_xyah);
-            p.iou_type     = getInt(s, "iou_type",     p.iou_type);
-            p.iou_plus_one = getInt(s, "iou_plus_one", p.iou_plus_one);
-            p.kalman_type  = getInt(s, "kalman_type",  p.kalman_type);
+            p.enable_xyah = get_int(s, "enable_xyah", p.enable_xyah);
+            p.iou_type = get_int(s, "iou_type", p.iou_type);
+            p.iou_plus_one = get_int(s, "iou_plus_one", p.iou_plus_one);
+            p.kalman_type = get_int(s, "kalman_type", p.kalman_type);
         }
 
         if (adv.contains("reid_params"))
         {
             const auto& s = adv.at("reid_params");
-            p.feature_momentum     = getFloat(s, "feature_momentum",     p.feature_momentum);
-            p.reid_high_thresh     = getFloat(s, "reid_high_thresh",     p.reid_high_thresh);
-            p.reid_high_iou_weight = getFloat(s, "reid_high_iou_weight", p.reid_high_iou_weight);
-            p.reid_low_thresh      = getFloat(s, "reid_low_thresh",      p.reid_low_thresh);
-            p.reid_low_iou_weight  = getFloat(s, "reid_low_iou_weight",  p.reid_low_iou_weight);
-            p.reid_recovery_thresh = getFloat(s, "reid_recovery_thresh", p.reid_recovery_thresh);
-            p.max_feature_history  = getInt(s, "max_feature_history",  p.max_feature_history);
-            p.reid_direct_assignment_weight = getFloat(s, "reid_direct_assignment_weight", p.reid_direct_assignment_weight);
+            p.feature_momentum = get_float(s, "feature_momentum", p.feature_momentum);
+            p.reid_high_thresh = get_float(s, "reid_high_thresh", p.reid_high_thresh);
+            p.reid_high_iou_weight = get_float(s, "reid_high_iou_weight", p.reid_high_iou_weight);
+            p.reid_low_thresh = get_float(s, "reid_low_thresh", p.reid_low_thresh);
+            p.reid_low_iou_weight = get_float(s, "reid_low_iou_weight", p.reid_low_iou_weight);
+            p.reid_recovery_thresh = get_float(s, "reid_recovery_thresh", p.reid_recovery_thresh);
+            p.max_feature_history = get_int(s, "max_feature_history", p.max_feature_history);
+            p.reid_direct_assignment_weight =
+                get_float(s, "reid_direct_assignment_weight", p.reid_direct_assignment_weight);
         }
 
         if (adv.contains("tentative_logic"))
         {
             const auto& s = adv.at("tentative_logic");
-            p.tentative_match_thresh    = getFloat(s, "tentative_match_thresh",    p.tentative_match_thresh);
-            p.tentative_confirm_hits    = getInt(s, "tentative_confirm_hits",    p.tentative_confirm_hits);
-            p.tentative_max_age_seconds = getFloat(s, "tentative_max_age_seconds", p.tentative_max_age_seconds);
-            p.tentative_max_miss_frames = getInt(s, "tentative_max_miss_frames", p.tentative_max_miss_frames);
-            p.tentative_init_suppress_iou = getFloat(s, "tentative_init_suppress_iou", p.tentative_init_suppress_iou);
-            p.tentative_fast_thresh       = getFloat(s, "tentative_fast_thresh",       p.tentative_fast_thresh);
-            p.tentative_fast_hits         = getInt(s, "tentative_fast_hits",         p.tentative_fast_hits);
-            p.tentative_slow_thresh       = getFloat(s, "tentative_slow_thresh",       p.tentative_slow_thresh);
-            p.tentative_slow_hits_offset  = getInt(s, "tentative_slow_hits_offset",  p.tentative_slow_hits_offset);
-            p.tentative_vslow_hits_offset = getInt(s, "tentative_vslow_hits_offset", p.tentative_vslow_hits_offset);
+            p.tentative_match_thresh =
+                get_float(s, "tentative_match_thresh", p.tentative_match_thresh);
+            p.tentative_confirm_hits =
+                get_int(s, "tentative_confirm_hits", p.tentative_confirm_hits);
+            p.tentative_max_age_seconds =
+                get_float(s, "tentative_max_age_seconds", p.tentative_max_age_seconds);
+            p.tentative_max_miss_frames =
+                get_int(s, "tentative_max_miss_frames", p.tentative_max_miss_frames);
+            p.tentative_init_suppress_iou =
+                get_float(s, "tentative_init_suppress_iou", p.tentative_init_suppress_iou);
+            p.tentative_fast_thresh =
+                get_float(s, "tentative_fast_thresh", p.tentative_fast_thresh);
+            p.tentative_fast_hits = get_int(s, "tentative_fast_hits", p.tentative_fast_hits);
+            p.tentative_slow_thresh =
+                get_float(s, "tentative_slow_thresh", p.tentative_slow_thresh);
+            p.tentative_slow_hits_offset =
+                get_int(s, "tentative_slow_hits_offset", p.tentative_slow_hits_offset);
+            p.tentative_vslow_hits_offset =
+                get_int(s, "tentative_vslow_hits_offset", p.tentative_vslow_hits_offset);
         }
 
         if (adv.contains("ocm"))
         {
             const auto& s = adv.at("ocm");
-            p.ocm_vdc_weight  = getFloat(s, "ocm_vdc_weight",  p.ocm_vdc_weight);
-            p.ocm_delta_t     = getInt(s, "ocm_delta_t",     p.ocm_delta_t);
-            p.ocm_min_velocity = getFloat(s, "ocm_min_velocity", p.ocm_min_velocity);
-            p.ocm_max_age     = getInt(s, "ocm_max_age",     p.ocm_max_age);
-            p.ocm_maneuver_weight_scale = getFloat(s, "ocm_maneuver_weight_scale", p.ocm_maneuver_weight_scale);
+            p.ocm_vdc_weight = get_float(s, "ocm_vdc_weight", p.ocm_vdc_weight);
+            p.ocm_delta_t = get_int(s, "ocm_delta_t", p.ocm_delta_t);
+            p.ocm_min_velocity = get_float(s, "ocm_min_velocity", p.ocm_min_velocity);
+            p.ocm_max_age = get_int(s, "ocm_max_age", p.ocm_max_age);
+            p.ocm_maneuver_weight_scale =
+                get_float(s, "ocm_maneuver_weight_scale", p.ocm_maneuver_weight_scale);
         }
 
         if (adv.contains("mahalanobis_gating"))
         {
             const auto& s = adv.at("mahalanobis_gating");
-            p.gating_thresh      = getFloat(s, "gating_thresh",      p.gating_thresh);
-            p.motion_cost_weight = getFloat(s, "motion_cost_weight", p.motion_cost_weight);
-            p.max_area_ratio     = getFloat(s, "max_area_ratio",     p.max_area_ratio);
+            p.gating_thresh = get_float(s, "gating_thresh", p.gating_thresh);
+            p.motion_cost_weight = get_float(s, "motion_cost_weight", p.motion_cost_weight);
+            p.max_area_ratio = get_float(s, "max_area_ratio", p.max_area_ratio);
         }
     }
 } // namespace
@@ -174,7 +185,7 @@ namespace SushiTrack
      * @brief Resolves configuration file path from explicit path, environment, or search.
      * @return Resolved path string, or empty string when no file found.
      */
-    std::string resolveConfigPath(const char* path)
+    std::string resolve_config_path(const char* path)
     {
         std::error_code ec;
 
@@ -196,9 +207,9 @@ namespace SushiTrack
         }
 
         fs::path dir = fs::current_path(ec);
-        for (int depth = 0; depth <= kMaxSearchDepth && !dir.empty(); ++depth)
+        for (int depth = 0; depth <= K_MAX_SEARCH_DEPTH && !dir.empty(); ++depth)
         {
-            fs::path candidate = dir / kDefaultConfigName;
+            fs::path candidate = dir / K_DEFAULT_CONFIG_NAME;
             if (fs::exists(candidate, ec))
             {
                 return candidate.string();
@@ -223,9 +234,9 @@ namespace SushiTrack
      * @brief Loads tracker configuration parameters from a JSON file.
      * @return True when file was found and parsed successfully, false otherwise.
      */
-    bool loadConfigFromJson(const char* path, TrackerConfig& config)
+    bool load_config_from_json(const char* path, TrackerConfig& config)
     {
-        const std::string resolved = resolveConfigPath(path);
+        const std::string resolved = resolve_config_path(path);
         if (resolved.empty())
         {
             return false;
@@ -258,7 +269,8 @@ extern "C"
      * @param params Parameters structure updated in place.
      * @return Status code indicating success or failure reason.
      */
-    sushitrack_status_t sushitrack_load_params_from_json(const char* path, sushitrack_params_t* params)
+    sushitrack_status_t sushitrack_load_params_from_json(const char* path,
+                                                         sushitrack_params_t* params)
     {
         if (!params)
         {
@@ -269,17 +281,19 @@ extern "C"
 
         try
         {
-            resolved = SushiTrack::resolveConfigPath(path);
+            resolved = SushiTrack::resolve_config_path(path);
             if (resolved.empty())
             {
-                SUSHITRACK_LOG_INFO("[SushiTrack] No configuration file found -- using provided parameters.");
+                SUSHITRACK_LOG_INFO(
+                    "[SushiTrack] No configuration file found -- using provided parameters.");
                 return SUSHITRACK_SUCCESS;
             }
 
             std::ifstream file(resolved);
             if (!file.is_open())
             {
-                SUSHITRACK_LOG_WARN("[SushiTrack] Configuration file could not be opened: %s", resolved.c_str());
+                SUSHITRACK_LOG_WARN("[SushiTrack] Configuration file could not be opened: %s",
+                                    resolved.c_str());
                 return SUSHITRACK_SUCCESS;
             }
 
@@ -291,12 +305,14 @@ extern "C"
         }
         catch (const std::exception& e)
         {
-            SUSHITRACK_LOG_ERROR("[SushiTrack] Failed to parse configuration %s: %s", resolved.c_str(), e.what());
+            SUSHITRACK_LOG_ERROR("[SushiTrack] Failed to parse configuration %s: %s",
+                                 resolved.c_str(), e.what());
             return SUSHITRACK_RUNTIME_ERROR;
         }
         catch (...)
         {
-            SUSHITRACK_LOG_ERROR("[SushiTrack] Failed to load configuration %s: unknown exception.", resolved.c_str());
+            SUSHITRACK_LOG_ERROR("[SushiTrack] Failed to load configuration %s: unknown exception.",
+                                 resolved.c_str());
             return SUSHITRACK_RUNTIME_ERROR;
         }
     }

@@ -25,9 +25,11 @@
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-#include <SushiTrack/c_api/sushitrack_c.h>
 #include <vector>
+
+#include <gtest/gtest.h>
+
+#include <SushiTrack/c_api/sushitrack_c.h>
 
 // TrackerBuffersTest — standard 0.08 s buffer window
 
@@ -39,50 +41,53 @@
  */
 class TrackerBuffersTest : public ::testing::Test
 {
-protected:
-    sushitrack_tracker_t     hdl_    = nullptr;
-    sushitrack_params_t params_ = {};
+    protected:
+        sushitrack_tracker_t hdl_ = nullptr;
+        sushitrack_params_t params_ = {};
 
-    void SetUp() override
-    {
-        sushitrack_get_default_params(&params_);
-        params_.time_aware                = 1;
-        params_.enable_tentative          = 1;
-        params_.tentative_confirm_hits    = 3;
-        params_.tentative_max_age_seconds = 0.08f;
-        params_.track_buffer              = 2;
-        params_.frame_rate                = 25;
-        params_.tentative_match_thresh    = 0.9f;
-        params_.track_thresh              = 0.1f;
-        params_.high_thresh               = 0.2f;
+        void SetUp() override
+        {
+            sushitrack_get_default_params(&params_);
+            params_.time_aware = 1;
+            params_.enable_tentative = 1;
+            params_.tentative_confirm_hits = 3;
+            params_.tentative_max_age_seconds = 0.08f;
+            params_.track_buffer = 2;
+            params_.frame_rate = 25;
+            params_.tentative_match_thresh = 0.9f;
+            params_.track_thresh = 0.1f;
+            params_.high_thresh = 0.2f;
 
-        hdl_ = sushitrack_create(&params_);
-        ASSERT_NE(hdl_, nullptr);
-    }
+            hdl_ = sushitrack_create(&params_);
+            ASSERT_NE(hdl_, nullptr);
+        }
 
-    void TearDown() override { sushitrack_destroy(hdl_); }
+        void TearDown() override { sushitrack_destroy(hdl_); }
 
-    /** @brief Returns a detection at the given top-left position. */
-    sushitrack_object_t det(float x, float y) const
-    {
-        sushitrack_object_t o{};
-        o.x = x; o.y = y;
-        o.width = 50.0f; o.height = 100.0f;
-        o.score = 0.9f;  o.label  = 1;
-        return o;
-    }
+        /** @brief Returns a detection at the given top-left position. */
+        sushitrack_object_t det(float x, float y) const
+        {
+            sushitrack_object_t o{};
+            o.x = x;
+            o.y = y;
+            o.width = 50.0f;
+            o.height = 100.0f;
+            o.score = 0.9f;
+            o.label = 1;
+            return o;
+        }
 
-    /**
-     * @brief Drives the tracker through three matched frames to reach Tracked state.
-     * @param out Output buffer (must have capacity >= 1).
-     */
-    void confirmTrack(std::vector<sushitrack_track_t>& out)
-    {
-        sushitrack_update(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
-        sushitrack_update(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
-        sushitrack_update(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
-        ASSERT_EQ(out[0].state, 1) << "Precondition: track must be Tracked before buffer tests";
-    }
+        /**
+         * @brief Drives the tracker through three matched frames to reach Tracked state.
+         * @param out Output buffer (must have capacity >= 1).
+         */
+        void confirm_track(std::vector<sushitrack_track_t>& out)
+        {
+            sushitrack_update(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
+            sushitrack_update(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
+            sushitrack_update(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
+            ASSERT_EQ(out[0].state, 1) << "Precondition: track must be Tracked before buffer tests";
+        }
 };
 
 /**
@@ -92,7 +97,7 @@ protected:
 TEST_F(TrackerBuffersTest, TrackedTransitionsToLostOnFirstMiss)
 {
     std::vector<sushitrack_track_t> out(10);
-    confirmTrack(out);
+    confirm_track(out);
 
     int n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
@@ -106,7 +111,7 @@ TEST_F(TrackerBuffersTest, TrackedTransitionsToLostOnFirstMiss)
 TEST_F(TrackerBuffersTest, LostTimeAccumulatesAcrossMissedFrames)
 {
     std::vector<sushitrack_track_t> out(10);
-    confirmTrack(out);
+    confirm_track(out);
 
     sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
     int n = sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
@@ -123,7 +128,7 @@ TEST_F(TrackerBuffersTest, LostTimeAccumulatesAcrossMissedFrames)
 TEST_F(TrackerBuffersTest, LostTrackRemovedAfterBufferExpiry)
 {
     std::vector<sushitrack_track_t> out(10);
-    confirmTrack(out);
+    confirm_track(out);
 
     sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
     sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
@@ -140,7 +145,7 @@ TEST_F(TrackerBuffersTest, LostTrackRemovedAfterBufferExpiry)
 TEST_F(TrackerBuffersTest, LostTrackRecoveredWhenReassociated)
 {
     std::vector<sushitrack_track_t> out(10);
-    confirmTrack(out);
+    confirm_track(out);
 
     sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
     ASSERT_EQ(out[0].state, 2) << "Precondition: track must be Lost before recovery test";
@@ -159,7 +164,7 @@ TEST_F(TrackerBuffersTest, LostTrackRecoveredWhenReassociated)
 TEST_F(TrackerBuffersTest, RemovedTrackAbsentFromNextFrameOutput)
 {
     std::vector<sushitrack_track_t> out(10);
-    confirmTrack(out);
+    confirm_track(out);
 
     sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
 
@@ -222,14 +227,16 @@ TEST_F(TrackerBuffersTest, MultipleTrackIndependentLostState)
     ASSERT_EQ(n_mixed, 2);
 
     int tracked_count = 0;
-    int lost_count    = 0;
+    int lost_count = 0;
     for (int i = 0; i < n_mixed; ++i)
     {
-        if (out[i].state == 1) ++tracked_count;
-        else if (out[i].state == 2) ++lost_count;
+        if (out[i].state == 1)
+            ++tracked_count;
+        else if (out[i].state == 2)
+            ++lost_count;
     }
     EXPECT_EQ(tracked_count, 1);
-    EXPECT_EQ(lost_count,    1);
+    EXPECT_EQ(lost_count, 1);
 }
 
 // TrackerBuffersLargeBufferTest — wide 0.4 s expiry window
@@ -242,50 +249,53 @@ TEST_F(TrackerBuffersTest, MultipleTrackIndependentLostState)
  */
 class TrackerBuffersLargeBufferTest : public ::testing::Test
 {
-protected:
-    sushitrack_tracker_t     hdl_    = nullptr;
-    sushitrack_params_t params_ = {};
+    protected:
+        sushitrack_tracker_t hdl_ = nullptr;
+        sushitrack_params_t params_ = {};
 
-    void SetUp() override
-    {
-        sushitrack_get_default_params(&params_);
-        params_.time_aware                = 1;
-        params_.enable_tentative          = 1;
-        params_.tentative_confirm_hits    = 3;
-        params_.tentative_max_age_seconds = 0.08f;
-        params_.track_buffer              = 10;
-        params_.frame_rate                = 25;
-        params_.tentative_match_thresh    = 0.9f;
-        params_.track_thresh              = 0.1f;
-        params_.high_thresh               = 0.2f;
+        void SetUp() override
+        {
+            sushitrack_get_default_params(&params_);
+            params_.time_aware = 1;
+            params_.enable_tentative = 1;
+            params_.tentative_confirm_hits = 3;
+            params_.tentative_max_age_seconds = 0.08f;
+            params_.track_buffer = 10;
+            params_.frame_rate = 25;
+            params_.tentative_match_thresh = 0.9f;
+            params_.track_thresh = 0.1f;
+            params_.high_thresh = 0.2f;
 
-        hdl_ = sushitrack_create(&params_);
-        ASSERT_NE(hdl_, nullptr);
-    }
+            hdl_ = sushitrack_create(&params_);
+            ASSERT_NE(hdl_, nullptr);
+        }
 
-    void TearDown() override { sushitrack_destroy(hdl_); }
+        void TearDown() override { sushitrack_destroy(hdl_); }
 
-    /** @brief Returns a detection at the given top-left position. */
-    sushitrack_object_t det(float x, float y) const
-    {
-        sushitrack_object_t o{};
-        o.x = x; o.y = y;
-        o.width = 50.0f; o.height = 100.0f;
-        o.score = 0.9f;  o.label  = 1;
-        return o;
-    }
+        /** @brief Returns a detection at the given top-left position. */
+        sushitrack_object_t det(float x, float y) const
+        {
+            sushitrack_object_t o{};
+            o.x = x;
+            o.y = y;
+            o.width = 50.0f;
+            o.height = 100.0f;
+            o.score = 0.9f;
+            o.label = 1;
+            return o;
+        }
 
-    /**
-     * @brief Drives three matched frames to bring the track to Tracked state.
-     * @param out Output buffer (capacity >= 1).
-     */
-    void confirmTrack(std::vector<sushitrack_track_t>& out)
-    {
-        sushitrack_update(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
-        sushitrack_update(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
-        sushitrack_update(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
-        ASSERT_EQ(out[0].state, 1) << "Precondition: track must be Tracked";
-    }
+        /**
+         * @brief Drives three matched frames to bring the track to Tracked state.
+         * @param out Output buffer (capacity >= 1).
+         */
+        void confirm_track(std::vector<sushitrack_track_t>& out)
+        {
+            sushitrack_update(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
+            sushitrack_update(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
+            sushitrack_update(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
+            ASSERT_EQ(out[0].state, 1) << "Precondition: track must be Tracked";
+        }
 };
 
 /**
@@ -298,7 +308,7 @@ protected:
 TEST_F(TrackerBuffersLargeBufferTest, DifferentBufferWindowAffectsExpiry)
 {
     std::vector<sushitrack_track_t> out(10);
-    confirmTrack(out);
+    confirm_track(out);
 
     int n = 0;
     for (int i = 0; i < 5; ++i)

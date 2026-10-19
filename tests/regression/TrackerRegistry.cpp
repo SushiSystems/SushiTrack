@@ -25,31 +25,30 @@
  * @author Mustafa Garip
  */
 
-#include "TrackerRegistry.h"
 #include <vector>
 
 #include "ByteTrackAdapter.h"
-#include "SushiTrackAdapter.h"
 #include "OCSORTAdapter.h"
+#include "SushiTrackAdapter.h"
+#include "TrackerRegistry.h"
 
 REGISTER_TRACKER("ByteTrack", TestInfrastructure::ByteTrackAdapter);
 REGISTER_TRACKER("SushiTrack", TestInfrastructure::SushiTrackAdapter);
 REGISTER_TRACKER("sushitrack", TestInfrastructure::SushiTrackAdapter);
 REGISTER_TRACKER("OCSORT", TestInfrastructure::OCSORTAdapter);
 
-extern "C" 
+extern "C"
 {
-
-    ITrackerAdapter* create_tracker(const char* name)
+    TrackerAdapter* create_tracker(const char* name)
     {
         if (!name)
         {
             return nullptr;
         }
-        return TrackerRegistry::getInstance().create(std::string(name));
+        return TrackerRegistry::get_instance().create(std::string(name));
     }
 
-    void delete_tracker(ITrackerAdapter* tracker)
+    void delete_tracker(TrackerAdapter* tracker)
     {
         if (tracker)
         {
@@ -57,7 +56,9 @@ extern "C"
         }
     }
 
-    void tracker_process_c(ITrackerAdapter* tracker, const CDetection* detections, int num_detections, CTrackResult* results, int* num_results, int max_results)
+    void tracker_process_c(TrackerAdapter* tracker, const CDetection* detections,
+                           int num_detections, CTrackResult* results, int* num_results,
+                           int max_results)
     {
         if (!tracker || !detections || !results || !num_results)
         {
@@ -66,7 +67,7 @@ extern "C"
 
         std::vector<MOTDetection> dets;
         dets.reserve(num_detections);
-        
+
         for (int i = 0; i < num_detections; ++i)
         {
             MOTDetection d;
@@ -76,12 +77,12 @@ extern "C"
             d.h = detections[i].h;
             d.score = detections[i].score;
             d.label = detections[i].label;
-            
+
             if (detections[i].feat != nullptr && detections[i].feat_dim > 0)
             {
                 d.feature.assign(detections[i].feat, detections[i].feat + detections[i].feat_dim);
             }
-            
+
             dets.push_back(d);
         }
 
@@ -98,8 +99,7 @@ extern "C"
             results[i].score = cpp_results[i].score;
             count++;
         }
-        
+
         *num_results = count;
     }
-
 }

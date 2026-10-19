@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* i_cost_calculator.hpp                                                  */
+/* cost_calculator.hpp                                                    */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -20,17 +20,17 @@
 /**************************************************************************/
 
 /**
- * @file i_cost_calculator.hpp
+ * @file cost_calculator.hpp
  * @brief Interface definition for similarity and distance calculation components.
  * @author Mustafa Garip
  */
 
 #pragma once
 
-#include <SushiTrack/association/cost_matrix.hpp>
-
 #include <memory>
 #include <vector>
+
+#include <SushiTrack/association/cost_matrix.hpp>
 
 namespace SushiTrack
 {
@@ -39,33 +39,34 @@ namespace SushiTrack
     /**
      * @brief Abstract interface for similarity and distance metrics.
      */
-    class ICostCalculator
+    class CostCalculator
     {
-    public:
-        using TrackletPtr = std::shared_ptr<Tracklet>;
+        public:
+            using TrackletPtr = std::shared_ptr<Tracklet>;
 
-        /**
-         * @brief Virtual destructor for the interface.
-         */
-        virtual ~ICostCalculator() = default;
+            /**
+             * @brief Virtual destructor for the interface.
+             */
+            virtual ~CostCalculator() = default;
 
-        /**
-         * @brief Computes association costs for all candidate tracklet pairs.
-         * @param a Collection of source tracklets.
-         * @param b Collection of target tracklets (observations).
-         * @param out_matrix Output cost matrix populated in place.
-         */
-        virtual void calculate(const std::vector<TrackletPtr>& __restrict a,
-                               const std::vector<TrackletPtr>& __restrict b,
-                               CostMatrix& __restrict out_matrix) = 0;
+            /**
+             * @brief Computes association costs for all candidate tracklet pairs.
+             * @param a Collection of source tracklets.
+             * @param b Collection of target tracklets (observations).
+             * @param out_matrix Output cost matrix populated in place.
+             */
+            virtual void calculate(const std::vector<TrackletPtr>& __restrict a,
+                                   const std::vector<TrackletPtr>& __restrict b,
+                                   CostMatrix& __restrict out_matrix) = 0;
 
-        /**
-         * @brief Computes association cost for a single pair of tracklets.
-         * @param a Source tracklet.
-         * @param b Target tracklet.
-         * @return Computed cost value.
-         */
-        virtual float calculate_single(const TrackletPtr& a, const TrackletPtr& b) const = 0;
+            /**
+             * @brief Computes association cost for a single pair of tracklets.
+             * @param a Source tracklet.
+             * @param b Target tracklet.
+             * @return Computed cost value.
+             */
+            [[nodiscard]] virtual float calculate_single(const TrackletPtr& a,
+                                                         const TrackletPtr& b) const = 0;
     };
 
 } // namespace SushiTrack

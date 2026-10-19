@@ -12,12 +12,12 @@ This document defines the engineering standards for contributing to SushiTrack. 
 |---|---|---|
 | Namespaces | PascalCase | `SushiTrack` |
 | Classes / Structs | PascalCase | `Tracker`, `TrackerConfig` |
-| Interfaces (pure virtual) | `I` prefix + PascalCase | `ICostCalculator`, `IKalmanFactory` |
-| Methods | camelCase | `update()`, `getTracks()` |
+| Interfaces (pure virtual) | `I` prefix + PascalCase | `CostCalculator`, `KalmanFactory` |
+| Methods | camelCase | `update()`, `get_tracks()` |
 | Member variables | snake_case with trailing `_` | `frame_id_`, `config_` |
 | Local variables | snake_case | `track_remaining`, `dt` |
 | C API symbols | `sushitrack_` prefix | `sushitrack_update`, `sushitrack_params_t` |
-| Constants / Enumerators | PascalCase / `kPrefix` | `TrackState::Tracked`, `kMaxKfDtSteps` |
+| Constants / Enumerators | PascalCase / `kPrefix` | `TrackState::Tracked`, `K_MAX_KF_DT_STEPS` |
 
 ### Braces
 

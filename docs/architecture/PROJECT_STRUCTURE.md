@@ -41,7 +41,7 @@ sushitrack/
 │   └── regression/
 │       ├── RegressionTest.cpp         # GTest entry over (scenario x tracker)
 │       ├── ScenarioList.h             # MOT17, MOT20 and DanceTrack scenarios
-│       ├── ITrackerAdapter.h          # adapter interface
+│       ├── TrackerAdapter.h          # adapter interface
 │       ├── SushiTrackAdapter.h  ByteTrackAdapter.h  OCSORTAdapter.h
 │       ├── TrackerRegistry.h  TrackerRegistry.cpp   # C entry points of tracker_bridge
 │       ├── MOTRunner.h                # det.txt reader and prediction writer

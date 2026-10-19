@@ -47,9 +47,8 @@ namespace SushiTrack
      * @brief Instantiates a state predictor through the registry.
      * @return Unique pointer to the constructed state predictor.
      */
-    std::unique_ptr<IStatePredictor> GenericKalmanFactory::create() const
+    std::unique_ptr<StatePredictor> GenericKalmanFactory::create() const
     {
-        return KalmanFilterRegistry::getInstance().create(
-            kalman_type_, enable_xyah_);
+        return KalmanFilterRegistry::get_instance().create(kalman_type_, enable_xyah_);
     }
 } // namespace SushiTrack

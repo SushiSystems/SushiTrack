@@ -58,8 +58,8 @@ extern "C"
     typedef enum
     {
         SUSHITRACK_LOG_DEBUG = 0, ///< Detailed diagnostic information.
-        SUSHITRACK_LOG_INFO  = 1, ///< Informational system messages.
-        SUSHITRACK_LOG_WARN  = 2, ///< Non-terminating operational warnings.
+        SUSHITRACK_LOG_INFO = 1,  ///< Informational system messages.
+        SUSHITRACK_LOG_WARN = 2,  ///< Non-terminating operational warnings.
         SUSHITRACK_LOG_ERROR = 3  ///< Terminating operational errors.
     } sushitrack_log_level_t;
 
@@ -76,14 +76,14 @@ extern "C"
      */
     typedef struct
     {
-        float        x;        ///< Top-left horizontal coordinate.
-        float        y;        ///< Top-left vertical coordinate.
-        float        width;    ///< Horizontal dimension of bounding box.
-        float        height;   ///< Vertical dimension of bounding box.
-        float        score;    ///< Detection confidence score in range [0, 1].
-        int          label;    ///< Object classification identifier.
-        const float* feat;     ///< Pointer to visual feature vector.
-        int          feat_dim; ///< Dimensionality of the feature vector.
+            float x;           ///< Top-left horizontal coordinate.
+            float y;           ///< Top-left vertical coordinate.
+            float width;       ///< Horizontal dimension of bounding box.
+            float height;      ///< Vertical dimension of bounding box.
+            float score;       ///< Detection confidence score in range [0, 1].
+            int label;         ///< Object classification identifier.
+            const float* feat; ///< Pointer to visual feature vector.
+            int feat_dim;      ///< Dimensionality of the feature vector.
     } sushitrack_object_t;
 
     /**
@@ -91,25 +91,25 @@ extern "C"
      */
     typedef struct
     {
-        int64_t      track_id;                 ///< Unique persistent identifier.
-        int64_t      age;                      ///< Total frames the track has been alive.
-        int64_t      last_seen_frame;          ///< Frame index where track was last visible.
-        const float* feat;                     ///< Pointer to track visual feature vector.
-        float        x;                        ///< Estimated top-left horizontal coordinate.
-        float        y;                        ///< Estimated top-left vertical coordinate.
-        float        width;                    ///< Estimated horizontal dimension.
-        float        height;                   ///< Estimated vertical dimension.
-        float        score;                    ///< Association confidence score.
-        float        lost_time;                ///< Time spent in the lost state.
-        int          label;                    ///< Object classification identifier.
-        int          state;                    ///< Track lifecycle state.
-        int          kinematic_state;          ///< Kinematic movement state classification.
-        int          feat_dim;                 ///< Dimensionality of feature vector.
-        int          is_activated;             ///< Flag indicating if track has been activated.
-        int          is_confirmed;             ///< Flag indicating if track has been confirmed.
-        int          hits;                     ///< Number of successful detections matched.
-        int          frames_since_last_update; ///< Frames elapsed since last observation.
-        float        maneuver_probability;     ///< Manoeuvre likelihood in range [0, 1].
+            int64_t track_id;             ///< Unique persistent identifier.
+            int64_t age;                  ///< Total frames the track has been alive.
+            int64_t last_seen_frame;      ///< Frame index where track was last visible.
+            const float* feat;            ///< Pointer to track visual feature vector.
+            float x;                      ///< Estimated top-left horizontal coordinate.
+            float y;                      ///< Estimated top-left vertical coordinate.
+            float width;                  ///< Estimated horizontal dimension.
+            float height;                 ///< Estimated vertical dimension.
+            float score;                  ///< Association confidence score.
+            float lost_time;              ///< Time spent in the lost state.
+            int label;                    ///< Object classification identifier.
+            int state;                    ///< Track lifecycle state.
+            int kinematic_state;          ///< Kinematic movement state classification.
+            int feat_dim;                 ///< Dimensionality of feature vector.
+            int is_activated;             ///< Flag indicating if track has been activated.
+            int is_confirmed;             ///< Flag indicating if track has been confirmed.
+            int hits;                     ///< Number of successful detections matched.
+            int frames_since_last_update; ///< Frames elapsed since last observation.
+            float maneuver_probability;   ///< Manoeuvre likelihood in range [0, 1].
     } sushitrack_track_t;
 
     /**
@@ -117,67 +117,67 @@ extern "C"
      */
     typedef struct
     {
-        // Basic parameters
-        int   time_aware;
-        int   frame_rate;
-        int   track_buffer;
-        float track_thresh;
-        float high_thresh;
-        float match_thresh;
-        int   enable_tentative;
-        int   enable_reid;
-        int   enable_mahalanobis;
+            // Basic parameters
+            int time_aware;
+            int frame_rate;
+            int track_buffer;
+            float track_thresh;
+            float high_thresh;
+            float match_thresh;
+            int enable_tentative;
+            int enable_reid;
+            int enable_mahalanobis;
 
-        // Association parameters
-        int   primary_assoc_mode;
-        int   fuse_score;
-        float iou_match_thresh;
-        float unconfirmed_iou_thresh;
-        float duplicate_iou_thresh;
+            // Association parameters
+            int primary_assoc_mode;
+            int fuse_score;
+            float iou_match_thresh;
+            float unconfirmed_iou_thresh;
+            float duplicate_iou_thresh;
 
-        // Coordinate system parameters
-        int   enable_xyah;
-        int   iou_type;
-        int   iou_plus_one;
-        int   kalman_type;
+            // Coordinate system parameters
+            int enable_xyah;
+            int iou_type;
+            int iou_plus_one;
+            int kalman_type;
 
-        // ReID parameters
-        float feature_momentum;
-        float reid_high_thresh;
-        float reid_high_iou_weight;
-        float reid_low_thresh;
-        float reid_low_iou_weight;
-        float reid_recovery_thresh;
-        int   max_feature_history;
+            // ReID parameters
+            float feature_momentum;
+            float reid_high_thresh;
+            float reid_high_iou_weight;
+            float reid_low_thresh;
+            float reid_low_iou_weight;
+            float reid_recovery_thresh;
+            int max_feature_history;
 
-        // Observation-Centric Momentum parameters
-        int   enable_ocm;
-        int   enable_oru;
-        float ocm_vdc_weight;
-        int   ocm_delta_t;
-        float ocm_min_velocity;
-        int   ocm_max_age;
-        float ocm_maneuver_weight_scale;
+            // Observation-Centric Momentum parameters
+            int enable_ocm;
+            int enable_oru;
+            float ocm_vdc_weight;
+            int ocm_delta_t;
+            float ocm_min_velocity;
+            int ocm_max_age;
+            float ocm_maneuver_weight_scale;
 
-        // Tentative logic parameters
-        float tentative_match_thresh;
-        int   tentative_confirm_hits;
-        float tentative_max_age_seconds;
-        int   tentative_max_miss_frames;
-        float tentative_init_suppress_iou;
+            // Tentative logic parameters
+            float tentative_match_thresh;
+            int tentative_confirm_hits;
+            float tentative_max_age_seconds;
+            int tentative_max_miss_frames;
+            float tentative_init_suppress_iou;
 
-        // Mahalanobis gating parameters
-        float gating_thresh;
-        float motion_cost_weight;
-        float max_area_ratio;
+            // Mahalanobis gating parameters
+            float gating_thresh;
+            float motion_cost_weight;
+            float max_area_ratio;
 
-        // Extended parameters
-        float tentative_fast_thresh;
-        int   tentative_fast_hits;
-        float tentative_slow_thresh;
-        int   tentative_slow_hits_offset;
-        int   tentative_vslow_hits_offset;
-        float reid_direct_assignment_weight;
+            // Extended parameters
+            float tentative_fast_thresh;
+            int tentative_fast_hits;
+            float tentative_slow_thresh;
+            int tentative_slow_hits_offset;
+            int tentative_vslow_hits_offset;
+            float reid_direct_assignment_weight;
     } sushitrack_params_t;
 
     /**
@@ -213,9 +213,8 @@ extern "C"
      * @param out_tracker Pointer to receive initialized tracker handle.
      * @return Status code indicating success or failure reason.
      */
-    SUSHITRACK_API sushitrack_status_t sushitrack_create_ex(
-        const sushitrack_params_t* params,
-        sushitrack_tracker_t*      out_tracker);
+    SUSHITRACK_API sushitrack_status_t sushitrack_create_ex(const sushitrack_params_t* params,
+                                                            sushitrack_tracker_t* out_tracker);
 
     /**
      * @brief Terminates a tracker instance and deallocates associated memory.
@@ -236,13 +235,9 @@ extern "C"
      * @param out_tracks Pre-allocated buffer receiving active tracks.
      * @return Count of active tracks written into out_tracks.
      */
-    SUSHITRACK_API int sushitrack_update(
-        sushitrack_tracker_t       tracker,
-        const sushitrack_object_t* objects,
-        int                        n_objects,
-        sushitrack_track_t*        out_tracks,
-        int                        max_tracks,
-        float                      dt);
+    SUSHITRACK_API int sushitrack_update(sushitrack_tracker_t tracker,
+                                         const sushitrack_object_t* objects, int n_objects,
+                                         sushitrack_track_t* out_tracks, int max_tracks, float dt);
 
     /**
      * @brief Retrieves currently managed tracklets from the tracker.
@@ -251,10 +246,8 @@ extern "C"
      * @param max_tracks Maximum capacity of out_tracks array.
      * @return Number of tracklets written to output array.
      */
-    SUSHITRACK_API int sushitrack_get_tracklets(
-        sushitrack_tracker_t tracker,
-        sushitrack_track_t*  out_tracks,
-        int                  max_tracks);
+    SUSHITRACK_API int sushitrack_get_tracklets(sushitrack_tracker_t tracker,
+                                                sushitrack_track_t* out_tracks, int max_tracks);
 
     /**
      * @brief Overlays a JSON configuration file onto a parameters structure.
@@ -262,9 +255,8 @@ extern "C"
      * @param params Parameters structure updated in place.
      * @return Status code indicating success or failure reason.
      */
-    SUSHITRACK_API sushitrack_status_t sushitrack_load_params_from_json(
-        const char*          path,
-        sushitrack_params_t* params);
+    SUSHITRACK_API sushitrack_status_t
+    sushitrack_load_params_from_json(const char* path, sushitrack_params_t* params);
 
     /**
      * @brief Configures a global callback function for system logging.

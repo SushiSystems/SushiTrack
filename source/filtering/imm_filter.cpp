@@ -40,43 +40,41 @@ namespace SushiTrack
     namespace
     {
         // Position and velocity std weights shared with KalmanFilter.
-        constexpr float kSWP = KalmanFilter::kStdWeightPosition;
-        constexpr float kSWV = KalmanFilter::kStdWeightVelocity;
-        constexpr float kInitPos = KalmanFilter::kInitPositionMult;
-        constexpr float kInitVel = KalmanFilter::kInitVelocityMult;
+        constexpr float K_SWP = KalmanFilter::K_STD_WEIGHT_POSITION;
+        constexpr float K_SWV = KalmanFilter::K_STD_WEIGHT_VELOCITY;
+        constexpr float K_INIT_POS = KalmanFilter::K_INIT_POSITION_MULT;
+        constexpr float K_INIT_VEL = KalmanFilter::K_INIT_VELOCITY_MULT;
 
         // Markov mode transition probability of staying in current mode.
-        constexpr float kPStay = 0.90f;
+        constexpr float K_P_STAY = 0.90f;
 
         // Coordinated-turn process noise on turn rate.
-        constexpr float kSigmaOmega = 0.30f;
+        constexpr float K_SIGMA_OMEGA = 0.30f;
         // Singularity threshold where turn rate degenerates to constant velocity.
-        constexpr float kOmegaEps = 1e-4f;
+        constexpr float K_OMEGA_EPS = 1e-4f;
 
-        constexpr float kEps = 1e-9f;
-        constexpr float kTwoPi = 6.283185307179586f;
+        constexpr float K_EPS = 1e-9f;
+        constexpr float K_TWO_PI = 6.283185307179586f;
     } // namespace
 
     IMMFilter::IMMFilter(bool enable_xyah)
-        : enable_xyah_(enable_xyah),
-          gate_kf_(std::make_unique<KalmanFilter>(enable_xyah))
+        : enable_xyah_(enable_xyah), gate_kf_(std::make_unique<KalmanFilter>(enable_xyah))
     {
         // Transition matrix biased toward constant-velocity prior.
-        const float base[kNumModes] = {0.70f, 0.10f, 0.10f, 0.10f};
-        for (int i = 0; i < kNumModes; ++i)
+        const float base[K_NUM_MODES] = {0.70f, 0.10f, 0.10f, 0.10f};
+        for (int i = 0; i < K_NUM_MODES; ++i)
         {
             float denom = 0.0f;
-            for (int k = 0; k < kNumModes; ++k)
+            for (int k = 0; k < K_NUM_MODES; ++k)
             {
                 if (k != i)
                 {
                     denom += base[k];
                 }
             }
-            for (int j = 0; j < kNumModes; ++j)
+            for (int j = 0; j < K_NUM_MODES; ++j)
             {
-                Pi_(i, j) = (i == j) ? kPStay
-                                     : (1.0f - kPStay) * base[j] / denom;
+                pi_(i, j) = (i == j) ? K_P_STAY : (1.0f - K_P_STAY) * base[j] / denom;
             }
         }
 
@@ -85,23 +83,24 @@ namespace SushiTrack
         last_combined_.setZero();
     }
 
-    IMMFilter::MatH IMMFilter::measurementMatrix() const
+    IMMFilter::MatH IMMFilter::measurement_matrix() const
     {
-        MatH H = MatH::Zero();
-        H(0, 0) = H(1, 1) = H(2, 2) = H(3, 3) = 1.0f;
-        return H;
+        MatH measurement_map = MatH::Zero();
+        measurement_map(0, 0) = measurement_map(1, 1) = measurement_map(2, 2) =
+            measurement_map(3, 3) = 1.0f;
+        return measurement_map;
     }
 
-    IMMFilter::Mat4 IMMFilter::measurementNoise(float height, float width) const
+    IMMFilter::Mat4 IMMFilter::measurement_noise(float height, float width) const
     {
         Eigen::Vector4f s;
         if (enable_xyah_)
         {
-            s << kSWP * height, kSWP * height, 1e-1f, kSWP * height;
+            s << K_SWP * height, K_SWP * height, 1e-1f, K_SWP * height;
         }
         else
         {
-            s << kSWP * width, kSWP * height, kSWP * width, kSWP * height;
+            s << K_SWP * width, K_SWP * height, K_SWP * width, K_SWP * height;
         }
         return s.array().square().matrix().asDiagonal();
     }
@@ -112,47 +111,46 @@ namespace SushiTrack
      * @param dt Time interval for state propagation.
      * @return Discrete transition matrix.
      */
-    IMMFilter::Mat11 IMMFilter::transitionMatrix(Mode m, float dt) const
+    IMMFilter::Mat11 IMMFilter::transition_matrix(Mode m, float dt) const
     {
-        Mat11 F = Mat11::Identity();
+        Mat11 transition = Mat11::Identity();
 
         // Common size constant-velocity block: w += vw*dt, h += vh*dt.
-        F(2, 6) = dt;
-        F(3, 7) = dt;
+        transition(2, 6) = dt;
+        transition(3, 7) = dt;
 
-        F(10, 10) = 0.0f;
+        transition(10, 10) = 0.0f;
 
         switch (m)
         {
-            case CV:
-                F(0, 4) = dt;
-                F(1, 5) = dt;
-                F(8, 8) = 0.0f;
-                F(9, 9) = 0.0f;
+            case Mode::CV:
+                transition(0, 4) = dt;
+                transition(1, 5) = dt;
+                transition(8, 8) = 0.0f;
+                transition(9, 9) = 0.0f;
                 break;
 
-            case CA:
-                F(0, 4) = dt;
-                F(1, 5) = dt;
-                F(0, 8) = 0.5f * dt * dt;
-                F(1, 9) = 0.5f * dt * dt;
-                F(4, 8) = dt;
-                F(5, 9) = dt;
+            case Mode::CA:
+                transition(0, 4) = dt;
+                transition(1, 5) = dt;
+                transition(0, 8) = 0.5f * dt * dt;
+                transition(1, 9) = 0.5f * dt * dt;
+                transition(4, 8) = dt;
+                transition(5, 9) = dt;
                 break;
 
-            case NCP:
-                F(0, 4) = 0.0f;
-                F(1, 5) = 0.0f;
-                F(4, 4) = 0.0f;
-                F(5, 5) = 0.0f;
-                F(8, 8) = 0.0f;
-                F(9, 9) = 0.0f;
+            case Mode::NCP:
+                transition(0, 4) = 0.0f;
+                transition(1, 5) = 0.0f;
+                transition(4, 4) = 0.0f;
+                transition(5, 5) = 0.0f;
+                transition(8, 8) = 0.0f;
+                transition(9, 9) = 0.0f;
                 break;
 
-            case CT:
-                break;
+            case Mode::CT: break;
         }
-        return F;
+        return transition;
     }
 
     /**
@@ -163,12 +161,13 @@ namespace SushiTrack
      * @param height Bounding box height.
      * @return Process noise standard deviation vector.
      */
-    IMMFilter::Vec11 IMMFilter::processNoiseDiag(Mode m, float dt, float width, float height) const
+    IMMFilter::Vec11 IMMFilter::process_noise_diag(Mode m, float dt, float width,
+                                                   float height) const
     {
-        const float pos_w = kSWP * width  * dt;
-        const float pos_h = kSWP * height * dt;
-        const float vel_w = kSWV * width  * dt;
-        const float vel_h = kSWV * height * dt;
+        const float pos_w = K_SWP * width * dt;
+        const float pos_h = K_SWP * height * dt;
+        const float vel_w = K_SWV * width * dt;
+        const float vel_h = K_SWV * height * dt;
 
         Vec11 s = Vec11::Zero();
 
@@ -201,26 +200,23 @@ namespace SushiTrack
 
         switch (m)
         {
-            case CV:
-                break;
+            case Mode::CV: break;
 
-            case CA:
+            case Mode::CA:
                 s(4) *= 1.3f;
                 s(5) *= 1.3f;
                 s(8) = vel_w > 0.0f ? vel_w : vel_h;
                 s(9) = vel_h;
                 break;
 
-            case NCP:
+            case Mode::NCP:
                 s(0) *= 2.0f;
                 s(1) *= 2.0f;
                 s(4) *= 0.1f;
                 s(5) *= 0.1f;
                 break;
 
-            case CT:
-                s(10) = kSigmaOmega * dt;
-                break;
+            case Mode::CT: s(10) = K_SIGMA_OMEGA * dt; break;
         }
         return s;
     }
@@ -231,15 +227,15 @@ namespace SushiTrack
      * @param dt Time interval for propagation.
      * @return Propagated state vector.
      */
-    IMMFilter::Vec11 IMMFilter::ctTransition(const Vec11& x, float dt) const
+    IMMFilter::Vec11 IMMFilter::ct_transition(const Vec11& x, float dt) const
     {
         Vec11 y = x;
 
         const float vx = x(4);
         const float vy = x(5);
-        const float w  = x(10);
+        const float w = x(10);
 
-        if (std::fabs(w) > kOmegaEps)
+        if (std::fabs(w) > K_OMEGA_EPS)
         {
             const float wdt = w * dt;
             const float s = std::sin(wdt);
@@ -268,36 +264,36 @@ namespace SushiTrack
     /**
      * @brief Unscented time update for the coordinated-turn mode.
      * @param x0 Prior state vector.
-     * @param P0 Prior covariance matrix.
+     * @param prior_cov Prior covariance matrix.
      * @param dt Time interval for propagation.
      * @param x_out Output predicted state vector.
-     * @param P_out Output predicted covariance matrix.
+     * @param out_cov Output predicted covariance matrix.
      */
-    void IMMFilter::ukfPredict(const Vec11& x0, const Mat11& P0, float dt,
-                               Vec11& x_out, Mat11& P_out) const
+    void IMMFilter::ukf_predict(const Vec11& x0, const Mat11& prior_cov, float dt, Vec11& x_out,
+                                Mat11& out_cov) const
     {
-        constexpr int n = kDim;
+        constexpr int n = K_DIM;
         constexpr float lambda = 0.0f;
         constexpr float wc0 = lambda / (n + lambda) + (1.0f - 1.0f + 2.0f);
-        constexpr float wi  = 1.0f / (2.0f * (n + lambda));
+        constexpr float wi = 1.0f / (2.0f * (n + lambda));
         const float spread = std::sqrt(static_cast<float>(n) + lambda);
 
-        Mat11 Pj = P0;
-        Eigen::LLT<Mat11> llt(Pj);
+        Mat11 mode_cov = prior_cov;
+        Eigen::LLT<Mat11> llt(mode_cov);
         if (llt.info() != Eigen::Success)
         {
-            Pj.diagonal().array() += 1e-6f;
-            llt.compute(Pj);
+            mode_cov.diagonal().array() += 1e-6f;
+            llt.compute(mode_cov);
         }
-        Mat11 L = llt.matrixL();
+        Mat11 cholesky = llt.matrixL();
 
         std::array<Vec11, 2 * n + 1> Y;
-        Y[0] = ctTransition(x0, dt);
+        Y[0] = ct_transition(x0, dt);
         for (int k = 0; k < n; ++k)
         {
-            Vec11 col = spread * L.col(k);
-            Y[1 + k]     = ctTransition(x0 + col, dt);
-            Y[1 + n + k] = ctTransition(x0 - col, dt);
+            Vec11 col = spread * cholesky.col(k);
+            Y[1 + k] = ct_transition(x0 + col, dt);
+            Y[1 + n + k] = ct_transition(x0 - col, dt);
         }
 
         // Mean: Wm0 = lambda/(n+lambda) = 0, so the centre point drops out.
@@ -307,117 +303,117 @@ namespace SushiTrack
             xm += wi * Y[k];
         }
 
-        Mat11 Pm = Mat11::Zero();
+        Mat11 mixed_cov = Mat11::Zero();
         Vec11 d0 = Y[0] - xm;
-        Pm += wc0 * (d0 * d0.transpose());
+        mixed_cov += wc0 * (d0 * d0.transpose());
         for (int k = 1; k < 2 * n + 1; ++k)
         {
             Vec11 d = Y[k] - xm;
-            Pm += wi * (d * d.transpose());
+            mixed_cov += wi * (d * d.transpose());
         }
 
         x_out = xm;
-        P_out = Pm;
+        out_cov = mixed_cov;
     }
 
     void IMMFilter::initiate(KalmanTypes::StateMean& mean, KalmanTypes::StateCov& covariance,
                              const KalmanTypes::DetectBox& measurement, float /*score*/)
     {
-        const float width  = std::max(1e-2f, measurement(2));
+        const float width = std::max(1e-2f, measurement(2));
         const float height = std::max(1e-2f, measurement(3));
 
         Vec11 init_std = Vec11::Zero();
         if (enable_xyah_)
         {
-            init_std(0) = kInitPos * kSWP * height;
-            init_std(1) = kInitPos * kSWP * height;
+            init_std(0) = K_INIT_POS * K_SWP * height;
+            init_std(1) = K_INIT_POS * K_SWP * height;
             init_std(2) = 1e-2f;
-            init_std(3) = kInitPos * kSWP * height;
-            init_std(4) = kInitVel * kSWV * height;
-            init_std(5) = kInitVel * kSWV * height;
+            init_std(3) = K_INIT_POS * K_SWP * height;
+            init_std(4) = K_INIT_VEL * K_SWV * height;
+            init_std(5) = K_INIT_VEL * K_SWV * height;
             init_std(6) = 1e-5f;
-            init_std(7) = kInitVel * kSWV * height;
+            init_std(7) = K_INIT_VEL * K_SWV * height;
         }
         else
         {
-            init_std(0) = kInitPos * kSWP * width;
-            init_std(1) = kInitPos * kSWP * height;
-            init_std(2) = kInitPos * kSWP * width;
-            init_std(3) = kInitPos * kSWP * height;
-            init_std(4) = kInitVel * kSWV * width;
-            init_std(5) = kInitVel * kSWV * height;
-            init_std(6) = kInitVel * kSWV * width;
-            init_std(7) = kInitVel * kSWV * height;
+            init_std(0) = K_INIT_POS * K_SWP * width;
+            init_std(1) = K_INIT_POS * K_SWP * height;
+            init_std(2) = K_INIT_POS * K_SWP * width;
+            init_std(3) = K_INIT_POS * K_SWP * height;
+            init_std(4) = K_INIT_VEL * K_SWV * width;
+            init_std(5) = K_INIT_VEL * K_SWV * height;
+            init_std(6) = K_INIT_VEL * K_SWV * width;
+            init_std(7) = K_INIT_VEL * K_SWV * height;
         }
-        init_std(8)  = kInitVel * kSWV * height;
-        init_std(9)  = kInitVel * kSWV * height;
-        init_std(10) = kSigmaOmega;
+        init_std(8) = K_INIT_VEL * K_SWV * height;
+        init_std(9) = K_INIT_VEL * K_SWV * height;
+        init_std(10) = K_SIGMA_OMEGA;
 
-        Mat11 P0 = init_std.array().square().matrix().asDiagonal();
+        Mat11 prior_cov = init_std.array().square().matrix().asDiagonal();
 
         Vec11 x0 = Vec11::Zero();
         x0.head<4>() = measurement.transpose();
 
-        for (int j = 0; j < kNumModes; ++j)
+        for (int j = 0; j < K_NUM_MODES; ++j)
         {
             x_[j] = x0;
-            P_[j] = P0;
+            p_[j] = prior_cov;
         }
 
         // CV-weighted prior: most targets start in steady motion.
-        mu_(CV) = 0.70f;
-        mu_(CA) = 0.10f;
-        mu_(NCP) = 0.10f;
-        mu_(CT) = 0.10f;
+        mu_(index(Mode::CV)) = 0.70f;
+        mu_(index(Mode::CA)) = 0.10f;
+        mu_(index(Mode::NCP)) = 0.10f;
+        mu_(index(Mode::CT)) = 0.10f;
         cbar_ = mu_;
 
         initialized_ = true;
         combine(mean, covariance);
-        maneuver_probability_ = mu_(CA) + mu_(CT);
-        stationary_probability_ = mu_(NCP);
+        maneuver_probability_ = mu_(index(Mode::CA)) + mu_(index(Mode::CT));
+        stationary_probability_ = mu_(index(Mode::NCP));
     }
 
     void IMMFilter::reanchor(const KalmanTypes::StateMean& external_mean)
     {
         // Delta between external and last combined mean is carried to all modes.
-        Eigen::Matrix<float, 8, 1> delta =
-            (external_mean - last_combined_).transpose().head<8>();
+        Eigen::Matrix<float, 8, 1> delta = (external_mean - last_combined_).transpose().head<8>();
 
-        if (delta.cwiseAbs().maxCoeff() <= kEps)
+        if (delta.cwiseAbs().maxCoeff() <= K_EPS)
         {
             return;
         }
 
-        for (int j = 0; j < kNumModes; ++j)
+        for (int j = 0; j < K_NUM_MODES; ++j)
         {
             x_[j].head<8>() += delta;
         }
     }
 
-    void IMMFilter::mix(std::array<Vec11, kNumModes>& x0,
-                        std::array<Mat11, kNumModes>& P0) const
+    void IMMFilter::mix(std::array<Vec11, K_NUM_MODES>& x0,
+                        std::array<Mat11, K_NUM_MODES>& prior_cov) const
     {
-        for (int j = 0; j < kNumModes; ++j)
+        for (int j = 0; j < K_NUM_MODES; ++j)
         {
             x0[j].setZero();
-            const float norm = std::max(cbar_(j), kEps);
-            for (int i = 0; i < kNumModes; ++i)
+            const float norm = std::max(cbar_(j), K_EPS);
+            for (int i = 0; i < K_NUM_MODES; ++i)
             {
-                const float w_ij = Pi_(i, j) * mu_(i) / norm;
+                const float w_ij = pi_(i, j) * mu_(i) / norm;
                 x0[j] += w_ij * x_[i];
             }
 
-            P0[j].setZero();
-            for (int i = 0; i < kNumModes; ++i)
+            prior_cov[j].setZero();
+            for (int i = 0; i < K_NUM_MODES; ++i)
             {
-                const float w_ij = Pi_(i, j) * mu_(i) / norm;
+                const float w_ij = pi_(i, j) * mu_(i) / norm;
                 Vec11 d = x_[i] - x0[j];
-                P0[j] += w_ij * (P_[i] + d * d.transpose());
+                prior_cov[j] += w_ij * (p_[i] + d * d.transpose());
             }
         }
     }
 
-    void IMMFilter::predict(KalmanTypes::StateMean& mean, KalmanTypes::StateCov& covariance, float dt)
+    void IMMFilter::predict(KalmanTypes::StateMean& mean, KalmanTypes::StateCov& covariance,
+                            float dt)
     {
         if (!initialized_)
         {
@@ -428,48 +424,48 @@ namespace SushiTrack
         reanchor(mean);
 
         // Predicted mode probabilities (mixing normalisers); carried to update().
-        for (int j = 0; j < kNumModes; ++j)
+        for (int j = 0; j < K_NUM_MODES; ++j)
         {
             float c = 0.0f;
-            for (int i = 0; i < kNumModes; ++i)
+            for (int i = 0; i < K_NUM_MODES; ++i)
             {
-                c += Pi_(i, j) * mu_(i);
+                c += pi_(i, j) * mu_(i);
             }
             cbar_(j) = c;
         }
 
-        std::array<Vec11, kNumModes> x0;
-        std::array<Mat11, kNumModes> P0;
-        mix(x0, P0);
+        std::array<Vec11, K_NUM_MODES> x0;
+        std::array<Mat11, K_NUM_MODES> prior_cov;
+        mix(x0, prior_cov);
 
-        for (int j = 0; j < kNumModes; ++j)
+        for (int j = 0; j < K_NUM_MODES; ++j)
         {
             const Mode m = static_cast<Mode>(j);
-            const float width  = std::max(1e-2f, x0[j](2));
+            const float width = std::max(1e-2f, x0[j](2));
             const float height = std::max(1e-2f, x0[j](3));
-            const Vec11 q = processNoiseDiag(m, dt, width, height);
+            const Vec11 q = process_noise_diag(m, dt, width, height);
 
-            if (m == CT)
+            if (m == Mode::CT)
             {
-                ukfPredict(x0[j], P0[j], dt, x_[j], P_[j]);
-                P_[j] += q.array().square().matrix().asDiagonal();
+                ukf_predict(x0[j], prior_cov[j], dt, x_[j], p_[j]);
+                p_[j] += q.array().square().matrix().asDiagonal();
             }
             else
             {
-                const Mat11 F = transitionMatrix(m, dt);
-                x_[j] = F * x0[j];
-                P_[j] = F * P0[j] * F.transpose();
-                P_[j] += q.array().square().matrix().asDiagonal();
+                const Mat11 transition = transition_matrix(m, dt);
+                x_[j] = transition * x0[j];
+                p_[j] = transition * prior_cov[j] * transition.transpose();
+                p_[j] += q.array().square().matrix().asDiagonal();
             }
-            symmetrize(P_[j]);
+            symmetrize(p_[j]);
         }
 
         // Predicted mode probabilities become the prior before measurement arrives.
         mu_ = cbar_;
 
         combine(mean, covariance);
-        maneuver_probability_ = mu_(CA) + mu_(CT);
-        stationary_probability_ = mu_(NCP);
+        maneuver_probability_ = mu_(index(Mode::CA)) + mu_(index(Mode::CT));
+        stationary_probability_ = mu_(index(Mode::NCP));
     }
 
     void IMMFilter::update(KalmanTypes::StateMean& mean, KalmanTypes::StateCov& covariance,
@@ -481,49 +477,50 @@ namespace SushiTrack
             return;
         }
 
-        const MatH H = measurementMatrix();
+        const MatH measurement_map = measurement_matrix();
         const Eigen::Vector4f z = measurement.transpose();
 
-        Eigen::Matrix<float, kNumModes, 1> likelihood;
+        Eigen::Matrix<float, K_NUM_MODES, 1> likelihood;
 
-        for (int j = 0; j < kNumModes; ++j)
+        for (int j = 0; j < K_NUM_MODES; ++j)
         {
-            const float width  = std::max(1e-2f, x_[j](2));
+            const float width = std::max(1e-2f, x_[j](2));
             const float height = std::max(1e-2f, x_[j](3));
-            const Mat4 R = measurementNoise(height, width);
+            const Mat4 noise = measurement_noise(height, width);
 
-            Eigen::Vector4f nu = z - H * x_[j];
-            Mat4 S = H * P_[j] * H.transpose() + R;
+            Eigen::Vector4f nu = z - measurement_map * x_[j];
+            Mat4 innovation_cov = measurement_map * p_[j] * measurement_map.transpose() + noise;
 
-            Eigen::LLT<Mat4> llt(S);
+            Eigen::LLT<Mat4> llt(innovation_cov);
             if (llt.info() != Eigen::Success)
             {
-                S.diagonal().array() += 1e-6f;
-                llt.compute(S);
+                innovation_cov.diagonal().array() += 1e-6f;
+                llt.compute(innovation_cov);
             }
 
-            Eigen::Matrix<float, kDim, 4> K = llt.solve((P_[j] * H.transpose()).transpose()).transpose();
-            x_[j] += K * nu;
-            P_[j] -= K * H * P_[j];
-            symmetrize(P_[j]);
+            Eigen::Matrix<float, K_DIM, 4> gain =
+                llt.solve((p_[j] * measurement_map.transpose()).transpose()).transpose();
+            x_[j] += gain * nu;
+            p_[j] -= gain * measurement_map * p_[j];
+            symmetrize(p_[j]);
 
-            // Gaussian likelihood of the innovation: Λ_j = N(nu; 0, S).
+            // Gaussian likelihood of the innovation: Λ_j = N(nu; 0, innovation_cov).
             Eigen::Vector4f sinv_nu = llt.solve(nu);
             float maha = nu.dot(sinv_nu);
-            Mat4 L = llt.matrixL();
-            float logdet = 2.0f * L.diagonal().array().log().sum();
-            float log_lik = -0.5f * (maha + logdet + 4.0f * std::log(kTwoPi));
+            Mat4 cholesky = llt.matrixL();
+            float logdet = 2.0f * cholesky.diagonal().array().log().sum();
+            float log_lik = -0.5f * (maha + logdet + 4.0f * std::log(K_TWO_PI));
             likelihood(j) = std::exp(log_lik);
         }
 
         // Mode probability update: μ_j ∝ c̄_j · Λ_j.
         float sum = 0.0f;
-        for (int j = 0; j < kNumModes; ++j)
+        for (int j = 0; j < K_NUM_MODES; ++j)
         {
             mu_(j) = cbar_(j) * likelihood(j);
             sum += mu_(j);
         }
-        if (sum > kEps)
+        if (sum > K_EPS)
         {
             mu_ /= sum;
         }
@@ -533,58 +530,58 @@ namespace SushiTrack
         }
 
         combine(mean, covariance);
-        maneuver_probability_ = mu_(CA) + mu_(CT);
-        stationary_probability_ = mu_(NCP);
+        maneuver_probability_ = mu_(index(Mode::CA)) + mu_(index(Mode::CT));
+        stationary_probability_ = mu_(index(Mode::NCP));
     }
 
     void IMMFilter::combine(KalmanTypes::StateMean& mean, KalmanTypes::StateCov& covariance)
     {
         Vec11 xc = Vec11::Zero();
-        for (int j = 0; j < kNumModes; ++j)
+        for (int j = 0; j < K_NUM_MODES; ++j)
         {
             xc += mu_(j) * x_[j];
         }
 
-        Mat11 Pc = Mat11::Zero();
-        for (int j = 0; j < kNumModes; ++j)
+        Mat11 combined_cov = Mat11::Zero();
+        for (int j = 0; j < K_NUM_MODES; ++j)
         {
             Vec11 d = x_[j] - xc;
-            Pc += mu_(j) * (P_[j] + d * d.transpose());
+            combined_cov += mu_(j) * (p_[j] + d * d.transpose());
         }
 
         mean = xc.head<8>().transpose();
-        covariance = Pc.topLeftCorner<8, 8>();
+        covariance = combined_cov.topLeftCorner<8, 8>();
         last_combined_ = mean;
     }
 
-    void IMMFilter::saveCheckpoint()
+    void IMMFilter::save_checkpoint()
     {
-        checkpoint_.x             = x_;
-        checkpoint_.P             = P_;
-        checkpoint_.mu            = mu_;
-        checkpoint_.cbar          = cbar_;
+        checkpoint_.x = x_;
+        checkpoint_.cov = p_;
+        checkpoint_.mu = mu_;
+        checkpoint_.cbar = cbar_;
         checkpoint_.last_combined = last_combined_;
-        checkpoint_.initialized   = initialized_;
-        checkpoint_.valid         = true;
+        checkpoint_.initialized = initialized_;
+        checkpoint_.valid = true;
     }
 
-    void IMMFilter::restoreCheckpoint()
+    void IMMFilter::restore_checkpoint()
     {
         if (!checkpoint_.valid)
         {
             return;
         }
-        x_              = checkpoint_.x;
-        P_              = checkpoint_.P;
-        mu_             = checkpoint_.mu;
-        cbar_           = checkpoint_.cbar;
-        last_combined_  = checkpoint_.last_combined;
-        initialized_    = checkpoint_.initialized;
-        maneuver_probability_   = mu_(CA) + mu_(CT);
-        stationary_probability_ = mu_(NCP);
+        x_ = checkpoint_.x;
+        p_ = checkpoint_.cov;
+        mu_ = checkpoint_.mu;
+        cbar_ = checkpoint_.cbar;
+        last_combined_ = checkpoint_.last_combined;
+        initialized_ = checkpoint_.initialized;
+        maneuver_probability_ = mu_(index(Mode::CA)) + mu_(index(Mode::CT));
+        stationary_probability_ = mu_(index(Mode::NCP));
     }
 
-    void IMMFilter::setNoiseMultipliers(float pos_mult, float size_mult, float vel_mult)
+    void IMMFilter::set_noise_multipliers(float pos_mult, float size_mult, float vel_mult)
     {
         // Intentional no-op: the IMM model bank carries per-mode process noise.
         (void)pos_mult;
@@ -592,28 +589,28 @@ namespace SushiTrack
         (void)vel_mult;
     }
 
-    bool IMMFilter::isInGate(const KalmanTypes::StateMean& mean, const KalmanTypes::StateCov& covariance,
-                             const KalmanTypes::DetectBox& measurement, float chi2_thresh,
-                             float score) const
+    bool IMMFilter::is_in_gate(const KalmanTypes::StateMean& mean,
+                               const KalmanTypes::StateCov& covariance,
+                               const KalmanTypes::DetectBox& measurement, float chi2_thresh,
+                               float score) const
     {
-        return gate_kf_->isInGate(mean, covariance, measurement, chi2_thresh, score);
+        return gate_kf_->is_in_gate(mean, covariance, measurement, chi2_thresh, score);
     }
 
-    std::vector<bool> IMMFilter::getGateFlags(const KalmanTypes::StateMean& mean,
-                                              const KalmanTypes::StateCov& covariance,
-                                              const KalmanTypes::DetectBoxVector& measurements,
-                                              float chi2_thresh,
-                                              const std::vector<float>& scores) const
+    std::vector<bool> IMMFilter::get_gate_flags(const KalmanTypes::StateMean& mean,
+                                                const KalmanTypes::StateCov& covariance,
+                                                const KalmanTypes::DetectBoxVector& measurements,
+                                                float chi2_thresh,
+                                                const std::vector<float>& scores) const
     {
-        return gate_kf_->getGateFlags(mean, covariance, measurements, chi2_thresh, scores);
+        return gate_kf_->get_gate_flags(mean, covariance, measurements, chi2_thresh, scores);
     }
 
-    std::vector<float> IMMFilter::getGateSqDistances(const KalmanTypes::StateMean& mean,
-                                                     const KalmanTypes::StateCov& covariance,
-                                                     const KalmanTypes::DetectBoxVector& measurements,
-                                                     const std::vector<float>& scores) const
+    std::vector<float> IMMFilter::get_gate_sq_distances(
+        const KalmanTypes::StateMean& mean, const KalmanTypes::StateCov& covariance,
+        const KalmanTypes::DetectBoxVector& measurements, const std::vector<float>& scores) const
     {
-        return gate_kf_->getGateSqDistances(mean, covariance, measurements, scores);
+        return gate_kf_->get_gate_sq_distances(mean, covariance, measurements, scores);
     }
 
 } // namespace SushiTrack

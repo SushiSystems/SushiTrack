@@ -35,10 +35,10 @@
 namespace SushiTrack
 {
     using StateMean = KalmanTypes::StateMean;
-    using StateCov  = KalmanTypes::StateCov;
+    using StateCov = KalmanTypes::StateCov;
     using DetectBox = KalmanTypes::DetectBox;
     using StateHMean = Eigen::Matrix<float, 1, 4, Eigen::RowMajor>;
-    using StateHCov  = Eigen::Matrix<float, 4, 4, Eigen::RowMajor>;
+    using StateHCov = Eigen::Matrix<float, 4, 4, Eigen::RowMajor>;
 
     static KalmanFilterRegistrar<NSAKalmanFilter> reg_nsa(1);
 
@@ -48,7 +48,7 @@ namespace SushiTrack
      * @param score Confidence score used for noise scaling.
      */
     void NSAKalmanFilter::initiate(StateMean& mean, StateCov& covariance,
-                                    const DetectBox& measurement, float score)
+                                   const DetectBox& measurement, float score)
     {
         mean.block<1, 4>(0, 0) = measurement.block<1, 4>(0, 0);
         mean.block<1, 4>(0, 4) = Eigen::RowVector4f::Zero();
@@ -60,27 +60,27 @@ namespace SushiTrack
         if (enable_xyah_)
         {
             float height = std::max(1e-2f, measurement[3]);
-            std_vec(0) = kInitPositionMult * kStdWeightPosition * height * linear_std_scale;
-            std_vec(1) = kInitPositionMult * kStdWeightPosition * height * linear_std_scale;
+            std_vec(0) = K_INIT_POSITION_MULT * K_STD_WEIGHT_POSITION * height * linear_std_scale;
+            std_vec(1) = K_INIT_POSITION_MULT * K_STD_WEIGHT_POSITION * height * linear_std_scale;
             std_vec(2) = 1e-2f;
-            std_vec(3) = kInitPositionMult * kStdWeightPosition * height * linear_std_scale;
-            std_vec(4) = kInitVelocityMult * kStdWeightVelocity * height;
-            std_vec(5) = kInitVelocityMult * kStdWeightVelocity * height;
+            std_vec(3) = K_INIT_POSITION_MULT * K_STD_WEIGHT_POSITION * height * linear_std_scale;
+            std_vec(4) = K_INIT_VELOCITY_MULT * K_STD_WEIGHT_VELOCITY * height;
+            std_vec(5) = K_INIT_VELOCITY_MULT * K_STD_WEIGHT_VELOCITY * height;
             std_vec(6) = 1e-5f;
-            std_vec(7) = kInitVelocityMult * kStdWeightVelocity * height;
+            std_vec(7) = K_INIT_VELOCITY_MULT * K_STD_WEIGHT_VELOCITY * height;
         }
         else
         {
-            float width  = std::max(1e-2f, measurement[2]);
+            float width = std::max(1e-2f, measurement[2]);
             float height = std::max(1e-2f, measurement[3]);
-            std_vec(0) = kInitPositionMult * kStdWeightPosition * width * linear_std_scale;
-            std_vec(1) = kInitPositionMult * kStdWeightPosition * height * linear_std_scale;
-            std_vec(2) = kInitPositionMult * kStdWeightPosition * width * linear_std_scale;
-            std_vec(3) = kInitPositionMult * kStdWeightPosition * height * linear_std_scale;
-            std_vec(4) = kInitVelocityMult * kStdWeightVelocity * width;
-            std_vec(5) = kInitVelocityMult * kStdWeightVelocity * height;
-            std_vec(6) = kInitVelocityMult * kStdWeightVelocity * width;
-            std_vec(7) = kInitVelocityMult * kStdWeightVelocity * height;
+            std_vec(0) = K_INIT_POSITION_MULT * K_STD_WEIGHT_POSITION * width * linear_std_scale;
+            std_vec(1) = K_INIT_POSITION_MULT * K_STD_WEIGHT_POSITION * height * linear_std_scale;
+            std_vec(2) = K_INIT_POSITION_MULT * K_STD_WEIGHT_POSITION * width * linear_std_scale;
+            std_vec(3) = K_INIT_POSITION_MULT * K_STD_WEIGHT_POSITION * height * linear_std_scale;
+            std_vec(4) = K_INIT_VELOCITY_MULT * K_STD_WEIGHT_VELOCITY * width;
+            std_vec(5) = K_INIT_VELOCITY_MULT * K_STD_WEIGHT_VELOCITY * height;
+            std_vec(6) = K_INIT_VELOCITY_MULT * K_STD_WEIGHT_VELOCITY * width;
+            std_vec(7) = K_INIT_VELOCITY_MULT * K_STD_WEIGHT_VELOCITY * height;
         }
 
         covariance = std_vec.array().square().matrix().asDiagonal();
@@ -93,10 +93,9 @@ namespace SushiTrack
      * @param score Confidence score used for noise scaling.
      */
     void NSAKalmanFilter::project(Eigen::Matrix<float, 1, 4, Eigen::RowMajor>& projected_mean,
-                                    Eigen::Matrix<float, 4, 4, Eigen::RowMajor>& projected_cov,
-                                    const StateMean& mean,
-                                    const StateCov&  covariance,
-                                    float score) const
+                                  Eigen::Matrix<float, 4, 4, Eigen::RowMajor>& projected_cov,
+                                  const StateMean& mean, const StateCov& covariance,
+                                  float score) const
     {
         float width = std::max(1e-2f, mean(2));
         float height = std::max(1e-2f, mean(3));
@@ -106,21 +105,20 @@ namespace SushiTrack
         DetectBox std_vec;
         if (enable_xyah_)
         {
-            std_vec << kStdWeightPosition * height * linear_std_scale,
-                    kStdWeightPosition * height * linear_std_scale,
-                    1e-1f,
-                    kStdWeightPosition * height * linear_std_scale;
+            std_vec << K_STD_WEIGHT_POSITION * height * linear_std_scale,
+                K_STD_WEIGHT_POSITION * height * linear_std_scale, 1e-1f,
+                K_STD_WEIGHT_POSITION * height * linear_std_scale;
         }
         else
         {
-            std_vec << kStdWeightPosition * width * linear_std_scale,
-                    kStdWeightPosition * height * linear_std_scale,
-                    kStdWeightPosition * width * linear_std_scale,
-                    kStdWeightPosition * height * linear_std_scale;
+            std_vec << K_STD_WEIGHT_POSITION * width * linear_std_scale,
+                K_STD_WEIGHT_POSITION * height * linear_std_scale,
+                K_STD_WEIGHT_POSITION * width * linear_std_scale,
+                K_STD_WEIGHT_POSITION * height * linear_std_scale;
         }
 
         projected_mean = (update_mat_ * mean.transpose()).transpose();
-        projected_cov  = update_mat_ * covariance * update_mat_.transpose();
+        projected_cov = update_mat_ * covariance * update_mat_.transpose();
 
         Eigen::Matrix<float, 4, 4> diag = std_vec.asDiagonal();
         projected_cov += diag.array().square().matrix();

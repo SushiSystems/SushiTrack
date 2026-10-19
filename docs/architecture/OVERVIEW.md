@@ -120,13 +120,13 @@ constructed by the C-API entry point (`sushitrack_create_ex` in
 
 | Interface | Responsibility | Implementations |
 |---|---|---|
-| `IStatePredictor` | Propagate/update motion state | `KalmanFilter`, `NSAKalmanFilter`, `IMMFilter` |
-| `IGateValidator` | Mahalanobis gating | `KalmanFilter`, `NSAKalmanFilter`, `IMMFilter`, `NullGateValidator` |
-| `IKalmanFilter` | Predictor + validator union | `KalmanFilter`, `NSAKalmanFilter`, `IMMFilter` |
-| `IKalmanFactory` | Per-tracklet predictor factory | `GenericKalmanFactory` (registry-backed) |
-| `ICostCalculator` | Pairwise association cost | IoU/DIoU/GIoU/SIoU, Cosine, ReIDFirst, PureReID, Fused, GatedIoU, and the FuseScore and ObservationMomentum decorators |
-| `IAssignmentSolver` | Bipartite assignment | `LAPJVSolver` |
-| `ITimingPolicy` | `dt` normalization and expiry | `FrameTimingPolicy`, `WallClockTimingPolicy` |
+| `StatePredictor` | Propagate/update motion state | `KalmanFilter`, `NSAKalmanFilter`, `IMMFilter` |
+| `GateValidator` | Mahalanobis gating | `KalmanFilter`, `NSAKalmanFilter`, `IMMFilter`, `NullGateValidator` |
+| `GatedStatePredictor` | Predictor + validator union | `KalmanFilter`, `NSAKalmanFilter`, `IMMFilter` |
+| `KalmanFactory` | Per-tracklet predictor factory | `GenericKalmanFactory` (registry-backed) |
+| `CostCalculator` | Pairwise association cost | IoU/DIoU/GIoU/SIoU, Cosine, ReIDFirst, PureReID, Fused, GatedIoU, and the FuseScore and ObservationMomentum decorators |
+| `AssignmentSolver` | Bipartite assignment | `LAPJVSolver` |
+| `TimingPolicy` | `dt` normalization and expiry | `FrameTimingPolicy`, `WallClockTimingPolicy` |
 
 `KalmanFilterRegistry` is a singleton registry keyed by the integer
 `kalman_type`. Each predictor registers itself with a `KalmanFilterRegistrar<T>`
@@ -152,7 +152,7 @@ state mean/covariance, the current box, lifecycle flags, score (raw and
 EMA-smoothed), identifiers, feature history, the IMM-derived regime, the
 observation-centric direction estimate, and the ORU checkpoint. Detections are
 also wrapped in `Tracklet` instances so the association stages operate on a
-single type. State accessors (`getMean`/`getCovariance`/`getMeasurement`) are
+single type. State accessors (`get_mean`/`get_covariance`/`get_measurement`) are
 mutex-protected.
 
 **`sushitrack_track_t`** (`include/SushiTrack/c_api/sushitrack_c.h`) is the C output record:
@@ -190,19 +190,19 @@ estimator instance and any internal state.
 `KalmanFilter` (`source/filtering/kalman_filter.cpp`) is a constant-velocity filter over the
 8-D state. Process and measurement noise scale with the dominant box dimension,
 using the ByteTrack-calibrated compile-time constants
-`kStdWeightPosition = 1/20`, `kStdWeightVelocity = 1/160`,
-`kInitPositionMult = 2.0`, `kInitVelocityMult = 10.0`
+`K_STD_WEIGHT_POSITION = 1/20`, `K_STD_WEIGHT_VELOCITY = 1/160`,
+`K_INIT_POSITION_MULT = 2.0`, `K_INIT_VELOCITY_MULT = 10.0`
 (`include/SushiTrack/filtering/kalman_filter.hpp`). Process-noise standard deviations scale
 linearly with `dt` (variance proportional to `dt^2`). `initiate` seeds the
 position/size block from the measurement and zeroes velocity, with the initial
 covariance widened by the init multipliers. `project` maps the state to
 measurement space and adds measurement noise; the projected LLT decomposition is
 cached (mutex-protected) and reused for gating within a frame. `predict` and
-`update` invalidate the cache. `mahalanobisDistance` computes the squared
-distance in 4-D measurement space; `isInGate`/`getGateFlags`/`getGateSqDistances`
+`update` invalidate the cache. `mahalanobis_distance` computes the squared
+distance in 4-D measurement space; `is_in_gate`/`get_gate_flags`/`get_gate_sq_distances`
 apply the chi-squared threshold.
 
-Optional per-step process-noise multipliers exist (`setNoiseMultipliers`) and
+Optional per-step process-noise multipliers exist (`set_noise_multipliers`) and
 reset to 1.0 after each `predict`.
 
 ### NSA Kalman filter
@@ -217,7 +217,7 @@ scaled. All other behaviour is inherited from `KalmanFilter`.
 
 `IMMFilter` (`source/filtering/imm_filter.cpp`, `kalman_type=2`) runs an Interacting Multiple
 Model filter over a bank of four motion models. It presents the standard 8-D
-`IKalmanFilter` interface outward while carrying wider mode-specific sub-states
+`GatedStatePredictor` interface outward while carrying wider mode-specific sub-states
 internally.
 
 **Model bank** (`enum Mode`):
@@ -252,14 +252,14 @@ so the mixing and combination math is model-agnostic — no per-mode masking.
    (probability-weighted, with the mode-spread term) written back to the
    tracklet.
 
-**Transition prior.** The Markov transition matrix `Pi` keeps `kPStay = 0.90`
+**Transition prior.** The Markov transition matrix `Pi` keeps `K_P_STAY = 0.90`
 probability of remaining in the current mode; the off-diagonal mass is weighted
 toward CV so the stationary distribution is CV-heavy and the bank behaves like
 the CV baseline until a manoeuvre likelihood spikes.
 
-**Coordinated turn.** `ctTransition` rotates the centre velocity by
+**Coordinated turn.** `ct_transition` rotates the centre velocity by
 `omega * dt` and integrates the curved path, degenerating to a straight line as
-`|omega| -> 0` (avoiding the `1/omega` singularity). `ukfPredict` uses the
+`|omega| -> 0` (avoiding the `1/omega` singularity). `ukf_predict` uses the
 symmetric sigma-point set with `lambda = 0` (`alpha = 1`, `kappa = 0`,
 `beta = 2`).
 
@@ -273,7 +273,7 @@ consistent with the tracklet's view without any tracklet-side change.
 `KalmanFilter` helper, so the gate sees the same 4-D box projection as the
 single-model path.
 
-**Checkpoint.** `saveCheckpoint`/`restoreCheckpoint` snapshot and restore the
+**Checkpoint.** `save_checkpoint`/`restore_checkpoint` snapshot and restore the
 full mode bank (states, covariances, probabilities) for
 [ORU rollback](#observation-centric-re-update); the external 8-D projection is
 lossy and cannot reconstruct the bank.
@@ -293,14 +293,14 @@ probabilities: NCP mass above 0.5 reads Stationary, CA+CT mass above 0.5 reads
 Maneuvering, otherwise Cruising; a track without a current observation reads
 Coasting, and the pre-Coasting regime is retained for restoration on recovery.
 
-When the predictor is not an IMM, `maneuverProbability()` returns a negative
+When the predictor is not an IMM, `maneuver_probability()` returns a negative
 sentinel; the tracklet's regime getters then fall back to Cruising, which makes
 every regime-aware policy degrade to identity behaviour. The regime and the
 continuous `maneuver_probability` feed:
 
 - association cost shaping (per-row gate scale and appearance/geometry blend,
-  `stateAssocMods` in `source/association/state_association_modifiers.hpp`),
-- the lost-buffer scale (`cleanupLost`: Stationary 1.5×, Maneuvering 1.2×,
+  `state_assoc_mods` in `source/association/state_association_modifiers.hpp`),
+- the lost-buffer scale (`cleanup_lost`: Stationary 1.5×, Maneuvering 1.2×,
   others 1.0×),
 - the OCM weight (Cruising full weight, Maneuvering scaled, Stationary/Coasting
   skipped),
@@ -333,7 +333,7 @@ Lost recovery uses an age-cascade over the lost set regardless of this flag.
 
 ### Cost calculators
 
-Cost calculators implement `ICostCalculator` and populate a `CostMatrix`
+Cost calculators implement `CostCalculator` and populate a `CostMatrix`
 (contiguous 2-D storage, workspace reused across frames). Cells that violate a
 constraint are set to a sentinel (`>= 1e3`) so the solver rejects them; the
 `max_area_ratio` constraint sets `1e4` for pairs with extreme area disparity.
@@ -379,7 +379,7 @@ OC-SORT.
 
 `GatedIoUCostCalculator` combines the gate with IoU; `motion_cost_weight`
 (default 0.15) blends the normalized squared distance into the cost. Regime-aware
-row policies (`stateAssocMods`) tighten the gate for Stationary tracks and widen
+row policies (`state_assoc_mods`) tighten the gate for Stationary tracks and widen
 it for Maneuvering/Coasting.
 
 ### Appearance / ReID
@@ -388,7 +388,7 @@ it for Maneuvering/Coasting.
 appearance embedding as a 7th tuple element (the library does not compute
 embeddings). Features are L2-normalized and exponentially smoothed
 (`feature_momentum`, default 0.9); a per-tracklet gallery holds up to
-`max_feature_history` (default 100) vectors, and `getMaxFeatureSimilarity`
+`max_feature_history` (default 100) vectors, and `get_max_feature_similarity`
 returns the maximum cosine similarity against the gallery.
 
 The active path depends on `enable_mahalanobis`:
@@ -420,7 +420,7 @@ track's last observation to the candidate. The term is bounded by
 the gate; it cannot rescue a gated-out pair or overpower geometry. Sentinel
 cells are skipped.
 
-Eligibility (per `effectiveWeight`): the observed speed must exceed
+Eligibility (per `effective_weight`): the observed speed must exceed
 `ocm_min_velocity`; the track must have been observed within `ocm_max_age`
 frames; the regime must be Cruising (full weight) or Maneuvering (weight scaled
 by `ocm_maneuver_weight_scale`, default 0.15). Stationary and Coasting tracks
@@ -454,7 +454,7 @@ the buffer, and is `Removed` on expiry.
 With `enable_tentative=1`, a new high-confidence detection starts a tentative
 track that must accumulate a required number of consecutive matches before
 promotion. The required count is adaptive to the smoothed score of the matched
-detection (`get_dynamic_hits` in `matchTentative`):
+detection (`get_dynamic_hits` in `match_tentative`):
 
 - `score >= tentative_fast_thresh` → `tentative_fast_hits` (single-hit
   confirmation),
@@ -497,7 +497,7 @@ just-recovered long-lived track is not displaced by a young overlapping one.
 
 ### Initialization suppression
 
-Before seeding new tentative tracks, `suppressOverlappingInits` drops any
+Before seeding new tentative tracks, `suppress_overlapping_inits` drops any
 init-candidate detection whose IoU with a track confirmed this frame exceeds
 `tentative_init_suppress_iou` (default 0.7). This prevents a freshly initialized
 tentative from duplicating an already-tracked target and splitting its identity
@@ -519,7 +519,7 @@ update.
 
 ## Timing policies
 
-`ITimingPolicy` normalizes the timestep and defines expiry:
+`TimingPolicy` normalizes the timestep and defines expiry:
 
 - **`FrameTimingPolicy`** (`time_aware=0`): each `update` is one step; expiry is
   by frame count.
@@ -528,7 +528,7 @@ update.
   accumulated wall time against `track_buffer / frame_rate` seconds (strict `>`
   with a `1e-4` epsilon for symmetry with the frame-counted path).
 
-The marking frame is counted in the lost-time budget (`markAsLost` seeds the
+The marking frame is counted in the lost-time budget (`mark_as_lost` seeds the
 accumulator with that frame's `dt`) so the two modes expire a track on the same
 frame.
 
@@ -595,7 +595,7 @@ pointer is stored atomically; setting or clearing it is thread-safe. Passing
 
 ## Thread safety
 
-`Tracklet` state accessors (`getMean`, `getCovariance`, `getMeasurement`) are
+`Tracklet` state accessors (`get_mean`, `get_covariance`, `get_measurement`) are
 mutex-protected. The `KalmanFilter` projected-LLT cache is mutex-protected. The
 log callback is atomic. A single tracker instance is not designed for concurrent
 `update` calls; construct one instance per stream.

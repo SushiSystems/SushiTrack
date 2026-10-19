@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* ITrackerAdapter.h                                                      */
+/* timing_policy.hpp                                                      */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -20,59 +20,40 @@
 /**************************************************************************/
 
 /**
- * @file ITrackerAdapter.h
- * @brief Defines the abstract interface for regression tracker adapters.
+ * @file timing_policy.hpp
+ * @brief Interface definition for time-interval normalization and track expiration.
  * @author Mustafa Garip
  */
 
 #pragma once
 
-#include "TestInfra.h"
-#include <string>
-#include <vector>
-
-namespace TestInfrastructure
+namespace SushiTrack
 {
     /**
-     * @brief Interface for tracker implementation adapters.
-     * 
-     * Provides an abstraction layer for benchmarking different tracking 
-     * algorithms within the test infrastructure.
+     * @brief Strategy interface for time-interval normalization and track expiration.
      */
-    class ITrackerAdapter
+    class TimingPolicy
     {
         public:
             /**
-             * @brief Destroys the ITrackerAdapter instance.
+             * @brief Virtual destructor for the interface.
              */
-            virtual ~ITrackerAdapter() = default;
+            virtual ~TimingPolicy() = default;
 
             /**
-             * @brief Retrieves the identifier for the tracker implementation.
-             * 
-             * @return Identifier string.
+             * @brief Normalizes a raw time interval for use in state prediction.
+             * @param raw_dt Input time interval provided by the caller.
+             * @return Normalized interval compatible with state predictor calibration.
              */
-            virtual std::string name() const = 0;
+            [[nodiscard]] virtual float to_kf_dt(float raw_dt) const = 0;
 
             /**
-             * @brief Processes detections and returns tracking results.
-             * 
-             * @param dets Collection of input detections.
-             * @param dt Time interval for state propagation.
-             * @return Collection of track results.
+             * @brief Determines if a track has exceeded its maximum persistence limit.
+             * @param accumulated Time interval or frame count elapsed since last update.
+             * @param limit_units Configured maximum persistence threshold in frames.
+             * @return True if the track is qualified for removal.
              */
-            virtual std::vector<TrackResult> update(
-                const std::vector<MOTDetection>& dets, float dt = 1.0f) = 0;
-
-            /**
-             * @brief Configures the processing frequency for the tracker.
-             * 
-             * Calibrates timing-dependent components such as motion models 
-             * and persistence buffers for data sequences.
-             * 
-             * @param fps Target frames-per-second.
-             */
-            virtual void setFrameRate(int fps) {}
+            [[nodiscard]] virtual bool is_expired(float accumulated, int limit_units) const = 0;
     };
 
-} // namespace TestInfrastructure
+} // namespace SushiTrack

@@ -42,9 +42,7 @@ namespace SushiTrack
      * @param _prob Confidence score of the detection.
      * @param _feature Visual feature vector (optional).
      */
-    Object::Object(const Rect<float>& _rect,
-                   const int& _label,
-                   const float& _prob,
+    Object::Object(const Rect<float>& _rect, const int& _label, const float& _prob,
                    std::vector<float> _feature)
         : rect(_rect), label(_label), prob(_prob), feature(std::move(_feature))
     {

@@ -26,28 +26,6 @@
  */
 
 #include <SushiTrack/c_api/sushitrack_c.h>
-#include <SushiTrack/tracking/tracker.hpp>
-#include <SushiTrack/filtering/kalman_filter.hpp>
-#include <SushiTrack/filtering/nsa_kalman_filter.hpp>
-#include <SushiTrack/association/lapjv_solver.hpp>
-#include <SushiTrack/association/cosine_cost_calculator.hpp>
-#include <SushiTrack/association/diou_cost_calculator.hpp>
-#include <SushiTrack/association/fuse_score_decorator.hpp>
-#include <SushiTrack/association/fused_cost_calculator.hpp>
-#include <SushiTrack/association/gated_iou_cost_calculator.hpp>
-#include <SushiTrack/association/giou_cost_calculator.hpp>
-#include <SushiTrack/association/iou_cost_calculator.hpp>
-#include <SushiTrack/association/observation_momentum_decorator.hpp>
-#include <SushiTrack/association/pure_reid_cost_calculator.hpp>
-#include <SushiTrack/association/reid_first_cost_calculator.hpp>
-#include <SushiTrack/association/siou_cost_calculator.hpp>
-#include <SushiTrack/filtering/generic_kalman_factory.hpp>
-#include <SushiTrack/filtering/i_gate_validator.hpp>
-#include <SushiTrack/filtering/null_gate_validator.hpp>
-#include <SushiTrack/tracking/track_state.hpp>
-#include <SushiTrack/detection/object.hpp>
-#include <SushiTrack/logging/logger.hpp>
-#include <SushiTrack/filtering/kalman_filter_registry.hpp>
 
 #include <algorithm>
 #include <cstddef>
@@ -56,39 +34,68 @@
 #include <utility>
 #include <vector>
 
+#include <SushiTrack/association/cosine_cost_calculator.hpp>
+#include <SushiTrack/association/diou_cost_calculator.hpp>
+#include <SushiTrack/association/fuse_score_decorator.hpp>
+#include <SushiTrack/association/fused_cost_calculator.hpp>
+#include <SushiTrack/association/gated_iou_cost_calculator.hpp>
+#include <SushiTrack/association/giou_cost_calculator.hpp>
+#include <SushiTrack/association/iou_cost_calculator.hpp>
+#include <SushiTrack/association/lapjv_solver.hpp>
+#include <SushiTrack/association/observation_momentum_decorator.hpp>
+#include <SushiTrack/association/pure_reid_cost_calculator.hpp>
+#include <SushiTrack/association/reid_first_cost_calculator.hpp>
+#include <SushiTrack/association/siou_cost_calculator.hpp>
+#include <SushiTrack/detection/object.hpp>
+#include <SushiTrack/filtering/gate_validator.hpp>
+#include <SushiTrack/filtering/generic_kalman_factory.hpp>
+#include <SushiTrack/filtering/kalman_filter.hpp>
+#include <SushiTrack/filtering/kalman_filter_registry.hpp>
+#include <SushiTrack/filtering/nsa_kalman_filter.hpp>
+#include <SushiTrack/filtering/null_gate_validator.hpp>
+#include <SushiTrack/logging/logger.hpp>
+#include <SushiTrack/tracking/track_state.hpp>
+#include <SushiTrack/tracking/tracker.hpp>
+
 /**
  * @brief Internal handle encapsulating tracker state and configuration.
  */
 struct sushitrack_tracker_impl_t
 {
-    std::unique_ptr<SushiTrack::Tracker>              tracker;
-    SushiTrack::TrackerConfig                         config;
-    std::vector<std::shared_ptr<SushiTrack::Tracklet>> last_results;
-    std::vector<std::vector<float>>                   last_features;
+        std::unique_ptr<SushiTrack::Tracker> tracker;
+        SushiTrack::TrackerConfig config;
+        std::vector<std::shared_ptr<SushiTrack::Tracklet>> last_results;
+        std::vector<std::vector<float>> last_features;
 };
 
 namespace
 {
-    int populate_tracks(
-        sushitrack_tracker_impl_t* impl,
-        std::vector<std::shared_ptr<SushiTrack::Tracklet>>& results,
-        sushitrack_track_t* out_tracks,
-        int max_tracks)
+    int populate_tracks(sushitrack_tracker_impl_t* impl,
+                        std::vector<std::shared_ptr<SushiTrack::Tracklet>>& results,
+                        sushitrack_track_t* out_tracks, int max_tracks)
     {
-        std::sort(results.begin(), results.end(), [](const auto& a, const auto& b) {
-            auto priority = [](SushiTrack::TrackState state) {
-                if (state == SushiTrack::TrackState::Tracked) return 0;
-                if (state == SushiTrack::TrackState::Tentative) return 1;
-                if (state == SushiTrack::TrackState::Lost) return 2;
-                if (state == SushiTrack::TrackState::Removed) return 3;
-                return 4;
-            };
-            return priority(a->getTrackState()) < priority(b->getTrackState());
-        });
+        std::sort(results.begin(), results.end(),
+                  [](const auto& a, const auto& b)
+                  {
+                      auto priority = [](SushiTrack::TrackState state)
+                      {
+                          if (state == SushiTrack::TrackState::Tracked)
+                              return 0;
+                          if (state == SushiTrack::TrackState::Tentative)
+                              return 1;
+                          if (state == SushiTrack::TrackState::Lost)
+                              return 2;
+                          if (state == SushiTrack::TrackState::Removed)
+                              return 3;
+                          return 4;
+                      };
+                      return priority(a->get_track_state()) < priority(b->get_track_state());
+                  });
 
         if (results.size() > static_cast<std::size_t>(max_tracks))
         {
-            SUSHITRACK_LOG_WARN("[SushiTrack] Output buffer capacity exceeded. Truncating lower priority tracks.");
+            SUSHITRACK_LOG_WARN(
+                "[SushiTrack] Output buffer capacity exceeded. Truncating lower priority tracks.");
         }
 
         int count = std::min(static_cast<int>(results.size()), max_tracks);
@@ -96,29 +103,31 @@ namespace
 
         for (int i = 0; i < count; ++i)
         {
-            const auto& res      = results[static_cast<std::size_t>(i)];
-            const auto& rect     = res->getRect();
-            out_tracks[i].x          = rect.x();
-            out_tracks[i].y          = rect.y();
-            out_tracks[i].width      = rect.width();
-            out_tracks[i].height     = rect.height();
-            out_tracks[i].score      = res->getScore();
-            out_tracks[i].track_id   = static_cast<int64_t>(res->getTrackId());
-            out_tracks[i].label      = res->getLabel();
-            out_tracks[i].state      = static_cast<int>(res->getTrackState());
-            out_tracks[i].kinematic_state = static_cast<int>(res->getKinematicState());
+            const auto& res = results[static_cast<std::size_t>(i)];
+            const auto& rect = res->get_rect();
+            out_tracks[i].x = rect.x();
+            out_tracks[i].y = rect.y();
+            out_tracks[i].width = rect.width();
+            out_tracks[i].height = rect.height();
+            out_tracks[i].score = res->get_score();
+            out_tracks[i].track_id = static_cast<int64_t>(res->get_track_id());
+            out_tracks[i].label = res->get_label();
+            out_tracks[i].state = static_cast<int>(res->get_track_state());
+            out_tracks[i].kinematic_state = static_cast<int>(res->get_kinematic_state());
             out_tracks[i].maneuver_probability =
-                res->immActive() ? res->getManeuverProbability() : -1.0f;
-            impl->last_features[i] = res->getSmoothFeat();
-            out_tracks[i].feat     = impl->last_features[i].empty() ? nullptr : impl->last_features[i].data();
+                res->imm_active() ? res->get_maneuver_probability() : -1.0f;
+            impl->last_features[i] = res->get_smooth_feat();
+            out_tracks[i].feat =
+                impl->last_features[i].empty() ? nullptr : impl->last_features[i].data();
             out_tracks[i].feat_dim = static_cast<int>(impl->last_features[i].size());
-            out_tracks[i].is_activated = res->isActivated() ? 1 : 0;
-            out_tracks[i].is_confirmed = res->isConfirmed() ? 1 : 0;
-            out_tracks[i].age          = static_cast<int64_t>(res->getTrackletLength());
-            out_tracks[i].lost_time    = res->getAccumulatedLostTime();
-            out_tracks[i].hits         = res->getHits();
-            out_tracks[i].last_seen_frame = static_cast<int64_t>(res->getFrameId());
-            out_tracks[i].frames_since_last_update = static_cast<int>(impl->tracker->getGlobalFrameId() - res->getFrameId());
+            out_tracks[i].is_activated = res->is_activated() ? 1 : 0;
+            out_tracks[i].is_confirmed = res->is_confirmed() ? 1 : 0;
+            out_tracks[i].age = static_cast<int64_t>(res->get_tracklet_length());
+            out_tracks[i].lost_time = res->get_accumulated_lost_time();
+            out_tracks[i].hits = res->get_hits();
+            out_tracks[i].last_seen_frame = static_cast<int64_t>(res->get_frame_id());
+            out_tracks[i].frames_since_last_update =
+                static_cast<int>(impl->tracker->get_global_frame_id() - res->get_frame_id());
         }
 
         return count;
@@ -133,64 +142,65 @@ extern "C"
      */
     void sushitrack_get_default_params(sushitrack_params_t* params)
     {
-        if (!params) return;
+        if (!params)
+            return;
 
-        params->enable_reid  = 0;
-        params->time_aware   = 0;
+        params->enable_reid = 0;
+        params->time_aware = 0;
 
-        params->frame_rate   = 25;
+        params->frame_rate = 25;
         params->track_buffer = 30;
 
         params->track_thresh = 0.2f;
-        params->high_thresh  = 0.5f;
+        params->high_thresh = 0.5f;
         params->match_thresh = 0.7f;
 
         params->enable_tentative = 0;
 
         params->enable_mahalanobis = 0;
-        params->gating_thresh      = 9.4877f;
-        params->max_area_ratio     = 50.0f;
+        params->gating_thresh = 9.4877f;
+        params->max_area_ratio = 50.0f;
         params->motion_cost_weight = 0.15f;
 
-        params->enable_xyah         = 0;
-        params->kalman_type         = 0;
-        params->iou_plus_one        = 1;
-        params->iou_type            = 1;
-        params->feature_momentum    = 0.9f;
+        params->enable_xyah = 0;
+        params->kalman_type = 0;
+        params->iou_plus_one = 1;
+        params->iou_type = 1;
+        params->feature_momentum = 0.9f;
         params->reid_direct_assignment_weight = 0.2f;
 
-        params->iou_match_thresh       = 0.5f;
+        params->iou_match_thresh = 0.5f;
         params->unconfirmed_iou_thresh = 0.7f;
-        params->duplicate_iou_thresh   = 0.15f;
+        params->duplicate_iou_thresh = 0.15f;
 
-        params->tentative_match_thresh    = 0.3f;
-        params->tentative_confirm_hits    = 3;
+        params->tentative_match_thresh = 0.3f;
+        params->tentative_confirm_hits = 3;
         params->tentative_max_age_seconds = 0.08f;
         params->tentative_max_miss_frames = 2;
         params->tentative_init_suppress_iou = 0.7f;
 
-        params->tentative_fast_thresh       = 0.85f;
-        params->tentative_fast_hits         = 1;
-        params->tentative_slow_thresh       = 0.40f;
-        params->tentative_slow_hits_offset  = 1;
+        params->tentative_fast_thresh = 0.85f;
+        params->tentative_fast_hits = 1;
+        params->tentative_slow_thresh = 0.40f;
+        params->tentative_slow_hits_offset = 1;
         params->tentative_vslow_hits_offset = 2;
 
-        params->reid_high_thresh     = 0.3f;
+        params->reid_high_thresh = 0.3f;
         params->reid_high_iou_weight = 0.3f;
-        params->reid_low_thresh      = 0.5f;
-        params->reid_low_iou_weight  = 0.2f;
+        params->reid_low_thresh = 0.5f;
+        params->reid_low_iou_weight = 0.2f;
         params->reid_recovery_thresh = 0.4f;
-        params->max_feature_history  = 100;
+        params->max_feature_history = 100;
 
-        params->primary_assoc_mode   = 1;
-        params->fuse_score           = 1;
+        params->primary_assoc_mode = 1;
+        params->fuse_score = 1;
 
-        params->enable_ocm       = 0;
-        params->enable_oru       = 0;
-        params->ocm_vdc_weight   = 0.1f;
-        params->ocm_delta_t      = 3;
+        params->enable_ocm = 0;
+        params->enable_oru = 0;
+        params->ocm_vdc_weight = 0.1f;
+        params->ocm_delta_t = 3;
         params->ocm_min_velocity = 1.0f;
-        params->ocm_max_age      = 1;
+        params->ocm_max_age = 1;
         params->ocm_maneuver_weight_scale = 0.15f;
     }
 
@@ -201,12 +211,14 @@ extern "C"
      */
     sushitrack_tracker_t sushitrack_create(const sushitrack_params_t* params)
     {
-        if (!params) return sushitrack_create_from_config(nullptr);
+        if (!params)
+            return sushitrack_create_from_config(nullptr);
 
-        sushitrack_tracker_t hdl    = nullptr;
-        sushitrack_status_t  status = sushitrack_create_ex(params, &hdl);
+        sushitrack_tracker_t hdl = nullptr;
+        sushitrack_status_t status = sushitrack_create_ex(params, &hdl);
 
-        if (status != SUSHITRACK_SUCCESS) return nullptr;
+        if (status != SUSHITRACK_SUCCESS)
+            return nullptr;
 
         return hdl;
     }
@@ -217,151 +229,147 @@ extern "C"
      * @param out_tracker Pointer to receive initialized tracker handle.
      * @return Status code indicating success or failure reason.
      */
-    sushitrack_status_t sushitrack_create_ex(
-        const sushitrack_params_t* params,
-        sushitrack_tracker_t*      out_tracker)
+    sushitrack_status_t sushitrack_create_ex(const sushitrack_params_t* params,
+                                             sushitrack_tracker_t* out_tracker)
     {
-        if (!params || !out_tracker) return SUSHITRACK_INVALID_ARGUMENT;
+        if (!params || !out_tracker)
+            return SUSHITRACK_INVALID_ARGUMENT;
 
         try
         {
             SushiTrack::TrackerConfig config;
-            config.enable_reid  = (params->enable_reid  != 0);
-            config.time_aware   = (params->time_aware   != 0);
+            config.enable_reid = (params->enable_reid != 0);
+            config.time_aware = (params->time_aware != 0);
 
-            config.frame_rate   = params->frame_rate;
+            config.frame_rate = params->frame_rate;
             config.track_buffer = params->track_buffer;
 
             config.track_thresh = params->track_thresh;
-            config.high_thresh  = params->high_thresh;
+            config.high_thresh = params->high_thresh;
             config.match_thresh = params->match_thresh;
 
             config.enable_tentative = (params->enable_tentative != 0);
 
             config.enable_mahalanobis = (params->enable_mahalanobis != 0);
-            config.gating_thresh      = params->gating_thresh;
-            config.max_area_ratio     = params->max_area_ratio;
+            config.gating_thresh = params->gating_thresh;
+            config.max_area_ratio = params->max_area_ratio;
             config.motion_cost_weight = params->motion_cost_weight;
 
-            config.iou_match_thresh       = params->iou_match_thresh;
+            config.iou_match_thresh = params->iou_match_thresh;
             config.unconfirmed_iou_thresh = params->unconfirmed_iou_thresh;
-            config.tentative_match_thresh    = params->tentative_match_thresh;
-            config.tentative_confirm_hits    = params->tentative_confirm_hits;
+            config.tentative_match_thresh = params->tentative_match_thresh;
+            config.tentative_confirm_hits = params->tentative_confirm_hits;
             config.tentative_max_age_seconds = params->tentative_max_age_seconds;
             config.tentative_max_miss_frames = params->tentative_max_miss_frames;
             config.tentative_init_suppress_iou = params->tentative_init_suppress_iou;
-            config.tentative_fast_thresh       = params->tentative_fast_thresh;
-            config.tentative_fast_hits         = params->tentative_fast_hits;
-            config.tentative_slow_thresh       = params->tentative_slow_thresh;
-            config.tentative_slow_hits_offset  = params->tentative_slow_hits_offset;
+            config.tentative_fast_thresh = params->tentative_fast_thresh;
+            config.tentative_fast_hits = params->tentative_fast_hits;
+            config.tentative_slow_thresh = params->tentative_slow_thresh;
+            config.tentative_slow_hits_offset = params->tentative_slow_hits_offset;
             config.tentative_vslow_hits_offset = params->tentative_vslow_hits_offset;
-            config.duplicate_iou_thresh   = params->duplicate_iou_thresh;
-            config.enable_xyah            = (params->enable_xyah  != 0);
-            config.kalman_type            = params->kalman_type;
-            config.iou_plus_one           = (params->iou_plus_one != 0);
-            config.iou_type               = params->iou_type;
-            config.feature_momentum       = params->feature_momentum;
+            config.duplicate_iou_thresh = params->duplicate_iou_thresh;
+            config.enable_xyah = (params->enable_xyah != 0);
+            config.kalman_type = params->kalman_type;
+            config.iou_plus_one = (params->iou_plus_one != 0);
+            config.iou_type = params->iou_type;
+            config.feature_momentum = params->feature_momentum;
             config.reid_direct_assignment_weight = params->reid_direct_assignment_weight;
 
-            config.reid_high_thresh     = params->reid_high_thresh;
+            config.reid_high_thresh = params->reid_high_thresh;
             config.reid_high_iou_weight = params->reid_high_iou_weight;
-            config.reid_low_thresh      = params->reid_low_thresh;
-            config.reid_low_iou_weight  = params->reid_low_iou_weight;
+            config.reid_low_thresh = params->reid_low_thresh;
+            config.reid_low_iou_weight = params->reid_low_iou_weight;
             config.reid_recovery_thresh = params->reid_recovery_thresh;
-            config.max_feature_history  = params->max_feature_history;
+            config.max_feature_history = params->max_feature_history;
 
-            config.primary_assoc_mode   = params->primary_assoc_mode;
-            config.fuse_score           = (params->fuse_score != 0);
+            config.primary_assoc_mode = params->primary_assoc_mode;
+            config.fuse_score = (params->fuse_score != 0);
 
-            config.enable_ocm       = (params->enable_ocm != 0);
-            config.enable_oru       = (params->enable_oru != 0);
-            config.ocm_vdc_weight   = params->ocm_vdc_weight;
-            config.ocm_delta_t      = params->ocm_delta_t;
+            config.enable_ocm = (params->enable_ocm != 0);
+            config.enable_oru = (params->enable_oru != 0);
+            config.ocm_vdc_weight = params->ocm_vdc_weight;
+            config.ocm_delta_t = params->ocm_delta_t;
             config.ocm_min_velocity = params->ocm_min_velocity;
-            config.ocm_max_age      = params->ocm_max_age;
+            config.ocm_max_age = params->ocm_max_age;
             config.ocm_maneuver_weight_scale = params->ocm_maneuver_weight_scale;
 
             auto kf_factory = std::make_shared<SushiTrack::GenericKalmanFactory>(
                 config.kalman_type, config.enable_xyah);
 
-            std::shared_ptr<SushiTrack::IGateValidator> active_gate_validator;
+            std::shared_ptr<SushiTrack::GateValidator> active_gate_validator;
 
             if (config.enable_mahalanobis)
             {
-                auto gate_kf = SushiTrack::KalmanFilterRegistry::getInstance().create(
+                auto gate_kf = SushiTrack::KalmanFilterRegistry::get_instance().create(
                     config.kalman_type, config.enable_xyah);
-                
+
                 if (gate_kf)
                 {
                     active_gate_validator = std::move(gate_kf);
                 }
                 else
                 {
-                    active_gate_validator = SushiTrack::NullGateValidator::getInstance();
+                    active_gate_validator = SushiTrack::NullGateValidator::get_instance();
                     SUSHITRACK_LOG_WARN("[SushiTrack] Gating disabled due to invalid kalman_type.");
                 }
             }
             else
             {
-                active_gate_validator = SushiTrack::NullGateValidator::getInstance();
+                active_gate_validator = SushiTrack::NullGateValidator::get_instance();
             }
 
             auto solver = std::make_unique<SushiTrack::LAPJVSolver>();
 
-            std::shared_ptr<SushiTrack::ICostCalculator> iou_calc;
+            std::shared_ptr<SushiTrack::CostCalculator> iou_calc;
             if (config.iou_type == 1)
             {
-                iou_calc = std::make_shared<SushiTrack::DIoUCostCalculator>(
-                    config.max_area_ratio, config.iou_plus_one);
+                iou_calc = std::make_shared<SushiTrack::DIoUCostCalculator>(config.max_area_ratio,
+                                                                            config.iou_plus_one);
             }
             else if (config.iou_type == 2)
             {
-                iou_calc = std::make_shared<SushiTrack::GIoUCostCalculator>(
-                    config.max_area_ratio, config.iou_plus_one);
+                iou_calc = std::make_shared<SushiTrack::GIoUCostCalculator>(config.max_area_ratio,
+                                                                            config.iou_plus_one);
             }
             else if (config.iou_type == 3)
             {
-                iou_calc = std::make_shared<SushiTrack::SIoUCostCalculator>(
-                    config.max_area_ratio, config.iou_plus_one);
+                iou_calc = std::make_shared<SushiTrack::SIoUCostCalculator>(config.max_area_ratio,
+                                                                            config.iou_plus_one);
             }
             else
             {
-                iou_calc = std::make_shared<SushiTrack::IoUCostCalculator>(
-                    config.max_area_ratio, config.iou_plus_one);
+                iou_calc = std::make_shared<SushiTrack::IoUCostCalculator>(config.max_area_ratio,
+                                                                           config.iou_plus_one);
             }
 
             // Plain-IoU calculator for stages with IoU-tuned thresholds.
-            auto iou_plain = std::make_shared<SushiTrack::IoUCostCalculator>(
-                config.max_area_ratio, config.iou_plus_one);
+            auto iou_plain = std::make_shared<SushiTrack::IoUCostCalculator>(config.max_area_ratio,
+                                                                             config.iou_plus_one);
 
-            std::shared_ptr<SushiTrack::ICostCalculator> high_conf_metric;
-            std::shared_ptr<SushiTrack::ICostCalculator> low_conf_metric;
-            std::shared_ptr<SushiTrack::ICostCalculator> tentative_metric     = iou_plain;
-            std::shared_ptr<SushiTrack::ICostCalculator> duplicate_metric     = iou_plain;
-            std::shared_ptr<SushiTrack::ICostCalculator> lost_recovery_metric = nullptr;
+            std::shared_ptr<SushiTrack::CostCalculator> high_conf_metric;
+            std::shared_ptr<SushiTrack::CostCalculator> low_conf_metric;
+            std::shared_ptr<SushiTrack::CostCalculator> tentative_metric = iou_plain;
+            std::shared_ptr<SushiTrack::CostCalculator> duplicate_metric = iou_plain;
+            std::shared_ptr<SushiTrack::CostCalculator> lost_recovery_metric = nullptr;
 
             if (config.enable_mahalanobis)
             {
                 auto gated_iou = std::make_shared<SushiTrack::GatedIoUCostCalculator>(
-                    config.gating_thresh,
-                    active_gate_validator,
-                    iou_calc,
+                    config.gating_thresh, active_gate_validator, iou_calc,
                     config.motion_cost_weight);
 
                 if (config.enable_reid)
                 {
                     // Fused association path with Mahalanobis gating.
-                    auto cosine_calc     = std::make_shared<SushiTrack::CosineCostCalculator>();
-                    high_conf_metric     = std::make_shared<SushiTrack::FusedCostCalculator>(
-                        config.reid_high_iou_weight,
-                        config.reid_high_thresh, config.gating_thresh,
-                        active_gate_validator,
-                        gated_iou, cosine_calc, config.reid_direct_assignment_weight);
-                    low_conf_metric      = std::make_shared<SushiTrack::FusedCostCalculator>(
-                        config.reid_low_iou_weight,
-                        config.reid_low_thresh, config.gating_thresh,
-                        active_gate_validator,
-                        gated_iou, cosine_calc, config.reid_direct_assignment_weight);
+                    auto cosine_calc = std::make_shared<SushiTrack::CosineCostCalculator>();
+                    high_conf_metric = std::make_shared<SushiTrack::FusedCostCalculator>(
+                        config.reid_high_iou_weight, config.reid_high_thresh, config.gating_thresh,
+                        active_gate_validator, gated_iou, cosine_calc,
+                        config.reid_direct_assignment_weight);
+                    low_conf_metric = std::make_shared<SushiTrack::FusedCostCalculator>(
+                        config.reid_low_iou_weight, config.reid_low_thresh, config.gating_thresh,
+                        active_gate_validator, gated_iou, cosine_calc,
+                        config.reid_direct_assignment_weight);
                     lost_recovery_metric = std::make_shared<SushiTrack::PureReIDCostCalculator>(
                         config.reid_recovery_thresh, config.gating_thresh, active_gate_validator);
                 }
@@ -369,23 +377,19 @@ extern "C"
                 {
                     // Mahalanobis-gated IoU path without appearance features.
                     high_conf_metric = gated_iou;
-                    low_conf_metric  = gated_iou;
+                    low_conf_metric = gated_iou;
                 }
             }
             else if (config.enable_reid)
             {
                 // Appearance-first path with IoU fallback.
-                auto cosine_calc     = std::make_shared<SushiTrack::CosineCostCalculator>();
-                high_conf_metric     = std::make_shared<SushiTrack::ReIDFirstCostCalculator>(
-                    config.reid_high_thresh,
-                    config.reid_high_iou_weight,
-                    config.reid_direct_assignment_weight,
-                    iou_calc, cosine_calc);
-                low_conf_metric      = std::make_shared<SushiTrack::ReIDFirstCostCalculator>(
-                    config.reid_low_thresh,
-                    config.reid_low_iou_weight,
-                    config.reid_direct_assignment_weight,
-                    iou_calc, cosine_calc);
+                auto cosine_calc = std::make_shared<SushiTrack::CosineCostCalculator>();
+                high_conf_metric = std::make_shared<SushiTrack::ReIDFirstCostCalculator>(
+                    config.reid_high_thresh, config.reid_high_iou_weight,
+                    config.reid_direct_assignment_weight, iou_calc, cosine_calc);
+                low_conf_metric = std::make_shared<SushiTrack::ReIDFirstCostCalculator>(
+                    config.reid_low_thresh, config.reid_low_iou_weight,
+                    config.reid_direct_assignment_weight, iou_calc, cosine_calc);
                 lost_recovery_metric = std::make_shared<SushiTrack::PureReIDCostCalculator>(
                     config.reid_recovery_thresh);
             }
@@ -393,33 +397,27 @@ extern "C"
             {
                 // Plain IoU or DIoU path.
                 high_conf_metric = iou_calc;
-                low_conf_metric  = iou_calc;
+                low_conf_metric = iou_calc;
             }
 
             if (config.fuse_score)
             {
-                high_conf_metric = std::make_shared<SushiTrack::FuseScoreDecorator>(high_conf_metric);
+                high_conf_metric =
+                    std::make_shared<SushiTrack::FuseScoreDecorator>(high_conf_metric);
             }
 
             if (config.enable_ocm)
             {
                 high_conf_metric = std::make_shared<SushiTrack::ObservationMomentumDecorator>(
-                    high_conf_metric,
-                    config.ocm_vdc_weight,
-                    config.ocm_min_velocity,
-                    config.ocm_max_age,
-                    config.ocm_maneuver_weight_scale);
+                    high_conf_metric, config.ocm_vdc_weight, config.ocm_min_velocity,
+                    config.ocm_max_age, config.ocm_maneuver_weight_scale);
             }
 
-            auto impl     = new sushitrack_tracker_impl_t();
-            impl->config  = config;
+            auto impl = new sushitrack_tracker_impl_t();
+            impl->config = config;
             impl->tracker = std::make_unique<SushiTrack::Tracker>(
-                config, kf_factory, std::move(solver),
-                high_conf_metric,
-                low_conf_metric,
-                tentative_metric,
-                duplicate_metric,
-                lost_recovery_metric);
+                config, kf_factory, std::move(solver), high_conf_metric, low_conf_metric,
+                tentative_metric, duplicate_metric, lost_recovery_metric);
 
             *out_tracker = static_cast<sushitrack_tracker_t>(impl);
 
@@ -450,7 +448,8 @@ extern "C"
      */
     void sushitrack_destroy(sushitrack_tracker_t tracker)
     {
-        if (!tracker) return;
+        if (!tracker)
+            return;
         std::unique_ptr<sushitrack_tracker_impl_t> owner(
             static_cast<sushitrack_tracker_impl_t*>(tracker));
 
@@ -461,7 +460,8 @@ extern "C"
         }
         catch (...)
         {
-            SUSHITRACK_LOG_ERROR("[SushiTrack] Destroy threw an unknown exception; the tracker is released.");
+            SUSHITRACK_LOG_ERROR(
+                "[SushiTrack] Destroy threw an unknown exception; the tracker is released.");
         }
     }
 
@@ -481,17 +481,15 @@ extern "C"
      * @param out_tracks Pre-allocated buffer receiving active tracks.
      * @return Count of active tracks written into out_tracks.
      */
-    int sushitrack_update(
-        sushitrack_tracker_t       tracker,
-        const sushitrack_object_t* objects,
-        int                        n_objects,
-        sushitrack_track_t*        out_tracks,
-        int                        max_tracks,
-        float                      dt)
+    int sushitrack_update(sushitrack_tracker_t tracker, const sushitrack_object_t* objects,
+                          int n_objects, sushitrack_track_t* out_tracks, int max_tracks, float dt)
     {
-        if (!tracker || !out_tracks) return 0;
-        if (n_objects > 0 && !objects) return 0;
-        if (n_objects < 0 || max_tracks < 0) return 0;
+        if (!tracker || !out_tracks)
+            return 0;
+        if (n_objects > 0 && !objects)
+            return 0;
+        if (n_objects < 0 || max_tracks < 0)
+            return 0;
         auto* impl = static_cast<sushitrack_tracker_impl_t*>(tracker);
 
         try
@@ -521,7 +519,8 @@ extern "C"
         }
         catch (...)
         {
-            SUSHITRACK_LOG_ERROR("[SushiTrack] Update failed: unknown exception; returning zero tracks.");
+            SUSHITRACK_LOG_ERROR(
+                "[SushiTrack] Update failed: unknown exception; returning zero tracks.");
             return 0;
         }
     }
@@ -533,17 +532,16 @@ extern "C"
      * @param max_tracks Maximum capacity of out_tracks array.
      * @return Number of tracklets written to output array.
      */
-    int sushitrack_get_tracklets(
-        sushitrack_tracker_t tracker,
-        sushitrack_track_t*  out_tracks,
-        int                  max_tracks)
+    int sushitrack_get_tracklets(sushitrack_tracker_t tracker, sushitrack_track_t* out_tracks,
+                                 int max_tracks)
     {
-        if (!tracker || !out_tracks || max_tracks <= 0) return 0;
+        if (!tracker || !out_tracks || max_tracks <= 0)
+            return 0;
         auto* impl = static_cast<sushitrack_tracker_impl_t*>(tracker);
 
         try
         {
-            auto tracks = impl->tracker->getTracks();
+            auto tracks = impl->tracker->get_tracks();
             return populate_tracks(impl, tracks, out_tracks, max_tracks);
         }
         catch (const std::exception& e)
@@ -553,7 +551,8 @@ extern "C"
         }
         catch (...)
         {
-            SUSHITRACK_LOG_ERROR("[SushiTrack] Get tracklets failed: unknown exception; returning zero tracks.");
+            SUSHITRACK_LOG_ERROR(
+                "[SushiTrack] Get tracklets failed: unknown exception; returning zero tracks.");
             return 0;
         }
     }
@@ -564,7 +563,7 @@ extern "C"
      */
     void sushitrack_set_log_callback(sushitrack_log_callback_t callback)
     {
-        SushiTrack::Logger::setCallback(callback);
+        SushiTrack::Logger::set_callback(callback);
     }
 
 } // extern "C"

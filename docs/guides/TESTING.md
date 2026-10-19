@@ -33,7 +33,7 @@ st test --suite unit                    # ctest --test-dir build -L '^unit$'
 Parameterised GTest binary that iterates over `Scenario × tracker_factory`. For each pair it:
 
 1. Reads `det.txt` frames via `MOTRunner`.
-2. Drives the tracker through `ITrackerAdapter` (`SushiTrackAdapter`, `ByteTrackAdapter`, `OCSORTAdapter`).
+2. Drives the tracker through `TrackerAdapter` (`SushiTrackAdapter`, `ByteTrackAdapter`, `OCSORTAdapter`).
 3. Writes predictions to `<sequence>/pred/<tracker>/<sequence>.txt`.
 4. Emits a `[ PERF <tracker> ] <sequence>: <us/frame> us/frame` line read back by the CLI (`cli/sushitrack_cli/services/label.py`).
 

@@ -27,37 +27,42 @@
 
 #pragma once
 
-#include "ITrackerAdapter.h"
-#include "TestInfra.h"
-
-#include "OCSort.hpp"
-#include <Eigen/Dense>
-
 #include <filesystem>
 #include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include <Eigen/Dense>
+
+#include "OCSort.hpp"
+#include "TestInfra.h"
+#include "TrackerAdapter.h"
+
 namespace TestInfrastructure
 {
     /**
-     * @brief Implementation of ITrackerAdapter for the OC-SORT algorithm.
-     * 
-     * Interfaces with the OC-SORT library to provide a standardized update 
+     * @brief Implementation of TrackerAdapter for the OC-SORT algorithm.
+     *
+     * Interfaces with the OC-SORT library to provide a standardized update
      * mechanism for benchmarking.
      */
-    class OCSORTAdapter final : public ITrackerAdapter
+    class OCSORTAdapter final : public TrackerAdapter
     {
         public:
             /**
              * @brief Initializes the adapter and loads configuration.
-             * 
+             *
              * @param config_path Optional path to a JSON configuration file.
              */
             explicit OCSORTAdapter(const std::string& config_path = "")
-                : det_thresh_(0.4f), max_age_(30), min_hits_(3), 
-                  iou_threshold_(0.3f), delta_t_(3), inertia_(0.2f), use_byte_(false)
+                : det_thresh_(0.4f),
+                  max_age_(30),
+                  min_hits_(3),
+                  iou_threshold_(0.3f),
+                  delta_t_(3),
+                  inertia_(0.2f),
+                  use_byte_(false)
             {
                 if (!config_path.empty() && std::filesystem::exists(config_path))
                 {
@@ -66,37 +71,41 @@ namespace TestInfrastructure
                     if (it != doc.end())
                     {
                         const JsonSection& s = it.value();
-                        det_thresh_    = json_get(s, "det_thresh",    det_thresh_);
-                        max_age_       = static_cast<int>(json_get(s, "max_age",       static_cast<float>(max_age_)));
-                        min_hits_      = static_cast<int>(json_get(s, "min_hits",      static_cast<float>(min_hits_)));
+                        det_thresh_ = json_get(s, "det_thresh", det_thresh_);
+                        max_age_ =
+                            static_cast<int>(json_get(s, "max_age", static_cast<float>(max_age_)));
+                        min_hits_ = static_cast<int>(
+                            json_get(s, "min_hits", static_cast<float>(min_hits_)));
                         iou_threshold_ = json_get(s, "iou_threshold", iou_threshold_);
-                        delta_t_       = static_cast<int>(json_get(s, "delta_t",       static_cast<float>(delta_t_)));
-                        inertia_       = json_get(s, "inertia",       inertia_);
-                        use_byte_      = json_get(s, "use_byte",      0.0f) > 0.5f;
+                        delta_t_ =
+                            static_cast<int>(json_get(s, "delta_t", static_cast<float>(delta_t_)));
+                        inertia_ = json_get(s, "inertia", inertia_);
+                        use_byte_ = json_get(s, "use_byte", 0.0f) > 0.5f;
                         std::cout << "[ OCSORTAdapter ] config loaded from " << config_path << "\n";
                     }
                 }
 
-                tracker_ = std::make_unique<ocsort::OCSort>(
-                    det_thresh_, max_age_, min_hits_, iou_threshold_, 
-                    delta_t_, "iou", inertia_, use_byte_);
+                tracker_ = std::make_unique<ocsort::OCSort>(det_thresh_, max_age_, min_hits_,
+                                                            iou_threshold_, delta_t_, "iou",
+                                                            inertia_, use_byte_);
             }
 
             /**
              * @brief Retrieves the tracker name.
-             * 
+             *
              * @return "ocsort"
              */
             std::string name() const override { return "ocsort"; }
 
             /**
              * @brief Processes detections using the OC-SORT algorithm.
-             * 
+             *
              * @param dets Collection of input detections.
              * @param dt Time interval (unused).
              * @return Collection of tracking results.
              */
-            std::vector<TrackResult> update(const std::vector<MOTDetection>& dets, float dt = 1.0f) override
+            std::vector<TrackResult> update(const std::vector<MOTDetection>& dets,
+                                            float dt = 1.0f) override
             {
                 if (dets.empty())
                 {
@@ -125,12 +134,12 @@ namespace TestInfrastructure
                 {
                     TrackResult r;
                     // OC-SORT returns [x1, y1, x2, y2, track_id, seed_id, label]
-                    r.x        = t(0);
-                    r.y        = t(1);
-                    r.w        = t(2) - t(0);
-                    r.h        = t(3) - t(1);
+                    r.x = t(0);
+                    r.y = t(1);
+                    r.w = t(2) - t(0);
+                    r.h = t(3) - t(1);
                     r.track_id = static_cast<int>(t(4));
-                    r.score    = 1.0f; // Score not explicitly returned in the same way
+                    r.score = 1.0f; // Score not explicitly returned in the same way
                     results.push_back(r);
                 }
                 return results;
@@ -138,12 +147,12 @@ namespace TestInfrastructure
 
         private:
             float det_thresh_;
-            int   max_age_;
-            int   min_hits_;
+            int max_age_;
+            int min_hits_;
             float iou_threshold_;
-            int   delta_t_;
+            int delta_t_;
             float inertia_;
-            bool  use_byte_;
+            bool use_byte_;
 
             std::unique_ptr<ocsort::OCSort> tracker_;
     };

@@ -35,11 +35,12 @@
 namespace SushiTrack
 {
     void GIoUCostCalculator::calculate(const std::vector<TrackletPtr>& __restrict a,
-                                    const std::vector<TrackletPtr>& __restrict b,
-                                    CostMatrix& __restrict out_matrix)
+                                       const std::vector<TrackletPtr>& __restrict b,
+                                       CostMatrix& __restrict out_matrix)
     {
         out_matrix.resize(a.size(), b.size(), 1e4f);
-        if (a.empty() || b.empty()) return;
+        if (a.empty() || b.empty())
+            return;
 
         const float offset = iou_plus_one_ ? 1.0f : 0.0f;
 
@@ -47,7 +48,7 @@ namespace SushiTrack
         row_areas_.reserve(a.size());
         for (const auto& track : a)
         {
-            const auto& r = track->getRect();
+            const auto& r = track->get_rect();
             row_areas_.push_back(r.width() * r.height());
         }
 
@@ -55,20 +56,20 @@ namespace SushiTrack
         col_areas_.reserve(b.size());
         for (const auto& det : b)
         {
-            const auto& r = det->getRect();
+            const auto& r = det->get_rect();
             col_areas_.push_back(r.width() * r.height());
         }
 
         for (size_t i = 0; i < a.size(); ++i)
         {
-            const auto& r1 = a[i]->getRect();
+            const auto& r1 = a[i]->get_rect();
             float area1 = (r1.width() + offset) * (r1.height() + offset);
 
             for (size_t j = 0; j < b.size(); ++j)
             {
                 float ratio = row_areas_[i] > col_areas_[j]
-                    ? row_areas_[i] / std::max(1e-6f, col_areas_[j])
-                    : col_areas_[j] / std::max(1e-6f, row_areas_[i]);
+                                  ? row_areas_[i] / std::max(1e-6f, col_areas_[j])
+                                  : col_areas_[j] / std::max(1e-6f, row_areas_[i]);
 
                 if (ratio > max_area_ratio_)
                 {
@@ -76,18 +77,18 @@ namespace SushiTrack
                     continue;
                 }
 
-                const auto& r2 = b[j]->getRect();
+                const auto& r2 = b[j]->get_rect();
                 float area2 = (r2.width() + offset) * (r2.height() + offset);
 
-                float iw = std::min(r1.x() + r1.width(), r2.x() + r2.width())
-                        - std::max(r1.x(), r2.x()) + offset;
+                float iw = std::min(r1.x() + r1.width(), r2.x() + r2.width()) -
+                           std::max(r1.x(), r2.x()) + offset;
                 float iou = 0.0f;
                 float intersection = 0.0f;
                 float ua = area1 + area2;
                 if (iw > 0)
                 {
-                    float ih = std::min(r1.y() + r1.height(), r2.y() + r2.height())
-                            - std::max(r1.y(), r2.y()) + offset;
+                    float ih = std::min(r1.y() + r1.height(), r2.y() + r2.height()) -
+                               std::max(r1.y(), r2.y()) + offset;
                     if (ih > 0)
                     {
                         intersection = iw * ih;
@@ -96,10 +97,10 @@ namespace SushiTrack
                     }
                 }
 
-                float enc_w = std::max(r1.x() + r1.width(), r2.x() + r2.width())
-                            - std::min(r1.x(), r2.x()) + offset;
-                float enc_h = std::max(r1.y() + r1.height(), r2.y() + r2.height())
-                            - std::min(r1.y(), r2.y()) + offset;
+                float enc_w = std::max(r1.x() + r1.width(), r2.x() + r2.width()) -
+                              std::min(r1.x(), r2.x()) + offset;
+                float enc_h = std::max(r1.y() + r1.height(), r2.y() + r2.height()) -
+                              std::min(r1.y(), r2.y()) + offset;
                 float ac = enc_w * enc_h;
 
                 float giou = iou - (ac - ua) / std::max(1e-6f, ac);
@@ -111,28 +112,28 @@ namespace SushiTrack
     float GIoUCostCalculator::calculate_single(const TrackletPtr& a, const TrackletPtr& b) const
     {
         const float offset = iou_plus_one_ ? 1.0f : 0.0f;
-        const auto& r1 = a->getRect();
-        const auto& r2 = b->getRect();
+        const auto& r1 = a->get_rect();
+        const auto& r2 = b->get_rect();
         float area1 = (r1.width() + offset) * (r1.height() + offset);
         float area2 = (r2.width() + offset) * (r2.height() + offset);
 
         float raw_area1 = r1.width() * r1.height();
         float raw_area2 = r2.width() * r2.height();
-        float ratio = (raw_area1 > raw_area2)
-            ? (raw_area1 / std::max(1e-6f, raw_area2))
-            : (raw_area2 / std::max(1e-6f, raw_area1));
+        float ratio = (raw_area1 > raw_area2) ? (raw_area1 / std::max(1e-6f, raw_area2))
+                                              : (raw_area2 / std::max(1e-6f, raw_area1));
 
-        if (ratio > max_area_ratio_) return 1e4f;
+        if (ratio > max_area_ratio_)
+            return 1e4f;
 
-        float iw = std::min(r1.x() + r1.width(), r2.x() + r2.width())
-                - std::max(r1.x(), r2.x()) + offset;
+        float iw =
+            std::min(r1.x() + r1.width(), r2.x() + r2.width()) - std::max(r1.x(), r2.x()) + offset;
         float iou = 0.0f;
         float intersection = 0.0f;
         float ua = area1 + area2;
         if (iw > 0)
         {
-            float ih = std::min(r1.y() + r1.height(), r2.y() + r2.height())
-                    - std::max(r1.y(), r2.y()) + offset;
+            float ih = std::min(r1.y() + r1.height(), r2.y() + r2.height()) -
+                       std::max(r1.y(), r2.y()) + offset;
             if (ih > 0)
             {
                 intersection = iw * ih;
@@ -141,10 +142,10 @@ namespace SushiTrack
             }
         }
 
-        float enc_w = std::max(r1.x() + r1.width(), r2.x() + r2.width())
-                    - std::min(r1.x(), r2.x()) + offset;
-        float enc_h = std::max(r1.y() + r1.height(), r2.y() + r2.height())
-                    - std::min(r1.y(), r2.y()) + offset;
+        float enc_w =
+            std::max(r1.x() + r1.width(), r2.x() + r2.width()) - std::min(r1.x(), r2.x()) + offset;
+        float enc_h = std::max(r1.y() + r1.height(), r2.y() + r2.height()) -
+                      std::min(r1.y(), r2.y()) + offset;
         float ac = enc_w * enc_h;
 
         float giou = iou - (ac - ua) / std::max(1e-6f, ac);

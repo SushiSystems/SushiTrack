@@ -29,36 +29,37 @@
 
 #include <vector>
 
-#include <SushiTrack/association/i_cost_calculator.hpp>
+#include <SushiTrack/association/cost_calculator.hpp>
 
 namespace SushiTrack
 {
     /**
      * @brief Visual similarity cost calculator using cosine distance.
-     * 
-     * Calculates costs based on the angular distance between high-dimensional 
+     *
+     * Calculates costs based on the angular distance between high-dimensional
      * feature vectors.
      */
-    class CosineCostCalculator : public ICostCalculator
+    class CosineCostCalculator final : public CostCalculator
     {
         public:
             /**
              * @brief Populates the cost matrix using visual feature similarity.
-             * 
+             *
              * @param a Collection of source tracklets.
              * @param b Collection of target tracklets (observations).
              * @param out_matrix Output cost matrix to be populated.
              */
             void calculate(const std::vector<TrackletPtr>& __restrict a,
-                        const std::vector<TrackletPtr>& __restrict b,
-                        CostMatrix& __restrict out_matrix) override;
+                           const std::vector<TrackletPtr>& __restrict b,
+                           CostMatrix& __restrict out_matrix) override;
             /**
              * @brief Computes the association cost for a single pair.
-             * 
+             *
              * @param a Source tracklet for association.
              * @param b Candidate tracklet for association.
              * @return float Calculated association cost.
              */
-            float calculate_single(const TrackletPtr& a, const TrackletPtr& b) const override;
+            [[nodiscard]] float calculate_single(const TrackletPtr& a,
+                                                 const TrackletPtr& b) const override;
     };
 } // namespace SushiTrack

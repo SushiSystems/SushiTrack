@@ -141,7 +141,7 @@ namespace SushiTrack
      * @return Vector containing TLBR coordinates.
      */
     template <typename T>
-    Tlbr<T> Rect<T>::getTlbr() const
+    Tlbr<T> Rect<T>::get_tlbr() const
     {
         return {
             tlwh[0],
@@ -156,7 +156,7 @@ namespace SushiTrack
      * @return Vector containing XYWH coordinates.
      */
     template <typename T>
-    Xywh<T> Rect<T>::getXywh() const
+    Xywh<T> Rect<T>::get_xywh() const
     {
         return {
             tlwh[0] + tlwh[2] / 2,
@@ -171,7 +171,7 @@ namespace SushiTrack
      * @return Vector containing TLWH coordinates.
      */
     template <typename T>
-    Tlwh<T> Rect<T>::getTlwh() const
+    Tlwh<T> Rect<T>::get_tlwh() const
     {
         return tlwh;
     }

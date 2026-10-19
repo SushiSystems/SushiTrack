@@ -25,12 +25,13 @@
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-#include <SushiTrack/association/lapjv_solver.hpp>
-#include <SushiTrack/association/cost_matrix.hpp>
-
 #include <algorithm>
 #include <vector>
+
+#include <gtest/gtest.h>
+
+#include <SushiTrack/association/cost_matrix.hpp>
+#include <SushiTrack/association/lapjv_solver.hpp>
 
 using namespace SushiTrack;
 
@@ -40,7 +41,7 @@ using namespace SushiTrack;
  * @brief Constructs an n×n identity-like cost matrix:
  *        diagonal = 0 (perfect match), off-diagonal = 1 (no match).
  */
-static CostMatrix makeIdentityCost(int n)
+static CostMatrix make_identity_cost(int n)
 {
     CostMatrix m;
     m.resize(n, n, 1.0f);
@@ -120,7 +121,7 @@ TEST(LAPJVSolverTest, IdentityMatrixPerfectDiagonalMatch)
 {
     const int n = 4;
     LAPJVSolver solver;
-    CostMatrix cost = makeIdentityCost(n);
+    CostMatrix cost = make_identity_cost(n);
 
     std::vector<std::vector<int>> matches;
     std::vector<int> a_unm, b_unm;
@@ -164,7 +165,8 @@ TEST(LAPJVSolverTest, MoreRowsThanColsSurplusRowsUnmatched)
 
     // Both columns must be matched.
     std::vector<int> matched_cols;
-    for (const auto& p : matches) matched_cols.push_back(p[1]);
+    for (const auto& p : matches)
+        matched_cols.push_back(p[1]);
     std::sort(matched_cols.begin(), matched_cols.end());
     EXPECT_EQ(matched_cols, (std::vector<int>{0, 1}));
 }
@@ -193,7 +195,8 @@ TEST(LAPJVSolverTest, MoreColsThanRowsSurplusColsUnmatched)
 
     // Matched columns must be 0 and 1.
     std::vector<int> matched_cols;
-    for (const auto& p : matches) matched_cols.push_back(p[1]);
+    for (const auto& p : matches)
+        matched_cols.push_back(p[1]);
     std::sort(matched_cols.begin(), matched_cols.end());
     EXPECT_EQ(matched_cols, (std::vector<int>{0, 1}));
 }
@@ -209,10 +212,10 @@ TEST(LAPJVSolverTest, ThresholdControlsAcceptedAssignments)
     LAPJVSolver solver;
     CostMatrix cost;
     cost.resize(2, 2);
-    cost(0, 0) = 0.2f;  // good match
+    cost(0, 0) = 0.2f; // good match
     cost(0, 1) = 0.9f;
     cost(1, 0) = 0.9f;
-    cost(1, 1) = 0.7f;  // borderline match
+    cost(1, 1) = 0.7f; // borderline match
 
     // Loose threshold: both diagonal matches are accepted.
     {
@@ -246,7 +249,7 @@ TEST(LAPJVSolverTest, NoDoubleAssignments)
 {
     const int n = 5;
     LAPJVSolver solver;
-    CostMatrix cost = makeIdentityCost(n);
+    CostMatrix cost = make_identity_cost(n);
 
     std::vector<std::vector<int>> matches;
     std::vector<int> a_unm, b_unm;
@@ -271,16 +274,17 @@ TEST(LAPJVSolverTest, NoDoubleAssignments)
 TEST(LAPJVSolverTest, RepeatedCallsProduceConsistentResults)
 {
     LAPJVSolver solver;
-    CostMatrix cost = makeIdentityCost(3);
+    CostMatrix cost = make_identity_cost(3);
 
-    auto run = [&]() {
+    auto run = [&]()
+    {
         std::vector<std::vector<int>> matches;
         std::vector<int> a_unm, b_unm;
         solver.solve(cost, 3, 3, 0.5f, matches, a_unm, b_unm);
         return matches.size();
     };
 
-    std::size_t first  = run();
+    std::size_t first = run();
     std::size_t second = run();
     EXPECT_EQ(first, second);
     EXPECT_EQ(first, 3u);

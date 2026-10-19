@@ -86,7 +86,7 @@ All knobs are exposed both on `sushitrack_params_t` (C API, `include/SushiTrack/
 
 `kalman_type` is documented under [Motion estimator](#motion-estimator) below.
 
-`KalmanFilter` baseline constants (compile-time, see `include/SushiTrack/filtering/kalman_filter.hpp`): `kStdWeightPosition=1/20`, `kStdWeightVelocity=1/160`, `kInitPositionMult=2.0`, `kInitVelocityMult=10.0`. These replace earlier configurable hyper-parameters and match the ByteTrack reference tuning.
+`KalmanFilter` baseline constants (compile-time, see `include/SushiTrack/filtering/kalman_filter.hpp`): `K_STD_WEIGHT_POSITION=1/20`, `K_STD_WEIGHT_VELOCITY=1/160`, `K_INIT_POSITION_MULT=2.0`, `K_INIT_VELOCITY_MULT=10.0`. These replace earlier configurable hyper-parameters and match the ByteTrack reference tuning.
 
 ### Association strategy
 

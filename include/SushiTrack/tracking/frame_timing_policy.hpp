@@ -27,35 +27,32 @@
 
 #pragma once
 
-#include <SushiTrack/tracking/i_timing_policy.hpp>
+#include <SushiTrack/tracking/timing_policy.hpp>
 
 namespace SushiTrack
 {
     /**
      * @brief Implements a discrete-step timing policy.
      */
-    class FrameTimingPolicy final : public ITimingPolicy
+    class FrameTimingPolicy final : public TimingPolicy
     {
-    public:
-        /**
-         * @brief Returns a constant unit step regardless of input.
-         * @param raw_dt Input time interval (unused).
-         * @return Constant value of 1.0.
-         */
-        float toKfDt(float /*raw_dt*/) const override
-        {
-            return 1.0f;
-        }
+        public:
+            /**
+             * @brief Returns a constant unit step regardless of input.
+             * @param raw_dt Input time interval (unused).
+             * @return Constant value of 1.0.
+             */
+            [[nodiscard]] float to_kf_dt(float /*raw_dt*/) const override { return 1.0f; }
 
-        /**
-         * @brief Evaluates expiration using frame count comparisons.
-         * @param frame_count Number of frames elapsed.
-         * @param buffer_frames Configured persistence limit in frames.
-         * @return True if frame count exceeds limit.
-         */
-        bool isExpired(float frame_count, int buffer_frames) const override
-        {
-            return frame_count > static_cast<float>(buffer_frames);
-        }
+            /**
+             * @brief Evaluates expiration using frame count comparisons.
+             * @param frame_count Number of frames elapsed.
+             * @param buffer_frames Configured persistence limit in frames.
+             * @return True if frame count exceeds limit.
+             */
+            [[nodiscard]] bool is_expired(float frame_count, int buffer_frames) const override
+            {
+                return frame_count > static_cast<float>(buffer_frames);
+            }
     };
 } // namespace SushiTrack

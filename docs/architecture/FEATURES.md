@@ -23,7 +23,7 @@ When `enable_tentative=1`, new tracks must accumulate `tentative_confirm_hits` c
 - Fused: `FusedCostCalculator` combines IoU, cosine appearance and Mahalanobis gating (when `enable_mahalanobis=1`).
 - Lost recovery: `PureReIDCostCalculator` (`reid_recovery_thresh`), active in all ReID paths.
 
-Visual features are L2-normalised and exponentially smoothed (`feature_momentum`, default 0.9). A per-tracklet feature history holds up to `max_feature_history` (default 100) vectors and `getMaxFeatureSimilarity` returns the max cosine similarity against the history.
+Visual features are L2-normalised and exponentially smoothed (`feature_momentum`, default 0.9). A per-tracklet feature history holds up to `max_feature_history` (default 100) vectors and `get_max_feature_similarity` returns the max cosine similarity against the history.
 
 ## Mahalanobis gating
 
@@ -78,4 +78,4 @@ Visual features are L2-normalised and exponentially smoothed (`feature_momentum`
 
 ## Thread safety
 
-`Tracklet` state access is mutex-protected for `getMean`/`getCovariance`/`getMeasurement`. The `KalmanFilter` LLT projection cache is mutex-protected.
+`Tracklet` state access is mutex-protected for `get_mean`/`get_covariance`/`get_measurement`. The `KalmanFilter` LLT projection cache is mutex-protected.

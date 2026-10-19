@@ -4,13 +4,13 @@ The runtime is organised around interfaces that the tracker depends on. Concrete
 
 | Interface | Purpose | Concrete implementations |
 |---|---|---|
-| `IStatePredictor` | State propagation/update | `KalmanFilter`, `NSAKalmanFilter` |
-| `IGateValidator` | Mahalanobis gating | `KalmanFilter`, `NSAKalmanFilter`, `NullGateValidator` |
-| `IKalmanFilter` | Unified predictor + validator | `KalmanFilter`, `NSAKalmanFilter` |
-| `IKalmanFactory` | Per-tracklet predictor factory | `GenericKalmanFactory` (registry-driven) |
-| `ICostCalculator` | Pairwise association cost | `IoUCostCalculator`, `DIoUCostCalculator`, `GIoUCostCalculator`, `SIoUCostCalculator`, `CosineCostCalculator`, `ReIDFirstCostCalculator`, `PureReIDCostCalculator`, `FusedCostCalculator`, `GatedIoUCostCalculator`, `FuseScoreDecorator` |
-| `IAssignmentSolver` | Bipartite assignment | `LAPJVSolver` (Jonker–Volgenant with active-row/column reduction) |
-| `ITimingPolicy` | dt normalisation, expiry | `FrameTimingPolicy`, `WallClockTimingPolicy` |
+| `StatePredictor` | State propagation/update | `KalmanFilter`, `NSAKalmanFilter` |
+| `GateValidator` | Mahalanobis gating | `KalmanFilter`, `NSAKalmanFilter`, `NullGateValidator` |
+| `GatedStatePredictor` | Unified predictor + validator | `KalmanFilter`, `NSAKalmanFilter` |
+| `KalmanFactory` | Per-tracklet predictor factory | `GenericKalmanFactory` (registry-driven) |
+| `CostCalculator` | Pairwise association cost | `IoUCostCalculator`, `DIoUCostCalculator`, `GIoUCostCalculator`, `SIoUCostCalculator`, `CosineCostCalculator`, `ReIDFirstCostCalculator`, `PureReIDCostCalculator`, `FusedCostCalculator`, `GatedIoUCostCalculator`, `FuseScoreDecorator` |
+| `AssignmentSolver` | Bipartite assignment | `LAPJVSolver` (Jonker–Volgenant with active-row/column reduction) |
+| `TimingPolicy` | dt normalisation, expiry | `FrameTimingPolicy`, `WallClockTimingPolicy` |
 
 `KalmanFilterRegistry` is a singleton plug-in registry. New Kalman variants register themselves through `KalmanFilterRegistrar<T>` and become selectable by `kalman_type`.
 

@@ -25,8 +25,6 @@
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-#include <SushiTrack/c_api/sushitrack_c.h>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -34,49 +32,51 @@
 #include <string>
 #include <vector>
 
+#include <gtest/gtest.h>
+
+#include <SushiTrack/c_api/sushitrack_c.h>
+
 namespace
 {
 
-/**
- * @brief Constructs a benign detection with default geometry and the given score.
- * @param x     Top-left horizontal coordinate.
- * @param y     Top-left vertical coordinate.
- * @param score Detection confidence score in [0, 1].
- * @return Populated sushitrack_object_t.
- */
-sushitrack_object_t makeDet(float x, float y, float score = 0.9f)
-{
-    sushitrack_object_t o{};
-    o.x      = x;
-    o.y      = y;
-    o.width  = 50.0f;
-    o.height = 100.0f;
-    o.score  = score;
-    o.label  = 1;
-    return o;
-}
-
-/**
- * @brief Drives N consecutive frames of a single moving detection through the
- *        tracker; convenience helper for tests that need an established track.
- * @param hdl        Tracker handle.
- * @param n_frames   Number of update cycles to execute.
- * @param out        Output buffer; must have capacity >= 1.
- * @param dt         Time delta passed to each Update call.
- */
-void driveFrames(sushitrack_tracker_t                   hdl,
-                 int                            n_frames,
-                 std::vector<sushitrack_track_t>&  out,
-                 float                          dt = 0.04f)
-{
-    for (int i = 0; i < n_frames; ++i)
+    /**
+     * @brief Constructs a benign detection with default geometry and the given score.
+     * @param x     Top-left horizontal coordinate.
+     * @param y     Top-left vertical coordinate.
+     * @param score Detection confidence score in [0, 1].
+     * @return Populated sushitrack_object_t.
+     */
+    sushitrack_object_t make_det(float x, float y, float score = 0.9f)
     {
-        sushitrack_object_t d = makeDet(100.0f + 2.0f * i, 200.0f + 2.0f * i);
-        sushitrack_update(hdl, &d, 1, out.data(), static_cast<int>(out.size()), dt);
+        sushitrack_object_t o{};
+        o.x = x;
+        o.y = y;
+        o.width = 50.0f;
+        o.height = 100.0f;
+        o.score = score;
+        o.label = 1;
+        return o;
     }
-}
 
-}
+    /**
+     * @brief Drives N consecutive frames of a single moving detection through the
+     *        tracker; convenience helper for tests that need an established track.
+     * @param hdl        Tracker handle.
+     * @param n_frames   Number of update cycles to execute.
+     * @param out        Output buffer; must have capacity >= 1.
+     * @param dt         Time delta passed to each Update call.
+     */
+    void drive_frames(sushitrack_tracker_t hdl, int n_frames, std::vector<sushitrack_track_t>& out,
+                      float dt = 0.04f)
+    {
+        for (int i = 0; i < n_frames; ++i)
+        {
+            sushitrack_object_t d = make_det(100.0f + 2.0f * i, 200.0f + 2.0f * i);
+            sushitrack_update(hdl, &d, 1, out.data(), static_cast<int>(out.size()), dt);
+        }
+    }
+
+} // namespace
 
 // CAPIInvalidArgumentTest
 
@@ -85,22 +85,22 @@ void driveFrames(sushitrack_tracker_t                   hdl,
  */
 class CAPIInvalidArgumentTest : public ::testing::Test
 {
-protected:
-    sushitrack_params_t params_{};
-    sushitrack_tracker_t     hdl_ = nullptr;
+    protected:
+        sushitrack_params_t params_{};
+        sushitrack_tracker_t hdl_ = nullptr;
 
-    void SetUp() override
-    {
-        sushitrack_get_default_params(&params_);
-        hdl_ = sushitrack_create(&params_);
-        ASSERT_NE(hdl_, nullptr);
-    }
+        void SetUp() override
+        {
+            sushitrack_get_default_params(&params_);
+            hdl_ = sushitrack_create(&params_);
+            ASSERT_NE(hdl_, nullptr);
+        }
 
-    void TearDown() override
-    {
-        if (hdl_ != nullptr)
-            sushitrack_destroy(hdl_);
-    }
+        void TearDown() override
+        {
+            if (hdl_ != nullptr)
+                sushitrack_destroy(hdl_);
+        }
 };
 
 /**
@@ -137,7 +137,8 @@ TEST(CAPIInvalidArgumentStandaloneTest, CreateWithNullParamsAutoLoadsConfig)
  */
 TEST(CAPIInvalidArgumentStandaloneTest, CreateExNullParamsPropagatesStatusViaOutHandle)
 {
-    sushitrack_tracker_t     hdl    = reinterpret_cast<sushitrack_tracker_t>(static_cast<uintptr_t>(0xDEADBEEFul));
+    sushitrack_tracker_t hdl =
+        reinterpret_cast<sushitrack_tracker_t>(static_cast<uintptr_t>(0xDEADBEEFul));
     sushitrack_status_t status = sushitrack_create_ex(nullptr, &hdl);
     EXPECT_EQ(status, SUSHITRACK_INVALID_ARGUMENT);
 }
@@ -149,7 +150,7 @@ TEST(CAPIInvalidArgumentStandaloneTest, CreateExNullParamsPropagatesStatusViaOut
 TEST_F(CAPIInvalidArgumentTest, UpdateWithNullHandleReturnsNonPositive)
 {
     std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d = makeDet(10.0f, 20.0f);
+    sushitrack_object_t d = make_det(10.0f, 20.0f);
     int n = sushitrack_update(nullptr, &d, 1, out.data(), static_cast<int>(out.size()), 0.04f);
     EXPECT_LE(n, 0);
 }
@@ -171,7 +172,7 @@ TEST_F(CAPIInvalidArgumentTest, UpdateWithNullDetectionsAndPositiveCountReturnsN
  */
 TEST_F(CAPIInvalidArgumentTest, UpdateWithNullOutputBufferAndPositiveMaxReturnsNonPositive)
 {
-    sushitrack_object_t d = makeDet(10.0f, 20.0f);
+    sushitrack_object_t d = make_det(10.0f, 20.0f);
     int n = sushitrack_update(hdl_, &d, 1, nullptr, 4, 0.04f);
     EXPECT_LE(n, 0);
 }
@@ -183,7 +184,7 @@ TEST_F(CAPIInvalidArgumentTest, UpdateWithNullOutputBufferAndPositiveMaxReturnsN
 TEST_F(CAPIInvalidArgumentTest, UpdateWithNegativeObjectCountReturnsNonPositive)
 {
     std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d = makeDet(10.0f, 20.0f);
+    sushitrack_object_t d = make_det(10.0f, 20.0f);
     int n = sushitrack_update(hdl_, &d, -1, out.data(), static_cast<int>(out.size()), 0.04f);
     EXPECT_LE(n, 0);
 }
@@ -195,7 +196,7 @@ TEST_F(CAPIInvalidArgumentTest, UpdateWithNegativeObjectCountReturnsNonPositive)
 TEST_F(CAPIInvalidArgumentTest, UpdateWithNegativeMaxTracksReturnsNonPositive)
 {
     std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d = makeDet(10.0f, 20.0f);
+    sushitrack_object_t d = make_det(10.0f, 20.0f);
     int n = sushitrack_update(hdl_, &d, 1, out.data(), -1, 0.04f);
     EXPECT_LE(n, 0);
 }
@@ -211,13 +212,10 @@ TEST_F(CAPIInvalidArgumentTest, UpdateWithNegativeMaxTracksReturnsNonPositive)
  */
 class CAPIParameterRangeTest : public ::testing::Test
 {
-protected:
-    sushitrack_params_t params_{};
+    protected:
+        sushitrack_params_t params_{};
 
-    void SetUp() override
-    {
-        sushitrack_get_default_params(&params_);
-    }
+        void SetUp() override { sushitrack_get_default_params(&params_); }
 };
 
 /**
@@ -228,7 +226,7 @@ protected:
 TEST_F(CAPIParameterRangeTest, ZeroFrameRateIsRejectedOrInert)
 {
     params_.frame_rate = 0;
-    sushitrack_tracker_t hdl   = nullptr;
+    sushitrack_tracker_t hdl = nullptr;
     sushitrack_status_t s = sushitrack_create_ex(&params_, &hdl);
 
     if (s == SUSHITRACK_INVALID_ARGUMENT)
@@ -239,7 +237,7 @@ TEST_F(CAPIParameterRangeTest, ZeroFrameRateIsRejectedOrInert)
 
     ASSERT_NE(hdl, nullptr);
     std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d = makeDet(10.0f, 20.0f, 0.9f);
+    sushitrack_object_t d = make_det(10.0f, 20.0f, 0.9f);
     int n = sushitrack_update(hdl, &d, 1, out.data(), static_cast<int>(out.size()), 0.04f);
     EXPECT_GE(n, 0);
     sushitrack_destroy(hdl);
@@ -251,7 +249,7 @@ TEST_F(CAPIParameterRangeTest, ZeroFrameRateIsRejectedOrInert)
 TEST_F(CAPIParameterRangeTest, NegativeFrameRateIsRejectedOrInert)
 {
     params_.frame_rate = -25;
-    sushitrack_tracker_t hdl   = nullptr;
+    sushitrack_tracker_t hdl = nullptr;
     sushitrack_status_t s = sushitrack_create_ex(&params_, &hdl);
 
     if (s != SUSHITRACK_SUCCESS)
@@ -271,8 +269,8 @@ TEST_F(CAPIParameterRangeTest, NegativeFrameRateIsRejectedOrInert)
 TEST_F(CAPIParameterRangeTest, NegativeTrackBufferIsRejectedOrNormalised)
 {
     params_.track_buffer = -5;
-    sushitrack_tracker_t hdl     = nullptr;
-    sushitrack_status_t s   = sushitrack_create_ex(&params_, &hdl);
+    sushitrack_tracker_t hdl = nullptr;
+    sushitrack_status_t s = sushitrack_create_ex(&params_, &hdl);
 
     if (s != SUSHITRACK_SUCCESS)
     {
@@ -291,7 +289,7 @@ TEST_F(CAPIParameterRangeTest, NegativeTrackBufferIsRejectedOrNormalised)
 TEST_F(CAPIParameterRangeTest, MatchThreshGreaterThanOneIsTolerated)
 {
     params_.match_thresh = 5.0f;
-    sushitrack_tracker_t hdl     = sushitrack_create(&params_);
+    sushitrack_tracker_t hdl = sushitrack_create(&params_);
     ASSERT_NE(hdl, nullptr);
     sushitrack_destroy(hdl);
 }
@@ -304,12 +302,12 @@ TEST_F(CAPIParameterRangeTest, MatchThreshGreaterThanOneIsTolerated)
 TEST_F(CAPIParameterRangeTest, TrackThreshGreaterThanHighThreshDoesNotCrash)
 {
     params_.track_thresh = 0.9f;
-    params_.high_thresh  = 0.1f;
-    sushitrack_tracker_t hdl     = sushitrack_create(&params_);
+    params_.high_thresh = 0.1f;
+    sushitrack_tracker_t hdl = sushitrack_create(&params_);
     ASSERT_NE(hdl, nullptr);
 
     std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d = makeDet(10.0f, 20.0f, 0.5f);
+    sushitrack_object_t d = make_det(10.0f, 20.0f, 0.5f);
     int n = sushitrack_update(hdl, &d, 1, out.data(), static_cast<int>(out.size()), 0.04f);
     EXPECT_GE(n, 0);
 
@@ -323,23 +321,23 @@ TEST_F(CAPIParameterRangeTest, TrackThreshGreaterThanHighThreshDoesNotCrash)
  */
 class CAPIBufferCapacityTest : public ::testing::Test
 {
-protected:
-    sushitrack_tracker_t     hdl_    = nullptr;
-    sushitrack_params_t params_ = {};
+    protected:
+        sushitrack_tracker_t hdl_ = nullptr;
+        sushitrack_params_t params_ = {};
 
-    void SetUp() override
-    {
-        sushitrack_get_default_params(&params_);
-        params_.enable_tentative = 0;
-        params_.time_aware       = 1;
-        params_.track_thresh     = 0.1f;
-        params_.high_thresh      = 0.2f;
-        params_.match_thresh     = 0.9f;
-        hdl_ = sushitrack_create(&params_);
-        ASSERT_NE(hdl_, nullptr);
-    }
+        void SetUp() override
+        {
+            sushitrack_get_default_params(&params_);
+            params_.enable_tentative = 0;
+            params_.time_aware = 1;
+            params_.track_thresh = 0.1f;
+            params_.high_thresh = 0.2f;
+            params_.match_thresh = 0.9f;
+            hdl_ = sushitrack_create(&params_);
+            ASSERT_NE(hdl_, nullptr);
+        }
 
-    void TearDown() override { sushitrack_destroy(hdl_); }
+        void TearDown() override { sushitrack_destroy(hdl_); }
 };
 
 /**
@@ -348,8 +346,8 @@ protected:
  */
 TEST_F(CAPIBufferCapacityTest, ZeroMaxTracksProducesZeroReturn)
 {
-    sushitrack_object_t d = makeDet(10.0f, 20.0f);
-    sushitrack_track_t  dummy{};
+    sushitrack_object_t d = make_det(10.0f, 20.0f);
+    sushitrack_track_t dummy{};
     int n = sushitrack_update(hdl_, &d, 1, &dummy, 0, 0.04f);
     EXPECT_LE(n, 0);
 }
@@ -360,23 +358,18 @@ TEST_F(CAPIBufferCapacityTest, ZeroMaxTracksProducesZeroReturn)
  */
 TEST_F(CAPIBufferCapacityTest, ReturnedCountIsBoundedByCapacity)
 {
-    constexpr int kDetections = 12;
-    constexpr int kCapacity   = 3;
+    constexpr int K_DETECTIONS = 12;
+    constexpr int K_CAPACITY = 3;
 
     std::vector<sushitrack_object_t> dets;
-    dets.reserve(kDetections);
-    for (int i = 0; i < kDetections; ++i)
-        dets.push_back(makeDet(50.0f + 200.0f * i, 50.0f + 200.0f * i));
+    dets.reserve(K_DETECTIONS);
+    for (int i = 0; i < K_DETECTIONS; ++i)
+        dets.push_back(make_det(50.0f + 200.0f * i, 50.0f + 200.0f * i));
 
-    std::vector<sushitrack_track_t> out(kCapacity);
-    int n = sushitrack_update(hdl_,
-                             dets.data(),
-                             kDetections,
-                             out.data(),
-                             kCapacity,
-                             0.04f);
+    std::vector<sushitrack_track_t> out(K_CAPACITY);
+    int n = sushitrack_update(hdl_, dets.data(), K_DETECTIONS, out.data(), K_CAPACITY, 0.04f);
 
-    EXPECT_LE(n, kCapacity);
+    EXPECT_LE(n, K_CAPACITY);
     EXPECT_GE(n, 0);
 }
 
@@ -475,85 +468,85 @@ TEST(CAPIStatusCodeCoverageTest, DISABLED_OutOfMemoryReturnsOutOfMemoryCode)
 namespace
 {
 
-/** @brief Names what the faulting log callback throws. */
-enum class Fault
-{
-    None,           /**< Throws nothing. */
-    NonStd,         /**< Throws an int. */
-    StdWithPercent, /**< Throws a std::runtime_error whose text holds a conversion. */
-};
+    /** @brief Names what the faulting log callback throws. */
+    enum class Fault
+    {
+        None,           /**< Throws nothing. */
+        NonStd,         /**< Throws an int. */
+        StdWithPercent, /**< Throws a std::runtime_error whose text holds a conversion. */
+    };
 
-static sushitrack_log_level_t g_fault_level = SUSHITRACK_LOG_DEBUG;
-static Fault                  g_fault       = Fault::None;
-static std::string            g_last_error;
+    static sushitrack_log_level_t g_fault_level = SUSHITRACK_LOG_DEBUG;
+    static Fault g_fault = Fault::None;
+    static std::string g_last_error;
 
-/**
- * @brief Records every ERROR line and throws the armed fault at the armed level.
- * @param level   Severity level forwarded from the logger.
- * @param message Formatted message forwarded from the logger.
- */
-void faultingCallback(sushitrack_log_level_t level, const char* message)
-{
-    if (level == SUSHITRACK_LOG_ERROR)
-        g_last_error = message ? message : "";
+    /**
+     * @brief Records every ERROR line and throws the armed fault at the armed level.
+     * @param level   Severity level forwarded from the logger.
+     * @param message Formatted message forwarded from the logger.
+     */
+    void faulting_callback(sushitrack_log_level_t level, const char* message)
+    {
+        if (level == SUSHITRACK_LOG_ERROR)
+            g_last_error = message ? message : "";
 
-    if (level != g_fault_level)
-        return;
+        if (level != g_fault_level)
+            return;
 
-    if (g_fault == Fault::NonStd)
-        throw 42;
+        if (g_fault == Fault::NonStd)
+            throw 42;
 
-    if (g_fault == Fault::StdWithPercent)
-        throw std::runtime_error("create probe 100%d");
-}
+        if (g_fault == Fault::StdWithPercent)
+            throw std::runtime_error("create probe 100%d");
+    }
 
-}
+} // namespace
 
 /**
  * @brief Fixture that owns one tracker and arms a log callback that throws.
  */
 class CAPIBoundaryExceptionTest : public ::testing::Test
 {
-protected:
-    sushitrack_tracker_t hdl_    = nullptr;
-    sushitrack_params_t  params_ = {};
+    protected:
+        sushitrack_tracker_t hdl_ = nullptr;
+        sushitrack_params_t params_ = {};
 
-    void SetUp() override
-    {
-        g_fault = Fault::None;
-        g_last_error.clear();
+        void SetUp() override
+        {
+            g_fault = Fault::None;
+            g_last_error.clear();
 
-        sushitrack_get_default_params(&params_);
-        params_.enable_tentative = 0;
-        params_.time_aware       = 1;
-        params_.track_thresh     = 0.1f;
-        params_.high_thresh      = 0.2f;
-        params_.match_thresh     = 0.9f;
-        hdl_ = sushitrack_create(&params_);
-        ASSERT_NE(hdl_, nullptr);
-    }
+            sushitrack_get_default_params(&params_);
+            params_.enable_tentative = 0;
+            params_.time_aware = 1;
+            params_.track_thresh = 0.1f;
+            params_.high_thresh = 0.2f;
+            params_.match_thresh = 0.9f;
+            hdl_ = sushitrack_create(&params_);
+            ASSERT_NE(hdl_, nullptr);
+        }
 
-    void TearDown() override
-    {
-        disarm();
-        if (hdl_ != nullptr)
-            sushitrack_destroy(hdl_);
-    }
+        void TearDown() override
+        {
+            disarm();
+            if (hdl_ != nullptr)
+                sushitrack_destroy(hdl_);
+        }
 
-    /** @brief Installs the callback so that it throws the fault at the given level. */
-    void arm(sushitrack_log_level_t level, Fault fault)
-    {
-        g_fault_level = level;
-        g_fault       = fault;
-        sushitrack_set_log_callback(faultingCallback);
-    }
+        /** @brief Installs the callback so that it throws the fault at the given level. */
+        void arm(sushitrack_log_level_t level, Fault fault)
+        {
+            g_fault_level = level;
+            g_fault = fault;
+            sushitrack_set_log_callback(faulting_callback);
+        }
 
-    /** @brief Removes the callback and clears the fault. */
-    void disarm()
-    {
-        sushitrack_set_log_callback(nullptr);
-        g_fault = Fault::None;
-    }
+        /** @brief Removes the callback and clears the fault. */
+        void disarm()
+        {
+            sushitrack_set_log_callback(nullptr);
+            g_fault = Fault::None;
+        }
 };
 
 /**
@@ -563,7 +556,7 @@ protected:
 TEST_F(CAPIBoundaryExceptionTest, UpdateContainsNonStdException)
 {
     std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d = makeDet(10.0f, 20.0f);
+    sushitrack_object_t d = make_det(10.0f, 20.0f);
 
     arm(SUSHITRACK_LOG_DEBUG, Fault::NonStd);
     int n = -1;
@@ -582,7 +575,7 @@ TEST_F(CAPIBoundaryExceptionTest, GetTrackletsContainsNonStdException)
 {
     std::vector<sushitrack_object_t> dets;
     for (int i = 0; i < 3; ++i)
-        dets.push_back(makeDet(50.0f + 400.0f * i, 50.0f + 400.0f * i));
+        dets.push_back(make_det(50.0f + 400.0f * i, 50.0f + 400.0f * i));
 
     std::vector<sushitrack_track_t> out(8);
     sushitrack_update(hdl_, dets.data(), 3, out.data(), static_cast<int>(out.size()), 0.04f);
@@ -604,7 +597,7 @@ TEST_F(CAPIBoundaryExceptionTest, GetTrackletsContainsNonStdException)
 TEST_F(CAPIBoundaryExceptionTest, CreateExContainsNonStdException)
 {
     sushitrack_tracker_t created = nullptr;
-    sushitrack_status_t  status  = SUSHITRACK_SUCCESS;
+    sushitrack_status_t status = SUSHITRACK_SUCCESS;
 
     arm(SUSHITRACK_LOG_INFO, Fault::NonStd);
     EXPECT_NO_THROW(status = sushitrack_create_ex(&params_, &created));

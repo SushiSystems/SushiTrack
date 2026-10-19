@@ -27,46 +27,46 @@
 
 #pragma once
 
-#include <SushiTrack/c_api/sushitrack_c.h>
-
 #include <cstdarg>
 #include <cstdio>
 #include <stdexcept>
 #include <string>
+
+#include <SushiTrack/c_api/sushitrack_c.h>
 
 namespace SushiTrack
 {
     /**
      * @brief Utility for handling system logs.
      */
-    class Logger
+    class Logger final
     {
-    public:
-        /**
-         * @brief Sets the global log callback.
-         * @param callback Function pointer to the logging implementation.
-         */
-        static void setCallback(sushitrack_log_callback_t callback);
+        public:
+            /**
+             * @brief Sets the global log callback.
+             * @param callback Function pointer to the logging implementation.
+             */
+            static void set_callback(sushitrack_log_callback_t callback);
 
-        /**
-         * @brief Emits a log message with formatting support.
-         * @param level   Severity level.
-         * @param format  Printf-style format string.
-         * @param ...     Variable arguments for formatting.
-         */
-        static void log(sushitrack_log_level_t level, const char* format, ...);
+            /**
+             * @brief Emits a log message with formatting support.
+             * @param level   Severity level.
+             * @param format  Printf-style format string.
+             * @param ...     Variable arguments for formatting.
+             */
+            static void log(sushitrack_log_level_t level, const char* format, ...);
 
-        /**
-         * @brief Internal helper for va_list logging.
-         */
-        static void logV(sushitrack_log_level_t level, const char* format, va_list args);
+            /**
+             * @brief Internal helper for va_list logging.
+             */
+            static void log_v(sushitrack_log_level_t level, const char* format, va_list args);
 
-        /**
-         * @brief Logs an error and throws a std::runtime_error.
-         * @param format Printf-style format string.
-         * @param ...    Variable arguments.
-         */
-        static void throw_runtime_error(const char* format, ...);
+            /**
+             * @brief Logs an error and throws a std::runtime_error.
+             * @param format Printf-style format string.
+             * @param ...    Variable arguments.
+             */
+            static void throw_runtime_error(const char* format, ...);
     };
 } // namespace SushiTrack
 
@@ -74,8 +74,8 @@ namespace SushiTrack
  * @brief Convenience macros for logging.
  */
 #define SUSHITRACK_LOG_DEBUG(...) SushiTrack::Logger::log(SUSHITRACK_LOG_DEBUG, __VA_ARGS__)
-#define SUSHITRACK_LOG_INFO(...)  SushiTrack::Logger::log(SUSHITRACK_LOG_INFO,  __VA_ARGS__)
-#define SUSHITRACK_LOG_WARN(...)  SushiTrack::Logger::log(SUSHITRACK_LOG_WARN,  __VA_ARGS__)
+#define SUSHITRACK_LOG_INFO(...) SushiTrack::Logger::log(SUSHITRACK_LOG_INFO, __VA_ARGS__)
+#define SUSHITRACK_LOG_WARN(...) SushiTrack::Logger::log(SUSHITRACK_LOG_WARN, __VA_ARGS__)
 #define SUSHITRACK_LOG_ERROR(...) SushiTrack::Logger::log(SUSHITRACK_LOG_ERROR, __VA_ARGS__)
 
 /**

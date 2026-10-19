@@ -10,7 +10,7 @@
 | Lost buffer | The period a lost track is kept before removal: `track_buffer` frames, or `track_buffer / frame_rate` seconds when `time_aware=1` |
 | Two-stage association | The ByteTrack scheme: detections at or above `track_thresh` are matched first, then the tracks left over try the low-score detections |
 | Primary stage, secondary stage | The first and second pass of two-stage association |
-| Cost calculator | An `ICostCalculator`; it fills the matrix of pairwise costs between tracks and detections |
+| Cost calculator | An `CostCalculator`; it fills the matrix of pairwise costs between tracks and detections |
 | IoU, DIoU, GIoU, SIoU | The four overlap measures `iou_type` selects for the primary and secondary stages |
 | LAPJV | The Jonker-Volgenant algorithm for the linear assignment problem, used by `LAPJVSolver` |
 | Gate | A test that removes a track and detection pair from association before the solver runs |
@@ -25,11 +25,11 @@
 | ReID | Appearance matching on a feature vector supplied with each detection, switched by `enable_reid` |
 | TLWH, XYAH | The two box states of the Kalman filter: top-left, width, height; or centre, aspect ratio, height (`enable_xyah`) |
 | Time-aware | `time_aware=1`; `dt` is real seconds and expiry is measured in wall-clock time |
-| Timing policy | An `ITimingPolicy`; it turns `dt` into filter steps and decides when a track expires |
+| Timing policy | An `TimingPolicy`; it turns `dt` into filter steps and decides when a track expires |
 | C ABI | The binary interface of `include/SushiTrack/c_api/sushitrack_c.h`: the `sushitrack_*` functions and structs |
 | Binding | `bindings/python/sushitrack.py`, the `ctypes` wrapper over the C ABI |
 | Reference tracker | ByteTrack or OC-SORT as vendored under `third_party/`, built only to compare against |
-| Adapter | An `ITrackerAdapter` in `tests/regression/`; it drives one tracker through the common harness |
+| Adapter | An `TrackerAdapter` in `tests/regression/`; it drives one tracker through the common harness |
 | `tracker_bridge` | The shared library built from `tests/regression/TrackerRegistry.cpp`; the inference pipeline loads the reference trackers through it |
 | Scenario | One sequence the regression binary runs, registered in `tests/regression/ScenarioList.h` |
 | Sequence | One folder under `tests/regression/evaluator/data/` with `det/det.txt`, `gt/gt.txt` and `seqinfo.ini` |

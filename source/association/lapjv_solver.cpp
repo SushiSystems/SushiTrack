@@ -46,8 +46,7 @@ namespace SushiTrack
      * @param cost Input cost matrix representing association weights.
      * @param thresh Cost threshold for qualifying an assignment.
      */
-    void LAPJVSolver::solve(const CostMatrix& __restrict cost,
-                            int n_rows, int n_cols, float thresh,
+    void LAPJVSolver::solve(const CostMatrix& __restrict cost, int n_rows, int n_cols, float thresh,
                             std::vector<std::vector<int>>& __restrict matches,
                             std::vector<int>& __restrict a_unmatched,
                             std::vector<int>& __restrict b_unmatched)
@@ -67,35 +66,36 @@ namespace SushiTrack
 
         ws_.resize_mappings(n_rows, n_cols);
 
-        std::fill(ws_._row_active.begin(), ws_._row_active.begin() + n_rows, 0);
-        std::fill(ws_._col_active.begin(), ws_._col_active.begin() + n_cols, 0);
+        std::fill(ws_.row_active.begin(), ws_.row_active.begin() + n_rows, 0);
+        std::fill(ws_.col_active.begin(), ws_.col_active.begin() + n_cols, 0);
 
         int num_active_rows = 0;
         int num_active_cols = 0;
 
-        for (int i = 0; i < n_rows; ++i) 
+        for (int i = 0; i < n_rows; ++i)
         {
-            for (int j = 0; j < n_cols; ++j) 
+            for (int j = 0; j < n_cols; ++j)
             {
                 if (cost(i, j) <= thresh)
                 {
-                    if (!ws_._row_active[i])
+                    if (!ws_.row_active[i])
                     {
-                        ws_._row_active[i] = 1;
+                        ws_.row_active[i] = 1;
                         num_active_rows++;
                     }
-                    if (!ws_._col_active[j])
+                    if (!ws_.col_active[j])
                     {
-                        ws_._col_active[j] = 1;
+                        ws_.col_active[j] = 1;
                         num_active_cols++;
                     }
                 }
             }
         }
 
-        SUSHITRACK_LOG_DEBUG("[Solver] Problem size: %d x %d, active: %d x %d", n_rows, n_cols, num_active_rows, num_active_cols);
+        SUSHITRACK_LOG_DEBUG("[Solver] Problem size: %d x %d, active: %d x %d", n_rows, n_cols,
+                             num_active_rows, num_active_cols);
 
-        if (num_active_rows == 0 || num_active_cols == 0) 
+        if (num_active_rows == 0 || num_active_cols == 0)
         {
             for (int i = 0; i < n_rows; ++i)
             {
@@ -109,11 +109,11 @@ namespace SushiTrack
         }
 
         int r_idx = 0;
-        for (int i = 0; i < n_rows; ++i) 
+        for (int i = 0; i < n_rows; ++i)
         {
-            if (ws_._row_active[i])
+            if (ws_.row_active[i])
             {
-                ws_._sparse_to_real_row[r_idx++] = i;
+                ws_.sparse_to_real_row[r_idx++] = i;
             }
             else
             {
@@ -122,42 +122,42 @@ namespace SushiTrack
         }
 
         int c_idx = 0;
-        for (int j = 0; j < n_cols; ++j) 
+        for (int j = 0; j < n_cols; ++j)
         {
-            if (ws_._col_active[j])
+            if (ws_.col_active[j])
             {
-                ws_._sparse_to_real_col[c_idx++] = j;
+                ws_.sparse_to_real_col[c_idx++] = j;
             }
         }
 
-        ws_._sparse_cost.resize(num_active_rows, num_active_cols, 1e4f);
-        for (int sr = 0; sr < num_active_rows; ++sr) 
+        ws_.sparse_cost.resize(num_active_rows, num_active_cols, 1e4f);
+        for (int sr = 0; sr < num_active_rows; ++sr)
         {
-            int rr = ws_._sparse_to_real_row[sr];
-            for (int sc = 0; sc < num_active_cols; ++sc) 
+            int rr = ws_.sparse_to_real_row[sr];
+            for (int sc = 0; sc < num_active_cols; ++sc)
             {
-                int rc = ws_._sparse_to_real_col[sc];
-                ws_._sparse_cost(sr, sc) = cost(rr, rc);
+                int rc = ws_.sparse_to_real_col[sc];
+                ws_.sparse_cost(sr, sc) = cost(rr, rc);
             }
         }
 
-        execLAPJV(ws_._sparse_cost, ws_._sparse_rowsol, ws_._sparse_colsol, true, thresh);
+        exec_lapjv(ws_.sparse_cost, ws_.sparse_rowsol, ws_.sparse_colsol, true, thresh);
 
-        std::fill(ws_._matched_cols.begin(), ws_._matched_cols.begin() + n_cols, 0);
+        std::fill(ws_.matched_cols.begin(), ws_.matched_cols.begin() + n_cols, 0);
 
-        for (int sr = 0; sr < num_active_rows; ++sr) 
+        for (int sr = 0; sr < num_active_rows; ++sr)
         {
-            int rr = ws_._sparse_to_real_row[sr];
-            int sc = ws_._sparse_rowsol[sr];
+            int rr = ws_.sparse_to_real_row[sr];
+            int sc = ws_.sparse_rowsol[sr];
 
-            if (sc >= 0 && sc < num_active_cols) 
+            if (sc >= 0 && sc < num_active_cols)
             {
-                int rc = ws_._sparse_to_real_col[sc];
-                if (ws_._sparse_cost(sr, sc) <= thresh) 
+                int rc = ws_.sparse_to_real_col[sc];
+                if (ws_.sparse_cost(sr, sc) <= thresh)
                 {
                     matches.push_back({rr, rc});
-                    ws_._matched_cols[rc] = 1;
-                } 
+                    ws_.matched_cols[rc] = 1;
+                }
                 else
                 {
                     a_unmatched.push_back(rr);
@@ -169,9 +169,9 @@ namespace SushiTrack
             }
         }
 
-        for (int j = 0; j < n_cols; ++j) 
+        for (int j = 0; j < n_cols; ++j)
         {
-            if (!ws_._matched_cols[j])
+            if (!ws_.matched_cols[j])
             {
                 b_unmatched.push_back(j);
             }
@@ -184,15 +184,13 @@ namespace SushiTrack
      * @brief Executes the Jonker-Volgenant algorithm on a cost matrix.
      * @param cost Input cost matrix.
      * @param extend_cost Flag indicating whether to pad matrix to square format.
-     * @return Total optimized assignment cost.
      */
-    double LAPJVSolver::execLAPJV(const CostMatrix& cost,
-                                std::vector<int>& rowsol, std::vector<int>& colsol,
-                                bool extend_cost, float cost_limit)
+    void LAPJVSolver::exec_lapjv(const CostMatrix& cost, std::vector<int>& rowsol,
+                                 std::vector<int>& colsol, bool extend_cost, float cost_limit)
     {
         int nr = static_cast<int>(cost.rows());
         int nc = static_cast<int>(cost.cols());
-        
+
         rowsol.assign(nr, -1);
         colsol.assign(nc, -1);
 
@@ -202,22 +200,24 @@ namespace SushiTrack
             n = nr + nc;
             ws_.resize(n);
 
-            float fill_val = (cost_limit < std::numeric_limits<float>::max()) ? (cost_limit * 1.1f) : 1e6f;
-            
-            std::fill(ws_._cost_data.begin(), ws_._cost_data.begin() + (static_cast<size_t>(n) * n), static_cast<double>(fill_val));
-            
+            float fill_val =
+                (cost_limit < std::numeric_limits<float>::max()) ? (cost_limit * 1.1f) : 1e6f;
+
+            std::fill(ws_.cost_data.begin(), ws_.cost_data.begin() + (static_cast<size_t>(n) * n),
+                      static_cast<double>(fill_val));
+
             for (int i = nr; i < n; ++i)
             {
                 for (int j = nc; j < n; ++j)
                 {
-                    ws_._cost_ptr[i][j] = 0.0;
+                    ws_.cost_ptr[i][j] = 0.0;
                 }
             }
             for (int i = 0; i < nr; ++i)
             {
                 for (int j = 0; j < nc; ++j)
                 {
-                    ws_._cost_ptr[i][j] = static_cast<double>(cost(i, j));
+                    ws_.cost_ptr[i][j] = static_cast<double>(cost(i, j));
                 }
             }
         }
@@ -225,34 +225,35 @@ namespace SushiTrack
         {
             if (nr != nc)
             {
-                SUSHITRACK_RUNTIME_ERROR("[Solver] LAPJV requires square matrix if not extending (nr=%d, nc=%d)", nr, nc);
+                SUSHITRACK_RUNTIME_ERROR(
+                    "[Solver] LAPJV requires square matrix if not extending (nr=%d, nc=%d)", nr,
+                    nc);
             }
-           
+
             n = nr;
             ws_.resize(n);
             for (int i = 0; i < n; ++i)
             {
                 for (int j = 0; j < n; ++j)
                 {
-                    ws_._cost_ptr[i][j] = static_cast<double>(cost(i, j));
+                    ws_.cost_ptr[i][j] = static_cast<double>(cost(i, j));
                 }
             }
         }
 
-        int result = lapjv_internal(static_cast<size_t>(n),
-                                    ws_._cost_ptr.data(),
-                                    ws_._x_c.data(),
-                                    ws_._y_c.data(),
-                                    &ws_._jv_ws);
-        
+        int result = lapjv_internal(static_cast<size_t>(n), ws_.cost_ptr.data(), ws_.x_c.data(),
+                                    ws_.y_c.data(), &ws_.jv_ws);
+
         if (result != 0)
         {
-            SUSHITRACK_RUNTIME_ERROR("[Solver] LAPJV assignment failed - cost matrix may be numerically unstable (result=%d)", result);
+            SUSHITRACK_RUNTIME_ERROR("[Solver] LAPJV assignment failed - cost matrix may be "
+                                     "numerically unstable (result=%d)",
+                                     result);
         }
 
         for (int i = 0; i < nr; ++i)
         {
-            int j = ws_._x_c[i];
+            int j = ws_.x_c[i];
             if (j < nc)
             {
                 rowsol[i] = j;
@@ -260,22 +261,12 @@ namespace SushiTrack
         }
         for (int j = 0; j < nc; ++j)
         {
-            int i = ws_._y_c[j];
+            int i = ws_.y_c[j];
             if (i < nr)
             {
                 colsol[j] = i;
             }
         }
-
-        double opt = 0.0;
-        for (int i = 0; i < nr; ++i)
-        {
-            if (rowsol[i] != -1)
-            {
-                opt += static_cast<double>(cost(i, rowsol[i]));
-            }
-        }
-        return opt;
     }
 
 } // namespace SushiTrack

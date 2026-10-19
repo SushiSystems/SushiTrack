@@ -25,26 +25,27 @@
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-#include <SushiTrack/filtering/kalman_filter.hpp>
-#include <SushiTrack/filtering/nsa_kalman_filter.hpp>
-#include <SushiTrack/filtering/kalman_types.hpp>
-#include <SushiTrack/filtering/kalman_filter_registry.hpp>
-#include <SushiTrack/logging/logger.hpp>
-
-#include <Eigen/Dense>
 #include <cmath>
 #include <string>
 
+#include <Eigen/Dense>
+#include <gtest/gtest.h>
+
+#include <SushiTrack/filtering/kalman_filter.hpp>
+#include <SushiTrack/filtering/kalman_filter_registry.hpp>
+#include <SushiTrack/filtering/kalman_types.hpp>
+#include <SushiTrack/filtering/nsa_kalman_filter.hpp>
+#include <SushiTrack/logging/logger.hpp>
+
 using namespace SushiTrack;
 using StateMean = KalmanTypes::StateMean;
-using StateCov  = KalmanTypes::StateCov;
+using StateCov = KalmanTypes::StateCov;
 using DetectBox = KalmanTypes::DetectBox;
 
 // Helpers
 
 /** @brief Constructs a [x, y, w, h] detection box. */
-static DetectBox makeBox(float x, float y, float w, float h)
+static DetectBox make_box(float x, float y, float w, float h)
 {
     DetectBox b;
     b << x, y, w, h;
@@ -60,16 +61,16 @@ static DetectBox makeBox(float x, float y, float w, float h)
 TEST(KalmanFilterTest, InitiateMeanMatchesMeasurement)
 {
     KalmanFilter kf;
-    StateMean    mean;
-    StateCov     cov;
-    DetectBox    box = makeBox(100.f, 200.f, 50.f, 80.f);
+    StateMean mean;
+    StateCov cov;
+    DetectBox box = make_box(100.f, 200.f, 50.f, 80.f);
 
     kf.initiate(mean, cov, box);
 
     EXPECT_FLOAT_EQ(mean(0), 100.f);
     EXPECT_FLOAT_EQ(mean(1), 200.f);
-    EXPECT_FLOAT_EQ(mean(2),  50.f);
-    EXPECT_FLOAT_EQ(mean(3),  80.f);
+    EXPECT_FLOAT_EQ(mean(2), 50.f);
+    EXPECT_FLOAT_EQ(mean(3), 80.f);
     // Velocity block must be zero.
     for (int i = 4; i < 8; ++i)
         EXPECT_FLOAT_EQ(mean(i), 0.f) << "velocity component " << i << " is non-zero";
@@ -82,9 +83,9 @@ TEST(KalmanFilterTest, InitiateMeanMatchesMeasurement)
 TEST(KalmanFilterTest, InitiateCovarianceIsDiagonalAndPositive)
 {
     KalmanFilter kf;
-    StateMean    mean;
-    StateCov     cov;
-    kf.initiate(mean, cov, makeBox(100.f, 200.f, 50.f, 80.f));
+    StateMean mean;
+    StateCov cov;
+    kf.initiate(mean, cov, make_box(100.f, 200.f, 50.f, 80.f));
 
     for (int r = 0; r < 8; ++r)
     {
@@ -109,13 +110,13 @@ TEST(KalmanFilterTest, InitiateCovarianceIsDiagonalAndPositive)
 TEST(KalmanFilterTest, PredictPositionShiftsByVelocityTimesDt)
 {
     KalmanFilter kf;
-    StateMean    mean;
-    StateCov     cov;
-    kf.initiate(mean, cov, makeBox(100.f, 200.f, 50.f, 80.f));
+    StateMean mean;
+    StateCov cov;
+    kf.initiate(mean, cov, make_box(100.f, 200.f, 50.f, 80.f));
 
     // Manually inject a velocity into the state.
-    mean(4) = 5.f;   // vx
-    mean(5) = 3.f;   // vy
+    mean(4) = 5.f; // vx
+    mean(5) = 3.f; // vy
 
     const float dt = 1.0f;
     const float x0 = mean(0), y0 = mean(1);
@@ -133,9 +134,9 @@ TEST(KalmanFilterTest, PredictPositionShiftsByVelocityTimesDt)
 TEST(KalmanFilterTest, PredictIncreasesCovariance)
 {
     KalmanFilter kf;
-    StateMean    mean;
-    StateCov     cov;
-    kf.initiate(mean, cov, makeBox(100.f, 200.f, 50.f, 80.f));
+    StateMean mean;
+    StateCov cov;
+    kf.initiate(mean, cov, make_box(100.f, 200.f, 50.f, 80.f));
 
     StateCov cov_before = cov;
     kf.predict(mean, cov, 1.0f);
@@ -154,9 +155,9 @@ TEST(KalmanFilterTest, PredictIncreasesCovariance)
 TEST(KalmanFilterTest, UpdateMeanMovesTowardMeasurement)
 {
     KalmanFilter kf;
-    StateMean    mean;
-    StateCov     cov;
-    DetectBox    box = makeBox(100.f, 200.f, 50.f, 80.f);
+    StateMean mean;
+    StateCov cov;
+    DetectBox box = make_box(100.f, 200.f, 50.f, 80.f);
     kf.initiate(mean, cov, box);
     kf.predict(mean, cov, 1.0f);
 
@@ -165,8 +166,8 @@ TEST(KalmanFilterTest, UpdateMeanMovesTowardMeasurement)
 
     EXPECT_NEAR(mean(0), 100.f, 5.f);
     EXPECT_NEAR(mean(1), 200.f, 5.f);
-    EXPECT_NEAR(mean(2),  50.f, 10.f);
-    EXPECT_NEAR(mean(3),  80.f, 10.f);
+    EXPECT_NEAR(mean(2), 50.f, 10.f);
+    EXPECT_NEAR(mean(3), 80.f, 10.f);
 }
 
 /**
@@ -176,9 +177,9 @@ TEST(KalmanFilterTest, UpdateMeanMovesTowardMeasurement)
 TEST(KalmanFilterTest, UpdateDecreasesCovariance)
 {
     KalmanFilter kf;
-    StateMean    mean;
-    StateCov     cov;
-    DetectBox    box = makeBox(100.f, 200.f, 50.f, 80.f);
+    StateMean mean;
+    StateCov cov;
+    DetectBox box = make_box(100.f, 200.f, 50.f, 80.f);
     kf.initiate(mean, cov, box);
     kf.predict(mean, cov, 1.0f);
 
@@ -199,19 +200,17 @@ TEST(KalmanFilterTest, UpdateDecreasesCovariance)
 TEST(KalmanFilterTest, IsInGate_ObservationAtMeanPasses)
 {
     KalmanFilter kf;
-    StateMean    mean;
-    StateCov     cov;
-    DetectBox    box = makeBox(100.f, 200.f, 50.f, 80.f);
+    StateMean mean;
+    StateCov cov;
+    DetectBox box = make_box(100.f, 200.f, 50.f, 80.f);
     kf.initiate(mean, cov, box);
 
     // Observation exactly at the current state mean (in measurement space).
     DetectBox obs;
-    obs << mean(0) + mean(2) * 0.f,   // x   (centre for XYWH = x + w/2, but state is XYWH directly)
-           mean(1),
-           mean(2),
-           mean(3);
+    obs << mean(0) + mean(2) * 0.f, // x   (centre for XYWH = x + w/2, but state is XYWH directly)
+        mean(1), mean(2), mean(3);
     // Actually for XYWH mode the measurement is [cx, cy, w, h] but the filter uses update_mat_ = identity (4x8 top rows), so measurement space = [x,y,w,h]. Use the box we initiated with for a zero-residual gate check.
-    EXPECT_TRUE(kf.isInGate(mean, cov, box, 9.4877f));
+    EXPECT_TRUE(kf.is_in_gate(mean, cov, box, 9.4877f));
 }
 
 /**
@@ -220,37 +219,37 @@ TEST(KalmanFilterTest, IsInGate_ObservationAtMeanPasses)
 TEST(KalmanFilterTest, IsInGate_FarObservationFails)
 {
     KalmanFilter kf;
-    StateMean    mean;
-    StateCov     cov;
-    kf.initiate(mean, cov, makeBox(100.f, 200.f, 50.f, 80.f));
+    StateMean mean;
+    StateCov cov;
+    kf.initiate(mean, cov, make_box(100.f, 200.f, 50.f, 80.f));
 
-    DetectBox far_obs = makeBox(5000.f, 5000.f, 50.f, 80.f);
-    EXPECT_FALSE(kf.isInGate(mean, cov, far_obs, 9.4877f));
+    DetectBox far_obs = make_box(5000.f, 5000.f, 50.f, 80.f);
+    EXPECT_FALSE(kf.is_in_gate(mean, cov, far_obs, 9.4877f));
 }
 
 /**
- * @brief getGateFlags() batch result matches individual isInGate() calls.
+ * @brief get_gate_flags() batch result matches individual is_in_gate() calls.
  */
 TEST(KalmanFilterTest, GetGateFlagsMatchesScalarIsInGate)
 {
     KalmanFilter kf;
-    StateMean    mean;
-    StateCov     cov;
-    kf.initiate(mean, cov, makeBox(100.f, 200.f, 50.f, 80.f));
+    StateMean mean;
+    StateCov cov;
+    kf.initiate(mean, cov, make_box(100.f, 200.f, 50.f, 80.f));
 
     KalmanTypes::DetectBoxVector obs_vec;
-    obs_vec.push_back(makeBox(100.f, 200.f,  50.f,  80.f));  // near
-    obs_vec.push_back(makeBox(5000.f, 5000.f, 50.f, 80.f));  // far
+    obs_vec.push_back(make_box(100.f, 200.f, 50.f, 80.f));   // near
+    obs_vec.push_back(make_box(5000.f, 5000.f, 50.f, 80.f)); // far
 
-    auto flags = kf.getGateFlags(mean, cov, obs_vec, 9.4877f);
+    auto flags = kf.get_gate_flags(mean, cov, obs_vec, 9.4877f);
     ASSERT_EQ(flags.size(), obs_vec.size());
 
     for (size_t i = 0; i < obs_vec.size(); ++i)
-        EXPECT_EQ(flags[i], kf.isInGate(mean, cov, obs_vec[i], 9.4877f))
+        EXPECT_EQ(flags[i], kf.is_in_gate(mean, cov, obs_vec[i], 9.4877f))
             << "mismatch at index " << i;
 }
 
-// setNoiseMultipliers
+// set_noise_multipliers
 
 /**
  * @brief With noise multipliers > 1, predict produces larger covariance
@@ -259,14 +258,14 @@ TEST(KalmanFilterTest, GetGateFlagsMatchesScalarIsInGate)
 TEST(KalmanFilterTest, ElevatedMultipliersIncreaseProcessNoise)
 {
     KalmanFilter kf_base, kf_elevated;
-    StateMean    mean_base, mean_elev;
-    StateCov     cov_base, cov_elev;
-    DetectBox    box = makeBox(100.f, 200.f, 50.f, 80.f);
+    StateMean mean_base, mean_elev;
+    StateCov cov_base, cov_elev;
+    DetectBox box = make_box(100.f, 200.f, 50.f, 80.f);
 
     kf_base.initiate(mean_base, cov_base, box);
     kf_elevated.initiate(mean_elev, cov_elev, box);
 
-    kf_elevated.setNoiseMultipliers(2.0f, 2.0f, 2.0f);
+    kf_elevated.set_noise_multipliers(2.0f, 2.0f, 2.0f);
 
     kf_base.predict(mean_base, cov_base, 1.0f);
     kf_elevated.predict(mean_elev, cov_elev, 1.0f);
@@ -284,8 +283,8 @@ TEST(KalmanFilterTest, ElevatedMultipliersIncreaseProcessNoise)
 TEST(KalmanFilterTest, XYAHModeInitiateMeanMatchesMeasurement)
 {
     KalmanFilter kf(/*enable_xyah=*/true);
-    StateMean    mean;
-    StateCov     cov;
+    StateMean mean;
+    StateCov cov;
 
     // [cx, cy, aspect, height]
     DetectBox box;
@@ -304,15 +303,13 @@ TEST(KalmanFilterTest, XYAHModeInitiateMeanMatchesMeasurement)
 
 class NSAKalmanFilterTest : public ::testing::Test
 {
-protected:
-    NSAKalmanFilter kf;
-    StateMean mean;
-    StateCov cov;
-    DetectBox default_box;
+    protected:
+        NSAKalmanFilter kf_;
+        StateMean mean_;
+        StateCov cov_;
+        DetectBox default_box_;
 
-    void SetUp() override {
-        default_box = makeBox(100.f, 200.f, 50.f, 80.f);
-    }
+        void SetUp() override { default_box_ = make_box(100.f, 200.f, 50.f, 80.f); }
 };
 
 /**
@@ -320,10 +317,10 @@ protected:
  */
 TEST_F(NSAKalmanFilterTest, InitiateProducesValidCovariance)
 {
-    kf.initiate(mean, cov, default_box, 0.8f);
+    kf_.initiate(mean_, cov_, default_box_, 0.8f);
 
     for (int i = 0; i < 8; ++i)
-        EXPECT_GT(cov(i, i), 0.f) << "NSA diagonal entry " << i << " not positive";
+        EXPECT_GT(cov_(i, i), 0.f) << "NSA diagonal entry " << i << " not positive";
 }
 
 /**
@@ -331,20 +328,20 @@ TEST_F(NSAKalmanFilterTest, InitiateProducesValidCovariance)
  */
 TEST_F(NSAKalmanFilterTest, PredictUpdateCycleIsNumericallyStable)
 {
-    kf.initiate(mean, cov, default_box, 0.8f);
+    kf_.initiate(mean_, cov_, default_box_, 0.8f);
 
     for (int step = 0; step < 20; ++step)
     {
-        kf.predict(mean, cov, 1.0f);
-        kf.update(mean, cov, default_box, 0.8f);
+        kf_.predict(mean_, cov_, 1.0f);
+        kf_.update(mean_, cov_, default_box_, 0.8f);
     }
 
     for (int i = 0; i < 8; ++i)
     {
-        EXPECT_FALSE(std::isnan(mean(i)))   << "NaN in mean at " << i;
-        EXPECT_FALSE(std::isinf(mean(i)))   << "Inf in mean at " << i;
-        EXPECT_FALSE(std::isnan(cov(i, i))) << "NaN in cov diagonal at " << i;
-        EXPECT_GT(cov(i, i), 0.f)          << "non-positive covariance at " << i;
+        EXPECT_FALSE(std::isnan(mean_(i))) << "NaN in mean_ at " << i;
+        EXPECT_FALSE(std::isinf(mean_(i))) << "Inf in mean_ at " << i;
+        EXPECT_FALSE(std::isnan(cov_(i, i))) << "NaN in cov_ diagonal at " << i;
+        EXPECT_GT(cov_(i, i), 0.f) << "non-positive covariance at " << i;
     }
 }
 
@@ -356,16 +353,18 @@ TEST_F(NSAKalmanFilterTest, InitiateCovarianceScalesWithScore)
     StateMean mean_high, mean_low;
     StateCov cov_high, cov_low;
 
-    kf.initiate(mean_high, cov_high, default_box, 0.9f); // High confidence
-    kf.initiate(mean_low, cov_low, default_box, 0.1f);   // Low confidence
+    kf_.initiate(mean_high, cov_high, default_box_, 0.9f); // High confidence
+    kf_.initiate(mean_low, cov_low, default_box_, 0.1f);   // Low confidence
 
-    for (int i = 0; i < 4; ++i) {
-        EXPECT_GT(cov_low(i, i), cov_high(i, i)) 
+    for (int i = 0; i < 4; ++i)
+    {
+        EXPECT_GT(cov_low(i, i), cov_high(i, i))
             << "Position/size covariance index " << i << " did not scale appropriately with score.";
     }
-    
-    for (int i = 4; i < 8; ++i) {
-        EXPECT_FLOAT_EQ(cov_low(i, i), cov_high(i, i)) 
+
+    for (int i = 4; i < 8; ++i)
+    {
+        EXPECT_FLOAT_EQ(cov_low(i, i), cov_high(i, i))
             << "Velocity covariance index " << i << " should not be scaled by score.";
     }
 }
@@ -380,39 +379,39 @@ TEST_F(NSAKalmanFilterTest, UpdateWeightsMeasurementByScore)
     StateMean mean_high, mean_low;
     StateCov cov_high, cov_low;
 
-    kf.initiate(mean_high, cov_high, default_box, 0.5f);
-    kf.initiate(mean_low, cov_low, default_box, 0.5f);
+    kf_.initiate(mean_high, cov_high, default_box_, 0.5f);
+    kf_.initiate(mean_low, cov_low, default_box_, 0.5f);
 
-    kf.predict(mean_high, cov_high, 1.0f);
-    kf.predict(mean_low, cov_low, 1.0f);
+    kf_.predict(mean_high, cov_high, 1.0f);
+    kf_.predict(mean_low, cov_low, 1.0f);
 
-    DetectBox new_meas = makeBox(110.f, 210.f, 50.f, 80.f);
-    
-    kf.update(mean_high, cov_high, new_meas, 0.9f); // High confidence
-    kf.update(mean_low, cov_low, new_meas, 0.1f);   // Low confidence
+    DetectBox new_meas = make_box(110.f, 210.f, 50.f, 80.f);
+
+    kf_.update(mean_high, cov_high, new_meas, 0.9f); // High confidence
+    kf_.update(mean_low, cov_low, new_meas, 0.1f);   // Low confidence
 
     float dist_high = (mean_high.block<1, 4>(0, 0) - new_meas).norm();
     float dist_low = (mean_low.block<1, 4>(0, 0) - new_meas).norm();
 
-    EXPECT_LT(dist_high, dist_low) 
-        << "High score update should pull mean closer to measurement than low score update.";
+    EXPECT_LT(dist_high, dist_low)
+        << "High score update should pull mean_ closer to measurement than low score update.";
 }
 
 /**
- * @brief Mahalanobis distance effectively shrinks for lower scores due to higher 
+ * @brief Mahalanobis distance effectively shrinks for lower scores due to higher
  * expected measurement noise, making association more permissive.
  */
 TEST_F(NSAKalmanFilterTest, MahalanobisDistanceScalesWithScore)
 {
-    kf.initiate(mean, cov, default_box, 0.5f);
-    kf.predict(mean, cov, 1.0f);
+    kf_.initiate(mean_, cov_, default_box_, 0.5f);
+    kf_.predict(mean_, cov_, 1.0f);
 
-    DetectBox meas = makeBox(150.f, 250.f, 50.f, 80.f);
+    DetectBox meas = make_box(150.f, 250.f, 50.f, 80.f);
 
-    float dist_high = kf.mahalanobisDistance(mean, cov, meas, 0.9f);
-    float dist_low = kf.mahalanobisDistance(mean, cov, meas, 0.1f);
+    float dist_high = kf_.mahalanobis_distance(mean_, cov_, meas, 0.9f);
+    float dist_low = kf_.mahalanobis_distance(mean_, cov_, meas, 0.1f);
 
-    EXPECT_GT(dist_high, dist_low) 
+    EXPECT_GT(dist_high, dist_low)
         << "Lower score should reduce Mahalanobis distance by inflating measurement noise.";
 }
 
@@ -421,21 +420,19 @@ TEST_F(NSAKalmanFilterTest, MahalanobisDistanceScalesWithScore)
  */
 TEST_F(NSAKalmanFilterTest, BatchGatingWithScores)
 {
-    kf.initiate(mean, cov, default_box, 0.5f);
-    kf.predict(mean, cov, 1.0f);
+    kf_.initiate(mean_, cov_, default_box_, 0.5f);
+    kf_.predict(mean_, cov_, 1.0f);
 
-    KalmanTypes::DetectBoxVector meas_vec = {
-        makeBox(120.f, 220.f, 50.f, 80.f),
-        makeBox(120.f, 220.f, 50.f, 80.f)
-    };
+    KalmanTypes::DetectBoxVector meas_vec = {make_box(120.f, 220.f, 50.f, 80.f),
+                                             make_box(120.f, 220.f, 50.f, 80.f)};
     std::vector<float> scores = {0.9f, 0.1f};
-    
-    auto dists = kf.getGateSqDistances(mean, cov, meas_vec, scores);
+
+    auto dists = kf_.get_gate_sq_distances(mean_, cov_, meas_vec, scores);
     EXPECT_GT(dists[0], dists[1]) << "Low score should result in lower squared distance.";
-    
+
     float tight_thresh = (dists[0] + dists[1]) / 2.0f; // Threshold between the two distances
-    auto flags = kf.getGateFlags(mean, cov, meas_vec, tight_thresh, scores);
-    
+    auto flags = kf_.get_gate_flags(mean_, cov_, meas_vec, tight_thresh, scores);
+
     EXPECT_FALSE(flags[0]) << "High score measurement should fail tight gate.";
     EXPECT_TRUE(flags[1]) << "Low score measurement should pass tight gate due to inflated noise.";
 }
@@ -448,10 +445,11 @@ TEST_F(NSAKalmanFilterTest, NegativeScoreHandledGracefully)
     StateMean mean_neg, mean_zero;
     StateCov cov_neg, cov_zero;
 
-    kf.initiate(mean_neg, cov_neg, default_box, -0.5f);
-    kf.initiate(mean_zero, cov_zero, default_box, 0.0f);
+    kf_.initiate(mean_neg, cov_neg, default_box_, -0.5f);
+    kf_.initiate(mean_zero, cov_zero, default_box_, 0.0f);
 
-    for (int i = 0; i < 8; ++i) {
+    for (int i = 0; i < 8; ++i)
+    {
         EXPECT_FLOAT_EQ(cov_neg(i, i), cov_zero(i, i))
             << "Negative score should be handled identically to zero/missing score.";
     }
@@ -465,18 +463,19 @@ TEST(NSAKalmanFilterXYAHTest, XYAHModeSupport)
     NSAKalmanFilter kf_xyah(true);
     StateMean mean;
     StateCov cov;
-    
+
     DetectBox box;
     box << 150.f, 300.f, 0.6f, 120.f; // cx, cy, aspect, height
-    
+
     kf_xyah.initiate(mean, cov, box, 0.8f);
-    
+
     EXPECT_FLOAT_EQ(mean(0), 150.f);
     EXPECT_FLOAT_EQ(mean(1), 300.f);
     EXPECT_NEAR(mean(2), 0.6f, 1e-3f);
     EXPECT_FLOAT_EQ(mean(3), 120.f);
-    
-    for (int i = 0; i < 8; ++i) {
+
+    for (int i = 0; i < 8; ++i)
+    {
         EXPECT_GT(cov(i, i), 0.f);
     }
 }
@@ -487,9 +486,9 @@ TEST(NSAKalmanFilterXYAHTest, XYAHModeSupport)
  */
 TEST(KalmanFilterTest, PredictWithDtGreaterThanOne)
 {
-    KalmanFilter           kf(false); // standard xywh
+    KalmanFilter kf(false); // standard xywh
     KalmanTypes::StateMean mean;
-    KalmanTypes::StateCov  cov;
+    KalmanTypes::StateCov cov;
     KalmanTypes::DetectBox initial_box;
     initial_box << 100.0f, 100.0f, 50.0f, 200.0f;
 
@@ -505,14 +504,14 @@ TEST(KalmanFilterTest, PredictWithDtGreaterThanOne)
 }
 
 /**
- * @brief Evaluates numerical stability in XYAH coordinate format during a 
+ * @brief Evaluates numerical stability in XYAH coordinate format during a
  *        predict-update cycle with constant measurements.
  */
 TEST(KalmanFilterTest, XyahPredictUpdateStability)
 {
-    KalmanFilter           kf(true); // enable_xyah = true
+    KalmanFilter kf(true); // enable_xyah = true
     KalmanTypes::StateMean mean;
-    KalmanTypes::StateCov  cov;
+    KalmanTypes::StateCov cov;
     KalmanTypes::DetectBox box;
     box << 50.0f, 50.0f, 0.5f, 100.0f; // x, y, a, h
 
@@ -524,24 +523,24 @@ TEST(KalmanFilterTest, XyahPredictUpdateStability)
 }
 
 /**
- * @brief Validates that NSAKalmanFilter does not produce negative covariance 
+ * @brief Validates that NSAKalmanFilter does not produce negative covariance
  *        diagonal entries when updated with a detection score of zero.
  */
-TEST_F(NSAKalmanFilterTest, ScoreZeroDoesNotProduceNegativeCovariance) 
+TEST_F(NSAKalmanFilterTest, ScoreZeroDoesNotProduceNegativeCovariance)
 {
-    NSAKalmanFilter        nsa_kf(false);
-    KalmanTypes::StateMean mean;
-    KalmanTypes::StateCov  cov;
+    NSAKalmanFilter nsa_kf(false);
+    KalmanTypes::StateMean mean_;
+    KalmanTypes::StateCov cov_;
     KalmanTypes::DetectBox box;
     box << 10.0f, 10.0f, 20.0f, 20.0f;
 
-    nsa_kf.initiate(mean, cov, box, 1.0f);
-    nsa_kf.predict(mean, cov, 1.0f);
+    nsa_kf.initiate(mean_, cov_, box, 1.0f);
+    nsa_kf.predict(mean_, cov_, 1.0f);
 
-    nsa_kf.update(mean, cov, box, 0.0f); 
+    nsa_kf.update(mean_, cov_, box, 0.0f);
 
-    for(int i = 0; i < 8; ++i)
-        EXPECT_GE(cov(i, i), 0.0f);
+    for (int i = 0; i < 8; ++i)
+        EXPECT_GE(cov_(i, i), 0.0f);
 }
 
 /**
@@ -549,9 +548,9 @@ TEST_F(NSAKalmanFilterTest, ScoreZeroDoesNotProduceNegativeCovariance)
  */
 TEST(KalmanFilterTest, CovarianceRemainsSymmetricAfterUpdate)
 {
-    KalmanFilter           kf(false);
+    KalmanFilter kf(false);
     KalmanTypes::StateMean mean;
-    KalmanTypes::StateCov  cov;
+    KalmanTypes::StateCov cov;
     KalmanTypes::DetectBox box;
     box << 30.0f, 30.0f, 15.0f, 40.0f;
 
@@ -568,20 +567,20 @@ TEST(KalmanFilterTest, CovarianceRemainsSymmetricAfterUpdate)
 namespace
 {
 
-static std::string g_registry_error;
+    static std::string g_registry_error;
 
-/**
- * @brief Keeps the last ERROR line the logger forwards.
- * @param level   Severity level forwarded from the logger.
- * @param message Formatted message forwarded from the logger.
- */
-void recordRegistryError(sushitrack_log_level_t level, const char* message)
-{
-    if (level == SUSHITRACK_LOG_ERROR)
-        g_registry_error = message ? message : "";
-}
+    /**
+     * @brief Keeps the last ERROR line the logger forwards.
+     * @param level   Severity level forwarded from the logger.
+     * @param message Formatted message forwarded from the logger.
+     */
+    void record_registry_error(sushitrack_log_level_t level, const char* message)
+    {
+        if (level == SUSHITRACK_LOG_ERROR)
+            g_registry_error = message ? message : "";
+    }
 
-}
+} // namespace
 
 /**
  * @brief An unregistered type yields no filter and one ERROR line naming the type.
@@ -589,11 +588,11 @@ void recordRegistryError(sushitrack_log_level_t level, const char* message)
 TEST(KalmanFilterRegistryTest, UnregisteredTypeLogsTheTypeAndReturnsNull)
 {
     g_registry_error.clear();
-    Logger::setCallback(recordRegistryError);
+    Logger::set_callback(record_registry_error);
 
-    auto filter = KalmanFilterRegistry::getInstance().create(987654, false);
+    auto filter = KalmanFilterRegistry::get_instance().create(987654, false);
 
-    Logger::setCallback(nullptr);
+    Logger::set_callback(nullptr);
 
     EXPECT_EQ(filter, nullptr);
     EXPECT_NE(g_registry_error.find("Unregistered Kalman type requested: 987654"),

@@ -45,17 +45,19 @@ namespace SushiTrack
                                        CostMatrix& __restrict out_matrix)
     {
         inner_->calculate(a, b, out_matrix);
-        if (a.empty() || b.empty()) return;
+        if (a.empty() || b.empty())
+            return;
 
-        constexpr float kSentinel = 1e3f;
+        constexpr float K_SENTINEL = 1e3f;
 
         for (size_t j = 0; j < b.size(); ++j)
         {
-            const float score = std::clamp(b[j]->getScore(), 0.0f, 1.0f);
+            const float score = std::clamp(b[j]->get_score(), 0.0f, 1.0f);
             for (size_t i = 0; i < a.size(); ++i)
             {
                 float c = out_matrix(i, j);
-                if (c >= kSentinel) continue;
+                if (c >= K_SENTINEL)
+                    continue;
                 out_matrix(i, j) = 1.0f - (1.0f - c) * score;
             }
         }
@@ -70,8 +72,9 @@ namespace SushiTrack
     float FuseScoreDecorator::calculate_single(const TrackletPtr& a, const TrackletPtr& b) const
     {
         float c = inner_->calculate_single(a, b);
-        if (c >= 1e3f) return c;
-        const float score = std::clamp(b->getScore(), 0.0f, 1.0f);
+        if (c >= 1e3f)
+            return c;
+        const float score = std::clamp(b->get_score(), 0.0f, 1.0f);
         return 1.0f - (1.0f - c) * score;
     }
 } // namespace SushiTrack

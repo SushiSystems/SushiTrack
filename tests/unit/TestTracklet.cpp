@@ -25,23 +25,23 @@
  * @author Mustafa Garip
  */
 
+#include <cmath>
+#include <memory>
+#include <vector>
+
 #include <gtest/gtest.h>
 
-#include <SushiTrack/tracking/tracklet.hpp>
 #include <SushiTrack/filtering/kalman_filter.hpp>
 #include <SushiTrack/filtering/kalman_types.hpp>
 #include <SushiTrack/tracking/tracker_config.hpp>
-
-#include <memory>
-#include <vector>
-#include <cmath>
+#include <SushiTrack/tracking/tracklet.hpp>
 
 using namespace SushiTrack;
 
 // Helpers
 
-/** @brief Creates a real KalmanFilter-backed IStatePredictor. */
-static std::unique_ptr<IStatePredictor> makeKF()
+/** @brief Creates a real KalmanFilter-backed StatePredictor. */
+static std::unique_ptr<StatePredictor> make_kf()
 {
     return std::make_unique<KalmanFilter>();
 }
@@ -53,16 +53,10 @@ static std::unique_ptr<IStatePredictor> makeKF()
  * @param y      Top-left y.
  * @param w      Width.
  */
-static std::unique_ptr<Tracklet> makeTracklet(
-    float x = 100.f, float y = 200.f,
-    float w = 50.f,  float h = 80.f,
-    int label = 1,   float score = 0.9f)
+static std::unique_ptr<Tracklet> make_tracklet(float x = 100.f, float y = 200.f, float w = 50.f,
+                                               float h = 80.f, int label = 1, float score = 0.9f)
 {
-    return std::make_unique<Tracklet>(
-        makeKF(),
-        Rect<float>(x, y, w, h),
-        label, score
-    );
+    return std::make_unique<Tracklet>(make_kf(), Rect<float>(x, y, w, h), label, score);
 }
 
 // Construction
@@ -73,140 +67,140 @@ static std::unique_ptr<Tracklet> makeTracklet(
  */
 TEST(TrackletTest, ConstructionStateIsNew)
 {
-    auto t = makeTracklet();
-    EXPECT_EQ(t->getTrackState(), TrackState::New);
-    EXPECT_FALSE(t->isActivated());
-    EXPECT_FALSE(t->isConfirmed());
+    auto t = make_tracklet();
+    EXPECT_EQ(t->get_track_state(), TrackState::New);
+    EXPECT_FALSE(t->is_activated());
+    EXPECT_FALSE(t->is_confirmed());
 }
 
 // activate()
 
 /**
- * @brief activate() at frame_id=1 sets Tracked, isActivated=true, isConfirmed=true.
+ * @brief activate() at frame_id=1 sets Tracked, is_activated=true, is_confirmed=true.
  */
 TEST(TrackletTest, ActivateOnFrameOne)
 {
-    auto t = makeTracklet();
-    t->activate(makeKF(), /*frame_id=*/1, /*track_id=*/42);
+    auto t = make_tracklet();
+    t->activate(make_kf(), /*frame_id=*/1, /*track_id=*/42);
 
-    EXPECT_EQ(t->getTrackState(), TrackState::Tracked);
-    EXPECT_TRUE(t->isActivated());
-    EXPECT_TRUE(t->isConfirmed());
-    EXPECT_EQ(t->getTrackId(), static_cast<size_t>(42));
-    EXPECT_EQ(t->getFrameId(), static_cast<size_t>(1));
+    EXPECT_EQ(t->get_track_state(), TrackState::Tracked);
+    EXPECT_TRUE(t->is_activated());
+    EXPECT_TRUE(t->is_confirmed());
+    EXPECT_EQ(t->get_track_id(), static_cast<size_t>(42));
+    EXPECT_EQ(t->get_frame_id(), static_cast<size_t>(1));
 }
 
 /**
- * @brief activate() at frame_id=5 sets Tracked but isActivated=false
+ * @brief activate() at frame_id=5 sets Tracked but is_activated=false
  *        (implicit one-frame validation for non-first-frame tracks).
  */
 TEST(TrackletTest, ActivateOnLaterFrameIsNotActivated)
 {
-    auto t = makeTracklet();
-    t->activate(makeKF(), /*frame_id=*/5, /*track_id=*/7);
+    auto t = make_tracklet();
+    t->activate(make_kf(), /*frame_id=*/5, /*track_id=*/7);
 
-    EXPECT_EQ(t->getTrackState(), TrackState::Tracked);
-    EXPECT_FALSE(t->isActivated());
+    EXPECT_EQ(t->get_track_state(), TrackState::Tracked);
+    EXPECT_FALSE(t->is_activated());
 }
 
-// activateTentative()
+// activate_tentative()
 
 /**
- * @brief activateTentative() sets state to Tentative with isActivated=false
- *        and isConfirmed=false.
+ * @brief activate_tentative() sets state to Tentative with is_activated=false
+ *        and is_confirmed=false.
  */
 TEST(TrackletTest, ActivateTentativeState)
 {
-    auto t = makeTracklet();
-    t->activateTentative(makeKF(), /*frame_id=*/3, /*initial_id=*/0);
+    auto t = make_tracklet();
+    t->activate_tentative(make_kf(), /*frame_id=*/3, /*initial_id=*/0);
 
-    EXPECT_EQ(t->getTrackState(), TrackState::Tentative);
-    EXPECT_FALSE(t->isActivated());
-    EXPECT_FALSE(t->isConfirmed());
+    EXPECT_EQ(t->get_track_state(), TrackState::Tentative);
+    EXPECT_FALSE(t->is_activated());
+    EXPECT_FALSE(t->is_confirmed());
 }
 
 // confirm()
 
 /**
- * @brief confirm() promotes a Tentative track to Tracked with isActivated=true
+ * @brief confirm() promotes a Tentative track to Tracked with is_activated=true
  *        and assigns the final track id.
  */
 TEST(TrackletTest, ConfirmPromotesTentative)
 {
-    auto t = makeTracklet();
-    t->activateTentative(makeKF(), 3, 0);
+    auto t = make_tracklet();
+    t->activate_tentative(make_kf(), 3, 0);
     t->confirm(/*frame_id=*/5, /*final_id=*/99);
 
-    EXPECT_EQ(t->getTrackState(), TrackState::Tracked);
-    EXPECT_TRUE(t->isActivated());
-    EXPECT_TRUE(t->isConfirmed());
-    EXPECT_EQ(t->getTrackId(), static_cast<size_t>(99));
+    EXPECT_EQ(t->get_track_state(), TrackState::Tracked);
+    EXPECT_TRUE(t->is_activated());
+    EXPECT_TRUE(t->is_confirmed());
+    EXPECT_EQ(t->get_track_id(), static_cast<size_t>(99));
 }
 
-// markAsLost()
+// mark_as_lost()
 
 /**
- * @brief markAsLost() transitions the track to Lost and clears isActivated.
+ * @brief mark_as_lost() transitions the track to Lost and clears is_activated.
  */
 TEST(TrackletTest, MarkAsLostSetsLostState)
 {
-    auto t = makeTracklet();
-    t->activate(makeKF(), 1, 10);
-    ASSERT_TRUE(t->isActivated());
+    auto t = make_tracklet();
+    t->activate(make_kf(), 1, 10);
+    ASSERT_TRUE(t->is_activated());
 
-    t->markAsLost(0.04f);
+    t->mark_as_lost(0.04f);
 
-    EXPECT_EQ(t->getTrackState(), TrackState::Lost);
-    EXPECT_FALSE(t->isActivated());
+    EXPECT_EQ(t->get_track_state(), TrackState::Lost);
+    EXPECT_FALSE(t->is_activated());
 }
 
 /**
- * @brief markAsLost() initialises accumulated_lost_time with the dt argument.
+ * @brief mark_as_lost() initialises accumulated_lost_time with the dt argument.
  */
 TEST(TrackletTest, MarkAsLostInitialisesAccumulatedTime)
 {
-    auto t = makeTracklet();
-    t->activate(makeKF(), 1, 1);
-    t->markAsLost(0.04f);
+    auto t = make_tracklet();
+    t->activate(make_kf(), 1, 1);
+    t->mark_as_lost(0.04f);
 
-    EXPECT_FLOAT_EQ(t->getAccumulatedLostTime(), 0.04f);
+    EXPECT_FLOAT_EQ(t->get_accumulated_lost_time(), 0.04f);
 }
 
-// markAsRemoved()
+// mark_as_removed()
 
 /**
- * @brief markAsRemoved() transitions the track to Removed.
+ * @brief mark_as_removed() transitions the track to Removed.
  */
 TEST(TrackletTest, MarkAsRemovedSetsRemovedState)
 {
-    auto t = makeTracklet();
-    t->activate(makeKF(), 1, 1);
-    t->markAsRemoved();
+    auto t = make_tracklet();
+    t->activate(make_kf(), 1, 1);
+    t->mark_as_removed();
 
-    EXPECT_EQ(t->getTrackState(), TrackState::Removed);
-    EXPECT_FALSE(t->isActivated());
+    EXPECT_EQ(t->get_track_state(), TrackState::Removed);
+    EXPECT_FALSE(t->is_activated());
 }
 
-// reActivate()
+// re_activate()
 
 /**
- * @brief reActivate() recovers a Lost track back to Tracked with
- *        isActivated=true and resets accumulated_lost_time to 0.
+ * @brief re_activate() recovers a Lost track back to Tracked with
+ *        is_activated=true and resets accumulated_lost_time to 0.
  */
 TEST(TrackletTest, ReActivateRestoresTrackedState)
 {
-    auto t = makeTracklet();
-    t->activate(makeKF(), 1, 10);
-    t->markAsLost(0.04f);
-    ASSERT_EQ(t->getTrackState(), TrackState::Lost);
+    auto t = make_tracklet();
+    t->activate(make_kf(), 1, 10);
+    t->mark_as_lost(0.04f);
+    ASSERT_EQ(t->get_track_state(), TrackState::Lost);
 
-    auto obs = makeTracklet(105.f, 205.f);
-    t->reActivate(*obs, /*frame_id=*/8);
+    auto obs = make_tracklet(105.f, 205.f);
+    t->re_activate(*obs, /*frame_id=*/8);
 
-    EXPECT_EQ(t->getTrackState(), TrackState::Tracked);
-    EXPECT_TRUE(t->isActivated());
-    EXPECT_TRUE(t->isConfirmed());
-    EXPECT_FLOAT_EQ(t->getAccumulatedLostTime(), 0.f);
+    EXPECT_EQ(t->get_track_state(), TrackState::Tracked);
+    EXPECT_TRUE(t->is_activated());
+    EXPECT_TRUE(t->is_confirmed());
+    EXPECT_FLOAT_EQ(t->get_accumulated_lost_time(), 0.f);
 }
 
 // predict() — accumulated_lost_time
@@ -216,14 +210,14 @@ TEST(TrackletTest, ReActivateRestoresTrackedState)
  */
 TEST(TrackletTest, PredictIncrementsLostTimeForLostTrack)
 {
-    auto t = makeTracklet();
-    t->activate(makeKF(), 1, 1);
-    t->markAsLost(0.0f);
+    auto t = make_tracklet();
+    t->activate(make_kf(), 1, 1);
+    t->mark_as_lost(0.0f);
 
     const float dt = 0.04f;
     t->predict(dt);
 
-    EXPECT_NEAR(t->getAccumulatedLostTime(), dt, 1e-5f);
+    EXPECT_NEAR(t->get_accumulated_lost_time(), dt, 1e-5f);
 }
 
 /**
@@ -231,13 +225,13 @@ TEST(TrackletTest, PredictIncrementsLostTimeForLostTrack)
  */
 TEST(TrackletTest, PredictDoesNotIncrementLostTimeForTrackedTrack)
 {
-    auto t = makeTracklet();
-    t->activate(makeKF(), 1, 1);
-    ASSERT_EQ(t->getAccumulatedLostTime(), 0.f);
+    auto t = make_tracklet();
+    t->activate(make_kf(), 1, 1);
+    ASSERT_EQ(t->get_accumulated_lost_time(), 0.f);
 
     t->predict(0.04f);
 
-    EXPECT_FLOAT_EQ(t->getAccumulatedLostTime(), 0.f);
+    EXPECT_FLOAT_EQ(t->get_accumulated_lost_time(), 0.f);
 }
 
 // update() keep_state flag
@@ -247,15 +241,15 @@ TEST(TrackletTest, PredictDoesNotIncrementLostTimeForTrackedTrack)
  */
 TEST(TrackletTest, UpdateKeepStatePreservesTrackState)
 {
-    auto t = makeTracklet();
-    t->activateTentative(makeKF(), 3, 0);
-    ASSERT_EQ(t->getTrackState(), TrackState::Tentative);
+    auto t = make_tracklet();
+    t->activate_tentative(make_kf(), 3, 0);
+    ASSERT_EQ(t->get_track_state(), TrackState::Tentative);
 
-    auto obs = makeTracklet(102.f, 202.f);
+    auto obs = make_tracklet(102.f, 202.f);
     t->update(*obs, /*frame_id=*/4, /*update_features=*/false, /*keep_state=*/true);
 
-    EXPECT_EQ(t->getTrackState(), TrackState::Tentative);
-    EXPECT_FALSE(t->isActivated());
+    EXPECT_EQ(t->get_track_state(), TrackState::Tentative);
+    EXPECT_FALSE(t->is_activated());
 }
 
 /**
@@ -263,52 +257,53 @@ TEST(TrackletTest, UpdateKeepStatePreservesTrackState)
  */
 TEST(TrackletTest, UpdateNoKeepStatePromotesToTracked)
 {
-    auto t = makeTracklet();
-    t->activate(makeKF(), 3, 5);
+    auto t = make_tracklet();
+    t->activate(make_kf(), 3, 5);
 
-    auto obs = makeTracklet(102.f, 202.f);
+    auto obs = make_tracklet(102.f, 202.f);
     t->update(*obs, /*frame_id=*/4, /*update_features=*/false, /*keep_state=*/false);
 
-    EXPECT_EQ(t->getTrackState(), TrackState::Tracked);
-    EXPECT_TRUE(t->isActivated());
+    EXPECT_EQ(t->get_track_state(), TrackState::Tracked);
+    EXPECT_TRUE(t->is_activated());
 }
 
 // ReID — feature normalisation and similarity
 
 /**
- * @brief updateFeatures() L2-normalises the stored feature vector.
+ * @brief update_features() L2-normalises the stored feature vector.
  */
 TEST(TrackletTest, UpdateFeaturesNormalisesVector)
 {
-    auto t = makeTracklet();
-    std::vector<float> feat = {3.f, 4.f};  // L2 norm = 5
-    t->updateFeatures(feat);
+    auto t = make_tracklet();
+    std::vector<float> feat = {3.f, 4.f}; // L2 norm = 5
+    t->update_features(feat);
 
-    const auto& sf = t->getSmoothFeat();
+    const auto& sf = t->get_smooth_feat();
     ASSERT_EQ(sf.size(), static_cast<size_t>(2));
-    float norm = std::sqrt(sf[0]*sf[0] + sf[1]*sf[1]);
+    float norm = std::sqrt(sf[0] * sf[0] + sf[1] * sf[1]);
     EXPECT_NEAR(norm, 1.f, 1e-5f);
 }
 
 /**
- * @brief getMaxFeatureSimilarity() returns ~1.0 for the same feature that was
+ * @brief get_max_feature_similarity() returns ~1.0 for the same feature that was
  *        stored, and <0.5 for an orthogonal feature.
  */
 TEST(TrackletTest, FeatureSimilarityIdenticalVsOrthogonal)
 {
-    auto t = makeTracklet();
+    auto t = make_tracklet();
     std::vector<float> feat_a = {1.f, 0.f, 0.f};
-    t->updateFeatures(feat_a);
+    t->update_features(feat_a);
 
     // Normalise manually to compare
     std::vector<float> same = {1.f, 0.f, 0.f};
-    float norm = std::sqrt(same[0]*same[0] + same[1]*same[1] + same[2]*same[2]);
-    for (auto& v : same) v /= norm;
+    float norm = std::sqrt(same[0] * same[0] + same[1] * same[1] + same[2] * same[2]);
+    for (auto& v : same)
+        v /= norm;
 
-    EXPECT_NEAR(t->getMaxFeatureSimilarity(same), 1.f, 1e-4f);
+    EXPECT_NEAR(t->get_max_feature_similarity(same), 1.f, 1e-4f);
 
     std::vector<float> ortho = {0.f, 1.f, 0.f};
-    float dot = t->getMaxFeatureSimilarity(ortho);
+    float dot = t->get_max_feature_similarity(ortho);
     EXPECT_LT(dot, 0.1f);
 }
 
@@ -319,23 +314,20 @@ TEST(TrackletTest, FeatureSimilarityIdenticalVsOrthogonal)
 TEST(TrackletTest, FeatureHistoryCapIsRespected)
 {
     const int max_hist = 5;
-    auto t = std::make_unique<Tracklet>(
-        makeKF(),
-        Rect<float>(0.f, 0.f, 50.f, 80.f),
-        /*label=*/1, /*score=*/0.9f,
-        /*feat=*/std::vector<float>{},
-        /*alpha=*/0.9f,
-        /*enable_xyah=*/false,
-        /*max_feature_history=*/max_hist
-    );
+    auto t = std::make_unique<Tracklet>(make_kf(), Rect<float>(0.f, 0.f, 50.f, 80.f),
+                                        /*label=*/1, /*score=*/0.9f,
+                                        /*feat=*/std::vector<float>{},
+                                        /*alpha=*/0.9f,
+                                        /*enable_xyah=*/false,
+                                        /*max_feature_history=*/max_hist);
 
     for (int i = 0; i < max_hist + 3; ++i)
     {
         std::vector<float> f = {static_cast<float>(i), 0.f, 0.f};
-        t->updateFeatures(f);
+        t->update_features(f);
     }
 
-    EXPECT_LE(static_cast<int>(t->getFeatureHistory().size()), max_hist);
+    EXPECT_LE(static_cast<int>(t->get_feature_history().size()), max_hist);
 }
 
 // Tier 3 edge cases
@@ -345,52 +337,52 @@ TEST(TrackletTest, FeatureHistoryCapIsRespected)
  */
 TEST(TrackletTest, PredictIncrementsLostTimeForTentativeTrack)
 {
-    auto t = makeTracklet();
-    t->activateTentative(makeKF(), 1, 0);
-    ASSERT_EQ(t->getTrackState(), TrackState::Tentative);
+    auto t = make_tracklet();
+    t->activate_tentative(make_kf(), 1, 0);
+    ASSERT_EQ(t->get_track_state(), TrackState::Tentative);
 
     const float dt = 0.04f;
     t->predict(dt);
 
-    EXPECT_NEAR(t->getAccumulatedLostTime(), dt, 1e-5f);
+    EXPECT_NEAR(t->get_accumulated_lost_time(), dt, 1e-5f);
 }
 
 /**
- * @brief activateTentative() initialises accumulated_lost_time to zero.
+ * @brief activate_tentative() initialises accumulated_lost_time to zero.
  */
 TEST(TrackletTest, ActivateTentativeInitialisesLostTimeToZero)
 {
-    auto t = makeTracklet();
-    t->activateTentative(makeKF(), 3, 0);
-    EXPECT_FLOAT_EQ(t->getAccumulatedLostTime(), 0.f);
+    auto t = make_tracklet();
+    t->activate_tentative(make_kf(), 3, 0);
+    EXPECT_FLOAT_EQ(t->get_accumulated_lost_time(), 0.f);
 }
 
 /**
- * @brief markAsLost() called with dt=0 initialises accumulated_lost_time
+ * @brief mark_as_lost() called with dt=0 initialises accumulated_lost_time
  *        to zero rather than a garbage value.
  */
 TEST(TrackletTest, MarkAsLostWithZeroDtInitialisesToZero)
 {
-    auto t = makeTracklet();
-    t->activate(makeKF(), 1, 1);
-    t->markAsLost(0.0f);
-    EXPECT_FLOAT_EQ(t->getAccumulatedLostTime(), 0.f);
+    auto t = make_tracklet();
+    t->activate(make_kf(), 1, 1);
+    t->mark_as_lost(0.0f);
+    EXPECT_FLOAT_EQ(t->get_accumulated_lost_time(), 0.f);
 }
 
 /**
- * @brief reActivate() preserves the original track_id assigned at activation.
+ * @brief re_activate() preserves the original track_id assigned at activation.
  */
 TEST(TrackletTest, ReActivatePreservesTrackId)
 {
-    auto t = makeTracklet();
-    t->activate(makeKF(), 1, 77);
-    ASSERT_EQ(t->getTrackId(), static_cast<size_t>(77));
+    auto t = make_tracklet();
+    t->activate(make_kf(), 1, 77);
+    ASSERT_EQ(t->get_track_id(), static_cast<size_t>(77));
 
-    t->markAsLost(0.04f);
-    auto obs = makeTracklet(105.f, 205.f);
-    t->reActivate(*obs, 5);
+    t->mark_as_lost(0.04f);
+    auto obs = make_tracklet(105.f, 205.f);
+    t->re_activate(*obs, 5);
 
-    EXPECT_EQ(t->getTrackId(), static_cast<size_t>(77));
+    EXPECT_EQ(t->get_track_id(), static_cast<size_t>(77));
 }
 
 /**
@@ -398,23 +390,23 @@ TEST(TrackletTest, ReActivatePreservesTrackId)
  */
 TEST(TrackletTest, HitsIncrementOnConsecutiveUpdates)
 {
-    auto t = makeTracklet();
-    t->activate(makeKF(), 1, 1);
-    ASSERT_EQ(t->getHits(), 1);
+    auto t = make_tracklet();
+    t->activate(make_kf(), 1, 1);
+    ASSERT_EQ(t->get_hits(), 1);
 
-    auto obs = makeTracklet(102.f, 202.f);
+    auto obs = make_tracklet(102.f, 202.f);
     t->update(*obs, 2, false, false);
-    EXPECT_EQ(t->getHits(), 2);
+    EXPECT_EQ(t->get_hits(), 2);
 
-    auto obs2 = makeTracklet(104.f, 204.f);
+    auto obs2 = make_tracklet(104.f, 204.f);
     t->update(*obs2, 3, false, false);
-    EXPECT_EQ(t->getHits(), 3);
+    EXPECT_EQ(t->get_hits(), 3);
 }
 
 // Lost-time and State Transitions
 
 /**
- * @brief Verifies that prediction increments the accumulated lost time for tracks 
+ * @brief Verifies that prediction increments the accumulated lost time for tracks
  *        in the Tentative state.
  *
  * Ensures that the temporal tracking of missing observations correctly accumulates
@@ -422,37 +414,37 @@ TEST(TrackletTest, HitsIncrementOnConsecutiveUpdates)
  */
 TEST(TrackletTest, PredictIncrementsLostTimeForTentative)
 {
-    auto t = makeTracklet();
-    t->activateTentative(makeKF(), 1, 0);
-    ASSERT_EQ(t->getTrackState(), TrackState::Tentative);
+    auto t = make_tracklet();
+    t->activate_tentative(make_kf(), 1, 0);
+    ASSERT_EQ(t->get_track_state(), TrackState::Tentative);
 
     const float dt = 1.0f;
     t->predict(dt);
 
-    EXPECT_EQ(t->getTrackState(), TrackState::Tentative);
-    EXPECT_NEAR(t->getAccumulatedLostTime(), dt, 1e-5f);
+    EXPECT_EQ(t->get_track_state(), TrackState::Tentative);
+    EXPECT_NEAR(t->get_accumulated_lost_time(), dt, 1e-5f);
 }
 
 /**
- * @brief Confirms that the accumulated lost time is reset to zero upon 
+ * @brief Confirms that the accumulated lost time is reset to zero upon
  * initial activation.
  *
  * Validates that transitioning from a tentative or newly created state to
  * an active tracking state clears any prior temporal accumulation of lost cycles.
  */
-TEST(TrackletTest, ActivateTentativeSetsLostTimeZero) 
+TEST(TrackletTest, ActivateTentativeSetsLostTimeZero)
 {
-    auto t = makeTracklet();
+    auto t = make_tracklet();
 
-    t->activateTentative(makeKF(), /*frame_id=*/1, /*initial_id=*/0);
-    
-    EXPECT_EQ(t->getTrackState(), TrackState::Tentative);
-    
-    EXPECT_FLOAT_EQ(t->getAccumulatedLostTime(), 0.0f);
+    t->activate_tentative(make_kf(), /*frame_id=*/1, /*initial_id=*/0);
+
+    EXPECT_EQ(t->get_track_state(), TrackState::Tentative);
+
+    EXPECT_FLOAT_EQ(t->get_accumulated_lost_time(), 0.0f);
 }
 
 /**
- * @brief Verifies that marking a track as lost with a zero time interval 
+ * @brief Verifies that marking a track as lost with a zero time interval
  *        correctly initializes the accumulated lost time.
  *
  * Ensures that boundary conditions for the time interval are handled correctly
@@ -460,14 +452,14 @@ TEST(TrackletTest, ActivateTentativeSetsLostTimeZero)
  */
 TEST(TrackletTest, MarkAsLostWithZeroDtInitialisesToZeroOverride)
 {
-    auto t = makeTracklet();
-    t->activate(makeKF(), 1, 100);
+    auto t = make_tracklet();
+    t->activate(make_kf(), 1, 100);
 
     // Transition to lost with zero dt
-    t->markAsLost(0.0f);
+    t->mark_as_lost(0.0f);
 
-    EXPECT_EQ(t->getTrackState(), TrackState::Lost);
-    EXPECT_FLOAT_EQ(t->getAccumulatedLostTime(), 0.0f);
+    EXPECT_EQ(t->get_track_state(), TrackState::Lost);
+    EXPECT_FLOAT_EQ(t->get_accumulated_lost_time(), 0.0f);
 }
 
 // Observation-Centric Momentum: observation channel
@@ -478,12 +470,12 @@ TEST(TrackletTest, MarkAsLostWithZeroDtInitialisesToZeroOverride)
  */
 TEST(TrackletTest, ActivateRecordsObservationWithoutVelocity)
 {
-    auto t = makeTracklet(100.f, 200.f);
-    t->activate(makeKF(), 1, 1);
+    auto t = make_tracklet(100.f, 200.f);
+    t->activate(make_kf(), 1, 1);
 
-    EXPECT_TRUE(t->hasLastObservation());
-    EXPECT_FALSE(t->hasObsVelocity());
-    EXPECT_EQ(t->getFramesSinceObservation(), 0);
+    EXPECT_TRUE(t->has_last_observation());
+    EXPECT_FALSE(t->has_obs_velocity());
+    EXPECT_EQ(t->get_frames_since_observation(), 0);
 }
 
 /**
@@ -491,14 +483,14 @@ TEST(TrackletTest, ActivateRecordsObservationWithoutVelocity)
  */
 TEST(TrackletTest, PredictIncrementsFramesSinceObservation)
 {
-    auto t = makeTracklet();
-    t->activate(makeKF(), 1, 1);
-    ASSERT_EQ(t->getFramesSinceObservation(), 0);
+    auto t = make_tracklet();
+    t->activate(make_kf(), 1, 1);
+    ASSERT_EQ(t->get_frames_since_observation(), 0);
 
     t->predict(1.0f);
-    EXPECT_EQ(t->getFramesSinceObservation(), 1);
+    EXPECT_EQ(t->get_frames_since_observation(), 1);
     t->predict(1.0f);
-    EXPECT_EQ(t->getFramesSinceObservation(), 2);
+    EXPECT_EQ(t->get_frames_since_observation(), 2);
 }
 
 /**
@@ -506,14 +498,14 @@ TEST(TrackletTest, PredictIncrementsFramesSinceObservation)
  */
 TEST(TrackletTest, UpdateResetsFramesSinceObservation)
 {
-    auto t = makeTracklet();
-    t->activate(makeKF(), 1, 1);
+    auto t = make_tracklet();
+    t->activate(make_kf(), 1, 1);
     t->predict(1.0f);
-    ASSERT_EQ(t->getFramesSinceObservation(), 1);
+    ASSERT_EQ(t->get_frames_since_observation(), 1);
 
-    auto obs = makeTracklet(110.f, 200.f);
+    auto obs = make_tracklet(110.f, 200.f);
     t->update(*obs, 2, true, false);
-    EXPECT_EQ(t->getFramesSinceObservation(), 0);
+    EXPECT_EQ(t->get_frames_since_observation(), 0);
 }
 
 /**
@@ -522,22 +514,22 @@ TEST(TrackletTest, UpdateResetsFramesSinceObservation)
  */
 TEST(TrackletTest, ObservationVelocityFollowsHorizontalMotion)
 {
-    auto t = makeTracklet(100.f, 200.f);
-    t->activate(makeKF(), 1, 1);
+    auto t = make_tracklet(100.f, 200.f);
+    t->activate(make_kf(), 1, 1);
 
     float x = 100.f;
     for (size_t f = 2; f <= 4; ++f)
     {
         t->predict(1.0f);
         x += 10.f;
-        auto obs = makeTracklet(x, 200.f);
+        auto obs = make_tracklet(x, 200.f);
         t->update(*obs, f, true, false);
     }
 
-    ASSERT_TRUE(t->hasObsVelocity());
-    EXPECT_NEAR(t->getObsVelocityX(), 1.0f, 1e-3f);
-    EXPECT_NEAR(t->getObsVelocityY(), 0.0f, 1e-3f);
-    EXPECT_NEAR(t->getObsSpeed(), 10.0f, 1e-3f);
+    ASSERT_TRUE(t->has_obs_velocity());
+    EXPECT_NEAR(t->get_obs_velocity_x(), 1.0f, 1e-3f);
+    EXPECT_NEAR(t->get_obs_velocity_y(), 0.0f, 1e-3f);
+    EXPECT_NEAR(t->get_obs_speed(), 10.0f, 1e-3f);
 }
 
 /**
@@ -546,39 +538,38 @@ TEST(TrackletTest, ObservationVelocityFollowsHorizontalMotion)
  */
 TEST(TrackletTest, ObservationVelocitySignTracksDirection)
 {
-    auto t = makeTracklet(300.f, 200.f);
-    t->activate(makeKF(), 1, 1);
+    auto t = make_tracklet(300.f, 200.f);
+    t->activate(make_kf(), 1, 1);
 
     float x = 300.f;
     for (size_t f = 2; f <= 4; ++f)
     {
         t->predict(1.0f);
         x -= 8.f;
-        auto obs = makeTracklet(x, 200.f);
+        auto obs = make_tracklet(x, 200.f);
         t->update(*obs, f, true, false);
     }
 
-    ASSERT_TRUE(t->hasObsVelocity());
-    EXPECT_LT(t->getObsVelocityX(), 0.0f);
-    EXPECT_NEAR(t->getObsVelocityY(), 0.0f, 1e-3f);
+    ASSERT_TRUE(t->has_obs_velocity());
+    EXPECT_LT(t->get_obs_velocity_x(), 0.0f);
+    EXPECT_NEAR(t->get_obs_velocity_y(), 0.0f, 1e-3f);
 }
 
 /**
- * @brief getLastObservation() is the unfiltered detection box, not the
+ * @brief get_last_observation() is the unfiltered detection box, not the
  *        Kalman-blended estimate; a detection placed far from the prediction is
  *        stored verbatim.
  */
 TEST(TrackletTest, LastObservationIsRawDetection)
 {
-    auto t = makeTracklet(100.f, 200.f);
-    t->activate(makeKF(), 1, 1);
+    auto t = make_tracklet(100.f, 200.f);
+    t->activate(make_kf(), 1, 1);
     t->predict(1.0f);
 
-    auto obs = makeTracklet(140.f, 260.f);
+    auto obs = make_tracklet(140.f, 260.f);
     t->update(*obs, 2, true, false);
 
-    const auto& lo = t->getLastObservation();
+    const auto& lo = t->get_last_observation();
     EXPECT_FLOAT_EQ(lo.x(), 140.f);
     EXPECT_FLOAT_EQ(lo.y(), 260.f);
 }
-

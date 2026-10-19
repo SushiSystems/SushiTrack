@@ -41,7 +41,7 @@ namespace SushiTrack
      * @brief Registers a global callback for engine log redirection.
      * @param callback Function pointer conforming to sushitrack_log_callback_t signature.
      */
-    void Logger::setCallback(sushitrack_log_callback_t callback)
+    void Logger::set_callback(sushitrack_log_callback_t callback)
     {
         g_log_callback.store(callback, std::memory_order_release);
     }
@@ -55,7 +55,7 @@ namespace SushiTrack
     {
         va_list args;
         va_start(args, format);
-        logV(level, format, args);
+        log_v(level, format, args);
         va_end(args);
     }
 
@@ -65,7 +65,7 @@ namespace SushiTrack
      * @param format Printf-style format string.
      * @param args Argument list for formatting.
      */
-    void Logger::logV(sushitrack_log_level_t level, const char* format, va_list args)
+    void Logger::log_v(sushitrack_log_level_t level, const char* format, va_list args)
     {
         sushitrack_log_callback_t cb = g_log_callback.load(std::memory_order_acquire);
         if (!cb)
@@ -98,7 +98,7 @@ namespace SushiTrack
     {
         va_list args;
         va_start(args, format);
-        logV(SUSHITRACK_LOG_ERROR, format, args);
+        log_v(SUSHITRACK_LOG_ERROR, format, args);
         va_end(args);
 
         va_start(args, format);

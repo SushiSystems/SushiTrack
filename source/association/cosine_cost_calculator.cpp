@@ -41,20 +41,20 @@ namespace SushiTrack
      * @param out_matrix Reference to the cost matrix for result population.
      */
     void CosineCostCalculator::calculate(const std::vector<TrackletPtr>& __restrict a,
-                                        const std::vector<TrackletPtr>& __restrict b,
-                                        CostMatrix& __restrict out_matrix)
+                                         const std::vector<TrackletPtr>& __restrict b,
+                                         CostMatrix& __restrict out_matrix)
     {
         out_matrix.resize(a.size(), b.size(), 1.0f);
         for (size_t i = 0; i < a.size(); ++i)
         {
             for (size_t j = 0; j < b.size(); ++j)
             {
-                if (!a[i]->hasFeature() || !b[j]->hasFeature())
+                if (!a[i]->has_feature() || !b[j]->has_feature())
                 {
                     out_matrix(i, j) = 1.0f;
                     continue;
                 }
-                float max_sim = a[i]->getMaxFeatureSimilarity(b[j]->getCurrFeat());
+                float max_sim = a[i]->get_max_feature_similarity(b[j]->get_curr_feat());
                 out_matrix(i, j) = std::max(0.0f, 1.0f - max_sim);
             }
         }
@@ -68,7 +68,8 @@ namespace SushiTrack
      */
     float CosineCostCalculator::calculate_single(const TrackletPtr& a, const TrackletPtr& b) const
     {
-        if (!a->hasFeature() || !b->hasFeature()) return 1.0f;
-        return std::max(0.0f, 1.0f - a->getMaxFeatureSimilarity(b->getCurrFeat()));
+        if (!a->has_feature() || !b->has_feature())
+            return 1.0f;
+        return std::max(0.0f, 1.0f - a->get_max_feature_similarity(b->get_curr_feat()));
     }
 } // namespace SushiTrack

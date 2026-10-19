@@ -35,24 +35,23 @@
 #include <cstddef>
 
 #include <SushiTrack/filtering/kalman_filter_registry.hpp>
-#include <SushiTrack/logging/logger.hpp>
 #include <SushiTrack/filtering/nsa_kalman_filter.hpp>
+#include <SushiTrack/logging/logger.hpp>
 
 namespace SushiTrack
 {
     static KalmanFilterRegistrar<KalmanFilter> reg_kf(0);
     using StateMean = KalmanTypes::StateMean;
-    using StateCov  = KalmanTypes::StateCov;
+    using StateCov = KalmanTypes::StateCov;
     using DetectBox = KalmanTypes::DetectBox;
     using StateHMean = Eigen::Matrix<float, 1, 4, Eigen::RowMajor>;
-    using StateHCov  = Eigen::Matrix<float, 4, 4, Eigen::RowMajor>;
+    using StateHCov = Eigen::Matrix<float, 4, 4, Eigen::RowMajor>;
 
     /**
      * @brief Initializes the Kalman filter with the configured coordinate system.
      * @param enable_xyah Flag for using [center_x, center_y, aspect_ratio, height] format.
      */
-    KalmanFilter::KalmanFilter(bool enable_xyah)
-        : enable_xyah_(enable_xyah)
+    KalmanFilter::KalmanFilter(bool enable_xyah) : enable_xyah_(enable_xyah)
     {
         motion_mat_.setIdentity();
         update_mat_.setIdentity();
@@ -64,14 +63,14 @@ namespace SushiTrack
      * @param covariance Output state covariance matrix.
      * @param measurement Input observation vector.
      */
-    void KalmanFilter::initiate(StateMean& mean, StateCov& covariance,
-                                const DetectBox& measurement, float /*score*/)
+    void KalmanFilter::initiate(StateMean& mean, StateCov& covariance, const DetectBox& measurement,
+                                float /*score*/)
     {
         mean.block<1, 4>(0, 0) = measurement.block<1, 4>(0, 0);
         mean.block<1, 4>(0, 4) = Eigen::RowVector4f::Zero();
 
-        constexpr float k_pos_init = kInitPositionMult * kStdWeightPosition;
-        constexpr float k_vel_init = kInitVelocityMult * kStdWeightVelocity;
+        constexpr float k_pos_init = K_INIT_POSITION_MULT * K_STD_WEIGHT_POSITION;
+        constexpr float k_vel_init = K_INIT_VELOCITY_MULT * K_STD_WEIGHT_VELOCITY;
 
         StateMean std_vec;
         if (enable_xyah_)
@@ -88,7 +87,7 @@ namespace SushiTrack
         }
         else
         {
-            float width  = std::max(1e-2f, measurement[2]);
+            float width = std::max(1e-2f, measurement[2]);
             float height = std::max(1e-2f, measurement[3]);
             std_vec(0) = k_pos_init * width;
             std_vec(1) = k_pos_init * height;
@@ -121,41 +120,42 @@ namespace SushiTrack
         if (enable_xyah_)
         {
             float height = std::max(1e-2f, mean(3));
-            std_vec(0) = dynamic_pos_mult_  * kStdWeightPosition * height * dt;
-            std_vec(1) = dynamic_pos_mult_  * kStdWeightPosition * height * dt;
+            std_vec(0) = dynamic_pos_mult_ * K_STD_WEIGHT_POSITION * height * dt;
+            std_vec(1) = dynamic_pos_mult_ * K_STD_WEIGHT_POSITION * height * dt;
             std_vec(2) = 1e-2f * dt;
-            std_vec(3) = dynamic_size_mult_ * kStdWeightPosition * height * dt;
-            std_vec(4) = dynamic_vel_mult_  * kStdWeightVelocity * height * dt;
-            std_vec(5) = dynamic_vel_mult_  * kStdWeightVelocity * height * dt;
+            std_vec(3) = dynamic_size_mult_ * K_STD_WEIGHT_POSITION * height * dt;
+            std_vec(4) = dynamic_vel_mult_ * K_STD_WEIGHT_VELOCITY * height * dt;
+            std_vec(5) = dynamic_vel_mult_ * K_STD_WEIGHT_VELOCITY * height * dt;
             std_vec(6) = 1e-5f * dt;
-            std_vec(7) = dynamic_vel_mult_  * kStdWeightVelocity * height * dt;
+            std_vec(7) = dynamic_vel_mult_ * K_STD_WEIGHT_VELOCITY * height * dt;
         }
         else
         {
-            float width  = std::max(1e-2f, mean(2));
+            float width = std::max(1e-2f, mean(2));
             float height = std::max(1e-2f, mean(3));
-            std_vec(0) = dynamic_pos_mult_  * kStdWeightPosition * width  * dt;
-            std_vec(1) = dynamic_pos_mult_  * kStdWeightPosition * height * dt;
-            std_vec(2) = dynamic_size_mult_ * kStdWeightPosition * width  * dt;
-            std_vec(3) = dynamic_size_mult_ * kStdWeightPosition * height * dt;
-            std_vec(4) = dynamic_vel_mult_  * kStdWeightVelocity * width  * dt;
-            std_vec(5) = dynamic_vel_mult_  * kStdWeightVelocity * height * dt;
-            std_vec(6) = dynamic_vel_mult_  * kStdWeightVelocity * width  * dt;
-            std_vec(7) = dynamic_vel_mult_  * kStdWeightVelocity * height * dt;
+            std_vec(0) = dynamic_pos_mult_ * K_STD_WEIGHT_POSITION * width * dt;
+            std_vec(1) = dynamic_pos_mult_ * K_STD_WEIGHT_POSITION * height * dt;
+            std_vec(2) = dynamic_size_mult_ * K_STD_WEIGHT_POSITION * width * dt;
+            std_vec(3) = dynamic_size_mult_ * K_STD_WEIGHT_POSITION * height * dt;
+            std_vec(4) = dynamic_vel_mult_ * K_STD_WEIGHT_VELOCITY * width * dt;
+            std_vec(5) = dynamic_vel_mult_ * K_STD_WEIGHT_VELOCITY * height * dt;
+            std_vec(6) = dynamic_vel_mult_ * K_STD_WEIGHT_VELOCITY * width * dt;
+            std_vec(7) = dynamic_vel_mult_ * K_STD_WEIGHT_VELOCITY * height * dt;
         }
 
         StateMean tmp = std_vec.array().square();
-        StateCov  motion_cov = tmp.asDiagonal();
+        StateCov motion_cov = tmp.asDiagonal();
 
         dynamic_pos_mult_ = 1.0f;
         dynamic_size_mult_ = 1.0f;
         dynamic_vel_mult_ = 1.0f;
 
-        mean        = (local_motion_mat * mean.transpose()).transpose();
-        covariance.noalias() = (local_motion_mat * covariance * local_motion_mat.transpose()).eval();
+        mean = (local_motion_mat * mean.transpose()).transpose();
+        covariance.noalias() =
+            (local_motion_mat * covariance * local_motion_mat.transpose()).eval();
         covariance += motion_cov;
 
-        invalidateLLTCache();
+        invalidate_llt_cache();
     }
 
     /**
@@ -165,30 +165,31 @@ namespace SushiTrack
      * @param measurement Input observation vector.
      * @param score Detection confidence score.
      */
-    void KalmanFilter::update(StateMean& mean, StateCov& covariance,
-                                const DetectBox& measurement, float score)
+    void KalmanFilter::update(StateMean& mean, StateCov& covariance, const DetectBox& measurement,
+                              float score)
     {
         StateHMean projected_mean;
-        StateHCov  projected_cov;
+        StateHCov projected_cov;
         project(projected_mean, projected_cov, mean, covariance, score);
 
-        Eigen::Matrix<float, 4, 8> B = (covariance * update_mat_.transpose()).transpose();
+        Eigen::Matrix<float, 4, 8> cross_cov = (covariance * update_mat_.transpose()).transpose();
 
         auto llt = projected_cov.llt();
         if (llt.info() != Eigen::Success)
         {
-            SUSHITRACK_LOG_WARN("[KalmanFilter] Matrix update conditioning failure. Regularizing covariance.");
+            SUSHITRACK_LOG_WARN(
+                "[KalmanFilter] Matrix update conditioning failure. Regularizing covariance.");
             projected_cov.diagonal().array() += 1e-6f;
             llt = projected_cov.llt();
         }
 
-        Eigen::Matrix<float, 8, 4> kalman_gain = llt.solve(B).transpose();
-        Eigen::Matrix<float, 1, 4> innovation  = measurement - projected_mean;
+        Eigen::Matrix<float, 8, 4> kalman_gain = llt.solve(cross_cov).transpose();
+        Eigen::Matrix<float, 1, 4> innovation = measurement - projected_mean;
 
-        mean       = (mean.array() + (innovation * kalman_gain.transpose()).array()).matrix();
+        mean = (mean.array() + (innovation * kalman_gain.transpose()).array()).matrix();
         covariance.noalias() -= kalman_gain * projected_cov * kalman_gain.transpose();
 
-        invalidateLLTCache();
+        invalidate_llt_cache();
     }
 
     /**
@@ -198,17 +199,14 @@ namespace SushiTrack
      * @param out_projected_mean Output projected mean vector.
      * @return Reference to the cached LLT solver instance.
      */
-    const Eigen::LLT<StateHCov>& KalmanFilter::getCachedLLT(
-        const StateMean& mean,
-        const StateCov& covariance,
-        StateHMean& out_projected_mean) const
+    const Eigen::LLT<StateHCov>& KalmanFilter::get_cached_llt(const StateMean& mean,
+                                                              const StateCov& covariance,
+                                                              StateHMean& out_projected_mean) const
     {
         std::lock_guard<std::mutex> lock(llt_cache_mutex_);
 
-        // Validate cache by address; mutations call invalidateLLTCache() to clear validity.
-        if (llt_cache_valid_ &&
-            &mean == cached_mean_ptr_ && 
-            &covariance == cached_cov_ptr_)
+        // Validate cache by address; mutations call invalidate_llt_cache() to clear validity.
+        if (llt_cache_valid_ && &mean == cached_mean_ptr_ && &covariance == cached_cov_ptr_)
         {
             out_projected_mean = cached_projected_mean_;
             return cached_llt_;
@@ -221,15 +219,16 @@ namespace SushiTrack
 
         if (cached_llt_.info() != Eigen::Success)
         {
-            SUSHITRACK_LOG_WARN("[KalmanFilter] Matrix projection conditioning failure. Regularizing covariance.");
+            SUSHITRACK_LOG_WARN(
+                "[KalmanFilter] Matrix projection conditioning failure. Regularizing covariance.");
             projected_cov.diagonal().array() += 1e-6f;
             cached_llt_ = projected_cov.llt();
         }
 
-        cached_mean_ptr_       = &mean;
-        cached_cov_ptr_        = &covariance;
+        cached_mean_ptr_ = &mean;
+        cached_cov_ptr_ = &covariance;
         cached_projected_mean_ = out_projected_mean;
-        llt_cache_valid_       = true;
+        llt_cache_valid_ = true;
 
         return cached_llt_;
     }
@@ -239,21 +238,20 @@ namespace SushiTrack
      * @param score Detection score (0.0 = legacy unscaled projection).
      * @return Computed squared Mahalanobis distance.
      */
-    float KalmanFilter::mahalanobisDistance(const StateMean& mean,
-                                            const StateCov& covariance,
-                                            const DetectBox& measurement,
-                                            float score) const
+    float KalmanFilter::mahalanobis_distance(const StateMean& mean, const StateCov& covariance,
+                                             const DetectBox& measurement, float score) const
     {
         if (score > 0.0f)
         {
             StateHMean projected_mean;
-            StateHCov  projected_cov;
+            StateHCov projected_cov;
             project(projected_mean, projected_cov, mean, covariance, score);
 
             auto llt = projected_cov.llt();
             if (llt.info() != Eigen::Success)
             {
-                SUSHITRACK_LOG_WARN("[KalmanFilter] Score-aware gate conditioning failure. Regularizing covariance.");
+                SUSHITRACK_LOG_WARN("[KalmanFilter] Score-aware gate conditioning failure. "
+                                    "Regularizing covariance.");
                 projected_cov.diagonal().array() += 1e-6f;
                 llt = projected_cov.llt();
             }
@@ -263,7 +261,7 @@ namespace SushiTrack
         }
 
         StateHMean projected_mean;
-        const auto& llt = getCachedLLT(mean, covariance, projected_mean);
+        const auto& llt = get_cached_llt(mean, covariance, projected_mean);
 
         Eigen::Matrix<float, 1, 4> diff = measurement - projected_mean;
         Eigen::Matrix<float, 1, 4> z = llt.solve(diff.transpose()).transpose();
@@ -276,13 +274,11 @@ namespace SushiTrack
      * @param score Detection score for confidence-aware projection.
      * @return True if the measurement is within the gate.
      */
-    bool KalmanFilter::isInGate(const StateMean& mean,
-                                const StateCov& covariance,
-                                const DetectBox& measurement,
-                                float chi2_thresh,
-                                float score) const
+    bool KalmanFilter::is_in_gate(const StateMean& mean, const StateCov& covariance,
+                                  const DetectBox& measurement, float chi2_thresh,
+                                  float score) const
     {
-        return mahalanobisDistance(mean, covariance, measurement, score) <= chi2_thresh;
+        return mahalanobis_distance(mean, covariance, measurement, score) <= chi2_thresh;
     }
 
     /**
@@ -291,11 +287,11 @@ namespace SushiTrack
      * @param scores Optional per-measurement detection scores.
      * @return Collection of boolean flags indicating gate membership.
      */
-    std::vector<bool> KalmanFilter::getGateFlags(const KalmanTypes::StateMean& mean,
-                                                const KalmanTypes::StateCov& covariance,
-                                                const KalmanTypes::DetectBoxVector& measurements,
-                                                float chi2_thresh,
-                                                const std::vector<float>& scores) const
+    std::vector<bool> KalmanFilter::get_gate_flags(const KalmanTypes::StateMean& mean,
+                                                   const KalmanTypes::StateCov& covariance,
+                                                   const KalmanTypes::DetectBoxVector& measurements,
+                                                   float chi2_thresh,
+                                                   const std::vector<float>& scores) const
     {
         std::vector<bool> flags;
         flags.reserve(measurements.size());
@@ -308,7 +304,7 @@ namespace SushiTrack
             for (size_t i = 0; i < measurements.size(); ++i)
             {
                 StateHMean projected_mean;
-                StateHCov  projected_cov;
+                StateHCov projected_cov;
                 project(projected_mean, projected_cov, mean, covariance, scores[i]);
 
                 auto llt = projected_cov.llt();
@@ -325,7 +321,7 @@ namespace SushiTrack
         }
 
         StateHMean projected_mean;
-        const auto& llt = getCachedLLT(mean, covariance, projected_mean);
+        const auto& llt = get_cached_llt(mean, covariance, projected_mean);
 
         for (const auto& measurement : measurements)
         {
@@ -344,10 +340,9 @@ namespace SushiTrack
      * @param scores Optional per-measurement detection scores.
      * @return Collection of squared Mahalanobis distances.
      */
-    std::vector<float> KalmanFilter::getGateSqDistances(const KalmanTypes::StateMean& mean,
-                                                       const KalmanTypes::StateCov& covariance,
-                                                       const KalmanTypes::DetectBoxVector& measurements,
-                                                       const std::vector<float>& scores) const
+    std::vector<float> KalmanFilter::get_gate_sq_distances(
+        const KalmanTypes::StateMean& mean, const KalmanTypes::StateCov& covariance,
+        const KalmanTypes::DetectBoxVector& measurements, const std::vector<float>& scores) const
     {
         std::vector<float> dists;
         dists.reserve(measurements.size());
@@ -359,7 +354,7 @@ namespace SushiTrack
             for (size_t i = 0; i < measurements.size(); ++i)
             {
                 StateHMean projected_mean;
-                StateHCov  projected_cov;
+                StateHCov projected_cov;
                 project(projected_mean, projected_cov, mean, covariance, scores[i]);
 
                 auto llt = projected_cov.llt();
@@ -376,7 +371,7 @@ namespace SushiTrack
         }
 
         StateHMean projected_mean;
-        const auto& llt = getCachedLLT(mean, covariance, projected_mean);
+        const auto& llt = get_cached_llt(mean, covariance, projected_mean);
 
         for (const auto& measurement : measurements)
         {
@@ -394,11 +389,11 @@ namespace SushiTrack
      * @param size_mult Multiplier for size noise.
      * @param vel_mult Multiplier for velocity noise.
      */
-    void KalmanFilter::setNoiseMultipliers(float pos_mult, float size_mult, float vel_mult)
+    void KalmanFilter::set_noise_multipliers(float pos_mult, float size_mult, float vel_mult)
     {
-        dynamic_pos_mult_  = pos_mult;
+        dynamic_pos_mult_ = pos_mult;
         dynamic_size_mult_ = size_mult;
-        dynamic_vel_mult_  = vel_mult;
+        dynamic_vel_mult_ = vel_mult;
     }
 
     /**
@@ -407,10 +402,9 @@ namespace SushiTrack
      * @param projected_cov Output projected covariance matrix.
      */
     void KalmanFilter::project(Eigen::Matrix<float, 1, 4, Eigen::RowMajor>& projected_mean,
-                                Eigen::Matrix<float, 4, 4, Eigen::RowMajor>&  projected_cov,
-                                const StateMean& mean,
-                                const StateCov&  covariance,
-                                float /*score*/) const
+                               Eigen::Matrix<float, 4, 4, Eigen::RowMajor>& projected_cov,
+                               const StateMean& mean, const StateCov& covariance,
+                               float /*score*/) const
     {
         float width = std::max(1e-2f, mean(2));
         float height = std::max(1e-2f, mean(3));
@@ -418,21 +412,17 @@ namespace SushiTrack
         DetectBox std_vec;
         if (enable_xyah_)
         {
-            std_vec << kStdWeightPosition * height,
-                    kStdWeightPosition * height,
-                    1e-1f,
-                    kStdWeightPosition * height;
+            std_vec << K_STD_WEIGHT_POSITION * height, K_STD_WEIGHT_POSITION * height, 1e-1f,
+                K_STD_WEIGHT_POSITION * height;
         }
         else
         {
-            std_vec << kStdWeightPosition * width,
-                    kStdWeightPosition * height,
-                    kStdWeightPosition * width,
-                    kStdWeightPosition * height;
+            std_vec << K_STD_WEIGHT_POSITION * width, K_STD_WEIGHT_POSITION * height,
+                K_STD_WEIGHT_POSITION * width, K_STD_WEIGHT_POSITION * height;
         }
 
         projected_mean = (update_mat_ * mean.transpose()).transpose();
-        projected_cov  = update_mat_ * covariance * update_mat_.transpose();
+        projected_cov = update_mat_ * covariance * update_mat_.transpose();
 
         Eigen::Matrix<float, 4, 4> diag = std_vec.asDiagonal();
         projected_cov += diag.array().square().matrix();

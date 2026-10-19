@@ -25,41 +25,40 @@
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-#include <SushiTrack/c_api/sushitrack_c.h>
 #include <atomic>
 #include <cmath>
 #include <vector>
 
+#include <gtest/gtest.h>
+
+#include <SushiTrack/c_api/sushitrack_c.h>
+
 namespace
 {
 
-static std::atomic<int> g_log_count{0};
+    static std::atomic<int> g_log_count{0};
 
-/**
- * @brief Counting log callback used in SetLogCallback tests.
- * @param level   Severity level (unused in count-only assertions).
- * @param message Formatted message string (unused in count-only assertions).
- */
-void countingCallback(sushitrack_log_level_t /*level*/, const char* /*message*/)
-{
-    g_log_count.fetch_add(1, std::memory_order_relaxed);
-}
+    /**
+     * @brief Counting log callback used in SetLogCallback tests.
+     * @param level   Severity level (unused in count-only assertions).
+     * @param message Formatted message string (unused in count-only assertions).
+     */
+    void counting_callback(sushitrack_log_level_t /*level*/, const char* /*message*/)
+    {
+        g_log_count.fetch_add(1, std::memory_order_relaxed);
+    }
 
-}
+} // namespace
 
 /**
  * @brief Fixture providing a default-initialised params struct.
  */
 class SushiTrackCParamsTest : public ::testing::Test
 {
-protected:
-    sushitrack_params_t params_{};
+    protected:
+        sushitrack_params_t params_{};
 
-    void SetUp() override
-    {
-        sushitrack_get_default_params(&params_);
-    }
+        void SetUp() override { sushitrack_get_default_params(&params_); }
 };
 
 /**
@@ -93,20 +92,17 @@ TEST_F(SushiTrackCParamsTest, DefaultMatchThreshIsFiniteAndPositive)
  */
 class SushiTrackCCreateExTest : public ::testing::Test
 {
-protected:
-    sushitrack_params_t params_{};
-    sushitrack_tracker_t     hdl_ = nullptr;
+    protected:
+        sushitrack_params_t params_{};
+        sushitrack_tracker_t hdl_ = nullptr;
 
-    void SetUp() override
-    {
-        sushitrack_get_default_params(&params_);
-    }
+        void SetUp() override { sushitrack_get_default_params(&params_); }
 
-    void TearDown() override
-    {
-        if (hdl_ != nullptr)
-            sushitrack_destroy(hdl_);
-    }
+        void TearDown() override
+        {
+            if (hdl_ != nullptr)
+                sushitrack_destroy(hdl_);
+        }
 };
 
 /**
@@ -145,54 +141,57 @@ TEST_F(SushiTrackCCreateExTest, ValidParamsReturnsSuccessAndNonNullHandle)
  */
 class SushiTrackCUpdateTest : public ::testing::Test
 {
-protected:
-    sushitrack_tracker_t     hdl_    = nullptr;
-    sushitrack_params_t params_ = {};
+    protected:
+        sushitrack_tracker_t hdl_ = nullptr;
+        sushitrack_params_t params_ = {};
 
-    void SetUp() override
-    {
-        sushitrack_get_default_params(&params_);
-        params_.time_aware             = 1;
-        params_.enable_tentative       = 1;
-        params_.tentative_confirm_hits = 3;
-        params_.track_buffer           = 2;
-        params_.frame_rate             = 25;
-        params_.tentative_match_thresh = 0.9f;
-        params_.track_thresh           = 0.1f;
-        params_.high_thresh            = 0.2f;
+        void SetUp() override
+        {
+            sushitrack_get_default_params(&params_);
+            params_.time_aware = 1;
+            params_.enable_tentative = 1;
+            params_.tentative_confirm_hits = 3;
+            params_.track_buffer = 2;
+            params_.frame_rate = 25;
+            params_.tentative_match_thresh = 0.9f;
+            params_.track_thresh = 0.1f;
+            params_.high_thresh = 0.2f;
 
-        hdl_ = sushitrack_create(&params_);
-        ASSERT_NE(hdl_, nullptr);
-    }
+            hdl_ = sushitrack_create(&params_);
+            ASSERT_NE(hdl_, nullptr);
+        }
 
-    void TearDown() override { sushitrack_destroy(hdl_); }
+        void TearDown() override { sushitrack_destroy(hdl_); }
 
-    /**
-     * @brief Constructs a detection at the given top-left position.
-     * @param x Top-left horizontal coordinate.
-     * @param y Top-left vertical coordinate.
-     * @return Populated sushitrack_object_t.
-     */
-    sushitrack_object_t det(float x, float y) const
-    {
-        sushitrack_object_t o{};
-        o.x = x; o.y = y;
-        o.width = 50.0f; o.height = 100.0f;
-        o.score = 0.9f;  o.label  = 1;
-        return o;
-    }
+        /**
+         * @brief Constructs a detection at the given top-left position.
+         * @param x Top-left horizontal coordinate.
+         * @param y Top-left vertical coordinate.
+         * @return Populated sushitrack_object_t.
+         */
+        sushitrack_object_t det(float x, float y) const
+        {
+            sushitrack_object_t o{};
+            o.x = x;
+            o.y = y;
+            o.width = 50.0f;
+            o.height = 100.0f;
+            o.score = 0.9f;
+            o.label = 1;
+            return o;
+        }
 
-    /**
-     * @brief Drives three matched frames to bring the track to Tracked state.
-     * @param out Output buffer; must have capacity >= 1.
-     */
-    void confirmTrack(std::vector<sushitrack_track_t>& out)
-    {
-        sushitrack_update(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
-        sushitrack_update(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
-        sushitrack_update(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
-        ASSERT_EQ(out[0].state, 1) << "Precondition: track must reach Tracked state";
-    }
+        /**
+         * @brief Drives three matched frames to bring the track to Tracked state.
+         * @param out Output buffer; must have capacity >= 1.
+         */
+        void confirm_track(std::vector<sushitrack_track_t>& out)
+        {
+            sushitrack_update(hdl_, &det(100.0f, 200.0f), 1, out.data(), 10, 0.04f);
+            sushitrack_update(hdl_, &det(102.0f, 202.0f), 1, out.data(), 10, 0.04f);
+            sushitrack_update(hdl_, &det(104.0f, 204.0f), 1, out.data(), 10, 0.04f);
+            ASSERT_EQ(out[0].state, 1) << "Precondition: track must reach Tracked state";
+        }
 };
 
 /**
@@ -233,8 +232,8 @@ TEST_F(SushiTrackCUpdateTest, NewDetectionProducesNonZeroTrackId)
 TEST_F(SushiTrackCUpdateTest, ThreeConsecutiveHitsPromoteToTracked)
 {
     std::vector<sushitrack_track_t> out(10);
-    confirmTrack(out);
-    EXPECT_EQ(out[0].state,        1);
+    confirm_track(out);
+    EXPECT_EQ(out[0].state, 1);
     EXPECT_EQ(out[0].is_confirmed, 1);
 }
 
@@ -244,7 +243,7 @@ TEST_F(SushiTrackCUpdateTest, ThreeConsecutiveHitsPromoteToTracked)
 TEST_F(SushiTrackCUpdateTest, RemovedTrackAbsentFromNextUpdate)
 {
     std::vector<sushitrack_track_t> out(10);
-    confirmTrack(out);
+    confirm_track(out);
 
     sushitrack_update(hdl_, nullptr, 0, out.data(), 10, 0.04f);
 
@@ -261,16 +260,10 @@ TEST_F(SushiTrackCUpdateTest, RemovedTrackAbsentFromNextUpdate)
  */
 class SushiTrackCLogCallbackTest : public ::testing::Test
 {
-protected:
-    void SetUp() override
-    {
-        g_log_count.store(0);
-    }
+    protected:
+        void SetUp() override { g_log_count.store(0); }
 
-    void TearDown() override
-    {
-        sushitrack_set_log_callback(nullptr);
-    }
+        void TearDown() override { sushitrack_set_log_callback(nullptr); }
 };
 
 /**
@@ -279,7 +272,7 @@ protected:
  */
 TEST_F(SushiTrackCLogCallbackTest, ValidCallbackReceivesLogEvents)
 {
-    sushitrack_set_log_callback(countingCallback);
+    sushitrack_set_log_callback(counting_callback);
 
     sushitrack_params_t params{};
     sushitrack_get_default_params(&params);
@@ -294,7 +287,7 @@ TEST_F(SushiTrackCLogCallbackTest, ValidCallbackReceivesLogEvents)
  */
 TEST_F(SushiTrackCLogCallbackTest, NullCallbackSilencesLogEvents)
 {
-    sushitrack_set_log_callback(countingCallback);
+    sushitrack_set_log_callback(counting_callback);
     sushitrack_set_log_callback(nullptr);
 
     sushitrack_params_t params{};

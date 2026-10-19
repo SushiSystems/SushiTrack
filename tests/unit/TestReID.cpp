@@ -25,35 +25,32 @@
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-#include <SushiTrack/tracking/tracklet.hpp>
-#include <SushiTrack/filtering/kalman_filter.hpp>
-
-#include <memory>
-#include <vector>
 #include <cmath>
+#include <memory>
 #include <numeric>
+#include <vector>
+
+#include <gtest/gtest.h>
+
+#include <SushiTrack/filtering/kalman_filter.hpp>
+#include <SushiTrack/tracking/tracklet.hpp>
 
 using namespace SushiTrack;
 
 // Helpers
 
 /** @brief Creates a Tracklet with the given max_feature_history limit. */
-static std::unique_ptr<Tracklet> makeTracklet(int max_hist = 100, float alpha = 0.9f)
+static std::unique_ptr<Tracklet> make_tracklet(int max_hist = 100, float alpha = 0.9f)
 {
-    return std::make_unique<Tracklet>(
-        std::make_unique<KalmanFilter>(),
-        Rect<float>(0.f, 0.f, 50.f, 80.f),
-        /*label=*/1, /*score=*/0.9f,
-        /*feat=*/std::vector<float>{},
-        alpha,
-        /*enable_xyah=*/false,
-        max_hist
-    );
+    return std::make_unique<Tracklet>(std::make_unique<KalmanFilter>(),
+                                      Rect<float>(0.f, 0.f, 50.f, 80.f),
+                                      /*label=*/1, /*score=*/0.9f,
+                                      /*feat=*/std::vector<float>{}, alpha,
+                                      /*enable_xyah=*/false, max_hist);
 }
 
 /** @brief Returns a unit vector [1, 0, 0, ...] of size n. */
-static std::vector<float> unitBasis(int n, int axis = 0)
+static std::vector<float> unit_basis(int n, int axis = 0)
 {
     std::vector<float> v(n, 0.f);
     v[axis] = 1.f;
@@ -64,62 +61,63 @@ static std::vector<float> unitBasis(int n, int axis = 0)
 static float l2Norm(const std::vector<float>& v)
 {
     float s = 0.f;
-    for (float x : v) s += x * x;
+    for (float x : v)
+        s += x * x;
     return std::sqrt(s);
 }
 
-// hasFeature()
+// has_feature()
 
 /**
- * @brief A freshly constructed Tracklet has no feature (hasFeature = false).
+ * @brief A freshly constructed Tracklet has no feature (has_feature = false).
  */
 TEST(ReIDTest, NoFeatureInitially)
 {
-    auto t = makeTracklet();
-    EXPECT_FALSE(t->hasFeature());
+    auto t = make_tracklet();
+    EXPECT_FALSE(t->has_feature());
 }
 
 /**
- * @brief After one updateFeatures() call, hasFeature() returns true.
+ * @brief After one update_features() call, has_feature() returns true.
  */
 TEST(ReIDTest, HasFeatureAfterUpdate)
 {
-    auto t = makeTracklet();
-    t->updateFeatures({1.f, 0.f, 0.f});
-    EXPECT_TRUE(t->hasFeature());
+    auto t = make_tracklet();
+    t->update_features({1.f, 0.f, 0.f});
+    EXPECT_TRUE(t->has_feature());
 }
 
 // L2 normalisation
 
 /**
- * @brief smooth_feat is unit-normalised after updateFeatures() for a
+ * @brief smooth_feat is unit-normalised after update_features() for a
  *        non-unit input vector.
  */
 TEST(ReIDTest, SmoothFeatIsUnitNormalised)
 {
-    auto t = makeTracklet();
-    t->updateFeatures({3.f, 4.f, 0.f});   // L2 norm = 5
+    auto t = make_tracklet();
+    t->update_features({3.f, 4.f, 0.f}); // L2 norm = 5
 
-    const auto& sf = t->getSmoothFeat();
+    const auto& sf = t->get_smooth_feat();
     EXPECT_NEAR(l2Norm(sf), 1.f, 1e-5f);
 }
 
 /**
- * @brief curr_feat is unit-normalised after updateFeatures().
+ * @brief curr_feat is unit-normalised after update_features().
  */
 TEST(ReIDTest, CurrFeatIsUnitNormalised)
 {
-    auto t = makeTracklet();
-    t->updateFeatures({0.f, 3.f, 4.f});
+    auto t = make_tracklet();
+    t->update_features({0.f, 3.f, 4.f});
 
-    const auto& cf = t->getCurrFeat();
+    const auto& cf = t->get_curr_feat();
     EXPECT_NEAR(l2Norm(cf), 1.f, 1e-5f);
 }
 
 // EMA blending
 
 /**
- * @brief After two updateFeatures() calls, smooth_feat lies strictly between
+ * @brief After two update_features() calls, smooth_feat lies strictly between
  *        the two unit observations (EMA blends them).
  *
  * alpha = 0.9: smooth = 0.9 * e1 + 0.1 * e2 (normalised)
@@ -127,15 +125,15 @@ TEST(ReIDTest, CurrFeatIsUnitNormalised)
  */
 TEST(ReIDTest, EMABlendsConsecutiveFeatures)
 {
-    auto t = makeTracklet(100, 0.5f);
+    auto t = make_tracklet(100, 0.5f);
 
     std::vector<float> e1 = {1.f, 0.f, 0.f};
     std::vector<float> e2 = {0.f, 1.f, 0.f};
 
-    t->updateFeatures(e1);
-    t->updateFeatures(e2);
+    t->update_features(e1);
+    t->update_features(e2);
 
-    const auto& sf = t->getSmoothFeat();
+    const auto& sf = t->get_smooth_feat();
     ASSERT_EQ(sf.size(), static_cast<size_t>(3));
 
     float proj_e1 = sf[0];
@@ -145,7 +143,7 @@ TEST(ReIDTest, EMABlendsConsecutiveFeatures)
     EXPECT_GT(proj_e2, 0.f) << "EMA should have component of e2";
 }
 
-// getMaxFeatureSimilarity()
+// get_max_feature_similarity()
 
 /**
  * @brief Querying with the same (unit-normalised) feature that was stored
@@ -153,11 +151,11 @@ TEST(ReIDTest, EMABlendsConsecutiveFeatures)
  */
 TEST(ReIDTest, SimilarityIdenticalFeatureIsOne)
 {
-    auto t = makeTracklet();
-    t->updateFeatures(unitBasis(4, 0));
+    auto t = make_tracklet();
+    t->update_features(unit_basis(4, 0));
 
-    std::vector<float> query = unitBasis(4, 0);
-    EXPECT_NEAR(t->getMaxFeatureSimilarity(query), 1.f, 1e-4f);
+    std::vector<float> query = unit_basis(4, 0);
+    EXPECT_NEAR(t->get_max_feature_similarity(query), 1.f, 1e-4f);
 }
 
 /**
@@ -165,32 +163,32 @@ TEST(ReIDTest, SimilarityIdenticalFeatureIsOne)
  */
 TEST(ReIDTest, SimilarityOrthogonalFeatureIsZero)
 {
-    auto t = makeTracklet();
-    t->updateFeatures(unitBasis(4, 0));   // e0
+    auto t = make_tracklet();
+    t->update_features(unit_basis(4, 0)); // e0
 
-    std::vector<float> ortho = unitBasis(4, 1);   // e1 — orthogonal
-    float sim = t->getMaxFeatureSimilarity(ortho);
+    std::vector<float> ortho = unit_basis(4, 1); // e1 — orthogonal
+    float sim = t->get_max_feature_similarity(ortho);
     EXPECT_LT(sim, 0.05f);
 }
 
 /**
- * @brief getMaxFeatureSimilarity() scans the history, not only smooth_feat.
+ * @brief get_max_feature_similarity() scans the history, not only smooth_feat.
  *
  * After several updates that blend the original feature away, querying the
  * exact original vector should still return a high similarity via history.
  */
 TEST(ReIDTest, SimilarityChecksHistory)
 {
-    auto t = makeTracklet(50, 0.9f);
-    std::vector<float> original = unitBasis(4, 0);
-    t->updateFeatures(original);
+    auto t = make_tracklet(50, 0.9f);
+    std::vector<float> original = unit_basis(4, 0);
+    t->update_features(original);
 
     // Overwrite smooth_feat with a different direction via many EMA steps
     for (int i = 0; i < 30; ++i)
-        t->updateFeatures(unitBasis(4, 1));
+        t->update_features(unit_basis(4, 1));
 
     // The original vector is still in history; similarity should be non-trivial.
-    float sim = t->getMaxFeatureSimilarity(original);
+    float sim = t->get_max_feature_similarity(original);
     EXPECT_GT(sim, 0.5f) << "history should preserve the original feature";
 }
 
@@ -202,32 +200,32 @@ TEST(ReIDTest, SimilarityChecksHistory)
 TEST(ReIDTest, HistoryDoesNotExceedCapacity)
 {
     const int cap = 8;
-    auto t = makeTracklet(cap);
+    auto t = make_tracklet(cap);
 
     for (int i = 0; i < cap + 5; ++i)
     {
         std::vector<float> f = {static_cast<float>(i), 0.f};
-        t->updateFeatures(f);
+        t->update_features(f);
     }
 
-    EXPECT_LE(static_cast<int>(t->getFeatureHistory().size()), cap);
+    EXPECT_LE(static_cast<int>(t->get_feature_history().size()), cap);
 }
 
 // Empty / zero feature vector
 
 /**
- * @brief Calling updateFeatures() with an empty vector is a no-op:
- *        hasFeature() remains false if called before any real update.
+ * @brief Calling update_features() with an empty vector is a no-op:
+ *        has_feature() remains false if called before any real update.
  */
 TEST(ReIDTest, EmptyFeatureVectorIsNoOp)
 {
-    auto t = makeTracklet();
-    ASSERT_FALSE(t->hasFeature());
+    auto t = make_tracklet();
+    ASSERT_FALSE(t->has_feature());
 
     // Empty vector should not set a feature (The implementation moves the empty vector in; if it's empty it skips the update) We test by checking the Tracklet's own guard: feat.empty() check
     std::vector<float> empty;
-    // updateFeatures with empty: hasFeature should stay false (Implementation: if feat.empty() guard is in place via !feat.empty() in constructor path, but updateFeatures itself does not guard — the feature IS empty after move. The hasFeature() check is smooth_feat_.empty(). So if updateFeatures assigns an empty vector it normalises nothing and smooth_feat_ stays empty.)
-    t->updateFeatures(empty);
+    // update_features with empty: has_feature should stay false (Implementation: if feat.empty() guard is in place via !feat.empty() in constructor path, but update_features itself does not guard — the feature IS empty after move. The has_feature() check is smooth_feat_.empty(). So if update_features assigns an empty vector it normalises nothing and smooth_feat_ stays empty.)
+    t->update_features(empty);
     // After empty update, smooth_feat_ is still empty
-    EXPECT_FALSE(t->hasFeature());
+    EXPECT_FALSE(t->has_feature());
 }

@@ -37,12 +37,12 @@ namespace TestInfrastructure
      */
     struct Scenario
     {
-        std::string name;    ///< Specific sequence name (e.g., "MOT17-02-DPM").
-        std::string dataset; ///< Parent dataset identifier (e.g., "MOT17").
+            std::string name;    ///< Specific sequence name (e.g., "MOT17-02-DPM").
+            std::string dataset; ///< Parent dataset identifier (e.g., "MOT17").
     };
 
-	// clang-format off
-	static const Scenario kScenarios[] =
+    // clang-format off
+	static const Scenario K_SCENARIOS[] =
 	{
 		{ "MOT17-02-DPM",   "MOT17" },
 		{ "MOT17-02-FRCNN", "MOT17" },
@@ -123,6 +123,6 @@ namespace TestInfrastructure
 		{ "dancetrack0098", "DanceTrack" },
 		{ "dancetrack0099", "DanceTrack" },
 	};
-	// clang-format on
+    // clang-format on
 
 } // namespace TestInfrastructure

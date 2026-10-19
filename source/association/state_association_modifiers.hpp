@@ -31,25 +31,25 @@
 
 namespace SushiTrack
 {
-        /**
-         * @brief Per-state association policy modifiers.
-         */
-        struct StateAssocMods
-        {
+    /**
+     * @brief Per-state association policy modifiers.
+     */
+    struct StateAssocMods
+    {
             float gate_scale;
             float reid_shift;
-            bool  require_reid;
-        };
+            bool require_reid;
+    };
 
-        inline StateAssocMods stateAssocMods(KinematicState s)
+    inline StateAssocMods state_assoc_mods(KinematicState s)
+    {
+        switch (s)
         {
-            switch (s)
-            {
-                case KinematicState::Stationary:  return {0.6f, -0.2f, false};
-                case KinematicState::Maneuvering: return {1.5f,  0.2f, false};
-                case KinematicState::Coasting:    return {2.0f,  0.4f, true };
-                case KinematicState::Cruising:
-                default:                          return {1.0f,  0.0f, false};
-            }
+            case KinematicState::Stationary: return {0.6f, -0.2f, false};
+            case KinematicState::Maneuvering: return {1.5f, 0.2f, false};
+            case KinematicState::Coasting: return {2.0f, 0.4f, true};
+            case KinematicState::Cruising:
+            default: return {1.0f, 0.0f, false};
         }
+    }
 } // namespace SushiTrack

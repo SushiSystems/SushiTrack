@@ -29,8 +29,8 @@
 
 #include <vector>
 
-#include <SushiTrack/tracking/tracklet.hpp>
 #include <SushiTrack/logging/logger.hpp>
+#include <SushiTrack/tracking/tracklet.hpp>
 
 namespace SushiTrack
 {
@@ -41,11 +41,12 @@ namespace SushiTrack
      * @param out_matrix Reference to the cost matrix for result population.
      */
     void PureReIDCostCalculator::calculate(const std::vector<TrackletPtr>& __restrict a,
-                                        const std::vector<TrackletPtr>& __restrict b,
-                                        CostMatrix& __restrict out_matrix)
+                                           const std::vector<TrackletPtr>& __restrict b,
+                                           CostMatrix& __restrict out_matrix)
     {
         out_matrix.resize(a.size(), b.size(), 1e4f);
-        if (a.empty() || b.empty()) return;
+        if (a.empty() || b.empty())
+            return;
 
         meas_workspace_.clear();
         score_workspace_.clear();
@@ -55,8 +56,8 @@ namespace SushiTrack
             score_workspace_.reserve(b.size());
             for (const auto& det : b)
             {
-                meas_workspace_.push_back(det->getMeasurement());
-                score_workspace_.push_back(det->getScore());
+                meas_workspace_.push_back(det->get_measurement());
+                score_workspace_.push_back(det->get_score());
             }
         }
 
@@ -64,19 +65,21 @@ namespace SushiTrack
 
         for (size_t i = 0; i < a.size(); ++i)
         {
-            if (!a[i]->hasFeature()) continue;
+            if (!a[i]->has_feature())
+                continue;
 
             std::vector<bool> in_gate;
             if (gate_validator_)
             {
-                in_gate = gate_validator_->getGateFlags(
-                    a[i]->getMean(), a[i]->getCovariance(), meas_workspace_,
-                    gating_thresh_, score_workspace_);
+                in_gate = gate_validator_->get_gate_flags(a[i]->get_mean(), a[i]->get_covariance(),
+                                                          meas_workspace_, gating_thresh_,
+                                                          score_workspace_);
             }
 
             for (size_t j = 0; j < b.size(); ++j)
             {
-                if (!b[j]->hasFeature()) continue;
+                if (!b[j]->has_feature())
+                    continue;
 
                 if (gate_validator_ && !in_gate[j])
                 {
@@ -85,7 +88,7 @@ namespace SushiTrack
                     continue;
                 }
 
-                float reid_sim = a[i]->getMaxFeatureSimilarity(b[j]->getCurrFeat());
+                float reid_sim = a[i]->get_max_feature_similarity(b[j]->get_curr_feat());
                 float reid_dist = 1.0f - reid_sim;
 
                 if (reid_dist < reid_thresh_)
@@ -96,7 +99,7 @@ namespace SushiTrack
         if (gated_pairs > 0)
         {
             SUSHITRACK_LOG_DEBUG("[Distance] PureReID: gated out %zu of %zu pairs (Mahalanobis).",
-                gated_pairs, a.size() * b.size());
+                                 gated_pairs, a.size() * b.size());
         }
     }
 
@@ -108,25 +111,25 @@ namespace SushiTrack
      */
     float PureReIDCostCalculator::calculate_single(const TrackletPtr& a, const TrackletPtr& b) const
     {
-        if (!a->hasFeature() || !b->hasFeature())
+        if (!a->has_feature() || !b->has_feature())
         {
             return 1e4f;
         }
 
         if (gate_validator_)
         {
-            KalmanTypes::DetectBoxVector meas_workspace = { b->getMeasurement() };
-            std::vector<float>           score_workspace = { b->getScore() };
-            std::vector<bool> in_gate = gate_validator_->getGateFlags(
-                a->getMean(), a->getCovariance(), meas_workspace,
-                gating_thresh_, score_workspace);
+            KalmanTypes::DetectBoxVector meas_workspace = {b->get_measurement()};
+            std::vector<float> score_workspace = {b->get_score()};
+            std::vector<bool> in_gate =
+                gate_validator_->get_gate_flags(a->get_mean(), a->get_covariance(), meas_workspace,
+                                                gating_thresh_, score_workspace);
             if (!in_gate[0])
             {
                 return 1e4f;
             }
         }
 
-        float reid_sim = a->getMaxFeatureSimilarity(b->getCurrFeat());
+        float reid_sim = a->get_max_feature_similarity(b->get_curr_feat());
         float reid_dist = 1.0f - reid_sim;
 
         if (reid_dist < reid_thresh_)

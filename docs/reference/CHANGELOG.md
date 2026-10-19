@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- 2026-10-19 — core: Dropped the unused total cost `LAPJVSolver::exec_lapjv` summed after every solve (`source/association/lapjv_solver.cpp`).
+- 2026-10-19 — core: Renamed the C++ methods to snake_case and the constants to K_ names, so `Tracker::getTracks` is now `Tracker::get_tracks` (`include/SushiTrack/tracking/tracker.hpp`, `include/SushiTrack/tracking/tracklet.hpp`).
+- 2026-10-19 — core: Dropped the I prefix from the interfaces and renamed `IKalmanFilter` to `GatedStatePredictor` (`include/SushiTrack/association/cost_calculator.hpp`, `include/SushiTrack/filtering/gated_state_predictor.hpp`).
 - 2026-10-19 — core: Moved every public header under an area folder, so `SushiTrack/sushitrack_c.h` is now `SushiTrack/c_api/sushitrack_c.h` (`include/SushiTrack/c_api/`, `include/SushiTrack/tracking/`, `include/SushiTrack/filtering/`).
 - 2026-10-19 — core: Split the cost calculators, gate validators, Kalman factories, timing policies and track states into one header and one source per type (`include/SushiTrack/association/`, `source/association/`).
 - 2026-10-19 — build: Moved the build policy and the Eigen target into `cmake/` and the library targets into `source/CMakeLists.txt` (`cmake/SushiTrackBuildPolicy.cmake`, `docs/architecture/BUILD_SYSTEM.md`).

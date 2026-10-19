@@ -29,18 +29,18 @@
 
 #ifndef SUSHITRACK_API
 #if defined(_WIN32) || defined(__CYGWIN__)
-    #if defined(SUSHITRACK_EXPORTS) || defined(SUSHITRACK_BUILDING_LIBRARY)
-        #define SUSHITRACK_API __declspec(dllexport)
-    #elif defined(SUSHITRACK_STATIC)
-        #define SUSHITRACK_API
-    #else
-        #define SUSHITRACK_API __declspec(dllimport)
-    #endif
+#if defined(SUSHITRACK_EXPORTS) || defined(SUSHITRACK_BUILDING_LIBRARY)
+#define SUSHITRACK_API __declspec(dllexport)
+#elif defined(SUSHITRACK_STATIC)
+#define SUSHITRACK_API
 #else
-    #if defined(__GNUC__) && __GNUC__ >= 4
-        #define SUSHITRACK_API __attribute__((visibility("default")))
-    #else
-        #define SUSHITRACK_API
-    #endif
+#define SUSHITRACK_API __declspec(dllimport)
+#endif
+#else
+#if defined(__GNUC__) && __GNUC__ >= 4
+#define SUSHITRACK_API __attribute__((visibility("default")))
+#else
+#define SUSHITRACK_API
+#endif
 #endif
 #endif

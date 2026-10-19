@@ -25,67 +25,63 @@
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-#include <SushiTrack/c_api/sushitrack_c.h>
 #include <cmath>
 #include <limits>
 #include <vector>
 
+#include <gtest/gtest.h>
+
+#include <SushiTrack/c_api/sushitrack_c.h>
+
 namespace
 {
 
-/**
- * @brief Constructs a benign detection without feature data.
- */
-sushitrack_object_t makeDet(float x,
-                         float y,
-                         float w     = 50.0f,
-                         float h     = 100.0f,
-                         float score = 0.9f)
-{
-    sushitrack_object_t o{};
-    o.x        = x;
-    o.y        = y;
-    o.width    = w;
-    o.height   = h;
-    o.score    = score;
-    o.label    = 1;
-    o.feat     = nullptr;
-    o.feat_dim = 0;
-    return o;
-}
-
-/**
- * @brief Constructs a detection backed by an external feature pointer.
- */
-sushitrack_object_t makeDetWithFeat(float        x,
-                                 float        y,
-                                 const float* feat,
-                                 int          feat_dim,
-                                 float        score = 0.95f)
-{
-    sushitrack_object_t o = makeDet(x, y, 50.0f, 100.0f, score);
-    o.feat             = feat;
-    o.feat_dim         = feat_dim;
-    return o;
-}
-
-/**
- * @brief Verifies that every active track in the buffer has finite geometry.
- */
-void expectFiniteGeometry(const std::vector<sushitrack_track_t>& out, int n)
-{
-    for (int i = 0; i < n; ++i)
+    /**
+     * @brief Constructs a benign detection without feature data.
+     */
+    sushitrack_object_t make_det(float x, float y, float w = 50.0f, float h = 100.0f,
+                                 float score = 0.9f)
     {
-        const sushitrack_track_t& t = out[static_cast<std::size_t>(i)];
-        EXPECT_TRUE(std::isfinite(t.x))      << "track " << i << " x is non-finite";
-        EXPECT_TRUE(std::isfinite(t.y))      << "track " << i << " y is non-finite";
-        EXPECT_TRUE(std::isfinite(t.width))  << "track " << i << " w is non-finite";
-        EXPECT_TRUE(std::isfinite(t.height)) << "track " << i << " h is non-finite";
+        sushitrack_object_t o{};
+        o.x = x;
+        o.y = y;
+        o.width = w;
+        o.height = h;
+        o.score = score;
+        o.label = 1;
+        o.feat = nullptr;
+        o.feat_dim = 0;
+        return o;
     }
-}
 
-}
+    /**
+     * @brief Constructs a detection backed by an external feature pointer.
+     */
+    sushitrack_object_t make_det_with_feat(float x, float y, const float* feat, int feat_dim,
+                                           float score = 0.95f)
+    {
+        sushitrack_object_t o = make_det(x, y, 50.0f, 100.0f, score);
+        o.feat = feat;
+        o.feat_dim = feat_dim;
+        return o;
+    }
+
+    /**
+     * @brief Verifies that every active track in the buffer has finite geometry.
+     */
+    void expect_finite_geometry(const std::vector<sushitrack_track_t>& out, int n)
+    {
+        for (int i = 0; i < n; ++i)
+        {
+            const sushitrack_track_t& t = out[static_cast<std::size_t>(i)];
+            EXPECT_TRUE(std::isfinite(t.x)) << "track " << i << " x is non-finite";
+            EXPECT_TRUE(std::isfinite(t.y)) << "track " << i << " y is non-finite";
+            EXPECT_TRUE(std::isfinite(t.width)) << "track " << i << " w is non-finite";
+            EXPECT_TRUE(std::isfinite(t.height)) << "track " << i << " h is non-finite";
+        }
+    }
+
+} // namespace
 
 // MalformedDetectionTest
 
@@ -94,24 +90,24 @@ void expectFiniteGeometry(const std::vector<sushitrack_track_t>& out, int n)
  */
 class MalformedDetectionTest : public ::testing::Test
 {
-protected:
-    sushitrack_tracker_t     hdl_    = nullptr;
-    sushitrack_params_t params_ = {};
+    protected:
+        sushitrack_tracker_t hdl_ = nullptr;
+        sushitrack_params_t params_ = {};
 
-    void SetUp() override
-    {
-        sushitrack_get_default_params(&params_);
-        params_.time_aware       = 1;
-        params_.enable_tentative = 0;
-        params_.track_thresh     = 0.1f;
-        params_.high_thresh      = 0.2f;
-        params_.frame_rate       = 25;
+        void SetUp() override
+        {
+            sushitrack_get_default_params(&params_);
+            params_.time_aware = 1;
+            params_.enable_tentative = 0;
+            params_.track_thresh = 0.1f;
+            params_.high_thresh = 0.2f;
+            params_.frame_rate = 25;
 
-        hdl_ = sushitrack_create(&params_);
-        ASSERT_NE(hdl_, nullptr);
-    }
+            hdl_ = sushitrack_create(&params_);
+            ASSERT_NE(hdl_, nullptr);
+        }
 
-    void TearDown() override { sushitrack_destroy(hdl_); }
+        void TearDown() override { sushitrack_destroy(hdl_); }
 };
 
 /**
@@ -121,10 +117,10 @@ protected:
 TEST_F(MalformedDetectionTest, ZeroWidthDetectionDoesNotCrash)
 {
     std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d = makeDet(100.0f, 200.0f, /*w*/ 0.0f, /*h*/ 80.0f);
+    sushitrack_object_t d = make_det(100.0f, 200.0f, /*w*/ 0.0f, /*h*/ 80.0f);
     int n = sushitrack_update(hdl_, &d, 1, out.data(), 4, 0.04f);
     EXPECT_GE(n, 0);
-    expectFiniteGeometry(out, n);
+    expect_finite_geometry(out, n);
 }
 
 /**
@@ -133,10 +129,10 @@ TEST_F(MalformedDetectionTest, ZeroWidthDetectionDoesNotCrash)
 TEST_F(MalformedDetectionTest, ZeroHeightDetectionDoesNotCrash)
 {
     std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d = makeDet(100.0f, 200.0f, /*w*/ 50.0f, /*h*/ 0.0f);
+    sushitrack_object_t d = make_det(100.0f, 200.0f, /*w*/ 50.0f, /*h*/ 0.0f);
     int n = sushitrack_update(hdl_, &d, 1, out.data(), 4, 0.04f);
     EXPECT_GE(n, 0);
-    expectFiniteGeometry(out, n);
+    expect_finite_geometry(out, n);
 }
 
 /**
@@ -146,11 +142,11 @@ TEST_F(MalformedDetectionTest, ZeroHeightDetectionDoesNotCrash)
 TEST_F(MalformedDetectionTest, NegativeScoreDoesNotProduceNaNGeometry)
 {
     std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d = makeDet(100.0f, 200.0f);
-    d.score            = -0.5f;
+    sushitrack_object_t d = make_det(100.0f, 200.0f);
+    d.score = -0.5f;
     int n = sushitrack_update(hdl_, &d, 1, out.data(), 4, 0.04f);
     EXPECT_GE(n, 0);
-    expectFiniteGeometry(out, n);
+    expect_finite_geometry(out, n);
 }
 
 /**
@@ -164,18 +160,18 @@ TEST_F(MalformedDetectionTest, DISABLED_NaNCoordinatesDoNotCorruptOtherTracks)
 {
     std::vector<sushitrack_track_t> out(8);
 
-    sushitrack_object_t good = makeDet(100.0f, 200.0f);
+    sushitrack_object_t good = make_det(100.0f, 200.0f);
     sushitrack_update(hdl_, &good, 1, out.data(), 8, 0.04f);
     ASSERT_GE(out[0].state, 0);
     const int64_t good_id = out[0].track_id;
 
-    const float kNaN = std::numeric_limits<float>::quiet_NaN();
-    sushitrack_object_t bad = makeDet(kNaN, kNaN);
-    sushitrack_object_t good2 = makeDet(102.0f, 202.0f);
-    sushitrack_object_t dets[2] = { good2, bad };
+    const float K_NAN = std::numeric_limits<float>::quiet_NaN();
+    sushitrack_object_t bad = make_det(K_NAN, K_NAN);
+    sushitrack_object_t good2 = make_det(102.0f, 202.0f);
+    sushitrack_object_t dets[2] = {good2, bad};
     int n = sushitrack_update(hdl_, dets, 2, out.data(), 8, 0.04f);
     EXPECT_GE(n, 0);
-    expectFiniteGeometry(out, n);
+    expect_finite_geometry(out, n);
 
     // The original good track must remain finite at its expected location.
     for (int i = 0; i < n; ++i)
@@ -196,11 +192,11 @@ TEST_F(MalformedDetectionTest, DISABLED_NaNCoordinatesDoNotCorruptOtherTracks)
 TEST_F(MalformedDetectionTest, DISABLED_InfCoordinatesDoNotCrash)
 {
     std::vector<sushitrack_track_t> out(4);
-    const float kInf = std::numeric_limits<float>::infinity();
-    sushitrack_object_t d = makeDet(kInf, kInf);
+    const float K_INF = std::numeric_limits<float>::infinity();
+    sushitrack_object_t d = make_det(K_INF, K_INF);
     int n = sushitrack_update(hdl_, &d, 1, out.data(), 4, 0.04f);
     EXPECT_GE(n, 0);
-    expectFiniteGeometry(out, n);
+    expect_finite_geometry(out, n);
 }
 
 /**
@@ -215,13 +211,13 @@ TEST_F(MalformedDetectionTest, NaNFeatureVectorDoesNotPoisonTracker)
     ASSERT_NE(hdl_, nullptr);
 
     std::vector<sushitrack_track_t> out(4);
-    const float kNaN = std::numeric_limits<float>::quiet_NaN();
-    std::vector<float> bad_feat(16, kNaN);
+    const float K_NAN = std::numeric_limits<float>::quiet_NaN();
+    std::vector<float> bad_feat(16, K_NAN);
 
-    sushitrack_object_t d = makeDetWithFeat(100.0f, 200.0f, bad_feat.data(), 16);
+    sushitrack_object_t d = make_det_with_feat(100.0f, 200.0f, bad_feat.data(), 16);
     int n = sushitrack_update(hdl_, &d, 1, out.data(), 4, 0.04f);
     EXPECT_GE(n, 0);
-    expectFiniteGeometry(out, n);
+    expect_finite_geometry(out, n);
 }
 
 // LargeCoordinateTest
@@ -231,24 +227,24 @@ TEST_F(MalformedDetectionTest, NaNFeatureVectorDoesNotPoisonTracker)
  */
 class LargeCoordinateTest : public ::testing::Test
 {
-protected:
-    sushitrack_tracker_t     hdl_    = nullptr;
-    sushitrack_params_t params_ = {};
+    protected:
+        sushitrack_tracker_t hdl_ = nullptr;
+        sushitrack_params_t params_ = {};
 
-    void SetUp() override
-    {
-        sushitrack_get_default_params(&params_);
-        params_.time_aware       = 1;
-        params_.enable_tentative = 0;
-        params_.track_thresh     = 0.1f;
-        params_.high_thresh      = 0.2f;
-        params_.match_thresh     = 0.95f;
-        params_.frame_rate       = 30;
-        hdl_ = sushitrack_create(&params_);
-        ASSERT_NE(hdl_, nullptr);
-    }
+        void SetUp() override
+        {
+            sushitrack_get_default_params(&params_);
+            params_.time_aware = 1;
+            params_.enable_tentative = 0;
+            params_.track_thresh = 0.1f;
+            params_.high_thresh = 0.2f;
+            params_.match_thresh = 0.95f;
+            params_.frame_rate = 30;
+            hdl_ = sushitrack_create(&params_);
+            ASSERT_NE(hdl_, nullptr);
+        }
 
-    void TearDown() override { sushitrack_destroy(hdl_); }
+        void TearDown() override { sushitrack_destroy(hdl_); }
 };
 
 /**
@@ -257,12 +253,12 @@ protected:
 TEST_F(LargeCoordinateTest, MillionPixelCoordinatesRemainFinite)
 {
     std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d0 = makeDet(1.0e6f, 1.0e6f);
-    sushitrack_object_t d1 = makeDet(1.0e6f + 2.0f, 1.0e6f + 2.0f);
+    sushitrack_object_t d0 = make_det(1.0e6f, 1.0e6f);
+    sushitrack_object_t d1 = make_det(1.0e6f + 2.0f, 1.0e6f + 2.0f);
     sushitrack_update(hdl_, &d0, 1, out.data(), 4, 1.0f / 30.0f);
     int n = sushitrack_update(hdl_, &d1, 1, out.data(), 4, 1.0f / 30.0f);
     EXPECT_GE(n, 1);
-    expectFiniteGeometry(out, n);
+    expect_finite_geometry(out, n);
 }
 
 /**
@@ -273,13 +269,13 @@ TEST_F(LargeCoordinateTest, MillionPixelCoordinatesRemainFinite)
 TEST_F(LargeCoordinateTest, HugeFrameToFrameJumpDoesNotProduceNonFinite)
 {
     std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d0 = makeDet(100.0f, 200.0f);
+    sushitrack_object_t d0 = make_det(100.0f, 200.0f);
     sushitrack_update(hdl_, &d0, 1, out.data(), 4, 1.0f / 30.0f);
 
-    sushitrack_object_t d_jump = makeDet(50000.0f, 50000.0f);
+    sushitrack_object_t d_jump = make_det(50000.0f, 50000.0f);
     int n = sushitrack_update(hdl_, &d_jump, 1, out.data(), 4, 1.0f / 30.0f);
     EXPECT_GE(n, 0);
-    expectFiniteGeometry(out, n);
+    expect_finite_geometry(out, n);
 }
 
 // HighDimensionalReIDTest
@@ -289,7 +285,7 @@ TEST_F(LargeCoordinateTest, HugeFrameToFrameJumpDoesNotProduceNonFinite)
  * @param dim Vector dimensionality.
  * @param axis Index of the active component (must be < dim).
  */
-std::vector<float> unitFeature(int dim, int axis)
+std::vector<float> unit_feature(int dim, int axis)
 {
     std::vector<float> v(static_cast<std::size_t>(dim), 0.0f);
     v[static_cast<std::size_t>(axis)] = 1.0f;
@@ -301,25 +297,25 @@ std::vector<float> unitFeature(int dim, int axis)
  */
 class HighDimensionalReIDTest : public ::testing::TestWithParam<int>
 {
-protected:
-    sushitrack_tracker_t     hdl_    = nullptr;
-    sushitrack_params_t params_ = {};
+    protected:
+        sushitrack_tracker_t hdl_ = nullptr;
+        sushitrack_params_t params_ = {};
 
-    void SetUp() override
-    {
-        sushitrack_get_default_params(&params_);
-        params_.time_aware       = 1;
-        params_.enable_tentative = 0;
-        params_.enable_reid      = 1;
-        params_.track_thresh     = 0.1f;
-        params_.high_thresh      = 0.2f;
-        params_.match_thresh     = 0.95f;
-        params_.frame_rate       = 25;
-        hdl_ = sushitrack_create(&params_);
-        ASSERT_NE(hdl_, nullptr);
-    }
+        void SetUp() override
+        {
+            sushitrack_get_default_params(&params_);
+            params_.time_aware = 1;
+            params_.enable_tentative = 0;
+            params_.enable_reid = 1;
+            params_.track_thresh = 0.1f;
+            params_.high_thresh = 0.2f;
+            params_.match_thresh = 0.95f;
+            params_.frame_rate = 25;
+            hdl_ = sushitrack_create(&params_);
+            ASSERT_NE(hdl_, nullptr);
+        }
 
-    void TearDown() override { sushitrack_destroy(hdl_); }
+        void TearDown() override { sushitrack_destroy(hdl_); }
 };
 
 /**
@@ -329,23 +325,22 @@ protected:
 TEST_P(HighDimensionalReIDTest, HighDimUnitFeaturePreservesIdentity)
 {
     const int dim = GetParam();
-    std::vector<float> feat = unitFeature(dim, 0);
+    std::vector<float> feat = unit_feature(dim, 0);
 
     std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d0 = makeDetWithFeat(100.0f, 200.0f, feat.data(), dim);
+    sushitrack_object_t d0 = make_det_with_feat(100.0f, 200.0f, feat.data(), dim);
     sushitrack_update(hdl_, &d0, 1, out.data(), 4, 0.04f);
     ASSERT_EQ(out[0].state, 1);
     const int64_t id = out[0].track_id;
 
-    sushitrack_object_t d1 = makeDetWithFeat(102.0f, 202.0f, feat.data(), dim);
+    sushitrack_object_t d1 = make_det_with_feat(102.0f, 202.0f, feat.data(), dim);
     int n = sushitrack_update(hdl_, &d1, 1, out.data(), 4, 0.04f);
     ASSERT_GE(n, 1);
     EXPECT_EQ(out[0].track_id, id);
-    expectFiniteGeometry(out, n);
+    expect_finite_geometry(out, n);
 }
 
-INSTANTIATE_TEST_SUITE_P(FeatureDimensions,
-                         HighDimensionalReIDTest,
+INSTANTIATE_TEST_SUITE_P(FeatureDimensions, HighDimensionalReIDTest,
                          ::testing::Values(128, 512, 2048));
 
 /**
@@ -356,21 +351,24 @@ TEST(HighDimensionalReIDZeroNormTest, ZeroNormFeatureIsToleratedWithoutNaN)
 {
     sushitrack_params_t params{};
     sushitrack_get_default_params(&params);
-    params.time_aware       = 1;
+    params.time_aware = 1;
     params.enable_tentative = 0;
-    params.enable_reid      = 1;
-    params.track_thresh     = 0.1f;
-    params.high_thresh      = 0.2f;
-    params.frame_rate       = 25;
+    params.enable_reid = 1;
+    params.track_thresh = 0.1f;
+    params.high_thresh = 0.2f;
+    params.frame_rate = 25;
 
     sushitrack_tracker_t hdl = sushitrack_create(&params);
     ASSERT_NE(hdl, nullptr);
 
     std::vector<float> zero_feat(128, 0.0f);
     sushitrack_object_t o{};
-    o.x = 100.0f; o.y = 200.0f;
-    o.width = 50.0f; o.height = 100.0f;
-    o.score = 0.9f; o.label = 1;
+    o.x = 100.0f;
+    o.y = 200.0f;
+    o.width = 50.0f;
+    o.height = 100.0f;
+    o.score = 0.9f;
+    o.label = 1;
     o.feat = zero_feat.data();
     o.feat_dim = 128;
 
@@ -398,32 +396,35 @@ TEST(LongRunStabilityTest, OneThousandFramesStationaryNoNumericalDrift)
 {
     sushitrack_params_t params{};
     sushitrack_get_default_params(&params);
-    params.time_aware       = 1;
+    params.time_aware = 1;
     params.enable_tentative = 0;
-    params.track_thresh     = 0.1f;
-    params.high_thresh      = 0.2f;
-    params.frame_rate       = 30;
-    params.track_buffer     = 60;
+    params.track_thresh = 0.1f;
+    params.high_thresh = 0.2f;
+    params.frame_rate = 30;
+    params.track_buffer = 60;
     sushitrack_tracker_t hdl = sushitrack_create(&params);
     ASSERT_NE(hdl, nullptr);
 
     std::vector<sushitrack_track_t> out(4);
-    constexpr int kFrames = 1000;
-    for (int i = 0; i < kFrames; ++i)
+    constexpr int K_FRAMES = 1000;
+    for (int i = 0; i < K_FRAMES; ++i)
     {
         sushitrack_object_t d{};
-        d.x = 100.0f; d.y = 200.0f;
-        d.width = 50.0f; d.height = 100.0f;
-        d.score = 0.9f; d.label = 1;
+        d.x = 100.0f;
+        d.y = 200.0f;
+        d.width = 50.0f;
+        d.height = 100.0f;
+        d.score = 0.9f;
+        d.label = 1;
         int n = sushitrack_update(hdl, &d, 1, out.data(), 4, 1.0f / 30.0f);
         ASSERT_GE(n, 1);
 
         // Spot check every 100 frames to keep the loop fast.
         if (i % 100 == 0)
         {
-            EXPECT_TRUE(std::isfinite(out[0].x))      << "frame " << i;
-            EXPECT_TRUE(std::isfinite(out[0].y))      << "frame " << i;
-            EXPECT_TRUE(std::isfinite(out[0].width))  << "frame " << i;
+            EXPECT_TRUE(std::isfinite(out[0].x)) << "frame " << i;
+            EXPECT_TRUE(std::isfinite(out[0].y)) << "frame " << i;
+            EXPECT_TRUE(std::isfinite(out[0].width)) << "frame " << i;
             EXPECT_TRUE(std::isfinite(out[0].height)) << "frame " << i;
         }
     }
@@ -442,11 +443,11 @@ TEST(SimilarityBoundaryTest, NearUnitySimilarityIsAccepted)
 {
     sushitrack_params_t params{};
     sushitrack_get_default_params(&params);
-    params.time_aware   = 1;
-    params.enable_reid  = 1;
-    params.frame_rate   = 25;
+    params.time_aware = 1;
+    params.enable_reid = 1;
+    params.frame_rate = 25;
     params.track_thresh = 0.1f;
-    params.high_thresh  = 0.2f;
+    params.high_thresh = 0.2f;
     sushitrack_tracker_t hdl = sushitrack_create(&params);
     ASSERT_NE(hdl, nullptr);
 
@@ -457,12 +458,24 @@ TEST(SimilarityBoundaryTest, NearUnitySimilarityIsAccepted)
     b[1] = 1.0e-4f;
 
     sushitrack_object_t d0{};
-    d0.x = 100.0f; d0.y = 200.0f; d0.width = 50.0f; d0.height = 100.0f;
-    d0.score = 0.95f; d0.label = 1; d0.feat = a.data(); d0.feat_dim = 32;
+    d0.x = 100.0f;
+    d0.y = 200.0f;
+    d0.width = 50.0f;
+    d0.height = 100.0f;
+    d0.score = 0.95f;
+    d0.label = 1;
+    d0.feat = a.data();
+    d0.feat_dim = 32;
 
     sushitrack_object_t d1{};
-    d1.x = 102.0f; d1.y = 202.0f; d1.width = 50.0f; d1.height = 100.0f;
-    d1.score = 0.95f; d1.label = 1; d1.feat = b.data(); d1.feat_dim = 32;
+    d1.x = 102.0f;
+    d1.y = 202.0f;
+    d1.width = 50.0f;
+    d1.height = 100.0f;
+    d1.score = 0.95f;
+    d1.label = 1;
+    d1.feat = b.data();
+    d1.feat_dim = 32;
 
     std::vector<sushitrack_track_t> out(4);
     int n0 = sushitrack_update(hdl, &d0, 1, out.data(), 4, 0.04f);
@@ -481,11 +494,11 @@ TEST(SimilarityBoundaryTest, NearOrthogonalSimilarityIsAccepted)
 {
     sushitrack_params_t params{};
     sushitrack_get_default_params(&params);
-    params.time_aware   = 1;
-    params.enable_reid  = 1;
-    params.frame_rate   = 25;
+    params.time_aware = 1;
+    params.enable_reid = 1;
+    params.frame_rate = 25;
     params.track_thresh = 0.1f;
-    params.high_thresh  = 0.2f;
+    params.high_thresh = 0.2f;
     sushitrack_tracker_t hdl = sushitrack_create(&params);
     ASSERT_NE(hdl, nullptr);
 
@@ -496,12 +509,24 @@ TEST(SimilarityBoundaryTest, NearOrthogonalSimilarityIsAccepted)
     b[0] = 1.0e-4f; // nearly orthogonal — cosine ≈ 1e-4
 
     sushitrack_object_t d0{};
-    d0.x = 100.0f; d0.y = 200.0f; d0.width = 50.0f; d0.height = 100.0f;
-    d0.score = 0.95f; d0.label = 1; d0.feat = a.data(); d0.feat_dim = 32;
+    d0.x = 100.0f;
+    d0.y = 200.0f;
+    d0.width = 50.0f;
+    d0.height = 100.0f;
+    d0.score = 0.95f;
+    d0.label = 1;
+    d0.feat = a.data();
+    d0.feat_dim = 32;
 
     sushitrack_object_t d1{};
-    d1.x = 600.0f; d1.y = 600.0f; d1.width = 50.0f; d1.height = 100.0f;
-    d1.score = 0.95f; d1.label = 1; d1.feat = b.data(); d1.feat_dim = 32;
+    d1.x = 600.0f;
+    d1.y = 600.0f;
+    d1.width = 50.0f;
+    d1.height = 100.0f;
+    d1.score = 0.95f;
+    d1.label = 1;
+    d1.feat = b.data();
+    d1.feat_dim = 32;
 
     std::vector<sushitrack_track_t> out(4);
     int n0 = sushitrack_update(hdl, &d0, 1, out.data(), 4, 0.04f);

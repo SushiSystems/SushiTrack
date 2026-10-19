@@ -29,32 +29,32 @@
 
 #include <memory>
 
-#include <SushiTrack/filtering/i_kalman_factory.hpp>
-#include <SushiTrack/filtering/i_state_predictor.hpp>
+#include <SushiTrack/filtering/kalman_factory.hpp>
+#include <SushiTrack/filtering/state_predictor.hpp>
 
 namespace SushiTrack
 {
     /**
      * @brief Generic factory for instantiating state predictors via a dynamic registry.
      */
-    class GenericKalmanFactory : public IKalmanFactory
+    class GenericKalmanFactory final : public KalmanFactory
     {
-    public:
-        /**
-         * @brief Initializes factory with Kalman type and coordinate parameters.
-         * @param kalman_type Identifier for the Kalman filter type.
-         * @param enable_xyah Flag for coordinate system selection.
-         */
-        GenericKalmanFactory(int kalman_type, bool enable_xyah = false);
+        public:
+            /**
+             * @brief Initializes factory with Kalman type and coordinate parameters.
+             * @param kalman_type Identifier for the Kalman filter type.
+             * @param enable_xyah Flag for coordinate system selection.
+             */
+            explicit GenericKalmanFactory(int kalman_type, bool enable_xyah = false);
 
-        /**
-         * @brief Generates a new state predictor instance from registry.
-         * @return Unique pointer to initialized state predictor.
-         */
-        std::unique_ptr<IStatePredictor> create() const override;
+            /**
+             * @brief Generates a new state predictor instance from registry.
+             * @return Unique pointer to initialized state predictor.
+             */
+            [[nodiscard]] std::unique_ptr<StatePredictor> create() const override;
 
-    private:
-        int kalman_type_;
-        bool enable_xyah_;
+        private:
+            int kalman_type_;
+            bool enable_xyah_;
     };
 } // namespace SushiTrack

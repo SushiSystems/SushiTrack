@@ -25,17 +25,7 @@
  * @author Mustafa Garip
  */
 
-
 #pragma once
-
-#include "ITrackerAdapter.h"
-#include "TestInfra.h"
-
-#include <SushiTrack/c_api/sushitrack_c.h>
-#include <SushiTrack/tracking/tracker.hpp>
-#include <SushiTrack/detection/object.hpp>
-#include <SushiTrack/detection/rect.hpp>
-#include <SushiTrack/tracking/tracker_config.hpp>
 
 #include <filesystem>
 #include <iostream>
@@ -44,6 +34,15 @@
 #include <string>
 #include <vector>
 
+#include <SushiTrack/c_api/sushitrack_c.h>
+#include <SushiTrack/detection/object.hpp>
+#include <SushiTrack/detection/rect.hpp>
+#include <SushiTrack/tracking/tracker.hpp>
+#include <SushiTrack/tracking/tracker_config.hpp>
+
+#include "TestInfra.h"
+#include "TrackerAdapter.h"
+
 namespace TestInfrastructure
 {
     /**
@@ -51,16 +50,16 @@ namespace TestInfrastructure
      */
     struct sushitrack_tracker_impl_t
     {
-        std::unique_ptr<SushiTrack::Tracker>              tracker;
-        SushiTrack::TrackerConfig                         config;
-        std::vector<std::shared_ptr<SushiTrack::Tracklet>> last_results;
-        std::vector<std::vector<float>>                   last_features;
+            std::unique_ptr<SushiTrack::Tracker> tracker;
+            SushiTrack::TrackerConfig config;
+            std::vector<std::shared_ptr<SushiTrack::Tracklet>> last_results;
+            std::vector<std::vector<float>> last_features;
     };
 
     /**
-     * @brief Implementation of ITrackerAdapter for the SushiTrack algorithm.
+     * @brief Implementation of TrackerAdapter for the SushiTrack algorithm.
      */
-    class SushiTrackAdapter final : public ITrackerAdapter
+    class SushiTrackAdapter final : public TrackerAdapter
     {
         public:
             /**
@@ -74,7 +73,7 @@ namespace TestInfrastructure
                 sushitrack_load_params_from_json(
                     config_path.empty() ? nullptr : config_path.c_str(), &params_);
 
-                rebuildTracker();
+                rebuild_tracker();
             }
 
             /**
@@ -82,20 +81,21 @@ namespace TestInfrastructure
              */
             ~SushiTrackAdapter() override
             {
-                if (hdl_) sushitrack_destroy(hdl_);
+                if (hdl_)
+                    sushitrack_destroy(hdl_);
             }
 
             /**
              * @brief Updates the tracker processing frequency.
              * @param fps Target frames-per-second.
              */
-            void setFrameRate(int fps) override
+            void set_frame_rate(int fps) override
             {
                 params_.frame_rate = fps;
-                rebuildTracker();
+                rebuild_tracker();
             }
 
-            SushiTrackAdapter(const SushiTrackAdapter&)            = delete;
+            SushiTrackAdapter(const SushiTrackAdapter&) = delete;
             SushiTrackAdapter& operator=(const SushiTrackAdapter&) = delete;
 
             /**
@@ -111,14 +111,13 @@ namespace TestInfrastructure
              * @return Collection of tracking results.
              */
             std::vector<TrackResult> update(const std::vector<MOTDetection>& dets,
-                                           float dt = 1.0f) override
+                                            float dt = 1.0f) override
             {
                 SushiTrack::ObjectVector objects;
                 objects.reserve(dets.size());
                 for (const auto& d : dets)
-                    objects.emplace_back(
-                        SushiTrack::Rect<float>(d.x, d.y, d.w, d.h),
-                        d.label, d.score, d.feature);
+                    objects.emplace_back(SushiTrack::Rect<float>(d.x, d.y, d.w, d.h), d.label,
+                                         d.score, d.feature);
 
                 auto tracklets = impl_->tracker->update(objects, dt);
 
@@ -126,33 +125,34 @@ namespace TestInfrastructure
                 results.reserve(tracklets.size());
                 for (const auto& t : tracklets)
                 {
-                    if (!t->isActivated())
+                    if (!t->is_activated())
                         continue;
 
-                    const auto& rect = t->getRect();
+                    const auto& rect = t->get_rect();
                     TrackResult r;
-                    r.track_id = static_cast<int>(t->getTrackId());
-                    r.x        = rect.x();
-                    r.y        = rect.y();
-                    r.w        = rect.width();
-                    r.h        = rect.height();
-                    r.score    = t->getScore();
+                    r.track_id = static_cast<int>(t->get_track_id());
+                    r.x = rect.x();
+                    r.y = rect.y();
+                    r.w = rect.width();
+                    r.h = rect.height();
+                    r.score = t->get_score();
                     results.push_back(r);
                 }
                 return results;
             }
 
         private:
-            sushitrack_params_t        params_{};
-            sushitrack_tracker_t       hdl_  = nullptr;
+            sushitrack_params_t params_{};
+            sushitrack_tracker_t hdl_ = nullptr;
             sushitrack_tracker_impl_t* impl_ = nullptr;
 
             /**
              * @brief Re-instantiates the tracker using current parameters.
              */
-            void rebuildTracker()
+            void rebuild_tracker()
             {
-                if (hdl_) sushitrack_destroy(hdl_);
+                if (hdl_)
+                    sushitrack_destroy(hdl_);
                 hdl_ = sushitrack_create(&params_);
                 if (!hdl_)
                     throw std::runtime_error("sushitrack_create failed");

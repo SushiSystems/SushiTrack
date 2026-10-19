@@ -26,6 +26,7 @@
  */
 
 #include <gtest/gtest.h>
+
 #include <SushiTrack/association/cost_matrix.hpp>
 
 using namespace SushiTrack;
@@ -73,8 +74,7 @@ TEST(CostMatrixTest, ResizeExplicitFillValue)
 
     for (std::size_t r = 0; r < 2; ++r)
         for (std::size_t c = 0; c < 3; ++c)
-            EXPECT_FLOAT_EQ(m(r, c), 0.5f)
-                << "cell (" << r << "," << c << ") not 0.5";
+            EXPECT_FLOAT_EQ(m(r, c), 0.5f) << "cell (" << r << "," << c << ") not 0.5";
 }
 
 // operator() — read and write

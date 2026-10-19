@@ -25,68 +25,62 @@
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-#include <SushiTrack/c_api/sushitrack_c.h>
 #include <cmath>
 #include <cstring>
 #include <vector>
 
+#include <gtest/gtest.h>
+
+#include <SushiTrack/c_api/sushitrack_c.h>
+
 namespace
 {
 
-/**
- * @brief Constructs a benign detection without feature data.
- */
-sushitrack_object_t makeDet(float x,
-                         float y,
-                         float score  = 0.9f,
-                         float width  = 50.0f,
-                         float height = 100.0f,
-                         int   label  = 1)
-{
-    sushitrack_object_t o{};
-    o.x        = x;
-    o.y        = y;
-    o.width    = width;
-    o.height   = height;
-    o.score    = score;
-    o.label    = label;
-    o.feat     = nullptr;
-    o.feat_dim = 0;
-    return o;
-}
+    /**
+     * @brief Constructs a benign detection without feature data.
+     */
+    sushitrack_object_t make_det(float x, float y, float score = 0.9f, float width = 50.0f,
+                                 float height = 100.0f, int label = 1)
+    {
+        sushitrack_object_t o{};
+        o.x = x;
+        o.y = y;
+        o.width = width;
+        o.height = height;
+        o.score = score;
+        o.label = label;
+        o.feat = nullptr;
+        o.feat_dim = 0;
+        return o;
+    }
 
-/**
- * @brief Constructs a detection backed by an external feature pointer.
- *        The caller owns the feature memory; it must outlive the Update call.
- */
-sushitrack_object_t makeDetWithFeat(float          x,
-                                 float          y,
-                                 const float*   feat,
-                                 int            feat_dim,
-                                 float          score = 0.9f)
-{
-    sushitrack_object_t o = makeDet(x, y, score);
-    o.feat             = feat;
-    o.feat_dim         = feat_dim;
-    return o;
-}
+    /**
+     * @brief Constructs a detection backed by an external feature pointer.
+     *        The caller owns the feature memory; it must outlive the Update call.
+     */
+    sushitrack_object_t make_det_with_feat(float x, float y, const float* feat, int feat_dim,
+                                           float score = 0.9f)
+    {
+        sushitrack_object_t o = make_det(x, y, score);
+        o.feat = feat;
+        o.feat_dim = feat_dim;
+        return o;
+    }
 
-/**
- * @brief Locates a track in an output buffer by its persistent ID.
- * @return Pointer into out for the matching track, or nullptr.
- */
-const sushitrack_track_t* findById(const std::vector<sushitrack_track_t>& out,
-                                int                                  n,
-                                int64_t                              id)
-{
-    for (int i = 0; i < n; ++i)
-        if (out[static_cast<std::size_t>(i)].track_id == id)
-            return &out[static_cast<std::size_t>(i)];
-    return nullptr;
-}
+    /**
+     * @brief Locates a track in an output buffer by its persistent ID.
+     * @return Pointer into out for the matching track, or nullptr.
+     */
+    const sushitrack_track_t* find_by_id(const std::vector<sushitrack_track_t>& out, int n,
+                                         int64_t id)
+    {
+        for (int i = 0; i < n; ++i)
+            if (out[static_cast<std::size_t>(i)].track_id == id)
+                return &out[static_cast<std::size_t>(i)];
+        return nullptr;
+    }
 
-}
+} // namespace
 
 // LongSequenceTrackingTest — Issue #3 (HIGH)
 
@@ -96,27 +90,27 @@ const sushitrack_track_t* findById(const std::vector<sushitrack_track_t>& out,
  */
 class LongSequenceTrackingTest : public ::testing::Test
 {
-protected:
-    sushitrack_tracker_t     hdl_    = nullptr;
-    sushitrack_params_t params_ = {};
+    protected:
+        sushitrack_tracker_t hdl_ = nullptr;
+        sushitrack_params_t params_ = {};
 
-    void SetUp() override
-    {
-        sushitrack_get_default_params(&params_);
-        params_.time_aware             = 1;
-        params_.enable_tentative       = 0;
-        params_.primary_assoc_mode     = 1;
-        params_.frame_rate             = 30;
-        params_.track_buffer           = 60;
-        params_.track_thresh           = 0.1f;
-        params_.high_thresh            = 0.2f;
-        params_.match_thresh           = 0.9f;
+        void SetUp() override
+        {
+            sushitrack_get_default_params(&params_);
+            params_.time_aware = 1;
+            params_.enable_tentative = 0;
+            params_.primary_assoc_mode = 1;
+            params_.frame_rate = 30;
+            params_.track_buffer = 60;
+            params_.track_thresh = 0.1f;
+            params_.high_thresh = 0.2f;
+            params_.match_thresh = 0.9f;
 
-        hdl_ = sushitrack_create(&params_);
-        ASSERT_NE(hdl_, nullptr);
-    }
+            hdl_ = sushitrack_create(&params_);
+            ASSERT_NE(hdl_, nullptr);
+        }
 
-    void TearDown() override { sushitrack_destroy(hdl_); }
+        void TearDown() override { sushitrack_destroy(hdl_); }
 };
 
 /**
@@ -126,10 +120,10 @@ protected:
  */
 TEST_F(LongSequenceTrackingTest, ThreeHundredFrameSingleObjectKeepsIdentity)
 {
-    constexpr int kFrames = 300;
+    constexpr int K_FRAMES = 300;
     std::vector<sushitrack_track_t> out(8);
 
-    sushitrack_object_t d0 = makeDet(100.0f, 200.0f);
+    sushitrack_object_t d0 = make_det(100.0f, 200.0f);
     int n0 = sushitrack_update(hdl_, &d0, 1, out.data(), 8, 1.0f / 30.0f);
     ASSERT_EQ(n0, 1);
     ASSERT_EQ(out[0].state, 1);
@@ -137,29 +131,27 @@ TEST_F(LongSequenceTrackingTest, ThreeHundredFrameSingleObjectKeepsIdentity)
 
     int64_t prev_age = out[0].age;
 
-    for (int frame = 1; frame < kFrames; ++frame)
+    for (int frame = 1; frame < K_FRAMES; ++frame)
     {
-        sushitrack_object_t d = makeDet(100.0f + 1.5f * frame,
-                                     200.0f + 0.5f * frame);
+        sushitrack_object_t d = make_det(100.0f + 1.5f * frame, 200.0f + 0.5f * frame);
         int n = sushitrack_update(hdl_, &d, 1, out.data(), 8, 1.0f / 30.0f);
         ASSERT_GE(n, 1) << "Tracker dropped the object at frame " << frame;
 
-        const sushitrack_track_t* t = findById(out, n, persistent_id);
+        const sushitrack_track_t* t = find_by_id(out, n, persistent_id);
         ASSERT_NE(t, nullptr) << "Track ID flipped at frame " << frame;
 
         EXPECT_TRUE(std::isfinite(t->x));
         EXPECT_TRUE(std::isfinite(t->y));
         EXPECT_TRUE(std::isfinite(t->width));
         EXPECT_TRUE(std::isfinite(t->height));
-        EXPECT_GT(t->width,  0.0f);
+        EXPECT_GT(t->width, 0.0f);
         EXPECT_GT(t->height, 0.0f);
 
         EXPECT_GE(t->age, prev_age) << "Age regressed at frame " << frame;
         prev_age = t->age;
 
         EXPECT_EQ(t->frames_since_last_update, 0)
-            << "Continuously observed track reported a non-zero update gap at frame "
-            << frame;
+            << "Continuously observed track reported a non-zero update gap at frame " << frame;
     }
 }
 
@@ -175,35 +167,35 @@ TEST_F(LongSequenceTrackingTest, ThreeHundredFrameSingleObjectKeepsIdentity)
  */
 class TrackerReIDEndToEndTest : public ::testing::Test
 {
-protected:
-    sushitrack_tracker_t     hdl_     = nullptr;
-    sushitrack_params_t params_  = {};
-    std::vector<float> feat_a_;
-    std::vector<float> feat_b_;
+    protected:
+        sushitrack_tracker_t hdl_ = nullptr;
+        sushitrack_params_t params_ = {};
+        std::vector<float> feat_a_;
+        std::vector<float> feat_b_;
 
-    void SetUp() override
-    {
-        sushitrack_get_default_params(&params_);
-        params_.time_aware             = 1;
-        params_.enable_tentative       = 0;
-        params_.enable_reid            = 1;
-        params_.primary_assoc_mode     = 1;
-        params_.frame_rate             = 25;
-        params_.track_buffer           = 30;
-        params_.track_thresh           = 0.1f;
-        params_.high_thresh            = 0.2f;
-        params_.match_thresh           = 0.95f;
+        void SetUp() override
+        {
+            sushitrack_get_default_params(&params_);
+            params_.time_aware = 1;
+            params_.enable_tentative = 0;
+            params_.enable_reid = 1;
+            params_.primary_assoc_mode = 1;
+            params_.frame_rate = 25;
+            params_.track_buffer = 30;
+            params_.track_thresh = 0.1f;
+            params_.high_thresh = 0.2f;
+            params_.match_thresh = 0.95f;
 
-        hdl_ = sushitrack_create(&params_);
-        ASSERT_NE(hdl_, nullptr);
+            hdl_ = sushitrack_create(&params_);
+            ASSERT_NE(hdl_, nullptr);
 
-        feat_a_.assign(16, 0.0f);
-        feat_b_.assign(16, 0.0f);
-        feat_a_[0] = 1.0f;   // unit vector along axis 0
-        feat_b_[1] = 1.0f;   // unit vector along axis 1 (orthogonal to A)
-    }
+            feat_a_.assign(16, 0.0f);
+            feat_b_.assign(16, 0.0f);
+            feat_a_[0] = 1.0f; // unit vector along axis 0
+            feat_b_[1] = 1.0f; // unit vector along axis 1 (orthogonal to A)
+        }
 
-    void TearDown() override { sushitrack_destroy(hdl_); }
+        void TearDown() override { sushitrack_destroy(hdl_); }
 };
 
 /**
@@ -215,9 +207,9 @@ TEST_F(TrackerReIDEndToEndTest, DistinctFeaturesPreventIdSwapOnCrossover)
 {
     std::vector<sushitrack_track_t> out(8);
 
-    sushitrack_object_t a0 = makeDetWithFeat(100.0f, 200.0f, feat_a_.data(), 16, 0.95f);
-    sushitrack_object_t b0 = makeDetWithFeat(400.0f, 200.0f, feat_b_.data(), 16, 0.95f);
-    sushitrack_object_t dets0[2] = { a0, b0 };
+    sushitrack_object_t a0 = make_det_with_feat(100.0f, 200.0f, feat_a_.data(), 16, 0.95f);
+    sushitrack_object_t b0 = make_det_with_feat(400.0f, 200.0f, feat_b_.data(), 16, 0.95f);
+    sushitrack_object_t dets0[2] = {a0, b0};
     int n0 = sushitrack_update(hdl_, dets0, 2, out.data(), 8, 0.04f);
     ASSERT_GE(n0, 2);
 
@@ -238,27 +230,26 @@ TEST_F(TrackerReIDEndToEndTest, DistinctFeaturesPreventIdSwapOnCrossover)
     {
         const float ax = 100.0f + 40.0f * k;
         const float bx = 400.0f - 40.0f * k;
-        sushitrack_object_t a = makeDetWithFeat(ax, 200.0f, feat_a_.data(), 16, 0.95f);
-        sushitrack_object_t b = makeDetWithFeat(bx, 200.0f, feat_b_.data(), 16, 0.95f);
-        sushitrack_object_t dets[2] = { a, b };
+        sushitrack_object_t a = make_det_with_feat(ax, 200.0f, feat_a_.data(), 16, 0.95f);
+        sushitrack_object_t b = make_det_with_feat(bx, 200.0f, feat_b_.data(), 16, 0.95f);
+        sushitrack_object_t dets[2] = {a, b};
         sushitrack_update(hdl_, dets, 2, out.data(), 8, 0.04f);
     }
 
     int n_final = sushitrack_update(hdl_,
-                                   /* unchanged */ nullptr, 0,
-                                   out.data(), 8, 0.04f);
+                                    /* unchanged */ nullptr, 0, out.data(), 8, 0.04f);
     (void)n_final;
 
     // Both original IDs must still be alive somewhere in the output history.
-    sushitrack_object_t a_late = makeDetWithFeat(380.0f, 200.0f, feat_a_.data(), 16, 0.95f);
-    sushitrack_object_t b_late = makeDetWithFeat(120.0f, 200.0f, feat_b_.data(), 16, 0.95f);
-    sushitrack_object_t dets_late[2] = { a_late, b_late };
+    sushitrack_object_t a_late = make_det_with_feat(380.0f, 200.0f, feat_a_.data(), 16, 0.95f);
+    sushitrack_object_t b_late = make_det_with_feat(120.0f, 200.0f, feat_b_.data(), 16, 0.95f);
+    sushitrack_object_t dets_late[2] = {a_late, b_late};
     int n_late = sushitrack_update(hdl_, dets_late, 2, out.data(), 8, 0.04f);
     ASSERT_GE(n_late, 2);
 
-    EXPECT_NE(findById(out, n_late, id_a), nullptr)
+    EXPECT_NE(find_by_id(out, n_late, id_a), nullptr)
         << "Track A lost its ID across the crossover.";
-    EXPECT_NE(findById(out, n_late, id_b), nullptr)
+    EXPECT_NE(find_by_id(out, n_late, id_b), nullptr)
         << "Track B lost its ID across the crossover.";
 }
 
@@ -270,7 +261,7 @@ TEST_F(TrackerReIDEndToEndTest, LostTrackRecoveredByMatchingFeature)
 {
     std::vector<sushitrack_track_t> out(8);
 
-    sushitrack_object_t d0 = makeDetWithFeat(100.0f, 200.0f, feat_a_.data(), 16, 0.95f);
+    sushitrack_object_t d0 = make_det_with_feat(100.0f, 200.0f, feat_a_.data(), 16, 0.95f);
     sushitrack_update(hdl_, &d0, 1, out.data(), 8, 0.04f);
     ASSERT_EQ(out[0].state, 1);
     const int64_t original_id = out[0].track_id;
@@ -280,13 +271,12 @@ TEST_F(TrackerReIDEndToEndTest, LostTrackRecoveredByMatchingFeature)
         sushitrack_update(hdl_, nullptr, 0, out.data(), 8, 0.04f);
 
     // Reappear with the same feature, slightly displaced.
-    sushitrack_object_t d_back = makeDetWithFeat(160.0f, 220.0f, feat_a_.data(), 16, 0.95f);
+    sushitrack_object_t d_back = make_det_with_feat(160.0f, 220.0f, feat_a_.data(), 16, 0.95f);
     int n = sushitrack_update(hdl_, &d_back, 1, out.data(), 8, 0.04f);
     ASSERT_GE(n, 1);
 
-    const sushitrack_track_t* recovered = findById(out, n, original_id);
-    EXPECT_NE(recovered, nullptr)
-        << "ReID failed to recover the lost track to its original ID.";
+    const sushitrack_track_t* recovered = find_by_id(out, n, original_id);
+    EXPECT_NE(recovered, nullptr) << "ReID failed to recover the lost track to its original ID.";
 }
 
 // TrackerTentativeWithReIDTest — Issue #6 (MED)
@@ -296,34 +286,34 @@ TEST_F(TrackerReIDEndToEndTest, LostTrackRecoveredByMatchingFeature)
  */
 class TrackerTentativeWithReIDTest : public ::testing::Test
 {
-protected:
-    sushitrack_tracker_t     hdl_    = nullptr;
-    sushitrack_params_t params_ = {};
-    std::vector<float> feat_;
+    protected:
+        sushitrack_tracker_t hdl_ = nullptr;
+        sushitrack_params_t params_ = {};
+        std::vector<float> feat_;
 
-    void SetUp() override
-    {
-        sushitrack_get_default_params(&params_);
-        params_.time_aware             = 1;
-        params_.enable_tentative       = 1;
-        params_.enable_reid            = 1;
-        params_.tentative_confirm_hits = 3;
-        params_.frame_rate             = 25;
-        params_.track_buffer           = 30;
-        params_.track_thresh           = 0.1f;
-        params_.high_thresh            = 0.2f;
-        params_.match_thresh           = 0.9f;
-        params_.tentative_match_thresh = 0.95f;
-        params_.tentative_fast_thresh  = 0.99f;
+        void SetUp() override
+        {
+            sushitrack_get_default_params(&params_);
+            params_.time_aware = 1;
+            params_.enable_tentative = 1;
+            params_.enable_reid = 1;
+            params_.tentative_confirm_hits = 3;
+            params_.frame_rate = 25;
+            params_.track_buffer = 30;
+            params_.track_thresh = 0.1f;
+            params_.high_thresh = 0.2f;
+            params_.match_thresh = 0.9f;
+            params_.tentative_match_thresh = 0.95f;
+            params_.tentative_fast_thresh = 0.99f;
 
-        hdl_ = sushitrack_create(&params_);
-        ASSERT_NE(hdl_, nullptr);
+            hdl_ = sushitrack_create(&params_);
+            ASSERT_NE(hdl_, nullptr);
 
-        feat_.assign(16, 0.0f);
-        feat_[3] = 1.0f;
-    }
+            feat_.assign(16, 0.0f);
+            feat_[3] = 1.0f;
+        }
 
-    void TearDown() override { sushitrack_destroy(hdl_); }
+        void TearDown() override { sushitrack_destroy(hdl_); }
 };
 
 /**
@@ -336,10 +326,8 @@ TEST_F(TrackerTentativeWithReIDTest, TentativeWithFeaturesConfirmsAfterHitCount)
 
     for (int i = 0; i < params_.tentative_confirm_hits; ++i)
     {
-        sushitrack_object_t d = makeDetWithFeat(100.0f + 1.0f * i,
-                                             200.0f + 1.0f * i,
-                                             feat_.data(), 16,
-                                             0.7f);
+        sushitrack_object_t d =
+            make_det_with_feat(100.0f + 1.0f * i, 200.0f + 1.0f * i, feat_.data(), 16, 0.7f);
         int n = sushitrack_update(hdl_, &d, 1, out.data(), 4, 0.04f);
         ASSERT_GE(n, 1);
     }
@@ -356,20 +344,19 @@ TEST_F(TrackerTentativeWithReIDTest, TentativeReAcquiresAfterSingleMissedFrame)
 {
     std::vector<sushitrack_track_t> out(4);
 
-    sushitrack_object_t d0 = makeDetWithFeat(100.0f, 200.0f, feat_.data(), 16, 0.7f);
+    sushitrack_object_t d0 = make_det_with_feat(100.0f, 200.0f, feat_.data(), 16, 0.7f);
     int n0 = sushitrack_update(hdl_, &d0, 1, out.data(), 4, 0.04f);
     ASSERT_GE(n0, 1);
     const int64_t tentative_id = out[0].track_id;
 
     sushitrack_update(hdl_, nullptr, 0, out.data(), 4, 0.04f);
 
-    sushitrack_object_t d2 = makeDetWithFeat(102.0f, 202.0f, feat_.data(), 16, 0.7f);
+    sushitrack_object_t d2 = make_det_with_feat(102.0f, 202.0f, feat_.data(), 16, 0.7f);
     int n2 = sushitrack_update(hdl_, &d2, 1, out.data(), 4, 0.04f);
     ASSERT_GE(n2, 1);
 
-    const sushitrack_track_t* same = findById(out, n2, tentative_id);
-    EXPECT_NE(same, nullptr)
-        << "Tentative track lost its ID across a single missed frame.";
+    const sushitrack_track_t* same = find_by_id(out, n2, tentative_id);
+    EXPECT_NE(same, nullptr) << "Tentative track lost its ID across a single missed frame.";
 }
 
 // TrackerImmGatingEndToEndTest — Section 2.3.2 (MED)
@@ -379,29 +366,29 @@ TEST_F(TrackerTentativeWithReIDTest, TentativeReAcquiresAfterSingleMissedFrame)
  */
 class TrackerImmGatingEndToEndTest : public ::testing::Test
 {
-protected:
-    sushitrack_tracker_t     hdl_    = nullptr;
-    sushitrack_params_t params_ = {};
+    protected:
+        sushitrack_tracker_t hdl_ = nullptr;
+        sushitrack_params_t params_ = {};
 
-    void SetUp() override
-    {
-        sushitrack_get_default_params(&params_);
-        params_.time_aware             = 1;
-        params_.enable_tentative       = 0;
-        params_.kalman_type            = 2;
-        params_.enable_mahalanobis     = 1;
-        params_.primary_assoc_mode     = 1;
-        params_.frame_rate             = 25;
-        params_.track_buffer           = 30;
-        params_.track_thresh           = 0.1f;
-        params_.high_thresh            = 0.2f;
-        params_.match_thresh           = 0.9f;
+        void SetUp() override
+        {
+            sushitrack_get_default_params(&params_);
+            params_.time_aware = 1;
+            params_.enable_tentative = 0;
+            params_.kalman_type = 2;
+            params_.enable_mahalanobis = 1;
+            params_.primary_assoc_mode = 1;
+            params_.frame_rate = 25;
+            params_.track_buffer = 30;
+            params_.track_thresh = 0.1f;
+            params_.high_thresh = 0.2f;
+            params_.match_thresh = 0.9f;
 
-        hdl_ = sushitrack_create(&params_);
-        ASSERT_NE(hdl_, nullptr);
-    }
+            hdl_ = sushitrack_create(&params_);
+            ASSERT_NE(hdl_, nullptr);
+        }
 
-    void TearDown() override { sushitrack_destroy(hdl_); }
+        void TearDown() override { sushitrack_destroy(hdl_); }
 };
 
 /**
@@ -411,7 +398,7 @@ protected:
 TEST_F(TrackerImmGatingEndToEndTest, ManeuveringTrackKeepsIdentityInsideGate)
 {
     std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d0 = makeDet(100.0f, 200.0f);
+    sushitrack_object_t d0 = make_det(100.0f, 200.0f);
     sushitrack_update(hdl_, &d0, 1, out.data(), 4, 0.04f);
     ASSERT_EQ(out[0].state, 1);
     const int64_t persistent_id = out[0].track_id;
@@ -421,10 +408,10 @@ TEST_F(TrackerImmGatingEndToEndTest, ManeuveringTrackKeepsIdentityInsideGate)
     {
         const float dx = 2.0f * static_cast<float>(k);
         const float dy = 1.0f * static_cast<float>(k);
-        sushitrack_object_t d = makeDet(100.0f + dx, 200.0f + dy);
+        sushitrack_object_t d = make_det(100.0f + dx, 200.0f + dy);
         int n = sushitrack_update(hdl_, &d, 1, out.data(), 4, 0.04f);
         ASSERT_GE(n, 1);
-        const sushitrack_track_t* t = findById(out, n, persistent_id);
+        const sushitrack_track_t* t = find_by_id(out, n, persistent_id);
         ASSERT_NE(t, nullptr) << "Track lost identity inside maneuver at step " << k;
     }
 }
@@ -436,21 +423,20 @@ TEST_F(TrackerImmGatingEndToEndTest, ManeuveringTrackKeepsIdentityInsideGate)
 TEST_F(TrackerImmGatingEndToEndTest, OutOfGateDetectionDoesNotBindEstablishedTrack)
 {
     std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d0 = makeDet(100.0f, 200.0f);
+    sushitrack_object_t d0 = make_det(100.0f, 200.0f);
     sushitrack_update(hdl_, &d0, 1, out.data(), 4, 0.04f);
     ASSERT_EQ(out[0].state, 1);
     const int64_t persistent_id = out[0].track_id;
 
     // Detection 5000 pixels away — far outside any reasonable gate.
-    sushitrack_object_t d_far = makeDet(5100.0f, 5200.0f);
+    sushitrack_object_t d_far = make_det(5100.0f, 5200.0f);
     int n = sushitrack_update(hdl_, &d_far, 1, out.data(), 4, 0.04f);
     ASSERT_GE(n, 0);
 
-    const sushitrack_track_t* original = findById(out, n, persistent_id);
+    const sushitrack_track_t* original = find_by_id(out, n, persistent_id);
     if (original != nullptr)
     {
-        EXPECT_NE(original->state, 1)
-            << "Out-of-gate detection silently re-bound a Tracked track.";
+        EXPECT_NE(original->state, 1) << "Out-of-gate detection silently re-bound a Tracked track.";
     }
 }
 
@@ -461,26 +447,26 @@ TEST_F(TrackerImmGatingEndToEndTest, OutOfGateDetectionDoesNotBindEstablishedTra
  */
 class TrackerVariableDtTest : public ::testing::Test
 {
-protected:
-    sushitrack_tracker_t     hdl_    = nullptr;
-    sushitrack_params_t params_ = {};
+    protected:
+        sushitrack_tracker_t hdl_ = nullptr;
+        sushitrack_params_t params_ = {};
 
-    void SetUp() override
-    {
-        sushitrack_get_default_params(&params_);
-        params_.time_aware             = 1;
-        params_.enable_tentative       = 0;
-        params_.frame_rate             = 30;
-        params_.track_buffer           = 30;
-        params_.track_thresh           = 0.1f;
-        params_.high_thresh            = 0.2f;
-        params_.match_thresh           = 0.95f;
+        void SetUp() override
+        {
+            sushitrack_get_default_params(&params_);
+            params_.time_aware = 1;
+            params_.enable_tentative = 0;
+            params_.frame_rate = 30;
+            params_.track_buffer = 30;
+            params_.track_thresh = 0.1f;
+            params_.high_thresh = 0.2f;
+            params_.match_thresh = 0.95f;
 
-        hdl_ = sushitrack_create(&params_);
-        ASSERT_NE(hdl_, nullptr);
-    }
+            hdl_ = sushitrack_create(&params_);
+            ASSERT_NE(hdl_, nullptr);
+        }
 
-    void TearDown() override { sushitrack_destroy(hdl_); }
+        void TearDown() override { sushitrack_destroy(hdl_); }
 };
 
 /**
@@ -490,13 +476,13 @@ protected:
 TEST_F(TrackerVariableDtTest, MixedFrameRateSequenceRetainsIdentity)
 {
     std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d0 = makeDet(100.0f, 200.0f);
+    sushitrack_object_t d0 = make_det(100.0f, 200.0f);
     sushitrack_update(hdl_, &d0, 1, out.data(), 4, 1.0f / 30.0f);
     ASSERT_EQ(out[0].state, 1);
     const int64_t persistent_id = out[0].track_id;
 
-    const float dts[] = { 1.0f / 60.0f, 1.0f / 60.0f, 1.0f / 10.0f,
-                          1.0f / 30.0f, 1.0f / 15.0f, 1.0f / 60.0f };
+    const float dts[] = {1.0f / 60.0f, 1.0f / 60.0f, 1.0f / 10.0f,
+                         1.0f / 30.0f, 1.0f / 15.0f, 1.0f / 60.0f};
 
     float x = 100.0f;
     float y = 200.0f;
@@ -504,10 +490,10 @@ TEST_F(TrackerVariableDtTest, MixedFrameRateSequenceRetainsIdentity)
     {
         x += 60.0f * dt; // 60 px/s
         y += 30.0f * dt;
-        sushitrack_object_t d = makeDet(x, y);
+        sushitrack_object_t d = make_det(x, y);
         int n = sushitrack_update(hdl_, &d, 1, out.data(), 4, dt);
         ASSERT_GE(n, 1);
-        ASSERT_NE(findById(out, n, persistent_id), nullptr);
+        ASSERT_NE(find_by_id(out, n, persistent_id), nullptr);
     }
 }
 
@@ -518,7 +504,7 @@ TEST_F(TrackerVariableDtTest, MixedFrameRateSequenceRetainsIdentity)
 TEST_F(TrackerVariableDtTest, OneSecondGapDoesNotCrash)
 {
     std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d0 = makeDet(100.0f, 200.0f);
+    sushitrack_object_t d0 = make_det(100.0f, 200.0f);
     sushitrack_update(hdl_, &d0, 1, out.data(), 4, 1.0f / 30.0f);
     ASSERT_EQ(out[0].state, 1);
 
@@ -534,27 +520,27 @@ TEST_F(TrackerVariableDtTest, OneSecondGapDoesNotCrash)
  */
 class TrackerHighToLowConfidenceTest : public ::testing::Test
 {
-protected:
-    sushitrack_tracker_t     hdl_    = nullptr;
-    sushitrack_params_t params_ = {};
+    protected:
+        sushitrack_tracker_t hdl_ = nullptr;
+        sushitrack_params_t params_ = {};
 
-    void SetUp() override
-    {
-        sushitrack_get_default_params(&params_);
-        params_.time_aware             = 1;
-        params_.enable_tentative       = 1;
-        params_.tentative_confirm_hits = 2;
-        params_.frame_rate             = 25;
-        params_.track_buffer           = 30;
-        params_.track_thresh           = 0.3f;
-        params_.high_thresh            = 0.6f;
-        params_.match_thresh           = 0.95f;
+        void SetUp() override
+        {
+            sushitrack_get_default_params(&params_);
+            params_.time_aware = 1;
+            params_.enable_tentative = 1;
+            params_.tentative_confirm_hits = 2;
+            params_.frame_rate = 25;
+            params_.track_buffer = 30;
+            params_.track_thresh = 0.3f;
+            params_.high_thresh = 0.6f;
+            params_.match_thresh = 0.95f;
 
-        hdl_ = sushitrack_create(&params_);
-        ASSERT_NE(hdl_, nullptr);
-    }
+            hdl_ = sushitrack_create(&params_);
+            ASSERT_NE(hdl_, nullptr);
+        }
 
-    void TearDown() override { sushitrack_destroy(hdl_); }
+        void TearDown() override { sushitrack_destroy(hdl_); }
 };
 
 /**
@@ -566,18 +552,18 @@ TEST_F(TrackerHighToLowConfidenceTest, TrackSurvivesScoreTransitionFromHighToLow
 {
     std::vector<sushitrack_track_t> out(4);
 
-    sushitrack_object_t d0 = makeDet(100.0f, 200.0f, 0.9f);
-    sushitrack_object_t d1 = makeDet(102.0f, 202.0f, 0.9f);
+    sushitrack_object_t d0 = make_det(100.0f, 200.0f, 0.9f);
+    sushitrack_object_t d1 = make_det(102.0f, 202.0f, 0.9f);
     sushitrack_update(hdl_, &d0, 1, out.data(), 4, 0.04f);
     sushitrack_update(hdl_, &d1, 1, out.data(), 4, 0.04f);
     ASSERT_EQ(out[0].state, 1);
     const int64_t persistent_id = out[0].track_id;
 
-    sushitrack_object_t d_low = makeDet(104.0f, 204.0f, 0.4f); // below high_thresh
+    sushitrack_object_t d_low = make_det(104.0f, 204.0f, 0.4f); // below high_thresh
     int n = sushitrack_update(hdl_, &d_low, 1, out.data(), 4, 0.04f);
     ASSERT_GE(n, 1);
 
-    const sushitrack_track_t* same = findById(out, n, persistent_id);
+    const sushitrack_track_t* same = find_by_id(out, n, persistent_id);
     EXPECT_NE(same, nullptr)
         << "Track was lost when its detection moved from high to low confidence.";
 }

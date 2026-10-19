@@ -25,52 +25,51 @@
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-#include <SushiTrack/logging/logger.hpp>
-#include <SushiTrack/c_api/c_types.hpp>
 #include <atomic>
 #include <string>
 #include <thread>
 
+#include <gtest/gtest.h>
+
+#include <SushiTrack/c_api/c_types.hpp>
+#include <SushiTrack/logging/logger.hpp>
+
 namespace
 {
 
-static std::atomic<int>   g_call_count{0};
-static sushitrack_log_level_t g_last_level{SUSHITRACK_LOG_DEBUG};
-static std::string        g_last_message;
+    static std::atomic<int> g_call_count{0};
+    static sushitrack_log_level_t g_last_level{SUSHITRACK_LOG_DEBUG};
+    static std::string g_last_message;
 
-/**
- * @brief Test callback that records invocation metadata into module-level state.
- * @param level   Severity level forwarded from the logger.
- * @param message Formatted message string forwarded from the logger.
- */
-void recordingCallback(sushitrack_log_level_t level, const char* message)
-{
-    g_last_level   = level;
-    g_last_message = message ? message : "";
-    g_call_count.fetch_add(1, std::memory_order_relaxed);
-}
+    /**
+     * @brief Test callback that records invocation metadata into module-level state.
+     * @param level   Severity level forwarded from the logger.
+     * @param message Formatted message string forwarded from the logger.
+     */
+    void recording_callback(sushitrack_log_level_t level, const char* message)
+    {
+        g_last_level = level;
+        g_last_message = message ? message : "";
+        g_call_count.fetch_add(1, std::memory_order_relaxed);
+    }
 
-}
+} // namespace
 
 /**
  * @brief Fixture that installs and tears down the recording callback.
  */
 class LoggerCallbackTest : public ::testing::Test
 {
-protected:
-    void SetUp() override
-    {
-        g_call_count = 0;
-        g_last_level = SUSHITRACK_LOG_DEBUG;
-        g_last_message.clear();
-        SushiTrack::Logger::setCallback(recordingCallback);
-    }
+    protected:
+        void SetUp() override
+        {
+            g_call_count = 0;
+            g_last_level = SUSHITRACK_LOG_DEBUG;
+            g_last_message.clear();
+            SushiTrack::Logger::set_callback(recording_callback);
+        }
 
-    void TearDown() override
-    {
-        SushiTrack::Logger::setCallback(nullptr);
-    }
+        void TearDown() override { SushiTrack::Logger::set_callback(nullptr); }
 };
 
 /**
@@ -96,7 +95,7 @@ TEST_F(LoggerCallbackTest, CallbackReceivesCorrectLevel)
  */
 TEST_F(LoggerCallbackTest, NullCallbackSuppressesOutput)
 {
-    SushiTrack::Logger::setCallback(nullptr);
+    SushiTrack::Logger::set_callback(nullptr);
     SushiTrack::Logger::log(SUSHITRACK_LOG_ERROR, "should not arrive");
     EXPECT_EQ(g_call_count.load(), 0);
 }
@@ -106,10 +105,7 @@ TEST_F(LoggerCallbackTest, NullCallbackSuppressesOutput)
  */
 TEST_F(LoggerCallbackTest, ThrowRuntimeErrorThrows)
 {
-    EXPECT_THROW(
-        SushiTrack::Logger::throw_runtime_error("fatal error %d", 42),
-        std::runtime_error
-    );
+    EXPECT_THROW(SushiTrack::Logger::throw_runtime_error("fatal error %d", 42), std::runtime_error);
 }
 
 /**
@@ -135,25 +131,29 @@ TEST_F(LoggerCallbackTest, ThrowRuntimeErrorMessageContainsFormattedText)
 TEST(LoggerThreadSafetyTest, ConcurrentCallsDeliverAllMessages)
 {
     g_call_count.store(0);
-    SushiTrack::Logger::setCallback(recordingCallback);
+    SushiTrack::Logger::set_callback(recording_callback);
 
-    constexpr int kMessagesPerThread = 50;
+    constexpr int K_MESSAGES_PER_THREAD = 50;
 
-    std::thread t1([kMessagesPerThread]() {
-        for (int i = 0; i < kMessagesPerThread; ++i)
-            SushiTrack::Logger::log(SUSHITRACK_LOG_DEBUG, "t1 msg %d", i);
-    });
-    std::thread t2([kMessagesPerThread]() {
-        for (int i = 0; i < kMessagesPerThread; ++i)
-            SushiTrack::Logger::log(SUSHITRACK_LOG_INFO, "t2 msg %d", i);
-    });
+    std::thread t1(
+        [K_MESSAGES_PER_THREAD]()
+        {
+            for (int i = 0; i < K_MESSAGES_PER_THREAD; ++i)
+                SushiTrack::Logger::log(SUSHITRACK_LOG_DEBUG, "t1 msg %d", i);
+        });
+    std::thread t2(
+        [K_MESSAGES_PER_THREAD]()
+        {
+            for (int i = 0; i < K_MESSAGES_PER_THREAD; ++i)
+                SushiTrack::Logger::log(SUSHITRACK_LOG_INFO, "t2 msg %d", i);
+        });
 
     t1.join();
     t2.join();
 
-    EXPECT_EQ(g_call_count.load(), 2 * kMessagesPerThread);
+    EXPECT_EQ(g_call_count.load(), 2 * K_MESSAGES_PER_THREAD);
 
-    SushiTrack::Logger::setCallback(nullptr);
+    SushiTrack::Logger::set_callback(nullptr);
 }
 
 // LoggerLevelRoutingTest — Verified Omission #4 (Logger level filtering)
@@ -163,19 +163,16 @@ TEST(LoggerThreadSafetyTest, ConcurrentCallsDeliverAllMessages)
  */
 class LoggerLevelRoutingTest : public ::testing::Test
 {
-protected:
-    void SetUp() override
-    {
-        g_call_count = 0;
-        g_last_level = SUSHITRACK_LOG_DEBUG;
-        g_last_message.clear();
-        SushiTrack::Logger::setCallback(recordingCallback);
-    }
+    protected:
+        void SetUp() override
+        {
+            g_call_count = 0;
+            g_last_level = SUSHITRACK_LOG_DEBUG;
+            g_last_message.clear();
+            SushiTrack::Logger::set_callback(recording_callback);
+        }
 
-    void TearDown() override
-    {
-        SushiTrack::Logger::setCallback(nullptr);
-    }
+        void TearDown() override { SushiTrack::Logger::set_callback(nullptr); }
 };
 
 /**
@@ -228,25 +225,27 @@ TEST(LoggerCallbackHotSwapTest, ReplacementCallbackReceivesSubsequentMessages)
     static std::atomic<int> a_count{0};
     static std::atomic<int> b_count{0};
 
-    auto a_cb = [](sushitrack_log_level_t, const char*) {
+    auto a_cb = [](sushitrack_log_level_t, const char*)
+    {
         a_count.fetch_add(1, std::memory_order_relaxed);
     };
-    auto b_cb = [](sushitrack_log_level_t, const char*) {
+    auto b_cb = [](sushitrack_log_level_t, const char*)
+    {
         b_count.fetch_add(1, std::memory_order_relaxed);
     };
 
-    SushiTrack::Logger::setCallback(a_cb);
+    SushiTrack::Logger::set_callback(a_cb);
     SushiTrack::Logger::log(SUSHITRACK_LOG_INFO, "first");
-    SushiTrack::Logger::setCallback(b_cb);
+    SushiTrack::Logger::set_callback(b_cb);
     SushiTrack::Logger::log(SUSHITRACK_LOG_INFO, "second");
-    SushiTrack::Logger::setCallback(nullptr);
+    SushiTrack::Logger::set_callback(nullptr);
 
     EXPECT_EQ(a_count.load(), 1);
     EXPECT_EQ(b_count.load(), 1);
 }
 
 /**
- * @brief Concurrent setCallback / log invocations must remain race-free.
+ * @brief Concurrent set_callback / log invocations must remain race-free.
  *
  * One thread continuously swaps between two callbacks while a second thread
  * issues log messages. The total messages observed by the two callbacks must
@@ -255,31 +254,34 @@ TEST(LoggerCallbackHotSwapTest, ReplacementCallbackReceivesSubsequentMessages)
 TEST(LoggerCallbackHotSwapTest, ConcurrentSetCallbackAndLogIsRaceFree)
 {
     static std::atomic<int> total{0};
-    auto cb = [](sushitrack_log_level_t, const char*) {
+    auto cb = [](sushitrack_log_level_t, const char*)
+    {
         total.fetch_add(1, std::memory_order_relaxed);
     };
 
-    SushiTrack::Logger::setCallback(cb);
+    SushiTrack::Logger::set_callback(cb);
 
-    constexpr int kIterations = 200;
+    constexpr int K_ITERATIONS = 200;
     std::atomic<bool> stop{false};
 
-    std::thread swapper([&stop, cb]() {
-        while (!stop.load(std::memory_order_relaxed))
+    std::thread swapper(
+        [&stop, cb]()
         {
-            SushiTrack::Logger::setCallback(cb);
-            SushiTrack::Logger::setCallback(cb);
-        }
-    });
+            while (!stop.load(std::memory_order_relaxed))
+            {
+                SushiTrack::Logger::set_callback(cb);
+                SushiTrack::Logger::set_callback(cb);
+            }
+        });
 
-    for (int i = 0; i < kIterations; ++i)
+    for (int i = 0; i < K_ITERATIONS; ++i)
         SushiTrack::Logger::log(SUSHITRACK_LOG_DEBUG, "race probe %d", i);
 
     stop.store(true, std::memory_order_relaxed);
     swapper.join();
 
     // The callback was the same function pointer for every swap, so every logged message must have been delivered exactly once.
-    EXPECT_GE(total.load(), kIterations);
+    EXPECT_GE(total.load(), K_ITERATIONS);
 
-    SushiTrack::Logger::setCallback(nullptr);
+    SushiTrack::Logger::set_callback(nullptr);
 }

@@ -28,10 +28,10 @@
 #include <SushiTrack/association/reid_first_cost_calculator.hpp>
 
 #include <algorithm>
+#include <association/state_association_modifiers.hpp>
 #include <vector>
 
 #include <SushiTrack/tracking/tracklet.hpp>
-#include <association/state_association_modifiers.hpp>
 
 namespace SushiTrack
 {
@@ -46,21 +46,22 @@ namespace SushiTrack
                                             CostMatrix& __restrict out_matrix)
     {
         out_matrix.resize(a.size(), b.size(), 1e4f);
-        if (a.empty() || b.empty()) return;
+        if (a.empty() || b.empty())
+            return;
 
         for (size_t i = 0; i < a.size(); ++i)
         {
             // Per-row state policy: Stationary leans into IoU, Maneuvering/Coasting into appearance, Coasting also rejects geometry-only fallback.
-            const StateAssocMods sm = stateAssocMods(a[i]->getLastSeenState());
+            const StateAssocMods sm = state_assoc_mods(a[i]->get_last_seen_state());
             const float row_iou_weight = std::clamp(iou_weight_ - sm.reid_shift, 0.0f, 1.0f);
 
             for (size_t j = 0; j < b.size(); ++j)
             {
                 float cost = 1e4f;
 
-                if (a[i]->hasFeature() && b[j]->hasFeature())
+                if (a[i]->has_feature() && b[j]->has_feature())
                 {
-                    float reid_sim = a[i]->getMaxFeatureSimilarity(b[j]->getCurrFeat());
+                    float reid_sim = a[i]->get_max_feature_similarity(b[j]->get_curr_feat());
                     float reid_dist = 1.0f - reid_sim;
 
                     if (reid_dist < reid_conf_thresh_)
@@ -104,15 +105,16 @@ namespace SushiTrack
      * @param b Candidate tracklet for association.
      * @return Calculated association cost.
      */
-    float ReIDFirstCostCalculator::calculate_single(const TrackletPtr& a, const TrackletPtr& b) const
+    float ReIDFirstCostCalculator::calculate_single(const TrackletPtr& a,
+                                                    const TrackletPtr& b) const
     {
         // Mirror batch calculate() row policy so single-pair path is regime-consistent.
-        const StateAssocMods sm = stateAssocMods(a->getLastSeenState());
+        const StateAssocMods sm = state_assoc_mods(a->get_last_seen_state());
         const float row_iou_weight = std::clamp(iou_weight_ - sm.reid_shift, 0.0f, 1.0f);
 
-        if (a->hasFeature() && b->hasFeature())
+        if (a->has_feature() && b->has_feature())
         {
-            float reid_sim = a->getMaxFeatureSimilarity(b->getCurrFeat());
+            float reid_sim = a->get_max_feature_similarity(b->get_curr_feat());
             float reid_dist = 1.0f - reid_sim;
 
             if (reid_dist < reid_conf_thresh_)

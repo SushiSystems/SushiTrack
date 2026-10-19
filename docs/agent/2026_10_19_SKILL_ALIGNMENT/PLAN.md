@@ -11,6 +11,7 @@ Run inline by one session on `feature/skill_alignment`. Each step is one commit 
 | 4 | `build: move the build logic of the root CMakeLists.txt into cmake/` | the root file holds `project()`, options and `add_subdirectory` |
 | 5 | `refactor(include)!: split the headers by area, one type per header` | every header holds one primary symbol under `include/SushiTrack/<area>/` |
 | 6 | `refactor!: apply the C++ naming rules` | no `I` prefix, `snake_case` functions and members, `K_` constants |
+| 6b | `feat(logging)!: log through SushiLog` | the library's log calls go through SushiLog with the module's category; `check_logging.py` passes |
 | 7 | `test: mirror the source tree and give every test a size` | `check_test_mirror.py` and `check_test_sizes.py` pass |
 | 8 | `feat(cli)!: select tests by size label` | `st test --label` works; `--suite` is gone |
 | 9 | `refactor: move the evaluation and inference programs to applications/` | `st eval` and `st infer` find them there |
