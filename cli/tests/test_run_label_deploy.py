@@ -39,8 +39,8 @@ def test_benchmark_capture_keeps_streams_apart(tmp_path, monkeypatch, recorder):
 
 
 def test_benchmark_args_name_every_tracker_and_sequence(tmp_path):
-    paths = SimpleNamespace(data_root=lambda: tmp_path / "data", bridge=tmp_path / "bridge")
-    assert label._benchmark_args(paths, ["S1", "S2"], ["sushitrack"]) == [
+    paths = SimpleNamespace(bridge=tmp_path / "bridge")
+    assert label._benchmark_args(paths, tmp_path / "data", ["S1", "S2"], ["sushitrack"]) == [
         "--data", str(tmp_path / "data"), "--settings", str(tmp_path / "bridge"),
         "--tracker", "sushitrack", "--sequence", "S1", "--sequence", "S2"]
 
@@ -53,6 +53,16 @@ def test_deploy_no_longer_imports_discovery():
 def test_eval_fails_when_no_sequence_matches(tmp_path, recorder):
     """Returns 1 and says so when the scenario filter matches no sequence."""
     spy = recorder(label)
-    paths = SimpleNamespace(data_root=lambda: tmp_path)
+    paths = SimpleNamespace(benchmarks=tmp_path, benchmark_names=lambda: ["mot17"],
+                            data_root=lambda name: tmp_path)
     assert label.evaluate_sequences(SimpleNamespace(), paths, scenario="MOT99") == 1
     assert spy.said("No sequence matched")
+
+
+def test_eval_refuses_an_unknown_benchmark(tmp_path, recorder):
+    """Returns 2 and names the benchmarks there are."""
+    spy = recorder(label)
+    paths = SimpleNamespace(benchmarks=tmp_path, benchmark_names=lambda: ["mot17", "mot20"],
+                            data_root=lambda name: tmp_path)
+    assert label.evaluate_sequences(SimpleNamespace(), paths, benchmark="mot99") == 2
+    assert spy.said("Available: mot17, mot20")

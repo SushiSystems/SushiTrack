@@ -29,7 +29,7 @@ video inference pipeline.
 | Document | Holds |
 | --- | --- |
 | [Test suites](guides/TESTING.md) | The mirror of the tests, their sizes and how to run them |
-| [Evaluation pipeline](guides/EVALUATION.md) | How `st eval` chains the `mot_evaluation` benchmark and TrackEval |
+| [Evaluation pipeline](guides/EVALUATION.md) | How `st eval` chains the `mot_engine` benchmark and TrackEval |
 | [Inference pipeline](guides/INFERENCE.md) | The YOLOX video pipeline behind `st infer` |
 | [Deploy packages](guides/DEPLOY_PACKAGES.md) | The `package/` tree `st deploy` assembles for C, C++ and Python consumers |
 | [Ultralytics integration](guides/ULTRALYTICS_INTEGRATION.md) | How to put SushiTrack behind `model.track()` |

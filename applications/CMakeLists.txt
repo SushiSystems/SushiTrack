@@ -7,4 +7,4 @@
 # Builds the tracker bridge and the MOT benchmark.
 
 add_subdirectory(tracker_bridge)
-add_subdirectory(benchmarks/mot_evaluation)
+add_subdirectory(benchmarks/mot_engine)

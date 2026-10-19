@@ -22,8 +22,10 @@ def st_paths(tmp_path):
     dense = tmp_path / "third_party" / "eigen" / "Eigen" / "Dense"
     dense.parent.mkdir(parents=True)
     dense.write_text("", encoding="utf-8")
+    benchmarks = tmp_path / "benchmarks"
     return SimpleNamespace(root=tmp_path, third_party=tmp_path / "third_party",
-                           data_root=lambda: tmp_path / "data")
+                           benchmarks=benchmarks, benchmark_names=lambda: ["mot17"],
+                           data_root=lambda name: benchmarks / name / "data")
 
 
 def _by_name(checks):
@@ -58,7 +60,7 @@ def test_missing_datasets_fail_with_a_pointer_to_the_readme(st_paths):
 
 
 def test_datasets_found_when_a_sequence_has_ground_truth(st_paths, tmp_path):
-    gt = tmp_path / "data" / "MOT17-02" / "gt" / "gt.txt"
+    gt = tmp_path / "benchmarks" / "mot17" / "data" / "MOT17-02" / "gt" / "gt.txt"
     gt.parent.mkdir(parents=True)
     gt.write_text("", encoding="utf-8")
     assert _by_name(st_checks(st_paths))["datasets"].run().state is State.OK

@@ -83,7 +83,8 @@ class Config:
     paths_config: str = "assets/sushitrack.json"
     paths_tests: str = "tests"
     paths_bridge: str = "applications/tracker_bridge"
-    paths_evaluator: str = "applications/benchmarks/mot_evaluation/evaluator"
+    paths_benchmarks: str = "applications/benchmarks"
+    paths_evaluator: str = "applications/benchmarks/mot_engine/evaluator"
     paths_inference: str = "applications/inference"
     paths_package: str = "package"
 
@@ -276,6 +277,7 @@ class Paths:
         self.config = self._resolve(cfg, cfg.paths_config)
         self.tests = self._resolve(cfg, cfg.paths_tests)
         self.bridge = self._resolve(cfg, cfg.paths_bridge)
+        self.benchmarks = self._resolve(cfg, cfg.paths_benchmarks)
         self.evaluator = self._resolve(cfg, cfg.paths_evaluator)
         self.inference = self._resolve(cfg, cfg.paths_inference)
         self.package = self._resolve(cfg, cfg.paths_package)
@@ -284,10 +286,16 @@ class Paths:
         expanded = Path(cfg.expand(value))
         return expanded if expanded.is_absolute() else self.root / expanded
 
-    def data_root(self):
-        """Where MOT sequences live: the benchmark's data/ wins when present, else [paths] data."""
-        eval_data = self.evaluator.parent / "data"
-        return eval_data if eval_data.exists() else self.data
+    def benchmark_names(self):
+        """The benchmarks with sequences: each folder of `benchmarks` or of `data` that holds data/."""
+        names = {entry.name for root in (self.benchmarks, self.data) if root.is_dir()
+                 for entry in root.iterdir() if (entry / "data").is_dir()}
+        return sorted(names)
+
+    def data_root(self, benchmark):
+        """Where *benchmark*'s sequences live: its folder under `benchmarks`, else under `data`."""
+        own = self.benchmarks / benchmark / "data"
+        return own if own.is_dir() else self.data / benchmark / "data"
 
     def as_dict(self):
         return {
@@ -297,7 +305,7 @@ class Paths:
             "include": self.include,
             "build": self.build,
             "data": self.data,
-            "data_root": self.data_root(),
+            "benchmarks": self.benchmarks,
             "third_party": self.third_party,
             "config": self.config,
             "tests": self.tests,

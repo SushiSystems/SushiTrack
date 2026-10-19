@@ -1,18 +1,20 @@
 # Data layout
 
-The MOT benchmark reads from `applications/benchmarks/mot_evaluation/data/`:
+Each benchmark keeps its sequences in its own `data/` folder, and the engine reads one
+benchmark at a time:
 
 ```
-applications/benchmarks/mot_evaluation/data/
-├── MOT17-02-DPM/
-│   ├── det/det.txt                   # MOT-format detections
-│   ├── gt/gt.txt                     # MOT-format ground truth
-│   └── seqinfo.ini                   # at minimum: seqLength, frameRate
-├── MOT17-02-FRCNN/  …
-├── MOT20-01/         …
-├── MOT20-01-YOLOX/   …
-├── dancetrack0001/img1/00000001.jpg  …
-└── …
+applications/benchmarks/
+├── mot17/data/
+│   ├── MOT17-02-DPM/
+│   │   ├── det/det.txt               # MOT-format detections
+│   │   ├── gt/gt.txt                 # MOT-format ground truth
+│   │   └── seqinfo.ini               # at minimum: seqLength, frameRate
+│   └── MOT17-02-FRCNN/  …
+├── mot20/data/
+│   └── MOT20-01/  MOT20-01-YOLOX/  …
+└── dancetrack/data/
+    └── dancetrack0001/  …
 ```
 
 MOT CSV format:

@@ -77,7 +77,7 @@ def test_a_fresh_tree_is_configured_then_built(tmp_path, runner):
                          "-DSUSHITRACK_BUILD_TESTS=ON"]
     assert compile_ == ["cmake", "--build", str(paths.build), "--config", "Debug",
                         "--parallel", "3", "--target", "sushitrack",
-                        "--target", "tracker_bridge", "--target", "mot_evaluation",
+                        "--target", "tracker_bridge", "--target", "mot_engine",
                         "--target", "sushitrack_tests", "--target", "sushitrack_application_tests"]
 
 

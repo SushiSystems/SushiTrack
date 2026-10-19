@@ -22,7 +22,7 @@ if(SUSHITRACK_BUILD_TESTS)
             "${CMAKE_CURRENT_SOURCE_DIR}/applications/*/test_*.cpp")
         sushitrack_add_sized_test_program(sushitrack_application_tests
             TEST_SOURCES ${SUSHITRACK_APPLICATION_TEST_SOURCES}
-            LINK mot_evaluation_runner tracker_bridge
+            LINK mot_engine_runner tracker_bridge
             ENVIRONMENT "SUSHITRACK_CONFIG=${PROJECT_SOURCE_DIR}/assets/sushitrack.json")
     endif()
 endif()

@@ -33,6 +33,8 @@ def parse_args():
     p.add_argument("--compare",   action="store_true")
     p.add_argument("--export",    type=str, default=None)
     p.add_argument("--split",     type=str, default="train")
+    p.add_argument("--benchmark", type=str, default="mot17",
+                   help="Folder under applications/benchmarks/ whose data/ is scored")
 
     p.add_argument("--gt",      type=str, default=None)
     p.add_argument("--pred",    type=str, default=None)
@@ -51,7 +53,7 @@ def resolve_data_dir(args) -> Path:
         return Path(args.data_dir)
 
     candidates = [
-        _THIS_DIR.parent / "data",
+        _THIS_DIR.parent.parent / args.benchmark / "data",
         _PROJECT_ROOT / "data",
     ]
     for c in candidates:

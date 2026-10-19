@@ -41,7 +41,8 @@ sushitrack/
 │
 ├── applications/
 │   ├── tracker_bridge/                # the tracker adapters and the C library ctypes loads
-│   ├── benchmarks/mot_evaluation/     # the MOT benchmark, its evaluator/ and data/
+│   ├── benchmarks/mot_engine/         # the engine: mot_engine and its evaluator/
+│   ├── benchmarks/mot17/  mot20/  dancetrack/   # one benchmark each, its sequences in data/
 │   └── inference/                     # the YOLOX video pipeline behind st infer
 │
 ├── cli/                               # the st CLI; see CLI_PACKAGE.md

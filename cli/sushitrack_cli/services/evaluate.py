@@ -37,15 +37,14 @@ def _load_evaluator(paths):
     return TrackEvalRunner, print_trackeval_table, export_trackeval_results
 
 
-def run_internal(paths, sequences, trackers, perf, export_dir=None,
+def run_internal(paths, data_root, sequences, trackers, perf, export_dir=None,
                  compare=False):
-    """Evaluate with the repo's own TrackEval wrapper and print the table."""
+    """Evaluate the sequences under *data_root* with the repo's own TrackEval wrapper."""
     loaded = _load_evaluator(paths)
     if loaded is None:
         return 1
     runner_cls, print_table, export_results = loaded
 
-    data_root = paths.data_root()
     if not data_root.is_dir():
         console.error(f"Data directory not found: {data_root}")
         return 1
@@ -75,13 +74,12 @@ def run_internal(paths, sequences, trackers, perf, export_dir=None,
     return 0
 
 
-def _stage_official_data(paths, sequences, trackers, trackeval_dir):
+def _stage_official_data(data_root, sequences, trackers, trackeval_dir):
     """Copy predictions and ground truth into TrackEval's expected tree.
 
     The whole data/ tree is rebuilt each run: a leftover sequence from a previous
     invocation would otherwise stay in the seqmap and be scored again.
     """
-    data_root = paths.data_root()
     shutil.rmtree(trackeval_dir / "data", ignore_errors=True)
     staged = 0
 
@@ -111,7 +109,7 @@ def _stage_official_data(paths, sequences, trackers, trackeval_dir):
     return staged
 
 
-def run_official(paths, sequences, trackers):
+def run_official(paths, data_root, sequences, trackers):
     """Run third_party/TrackEval's run_mot_challenge.py over the staged results."""
     trackeval_dir = paths.third_party / "TrackEval"
     script = trackeval_dir / "scripts" / "run_mot_challenge.py"
@@ -121,7 +119,7 @@ def run_official(paths, sequences, trackers):
         return 1
 
     console.header("TrackEval (official)")
-    staged = _stage_official_data(paths, sequences, trackers, trackeval_dir)
+    staged = _stage_official_data(data_root, sequences, trackers, trackeval_dir)
     if not staged:
         console.error("No prediction files to evaluate. Run `st eval` "
                       "without --eval-only first.")

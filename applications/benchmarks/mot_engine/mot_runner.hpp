@@ -32,7 +32,7 @@
 
 #include <tracker_adapter.hpp>
 
-namespace MOTEvaluation
+namespace MOTEngine
 {
     /**
      * @brief Holds how many frames a run processed and how long the tracker took on them.
@@ -60,4 +60,4 @@ namespace MOTEvaluation
                                              const std::string& sequence,
                                              TrackerBridge::TrackerAdapter& adapter,
                                              const std::filesystem::path& predictions = {});
-} // namespace MOTEvaluation
+} // namespace MOTEngine

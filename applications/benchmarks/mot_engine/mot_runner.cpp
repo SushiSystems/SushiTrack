@@ -34,7 +34,7 @@
 
 #include <mot_sequence.hpp>
 
-namespace MOTEvaluation
+namespace MOTEngine
 {
     RunResult run_mot_sequence(const std::filesystem::path& data_root, const std::string& sequence,
                                TrackerBridge::TrackerAdapter& adapter,
@@ -78,4 +78,4 @@ namespace MOTEvaluation
         }
         return result;
     }
-} // namespace MOTEvaluation
+} // namespace MOTEngine

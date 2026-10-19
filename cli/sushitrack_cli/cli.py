@@ -256,13 +256,17 @@ register_docs_commands(
 @app.command(
     "eval",
     rich_help_panel=K_BENCHMARK,
-    epilog="st eval\n"
-           "st eval --compare\n"
+    epilog="st eval  # every benchmark\n"
+           "st eval --benchmark mot17 --compare\n"
            "st eval --scenario MOT17-04-DPM --compare\n"
            "st eval --eval-only --export ./results\n"
            "st eval --trackeval --private",
 )
 def evaluate(
+    benchmark: Optional[str] = typer.Option(
+        None, "--benchmark", "-b", metavar="NAME",
+        help="Benchmark under applications/benchmarks/ to run: mot17, mot20 or dancetrack "
+             "(default: every benchmark)."),
     scenario: Optional[str] = typer.Option(
         None, "--scenario", metavar="NAME",
         help="Sequence name or substring filter (default: every sequence)."),
@@ -288,15 +292,15 @@ def evaluate(
         False, "--public",
         help="Exclude MOT sequences with private detections."),
 ):
-    """Run the MOT label benchmark and print TrackEval metrics.
+    """Run the MOT benchmarks and print TrackEval metrics.
 
-    Drives the regression binary over det.txt-backed sequences, then scores
-    the predictions (HOTA / DetA / AssA / MOTA / IDF1 / IDSW / latency).
+    Drives the mot_engine program over each benchmark's det.txt-backed sequences, then
+    scores the predictions (HOTA / DetA / AssA / MOTA / IDF1 / IDSW / latency).
     """
     cfg, paths = context()
     key = label_svc.resolve_tracker(tracker or cfg.test_tracker)
     raise typer.Exit(label_svc.evaluate_sequences(
-        cfg, paths, scenario=scenario, tracker=key, compare=compare,
+        cfg, paths, benchmark=benchmark, scenario=scenario, tracker=key, compare=compare,
         eval_only=eval_only, trackeval=trackeval, export=export,
         private=private, public=public))
 

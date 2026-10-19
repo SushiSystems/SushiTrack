@@ -202,4 +202,4 @@ write to hello@sushisystems.io with what you want to build and who will use it; 
 
 Third-party code and data keep their own licences, listed in [`NOTICE.md`](../../NOTICE.md). The
 repository's licence does not cover the MOT17, MOT20 and DanceTrack files under
-`applications/benchmarks/mot_evaluation/data/`.
+`applications/benchmarks/mot17/data/`, `mot20/data/` and `dancetrack/data/`.

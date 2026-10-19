@@ -31,7 +31,8 @@
 | Reference tracker | ByteTrack or OC-SORT as vendored under `third_party/`, built only to compare against |
 | Adapter | A `TrackerAdapter` in `applications/tracker_bridge/`; it drives one tracker for the benchmark and the inference pipeline |
 | `tracker_bridge` | The shared library built from `applications/tracker_bridge/tracker_bridge.cpp`; the inference pipeline loads it with ctypes |
-| Sequence | One folder under `applications/benchmarks/mot_evaluation/data/` with `det/det.txt`, `gt/gt.txt` and `seqinfo.ini` |
+| Benchmark | A folder under `applications/benchmarks/` with a `data/` folder of sequences: `mot17`, `mot20` or `dancetrack` |
+| Sequence | One folder under a benchmark's `data/` with `det/det.txt`, `gt/gt.txt` and `seqinfo.ini` |
 | Size | The label of a test, `small`, `medium` or `large`, taken from its suite's prefix; `st test --label` selects by it |
 | Private, public detections | In `st eval`, the `-YOLOX` sequences and the other MOT sequences |
 | TrackEval | The MOTChallenge evaluator under `third_party/TrackEval`; it computes HOTA, CLEAR and Identity metrics |

@@ -70,34 +70,35 @@ st run sushitrack_tests -- --gtest_shuffle --gtest_break_on_failure
 
 ## `st eval`
 
-The MOT label benchmark. Not a CTest suite: it runs `mot_evaluation` over
+The MOT label benchmark. Not a CTest suite: it runs `mot_engine` over
 det.txt-backed scenarios, parses the per-sequence `[ PERF ]` timings out of its
 output, then runs TrackEval and prints a metrics table (HOTA / DetA / AssA /
 MOTA / IDF1 / IDSW / FP / FN / Lat).
 
 | Flag | Effect |
 |---|---|
+| `--benchmark, -b <name>` | `mot17`, `mot20` or `dancetrack`, a folder under `applications/benchmarks/`; default: every benchmark, each run and scored on its own |
 | `--scenario <name>` | Sequence filter (exact match or case-insensitive substring) |
 | `--tracker <name>` | `sushitrack` (default), `bytetrack`, or `ocsort` |
 | `--compare` | Run all three trackers side-by-side |
 | `--eval-only` | Skip the binary; re-score existing `pred/*.txt` files |
 | `--trackeval` | Use the official `third_party/TrackEval/scripts/run_mot_challenge.py` instead of the internal runner |
-| `--export <dir>` | Export TrackEval JSON/CSV to `<dir>` |
+| `--export <dir>` | Export TrackEval JSON/CSV to `<dir>/<benchmark>` |
 | `--private` | Only `*-YOLOX` sequences (MOT only) |
 | `--public` | All sequences except `*-YOLOX` (MOT only) |
 
 ```bash
-st eval
-st eval --compare
+st eval                              # every benchmark
+st eval --benchmark mot17 --compare
 st eval --scenario MOT17-04-DPM --compare
 st eval --eval-only --export ./results
 st eval --trackeval --private
 ```
 
 The internal runner needs the evaluator's own dependencies (numpy, scipy,
-TrackEval) from `.config/conda/environment.yml`; `--trackeval` bypasses it. The sequences are the folders of
-`applications/benchmarks/mot_evaluation/data/` that hold `det/det.txt` and `gt/gt.txt`: the
-MOT17 train set, MOT20 and DanceTrack.
+TrackEval) from `.config/conda/environment.yml`; `--trackeval` bypasses it. A benchmark is a folder of
+`applications/benchmarks/` with a `data/` folder; its sequences are the folders there that hold
+`det/det.txt` and `gt/gt.txt`.
 
 ## `st infer`
 
@@ -128,16 +129,16 @@ ctypes. Arguments after `--` are forwarded to `demo.py` untouched.
 ```bash
 st infer -n yolox-x -c third_party/weight/mot17x.pth.tar --source third_party/video/MOT17-04.mp4 --num-classes 1 --legacy
 
-st infer -n yolox-x -c third_party/weight/mot17x.pth.tar --source applications/benchmarks/mot_evaluation/data/MOT20-01/img1 --num-classes 1 --legacy
+st infer -n yolox-x -c third_party/weight/mot17x.pth.tar --source applications/benchmarks/mot20/data/MOT20-01/img1 --num-classes 1 --legacy
 
 st infer --source 0 --tracker sushitrack --no-save --no-screen --stress
 ```
 
 `--source` also accepts an image-sequence directory (`<path>/img1`), not just a video
-file or camera index. `applications/benchmarks/mot_evaluation/data/` already holds 76 real
-tracker benchmark sequences (MOT17, MOT20, DanceTrack) used by the regression
-suite. Any of their names works, e.g. `applications/benchmarks/mot_evaluation/data/MOT20-01/img1`
-or `applications/benchmarks/mot_evaluation/data/dancetrack0001/img1`.
+file or camera index. The benchmarks under
+`applications/benchmarks/` hold 76 sequences (MOT17, MOT20, DanceTrack) whose frames work, e.g.
+`applications/benchmarks/mot20/data/MOT20-01/img1` or
+`applications/benchmarks/dancetrack/data/dancetrack0001/img1`.
 
 If the YOLOX checkpoint filename contains `mot17` and `--tsize` is omitted/640,
 the pipeline overrides `tsize` to `(800, 1440)` to match the MOT17 training

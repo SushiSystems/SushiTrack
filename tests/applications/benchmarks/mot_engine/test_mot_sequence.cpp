@@ -33,7 +33,7 @@
 
 #include <mot_sequence.hpp>
 
-using namespace MOTEvaluation;
+using namespace MOTEngine;
 
 namespace
 {

@@ -35,7 +35,7 @@
 #include <mot_runner.hpp>
 #include <sushitrack_adapter.hpp>
 
-using namespace MOTEvaluation;
+using namespace MOTEngine;
 
 namespace
 {

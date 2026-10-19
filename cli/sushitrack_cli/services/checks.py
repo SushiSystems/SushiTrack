@@ -41,11 +41,13 @@ def _python(module, group):
 def _datasets(paths):
     """Return an optional check passing when a sequence with ground truth exists."""
     def fn():
-        root = paths.data_root()
-        found = sorted(root.glob("*/gt/gt.txt")) if root.is_dir() else []
+        counts = {name: len(list(paths.data_root(name).glob("*/gt/gt.txt")))
+                  for name in paths.benchmark_names()}
+        found = {name: count for name, count in counts.items() if count}
         if found:
-            return CheckResult(State.OK, f"{len(found)} sequence(s) under {root}")
-        return CheckResult(State.FAIL, f"none found under {root}", _DATA_FIX)
+            return CheckResult(State.OK, ", ".join(f"{name}: {count} sequence(s)"
+                                                   for name, count in found.items()))
+        return CheckResult(State.FAIL, f"none found under {paths.benchmarks}", _DATA_FIX)
     return FunctionCheck("datasets", "eval", False, fn)
 
 

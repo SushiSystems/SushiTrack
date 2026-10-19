@@ -101,7 +101,7 @@ ignored by git and are not distributed. Their terms are unverified.
 
 ## Third-party data
 
-`applications/benchmarks/mot_evaluation/data/` holds 228 tracked files for 76 sequences: `gt/gt.txt`,
+`applications/benchmarks/mot17/data/`, `mot20/data/` and `dancetrack/data/` hold 228 tracked files for 76 sequences: `gt/gt.txt`,
 `det/det.txt` and `seqinfo.ini` each. No image is tracked. The repository's licence does not
 cover these files.
 

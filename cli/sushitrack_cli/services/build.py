@@ -32,7 +32,7 @@ LIBRARY_TARGET = "sushitrack"
 # TEST_TARGETS names every target the test build produces.
 TEST_TARGETS = ("sushitrack_tests", "sushitrack_application_tests")
 #: The applications every build makes: the inference bridge and the MOT benchmark.
-APPLICATION_TARGETS = ("tracker_bridge", "mot_evaluation")
+APPLICATION_TARGETS = ("tracker_bridge", "mot_engine")
 # The CMake options those targets are gated behind.
 TEST_OPTIONS = ("SUSHITRACK_BUILD_TESTS",)
 

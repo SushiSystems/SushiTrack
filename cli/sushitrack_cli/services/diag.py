@@ -26,7 +26,7 @@ _ENV_OF_INTEREST = ("PATH", "CC", "CXX", "CMAKE", "NINJA", "INCLUDE", "LIB",
                     "VIRTUAL_ENV", "CONDA", "VSINSTALLDIR", "VSCMD",
                     "VCINSTALLDIR", "VCTOOLS", "WINDOWSSDK")
 
-_TEST_BINARIES = ("sushitrack_tests", "sushitrack_application_tests", "mot_evaluation")
+_TEST_BINARIES = ("sushitrack_tests", "sushitrack_application_tests", "mot_engine")
 
 
 def _mtime(path):
@@ -100,15 +100,15 @@ def status(cfg, paths):
                  _state("built" if bridge else "missing", bridge),
                  _muted(str(bridge or "needed by `st infer`"))])
 
-    data_root = paths.data_root()
-    sequences = sorted(d.name for d in data_root.iterdir()
-                       if d.is_dir() and (d / "gt" / "gt.txt").exists()) \
-        if data_root.is_dir() else []
-    detail = f"{data_root}" + (f" — {', '.join(sequences[:4])}"
-                               + (" ..." if len(sequences) > 4 else "")
-                               if sequences else "")
-    rows.append(["datasets", _state(f"{len(sequences)} sequence(s)",
-                                    bool(sequences)), _muted(detail)])
+    for name in paths.benchmark_names():
+        data_root = paths.data_root(name)
+        sequences = sorted(entry.name for entry in data_root.iterdir()
+                           if entry.is_dir() and (entry / "gt" / "gt.txt").exists())
+        detail = f"{data_root}" + (f": {', '.join(sequences[:4])}"
+                                   + (" ..." if len(sequences) > 4 else "")
+                                   if sequences else "")
+        rows.append([name, _state(f"{len(sequences)} sequence(s)", bool(sequences)),
+                     _muted(detail)])
 
     rows.append(["package", "present" if paths.package.is_dir() else "absent",
                  _muted(str(paths.package))])

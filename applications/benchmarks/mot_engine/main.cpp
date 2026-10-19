@@ -60,7 +60,7 @@ namespace
     /** @brief Prints how to call the program on stderr. */
     void print_usage()
     {
-        std::cerr << "usage: mot_evaluation --data DIR --settings DIR [--tracker NAME]... "
+        std::cerr << "usage: mot_engine --data DIR --settings DIR [--tracker NAME]... "
                      "[--sequence NAME]...\n";
     }
 
@@ -72,7 +72,7 @@ namespace
             const std::string flag = argv[i];
             if (i + 1 >= argc)
             {
-                std::cerr << "mot_evaluation: " << flag << " needs a value\n";
+                std::cerr << "mot_engine: " << flag << " needs a value\n";
                 return false;
             }
             const std::string value = argv[++i];
@@ -86,7 +86,7 @@ namespace
                 args.sequences.push_back(value);
             else
             {
-                std::cerr << "mot_evaluation: unknown flag " << flag << "\n";
+                std::cerr << "mot_engine: unknown flag " << flag << "\n";
                 return false;
             }
         }
@@ -168,7 +168,7 @@ int main(int argc, char** argv)
     }
     if (!std::filesystem::is_directory(args.data))
     {
-        std::cerr << "mot_evaluation: no data folder at " << args.data.string() << "\n";
+        std::cerr << "mot_engine: no data folder at " << args.data.string() << "\n";
         return 1;
     }
     if (args.sequences.empty())
@@ -182,20 +182,20 @@ int main(int argc, char** argv)
             std::unique_ptr<TrackerBridge::TrackerAdapter> adapter = make_adapter(tracker, args);
             if (!adapter)
             {
-                std::cerr << "mot_evaluation: unknown tracker " << tracker << "\n";
+                std::cerr << "mot_engine: unknown tracker " << tracker << "\n";
                 return 2;
             }
             try
             {
-                const MOTEvaluation::RunResult result =
-                    MOTEvaluation::run_mot_sequence(args.data, sequence, *adapter);
+                const MOTEngine::RunResult result =
+                    MOTEngine::run_mot_sequence(args.data, sequence, *adapter);
                 std::cout << "[ PERF " << adapter->name() << " ] " << sequence << ": "
                           << result.mean_us() << " us/frame  (" << result.frames_processed
                           << " frames)\n";
             }
             catch (const std::exception& error)
             {
-                std::cerr << "mot_evaluation: " << sequence << ": " << error.what() << "\n";
+                std::cerr << "mot_engine: " << sequence << ": " << error.what() << "\n";
                 return 1;
             }
         }

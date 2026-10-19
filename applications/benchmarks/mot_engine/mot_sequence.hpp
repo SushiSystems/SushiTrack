@@ -35,7 +35,7 @@
 
 #include <mot_detection.hpp>
 
-namespace MOTEvaluation
+namespace MOTEngine
 {
     /// @brief The detections of a sequence, by frame number.
     using MOTFrames = std::map<int, std::vector<TrackerBridge::MOTDetection>>;
@@ -98,4 +98,4 @@ namespace MOTEvaluation
         }
         return fallback;
     }
-} // namespace MOTEvaluation
+} // namespace MOTEngine

@@ -82,7 +82,8 @@ Defects that stand in the tree. The work that closes each one is in
 
 ### KI-10 234 MB of benchmark annotations are tracked in git
 - Origin: own
-- Where: `applications/benchmarks/mot_evaluation/data/`
+- Where: `applications/benchmarks/mot17/data/`, `applications/benchmarks/mot20/data/`,
+  `applications/benchmarks/dancetrack/data/`
 - Cause: the MOT17, MOT20 and DanceTrack sequences were committed beside the evaluator
 - Recognise: a clone takes the 234 MB
 - Workaround: `git clone --filter=blob:none`
