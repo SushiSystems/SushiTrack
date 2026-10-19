@@ -16,6 +16,8 @@ from sushicore.provision.doctor import Doctor, State
 from sushitrack_cli.services import checks
 from sushitrack_cli.services.checks import st_checks
 
+pytestmark = pytest.mark.medium
+
 
 @pytest.fixture
 def st_paths(tmp_path):
@@ -53,10 +55,10 @@ def test_missing_python_module_fix_names_the_pip_package(st_paths, monkeypatch):
     assert result.fix == "pip install opencv-python"
 
 
-def test_missing_datasets_fail_with_a_pointer_to_the_readme(st_paths):
+def test_missing_datasets_fail_with_a_pointer_to_the_data_layout(st_paths):
     result = _by_name(st_checks(st_paths))["datasets"].run()
     assert result.state is State.FAIL
-    assert "docs/README.md" in result.fix
+    assert "docs/reference/DATA_LAYOUT.md" in result.fix
 
 
 def test_datasets_found_when_a_sequence_has_ground_truth(st_paths, tmp_path):

@@ -18,7 +18,7 @@ _DOCKER_WINDOWS_FIX = "winget install Docker.DockerDesktop"
 
 _DOCKER_DOCS_FIX = "https://docs.docker.com/engine/install/"
 
-_DATA_FIX = "place MOT sequences as described in docs/README.md#data-layout"
+_DATA_FIX = "place MOT sequences as docs/reference/DATA_LAYOUT.md describes"
 
 
 def _submodule(name, paths, folder, marker, group, required):

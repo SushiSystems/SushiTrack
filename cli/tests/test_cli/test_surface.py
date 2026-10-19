@@ -1,4 +1,4 @@
-# test_cli_surface.py
+# test_surface.py
 # SushiTrack - https://github.com/SushiSystems/SushiTrack
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
 # Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
@@ -20,6 +20,8 @@ from typer.testing import CliRunner
 from sushitrack_cli import cli, console
 from sushitrack_cli.config import config_dir
 from sushitrack_cli.services import docker as docker_svc
+
+pytestmark = pytest.mark.medium
 
 K_GIT_IDENTITY = ("-c", "user.name=st tests", "-c", "user.email=st-tests@example.invalid")
 K_PUBLISH_LIST = (

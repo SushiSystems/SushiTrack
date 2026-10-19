@@ -13,6 +13,7 @@ are self-contained — the consumer needs neither this repo nor a build tree.
 import enum
 import platform
 import shutil
+from importlib import resources
 
 from .. import console
 from ..config import IS_WINDOWS
@@ -27,149 +28,33 @@ class DeployKind(str, enum.Enum):
     cpp = "cpp"
     python = "python"
 
-_CPP_EXAMPLE = """\
-/*
- * Minimal SushiTrack C-API usage example.
- *
- * Build (after `st deploy cpp`):
- *   cd example && cmake -B build && cmake --build build
- *   ./build/sushitrack_example        (Windows: copy ../bin/sushitrack.dll next to the exe)
- */
-#include <stdio.h>
-#include <SushiTrack/c_api/sushitrack_c.h>
+#: The licence texts of the code inside the libraries, from the repository root to licenses/.
+K_LICENCE_TEXTS = (
+    ("third_party/bytetrack/LICENSE", "BYTETRACK_CPP_MIT.txt"),
+    ("third_party/licenses/LAP_BSD_2_CLAUSE.txt", "LAP_BSD_2_CLAUSE.txt"),
+    ("third_party/licenses/NLOHMANN_JSON_MIT.txt", "NLOHMANN_JSON_MIT.txt"),
+    ("third_party/eigen/COPYING.MPL2", "EIGEN_MPL_2_0.txt"),
+)
 
-int main(void)
-{
-    sushitrack_tracker_t tracker = sushitrack_create_tracker("sushitrack.json");
-    if (!tracker) { fprintf(stderr, "failed to create tracker\\n"); return 1; }
 
-    sushitrack_object_t dets[1] = { { 100.f, 100.f, 50.f, 80.f, 0.9f, 0 } };
-    sushitrack_track_t  out[64];
+def _template(name):
+    """Return the text of the deploy template *name*."""
+    return resources.files("sushitrack_cli").joinpath("templates", name).read_text(encoding="utf-8")
 
-    for (int frame = 0; frame < 5; ++frame) {
-        dets[0].x += 5.f;  /* move the box */
-        int n = sushitrack_update(tracker, dets, 1, out, 64, 1.0f / 30.0f);
-        printf("frame %d: %d track(s)\\n", frame, n);
-        for (int i = 0; i < n; ++i)
-            printf("  id=%lld  (%.1f, %.1f, %.1f, %.1f)  state=%d\\n",
-                   (long long)out[i].track_id, out[i].x, out[i].y,
-                   out[i].width, out[i].height, out[i].state);
-    }
 
-    sushitrack_destroy_tracker(tracker);
-    return 0;
-}
-"""
-
-_CPP_EXAMPLE_CMAKE = """\
-cmake_minimum_required(VERSION 3.14)
-project(sushitrack_example C)
-
-# The package root is one directory up from this example.
-set(SUSHITRACK_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
-
-add_executable(sushitrack_example example.c)
-target_include_directories(sushitrack_example PRIVATE "${SUSHITRACK_ROOT}/include")
-
-if(WIN32)
-    target_link_libraries(sushitrack_example PRIVATE "${SUSHITRACK_ROOT}/lib/sushitrack.lib")
-    # Copy the runtime DLL next to the executable so it can be launched directly.
-    add_custom_command(TARGET sushitrack_example POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${SUSHITRACK_ROOT}/bin/sushitrack.dll" $<TARGET_FILE_DIR:sushitrack_example>)
-else()
-    target_link_libraries(sushitrack_example PRIVATE "${SUSHITRACK_ROOT}/lib/libsushitrack.so")
-    set_target_properties(sushitrack_example PROPERTIES
-        BUILD_RPATH   "${SUSHITRACK_ROOT}/lib"
-        INSTALL_RPATH "${SUSHITRACK_ROOT}/lib")
-endif()
-"""
-
-_CPP_README = """\
-# SushiTrack — C/C++ Deployment Package
-
-Self-contained, ready-to-link build of the SushiTrack tracker (C ABI).
-
-## Contents
-```
-include/         Public C headers (SushiTrack/c_api/sushitrack_c.h)
-lib/             Link library  ({import_lib})
-bin/             Runtime library ({runtime_lib})   [Windows only]
-sushitrack.json  Default runtime configuration (editable, no recompile needed)
-example/         Minimal usage example + CMakeLists.txt
-```
-
-## Quick start
-```sh
-cd example
-cmake -B build
-cmake --build build
-```
-
-## Integrating into your own project
-- Add `include/` to your include path and include `SushiTrack/c_api/sushitrack_c.h`.
-- Link against `lib/{import_lib}`.
-- On Windows, ensure `bin/sushitrack.dll` is on the PATH or beside your executable.
-- Edit `sushitrack.json` and create the tracker with `sushitrack_create_tracker("sushitrack.json")`
-  to retune the algorithm without recompiling.
-
-Platform: {platform}
-"""
-
-_PY_EXAMPLE = """\
-\"\"\"Minimal SushiTrack Python usage example.
-
-Run (after `st deploy python`):
-    python example.py
-\"\"\"
-from sushitrack import Tracker
-
-# The binding loads the shared library bundled inside the sushitrack/ directory.
-tracker = Tracker(config_path="sushitrack.json")
-
-x = 100.0
-for frame in range(5):
-    x += 5.0
-    dets = [(x, 100.0, 50.0, 80.0, 0.9, 0)]   # (x, y, w, h, score, label)
-    tracks = tracker.update(dets, dt=1.0 / 30.0)
-    print(f"frame {frame}: {len(tracks)} track(s)")
-    for t in tracks:
-        print(f"  id={t.track_id}  ({t.x:.1f}, {t.y:.1f}, {t.width:.1f}, {t.height:.1f})")
-
-tracker.close()
-"""
-
-_PY_README = """\
-# SushiTrack — Python Deployment Package
-
-Self-contained binding bundled with the native SushiTrack library.
-
-## Contents
-```
-sushitrack/
-    __init__.py
-    {runtime_lib}    Bundled native library
-sushitrack.json      Default runtime configuration
-example.py           Minimal usage example
-```
-
-## Quick start
-```sh
-python example.py
-```
-
-## Integrating into your own project
-Copy the `sushitrack/` directory into your project (or add it to PYTHONPATH):
-```python
-from sushitrack import Tracker
-tracker = Tracker()
-tracks = tracker.update([(x, y, w, h, score, label)], dt=1/30)
-```
-The native library is loaded from inside the package automatically; no build
-tree or environment variable is required.
-
-Platform: {platform}
-"""
+def _copy_notices(paths, pkg_dir):
+    """Copy LICENSE, NOTICE.md and the third-party licence texts; False after naming a missing one."""
+    sources = [(paths.root / "LICENSE", pkg_dir / "LICENSE"),
+               (paths.root / "NOTICE.md", pkg_dir / "NOTICE.md")]
+    sources += [(paths.root / source, pkg_dir / "licenses" / target)
+                for source, target in K_LICENCE_TEXTS]
+    (pkg_dir / "licenses").mkdir(parents=True, exist_ok=True)
+    for source, target in sources:
+        if not source.is_file():
+            console.error(f"{source} not found; a package without its notices may not ship.")
+            return False
+        shutil.copy2(source, target)
+    return True
 
 
 def _copy_config(paths, pkg_dir):
@@ -221,14 +106,15 @@ def _deploy_cpp(paths, pkg_dir):
 
     _copy_config(paths, pkg_dir)
     (pkg_dir / "example").mkdir(parents=True, exist_ok=True)
-    (pkg_dir / "example" / "example.c").write_text(_CPP_EXAMPLE, encoding="utf-8")
-    (pkg_dir / "example" / "CMakeLists.txt").write_text(_CPP_EXAMPLE_CMAKE,
+    (pkg_dir / "example" / "example.c").write_text(_template("example.c.in"), encoding="utf-8")
+    (pkg_dir / "example" / "CMakeLists.txt").write_text(_template("CMakeLists.txt.in"),
                                                         encoding="utf-8")
     (pkg_dir / "README.md").write_text(
-        _CPP_README.format(import_lib=import_lib_name(),
-                           runtime_lib=shared_lib_name(),
-                           platform=platform.system()), encoding="utf-8")
-    return True
+        _template("cpp_readme.md.in").format(import_lib=import_lib_name(),
+                                             runtime_lib=shared_lib_name(),
+                                             sushilog_lib=sushilog_lib_name(),
+                                             platform=platform.system()), encoding="utf-8")
+    return _copy_notices(paths, pkg_dir)
 
 
 def _deploy_python(paths, pkg_dir):
@@ -245,18 +131,18 @@ def _deploy_python(paths, pkg_dir):
     module_dir = pkg_dir / "sushitrack"
     module_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(binding, module_dir / binding.name)
-    # Bundled beside the module because the binding's find_library() looks there first
     shutil.copy2(runtime, module_dir / shared_lib_name())
     shutil.copy2(sushilog, module_dir / sushilog_lib_name())
     (module_dir / "__init__.py").write_text(
         f"from .{binding.stem} import *  # noqa: F401,F403\n", encoding="utf-8")
 
     _copy_config(paths, pkg_dir)
-    (pkg_dir / "example.py").write_text(_PY_EXAMPLE, encoding="utf-8")
+    (pkg_dir / "example.py").write_text(_template("example.py.in"), encoding="utf-8")
     (pkg_dir / "README.md").write_text(
-        _PY_README.format(runtime_lib=shared_lib_name(),
-                          platform=platform.system()), encoding="utf-8")
-    return True
+        _template("python_readme.md.in").format(runtime_lib=shared_lib_name(),
+                                                sushilog_lib=sushilog_lib_name(),
+                                                platform=platform.system()), encoding="utf-8")
+    return _copy_notices(paths, pkg_dir)
 
 
 def deploy(paths, kind):

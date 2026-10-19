@@ -1,0 +1,28 @@
+# CMakeLists.txt.in
+# SushiTrack - https://github.com/SushiSystems/SushiTrack
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
+# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
+# Commercial use requires a licence from Sushi Systems.
+
+cmake_minimum_required(VERSION 3.14)
+project(sushitrack_example C)
+
+# The package root is one directory up from this example.
+set(SUSHITRACK_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
+
+add_executable(sushitrack_example example.c)
+target_include_directories(sushitrack_example PRIVATE "${SUSHITRACK_ROOT}/include")
+
+if(WIN32)
+    target_link_libraries(sushitrack_example PRIVATE "${SUSHITRACK_ROOT}/lib/sushitrack.lib")
+    # The runtime libraries sit beside the executable, so it starts without a PATH change.
+    add_custom_command(TARGET sushitrack_example POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${SUSHITRACK_ROOT}/bin/sushitrack.dll" "${SUSHITRACK_ROOT}/bin/sushilog.dll"
+                $<TARGET_FILE_DIR:sushitrack_example>)
+else()
+    target_link_libraries(sushitrack_example PRIVATE "${SUSHITRACK_ROOT}/lib/libsushitrack.so")
+    set_target_properties(sushitrack_example PROPERTIES
+        BUILD_RPATH   "${SUSHITRACK_ROOT}/lib"
+        INSTALL_RPATH "${SUSHITRACK_ROOT}/lib")
+endif()

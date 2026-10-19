@@ -64,19 +64,10 @@ Defects that stand in the tree. The work that closes each one is in
 ### KI-8 st doctor never looks for GoogleTest
 - Origin: own
 - Where: `cli/sushistack.deps.toml`
-- Cause: the fragment carries no check command, and says the test targets are off by default
-  while `st build` builds them unless `--no-test` is given
+- Cause: the GoogleTest fragment carries no check command
 - Recognise: `st doctor` passes and `st build` fails at `find_package(GTest)`
 - Workaround: `st build --no-test`
 - Fix: RW-18
-
-### KI-17 Deploy packages ship ported MIT code without its notice
-- Origin: own
-- Where: `cli/sushitrack_cli/services/deploy.py`
-- Cause: the packages copy the headers, the libraries and the configuration, and no licence file
-- Recognise: `package/` holds no `LICENSE` or `NOTICE.md` after `st deploy`
-- Workaround: copy `LICENSE`, `NOTICE.md` and `third_party/bytetrack/LICENSE` into the package by hand
-- Fix: RW-20
 
 ## Repository
 
@@ -89,51 +80,15 @@ Defects that stand in the tree. The work that closes each one is in
 - Workaround: `git clone --filter=blob:none`
 - Fix: RW-4
 
-### KI-11 The ignore files name paths that do not exist and miss ones that do
+### KI-13 The Python binding sits in a root folder the layout does not name
 - Origin: own
-- Where: `.gitignore`, `.config/docker/Dockerfile.dockerignore`
-- Cause: `.sushitrack_env.json` and `Dockerfile.cli` are named; `build-asan/`, `.worktrees/`
-  and `*.egg-info` are not
-- Recognise: `git status` lists a worktree or an asan build tree
+- Where: `bindings/python/`
+- Cause: `repository-layout` names no home for a language binding
+- Recognise: `bindings/` beside `cli/` and `applications/` in the root
 - Workaround: none
-- Fix: RW-1
-
-### KI-12 The submodules and two strings still say 3rdparty
-- Origin: own
-- Where: `.gitmodules`, `cli/sushitrack_cli/config.py`, `cli/sushitrack_cli/services/evaluate.py`
-- Cause: the folder was renamed to `third_party/` and the names were not
-- Recognise: `git submodule status` names `3rdparty/...` sections
-- Workaround: none
-- Fix: RW-1
-
-### KI-13 The layout of the tree departs from repository-layout
-- Origin: own
-- Where: repository root, `CMakeLists.txt`, `include/SushiTrack/`, `source/`, `tests/`
-- Cause: configuration files sit in the root, the root build file holds logic, headers are flat
-  and hold more than one type, and the test tree is split by kind instead of mirroring the source
-- Recognise: `python tools/testing/check_test_mirror.py .` reports findings
-- Workaround: none
-- Fix: RW-1
-
-### KI-14 Helper scripts sit inside the CLI package
-- Origin: own
-- Where: `cli/misc/`
-- Cause: three scripts that clean predictions and stage TrackEval data sit beside the CLI
-  package instead of being `st` commands or tools
-- Recognise: `cli/misc/` holds a `.sh`, a `.bat` and a `.ps1`
-- Workaround: none
-- Fix: RW-1
+- Fix: RW-3
 
 ## Documentation
-
-### KI-15 A fix message and a dependency description cite the old one-file manual
-- Origin: own
-- Where: `cli/sushitrack_cli/services/checks.py`, `cli/sushistack.deps.toml`
-- Cause: the sections moved to `docs/reference/DATA_LAYOUT.md` and
-  `docs/getting_started/INSTALL.md`
-- Recognise: the cited section is not in `docs/README.md`
-- Workaround: read the two pages named above
-- Fix: RW-1
 
 ### KI-16 The manual names symbols and paths the source does not hold
 - Origin: own

@@ -14,6 +14,8 @@ from sushitrack_cli import errors
 from sushitrack_cli.services import build as build_svc
 from sushitrack_cli.services import label
 
+pytestmark = pytest.mark.small
+
 
 def test_every_cli_error_derives_from_the_base_the_entry_point_catches():
     """Derives every st error from the class sushicore's entry point catches."""

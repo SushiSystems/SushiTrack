@@ -7,11 +7,15 @@
 
 from __future__ import annotations
 
+import pytest
+
 import json
 import os
 from types import SimpleNamespace
 
 from sushitrack_cli import env
+
+pytestmark = pytest.mark.medium
 
 
 def _tool(windows=True, vcvars="C:/vs/vcvars64.bat"):

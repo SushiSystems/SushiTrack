@@ -1,4 +1,4 @@
-# test_test_service.py
+# test_tests.py
 # SushiTrack - https://github.com/SushiSystems/SushiTrack
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
 # Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
@@ -16,6 +16,8 @@ from conftest import RecordingConsole
 from sushitrack_cli.services import build as build_svc
 from sushitrack_cli.services import tests as test_svc
 from sushitrack_cli.services.test_label import TestLabel
+
+pytestmark = pytest.mark.medium
 
 
 class DrainRecorder:

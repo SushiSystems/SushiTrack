@@ -12,10 +12,10 @@ from typing import Optional
 import sys
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[4]
-_3RDPARTY_TRACKEVAL = _PROJECT_ROOT / "third_party" / "TrackEval"
+_TRACKEVAL_DIR = _PROJECT_ROOT / "third_party" / "TrackEval"
 
-if _3RDPARTY_TRACKEVAL.exists() and str(_3RDPARTY_TRACKEVAL) not in sys.path:
-    sys.path.insert(0, str(_3RDPARTY_TRACKEVAL))
+if _TRACKEVAL_DIR.exists() and str(_TRACKEVAL_DIR) not in sys.path:
+    sys.path.insert(0, str(_TRACKEVAL_DIR))
 
 import messages as console
 

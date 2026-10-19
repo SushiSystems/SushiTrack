@@ -88,11 +88,6 @@ The single backlog of this repository. Defects that stand in the tree are in
 
 ## Install and release
 
-### RW-20 Ship the licence and the third-party notices in every deploy package
-- State: open
-- Done when: both `st deploy` packages hold `LICENSE`, `NOTICE.md` and the licence texts of
-  the ported ByteTrack-cpp and gatagat/lap code
-
 ### RW-16 Take sushicore from one source in every install path
 - State: open
 - Done when: `.config/conda/environment.yml`, the Dockerfile and `cli/pyproject.toml` name the same sushicore

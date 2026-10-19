@@ -5,10 +5,13 @@
 # Commercial use requires a licence from Sushi Systems.
 """Runs the tests of the build tree through CTest, selected by size label."""
 
+import sys
+
 from sushicore import cmake_cache
 
 from .. import console
 from ..env import load_build_env
+from ..process import RUNNER
 from . import build as build_svc
 from .test_label import select_labels
 
@@ -53,3 +56,15 @@ def test(cfg, paths, labels=None, filter=None, repeat=0, jobs=None):
     if code != 0:
         console.error(f"Tests failed (exit {code}).")
     return code
+
+
+def test_cli(paths, labels=None):
+    """Run the pytest suite of the st package that *labels* select.
+
+    Returns:
+        pytest's exit code.
+    """
+    console.header("Test (st package)")
+    expression = select_labels(labels).pytest_expression()
+    console.info(f"Markers: {expression}")
+    return RUNNER.run([sys.executable, "-m", "pytest", "-q", "-m", expression], paths.cli)

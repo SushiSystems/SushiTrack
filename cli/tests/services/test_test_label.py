@@ -7,7 +7,11 @@
 
 from __future__ import annotations
 
+import pytest
+
 from sushitrack_cli.services.test_label import TestLabel, select_labels
+
+pytestmark = pytest.mark.small
 
 
 def test_no_label_selects_small_and_medium_and_leaves_the_quarantine_out():
@@ -28,3 +32,10 @@ def test_quarantined_alone_selects_only_the_quarantine():
     selection = select_labels([TestLabel.QUARANTINED])
     assert selection.ctest_include() == "^quarantined$"
     assert selection.ctest_exclude() is None
+
+
+def test_pytest_expression_leaves_the_quarantine_out_unless_named():
+    """Selects the sizes and drops quarantined tests, unless the quarantine is named."""
+    assert select_labels(None).pytest_expression() == "(small or medium) and not quarantined"
+    assert select_labels([TestLabel.SMALL, TestLabel.QUARANTINED]).pytest_expression() == "(small)"
+    assert select_labels([TestLabel.QUARANTINED]).pytest_expression() == "quarantined"

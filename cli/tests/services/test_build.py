@@ -1,4 +1,4 @@
-# test_build_service.py
+# test_build.py
 # SushiTrack - https://github.com/SushiSystems/SushiTrack
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
 # Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
@@ -14,6 +14,8 @@ from sushicore.cmake_driver import CMakeDriver
 
 from conftest import RecordingConsole
 from sushitrack_cli.services import build as build_svc
+
+pytestmark = pytest.mark.medium
 
 
 class RecordingRunner:
@@ -186,3 +188,8 @@ def test_clean_removes_both_trees(tmp_path, recorder):
     paths.package.mkdir()
     assert build_svc.clean(paths) == 0
     assert not paths.build.exists() and not paths.package.exists()
+
+
+def test_build_type_values_match_build_types():
+    assert {member.value for member in build_svc.BuildType} == \
+        {name.lower() for name in build_svc.BUILD_TYPES}

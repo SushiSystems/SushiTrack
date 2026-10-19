@@ -7,7 +7,11 @@
 
 from __future__ import annotations
 
+import pytest
+
 from sushitrack_cli.services import artifacts
+
+pytestmark = pytest.mark.medium
 
 
 def _plant(path):

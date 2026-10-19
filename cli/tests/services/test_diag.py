@@ -1,4 +1,4 @@
-# test_diag_service.py
+# test_diag.py
 # SushiTrack - https://github.com/SushiSystems/SushiTrack
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
 # Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
@@ -7,9 +7,13 @@
 
 from __future__ import annotations
 
+import pytest
+
 from types import SimpleNamespace
 
 from sushitrack_cli.services import diag
+
+pytestmark = pytest.mark.medium
 
 
 def test_git_missing_answers_none(tmp_path, monkeypatch):

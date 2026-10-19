@@ -113,7 +113,8 @@ def build(
            "st test --label small -f 'RectTest'\n"
            "st test --label medium --repeat 3\n"
            "st test --label large  # Needs real hardware\n"
-           "st test --label quarantined",
+           "st test --label quarantined\n"
+           "st test --cli  # The st package's own tests",
 )
 def test(
     label: Optional[List[TestLabel]] = typer.Option(
@@ -130,16 +131,22 @@ def test(
     jobs: Optional[int] = typer.Option(
         None, "--jobs", "-j", metavar="N",
         help="Run up to N tests concurrently (ctest --parallel)."),
+    cli_tests: bool = typer.Option(
+        False, "--cli", help="Run the pytest suite of the st package instead of CTest."),
 ):
     """Run the tests through CTest, selected by size label.
 
     For GTest-level knobs (shuffle, break-on-failure) run the binary directly:
     st run sushitrack_tests -- --gtest_shuffle --gtest_break_on_failure
 
+    --cli runs the pytest suite of the st package instead, with the same labels.
+
     Metric evaluation and video inference are not CTest suites — see `st eval`
     and `st infer`.
     """
     cfg, paths = context()
+    if cli_tests:
+        raise typer.Exit(test_svc.test_cli(paths, labels=label))
     raise typer.Exit(test_svc.test(cfg, paths, labels=label, filter=filter,
                                    repeat=repeat, jobs=jobs))
 
@@ -167,10 +174,17 @@ def run(
                                  forwarded=list(ctx.args)))
 
 
-@app.command("clean", rich_help_panel=K_PROJECT, epilog="st clean")
-def clean():
-    """Remove the build tree and the assembled package directory."""
+@app.command("clean", rich_help_panel=K_PROJECT,
+             epilog="st clean\nst clean --predictions  # Only the benchmarks' pred/ folders")
+def clean(
+    predictions: bool = typer.Option(
+        False, "--predictions",
+        help="Remove the pred/ folder of every benchmark sequence instead of the build tree."),
+):
+    """Remove the build tree and the assembled package directory, or the predictions."""
     _, paths = context()
+    if predictions:
+        raise typer.Exit(label_svc.clean_predictions(paths))
     raise typer.Exit(build_svc.clean(paths))
 
 

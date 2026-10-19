@@ -1,0 +1,33 @@
+# SushiTrack Python package
+
+The ctypes binding of SushiTrack with the native libraries bundled inside it.
+
+## Contents
+```
+sushitrack/
+    __init__.py
+    {runtime_lib}    Native SushiTrack library
+    {sushilog_lib}   Native SushiLog library, which SushiTrack logs through
+sushitrack.json      Default runtime configuration
+example.py           A usage example
+LICENSE              The PolyForm Noncommercial licence of SushiTrack
+NOTICE.md            The third-party code inside the libraries
+licenses/            The licence texts NOTICE.md cites
+```
+
+## Quick start
+```sh
+python example.py
+```
+
+## Integrating into your own project
+Copy the `sushitrack/` directory into your project, or add it to PYTHONPATH:
+```python
+from sushitrack import Tracker
+tracker = Tracker()
+tracks = tracker.update([(x, y, w, h, score, label)], dt=1/30)
+```
+The binding loads the native libraries from inside the package; no build tree or environment
+variable is needed. Ship `LICENSE`, `NOTICE.md` and `licenses/` with any copy of the package.
+
+Platform: {platform}

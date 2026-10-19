@@ -5,6 +5,7 @@
 # Commercial use requires a licence from Sushi Systems.
 """The MOT label-based benchmark pipeline behind `st eval`."""
 
+import shutil
 from pathlib import Path
 
 from .. import console
@@ -170,3 +171,22 @@ def _evaluate_benchmark(cfg, paths, benchmark, names, trackers, compare, eval_on
     export_dir = None if export is None else str(Path(export) / benchmark)
     return evaluate.run_internal(paths, data_root, names, trackers, perf, export_dir,
                                  compare=compare)
+
+
+def clean_predictions(paths):
+    """Remove the pred/ folder of every sequence of every benchmark.
+
+    Returns:
+        0 when every pred/ folder is gone, 1 when one could not be removed.
+    """
+    console.header("Clean predictions")
+    removed = 0
+    for benchmark in paths.benchmark_names():
+        for prediction in sorted(paths.data_root(benchmark).glob("*/pred")):
+            shutil.rmtree(prediction, ignore_errors=True)
+            if prediction.exists():
+                console.error(f"Could not remove {prediction}; close whatever holds a file in it.")
+                return 1
+            removed += 1
+    console.success(f"Removed {removed} pred/ folder(s).")
+    return 0

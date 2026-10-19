@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- 2026-10-19 — cli: Mirrored the CLI tests on the package, gave each file a size and added `st test --cli`, which runs them by label (`cli/tests/`, `cli/sushitrack_cli/services/tests.py`).
+- 2026-10-19 — cli: Shipped `LICENSE`, `NOTICE.md` and the third-party licence texts in both deploy packages, written from template files (`cli/sushitrack_cli/services/deploy.py`, `cli/sushitrack_cli/templates/`).
+- 2026-10-19 — cli: Replaced the scripts of `cli/misc/` with `st clean --predictions`; `st eval --trackeval` already stages the TrackEval tree (`cli/sushitrack_cli/services/label.py`).
 - 2026-10-19 — cli: Added `st eval --benchmark`, which runs and scores one benchmark; without it each benchmark is run and scored on its own (`cli/sushitrack_cli/services/label.py`, `cli/sushitrack_cli/config.py`).
 - 2026-10-19 — applications: Split the sequences into the mot17, mot20 and dancetrack benchmarks, which one engine, `mot_engine`, runs and scores (`applications/benchmarks/`).
 - 2026-10-19 — applications: Made the Python evaluator and inference scripts print through their own `messages.py` instead of importing the `st` package (`applications/inference/messages.py`).

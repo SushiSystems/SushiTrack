@@ -1,0 +1,21 @@
+# example.py.in
+# SushiTrack - https://github.com/SushiSystems/SushiTrack
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
+# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
+# Commercial use requires a licence from Sushi Systems.
+"""Creates a tracker from sushitrack.json and follows one moving box for five frames."""
+
+from sushitrack import Tracker
+
+tracker = Tracker(config_path="sushitrack.json")
+
+x = 100.0
+for frame in range(5):
+    x += 5.0
+    dets = [(x, 100.0, 50.0, 80.0, 0.9, 0)]
+    tracks = tracker.update(dets, dt=1.0 / 30.0)
+    print(f"frame {frame}: {len(tracks)} track(s)")
+    for t in tracks:
+        print(f"  id={t.track_id}  ({t.x:.1f}, {t.y:.1f}, {t.width:.1f}, {t.height:.1f})")
+
+tracker.close()

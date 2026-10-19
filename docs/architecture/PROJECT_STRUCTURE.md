@@ -48,8 +48,7 @@ sushitrack/
 ├── cli/                               # the st CLI; see CLI_PACKAGE.md
 │   ├── pyproject.toml  config.toml  sushistack.deps.toml
 │   ├── sushitrack_cli/
-│   ├── tests/                         # pytest suite for the CLI
-│   └── misc/                          # clean_preds.sh, clean_preds.bat, construct_trackeval_data.ps1
+│   └── tests/                         # pytest suite for the CLI, mirroring sushitrack_cli/
 │
 ├── tools/                             # checkers; see tools/README.md
 └── docs/                              # this manual; see docs/README.md

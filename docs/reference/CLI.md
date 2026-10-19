@@ -52,6 +52,7 @@ is picked up with no CLI change. [Test suites](../guides/TESTING.md) says what e
 | `--filter, -f <regex>` | `ctest -R` over `Suite.Case` test names |
 | `--repeat, -r <n>` | `ctest --repeat until-fail:<n>`: re-run each test until it fails; flaky-test hunting |
 | `--jobs, -j <n>` | Run up to N tests concurrently (`ctest --parallel`) |
+| `--cli` | Run the pytest suite of the `st` package instead of CTest, with the same labels |
 
 ```bash
 st test                              # small and medium
@@ -60,6 +61,7 @@ st test --label small -f 'RectTest'
 st test --label medium --repeat 3
 st test --label large                # needs real hardware
 st test --label quarantined
+st test --cli                        # the st package's own tests
 ```
 
 For GTest-level knobs (shuffle, break-on-failure) run the binary directly instead:
@@ -148,9 +150,12 @@ resolution.
 
 Removes the build directory and the assembled package directory (`build/` and
 `package/` by default; both overridable in the `paths` section of `cli/config.toml`).
+`--predictions` removes the `pred/` folder of every benchmark sequence instead, and leaves
+the build tree.
 
 ```bash
 st clean
+st clean --predictions
 ```
 
 ## `st run`

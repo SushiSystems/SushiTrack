@@ -13,6 +13,8 @@ import pytest
 
 from sushitrack_cli import aliases
 
+pytestmark = pytest.mark.small
+
 
 @pytest.mark.parametrize("old, new", [
     ("st docker build", "st container build"),

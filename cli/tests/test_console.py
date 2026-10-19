@@ -1,4 +1,4 @@
-# test_console_lazy.py
+# test_console.py
 # SushiTrack - https://github.com/SushiSystems/SushiTrack
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
 # Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
@@ -13,6 +13,8 @@ from __future__ import annotations
 import importlib
 
 import pytest
+
+pytestmark = pytest.mark.medium
 
 
 def _fresh_console_module():

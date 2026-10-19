@@ -16,6 +16,8 @@ from sushicore.provision.config import ProvisionSettings
 from sushitrack_cli import config as config_module
 from sushitrack_cli.config import IS_WINDOWS, Config, ToolSettings, load_config
 
+pytestmark = pytest.mark.medium
+
 
 @pytest.fixture
 def st_checkout(monkeypatch, tmp_path):

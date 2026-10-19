@@ -1,0 +1,40 @@
+/**
+ * @file example.c
+ * @brief Creates a tracker from sushitrack.json and follows one moving box for five frames.
+ * @author Mustafa Garip
+ */
+
+#include <stdio.h>
+
+#include <SushiTrack/c_api/sushitrack_c.h>
+
+/**
+ * @brief Runs the example; build it with `cmake -B build && cmake --build build` in example/.
+ * @return 0 when the tracker ran, 1 when it could not be created.
+ */
+int main(void)
+{
+    sushitrack_tracker_t tracker = sushitrack_create_tracker("sushitrack.json");
+    if (!tracker)
+    {
+        fprintf(stderr, "failed to create tracker\n");
+        return 1;
+    }
+
+    sushitrack_object_t dets[1] = {{100.f, 100.f, 50.f, 80.f, 0.9f, 0, NULL, 0}};
+    sushitrack_track_t out[64];
+
+    for (int frame = 0; frame < 5; ++frame)
+    {
+        dets[0].x += 5.f;
+        int n = sushitrack_update(tracker, dets, 1, out, 64, 1.0f / 30.0f);
+        printf("frame %d: %d track(s)\n", frame, n);
+        for (int i = 0; i < n; ++i)
+            printf("  id=%lld  (%.1f, %.1f, %.1f, %.1f)  state=%d\n",
+                   (long long)out[i].track_id, out[i].x, out[i].y, out[i].width, out[i].height,
+                   out[i].state);
+    }
+
+    sushitrack_destroy_tracker(tracker);
+    return 0;
+}

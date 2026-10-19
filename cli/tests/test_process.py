@@ -7,12 +7,16 @@
 
 from __future__ import annotations
 
+import pytest
+
 import os
 import subprocess
 import sys
 
 from conftest import RecordingConsole
 from sushitrack_cli import process
+
+pytestmark = pytest.mark.medium
 
 MISSING = "definitely-not-a-program-4b7e"
 

@@ -1,0 +1,31 @@
+# SushiTrack C/C++ package
+
+A ready-to-link build of the SushiTrack tracker and its C API.
+
+## Contents
+```
+include/         Public headers (SushiTrack/c_api/sushitrack_c.h)
+lib/             Link library ({import_lib})
+bin/             Runtime libraries ({runtime_lib}, {sushilog_lib})   [Windows only]
+sushitrack.json  Default runtime configuration; edit it to retune without recompiling
+example/         A usage example and its CMakeLists.txt
+LICENSE          The PolyForm Noncommercial licence of SushiTrack
+NOTICE.md        The third-party code inside the libraries
+licenses/        The licence texts NOTICE.md cites
+```
+
+## Quick start
+```sh
+cd example
+cmake -B build
+cmake --build build
+```
+
+## Integrating into your own project
+- Add `include/` to your include path and include `SushiTrack/c_api/sushitrack_c.h`.
+- Link against `lib/{import_lib}`.
+- On Windows, keep `bin/{runtime_lib}` and `bin/{sushilog_lib}` on the PATH or beside your executable.
+- Create the tracker with `sushitrack_create_tracker("sushitrack.json")` to read the configuration.
+- Ship `LICENSE`, `NOTICE.md` and `licenses/` with any copy of the libraries.
+
+Platform: {platform}

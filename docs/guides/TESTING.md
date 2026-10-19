@@ -45,7 +45,10 @@ into `sushitrack_application_tests`. The MOT benchmark is a program, not a test;
 
 ## CLI tests (`cli/tests/`)
 
-A pytest suite for the `st` package. It needs no build.
+A pytest suite for the `st` package. It needs no build. It mirrors the package: the test of
+`cli/sushitrack_cli/services/<name>.py` is `cli/tests/services/test_<name>.py`, and `cli.py`,
+whose tests do not fit one file, has `cli/tests/test_cli/`. Each file carries its size as
+`pytestmark`, and `conftest.py` refuses a test with no size and gives each its timeout.
 
 `sushitrack_cli` imports `sushicore` at module load, so the suite cannot be collected without it.
 sushicore is an ordinary PyPI dependency of the CLI, not a checkout to be found on disk, so
@@ -61,5 +64,6 @@ shared console, or reads the developer's own project says something different on
 machine.
 
 ```bash
-python -m pytest cli/tests -q
+st test --cli                 # small and medium
+st test --cli --label small
 ```

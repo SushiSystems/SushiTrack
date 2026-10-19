@@ -13,6 +13,8 @@ import pytest
 
 from sushitrack_cli.cli import app, main
 
+pytestmark = pytest.mark.small
+
 K_GROUPS = {
     "Project": ["build", "test", "run", "clean", "deploy", "container", "docs"],
     "Benchmark": ["eval", "infer"],
