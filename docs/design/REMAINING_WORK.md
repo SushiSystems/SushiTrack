@@ -7,7 +7,8 @@ The single backlog of this repository. Defects that stand in the tree are in
 
 ## Next
 
-- RW-1 Every finding of the shared checkers in this tree is closed by it
+- RW-9 The Linux build and the tests run nowhere but on a developer machine
+- RW-13 A caller cannot tell a failed update from a frame with no tracks
 
 ## Decisions waiting for the owner
 
@@ -46,12 +47,6 @@ The single backlog of this repository. Defects that stand in the tree are in
 - Source: `docs/design/SUSHITRACK_MIGRATION.md` §5
 
 ## Repository
-
-### RW-1 Align the repository with SushiSkills
-- State: open
-- Done when: `python tools/check_all.py .` prints nothing, and `st test --label small --label
-  medium` passes
-- Source: `docs/agent/2026_10_19_SKILL_ALIGNMENT/PLAN.md`
 
 ### RW-9 Run st build and st test in CI on Windows and Linux
 - State: open

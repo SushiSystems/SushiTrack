@@ -1,6 +1,6 @@
 # Skill alignment
 
-**Status:** Open — specified; the plan is in `PLAN.md`
+**Status:** Shipped — 2026-10-19. The outcome is in `REPORT.md`.
 
 Bring SushiTrack in line with every SushiSkills rule, so that every shared checker passes on the
 tree and the layout, the test tree, the C++ style and the manual match the skills.

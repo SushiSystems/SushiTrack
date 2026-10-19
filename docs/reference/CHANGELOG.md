@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- 2026-10-19 — docs: Corrected the names and paths the manual cited, marked its uncompiled examples and split the overview and the benchmarks below the page ceiling (`docs/architecture/MOTION_ESTIMATORS.md`, `docs/reference/BENCHMARKS_IMM.md`, `docs/.docs_truth_allow`).
+- 2026-10-19 — docs: Rewrote the root README in the documentation skill's order, with a Status section, and closed the skill alignment work (`README.md`, `docs/agent/2026_10_19_SKILL_ALIGNMENT/REPORT.md`).
+- 2026-10-19 — docs: Corrected the names and paths the manual cited, marked its uncompiled examples and split two pages under the ceiling (`docs/architecture/MOTION_ESTIMATORS.md`, `docs/.docs_truth_allow`).
 - 2026-10-19 — cli: Mirrored the CLI tests on the package, gave each file a size and added `st test --cli`, which runs them by label (`cli/tests/`, `cli/sushitrack_cli/services/tests.py`).
 - 2026-10-19 — cli: Shipped `LICENSE`, `NOTICE.md` and the third-party licence texts in both deploy packages, written from template files (`cli/sushitrack_cli/services/deploy.py`, `cli/sushitrack_cli/templates/`).
 - 2026-10-19 — cli: Replaced the scripts of `cli/misc/` with `st clean --predictions`; `st eval --trackeval` already stages the TrackEval tree (`cli/sushitrack_cli/services/label.py`).
