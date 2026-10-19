@@ -19,9 +19,9 @@ data = "data"
 third_party = "third_party"
 config = "assets/sushitrack.json"
 tests = "tests"
-regression = "tests/regression"
-evaluator = "tests/regression/evaluator"
-inference = "tests/regression/inference"
+bridge = "applications/tracker_bridge"
+evaluator = "applications/benchmarks/mot_evaluation/evaluator"
+inference = "applications/inference"
 package = "package"
 
 [build]

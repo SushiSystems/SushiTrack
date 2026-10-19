@@ -12,7 +12,7 @@ import sys
 from ctypes import POINTER, Structure, c_float, c_int, c_void_p
 
 _BINDINGS_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "..", "bindings", "python")
+    os.path.join(os.path.dirname(__file__), "..", "..", "bindings", "python")
 )
 if _BINDINGS_DIR not in sys.path:
     sys.path.insert(0, _BINDINGS_DIR)

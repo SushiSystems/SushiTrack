@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* ByteTrackAdapter.h                                                     */
+/* byte_track_adapter.hpp                                                 */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -20,8 +20,8 @@
 /**************************************************************************/
 
 /**
- * @file ByteTrackAdapter.h
- * @brief Defines the regression test adapter for ByteTrack.
+ * @file byte_track_adapter.hpp
+ * @brief Declares ByteTrackAdapter, which drives the ByteTrack reference tracker.
  * @author Mustafa Garip
  */
 
@@ -33,13 +33,16 @@
 #include <string>
 #include <vector>
 
-#include "ByteTrack/BYTETracker.h"
-#include "ByteTrack/Object.h"
-#include "ByteTrack/Rect.h"
-#include "TestInfra.h"
-#include "TrackerAdapter.h"
+#include <ByteTrack/BYTETracker.h>
+#include <ByteTrack/Object.h>
+#include <ByteTrack/Rect.h>
 
-namespace TestInfrastructure
+#include <json_settings.hpp>
+#include <mot_detection.hpp>
+#include <track_result.hpp>
+#include <tracker_adapter.hpp>
+
+namespace TrackerBridge
 {
     /**
      * @brief Implementation of TrackerAdapter for the ByteTrack algorithm.
@@ -64,18 +67,18 @@ namespace TestInfrastructure
             {
                 if (!config_path.empty() && std::filesystem::exists(config_path))
                 {
-                    JsonDoc doc = parse_json(config_path);
+                    const nlohmann::json doc = read_json_settings(config_path);
                     auto it = doc.find("bytetrack");
                     if (it != doc.end())
                     {
-                        const JsonSection& s = it.value();
+                        const nlohmann::json& s = it.value();
                         frame_rate_ = static_cast<int>(
-                            json_get(s, "frame_rate", static_cast<float>(frame_rate_)));
+                            json_number(s, "frame_rate", static_cast<float>(frame_rate_)));
                         track_buffer_ = static_cast<int>(
-                            json_get(s, "track_buffer", static_cast<float>(track_buffer_)));
-                        track_thresh_ = json_get(s, "track_thresh", track_thresh_);
-                        high_thresh_ = json_get(s, "high_thresh", high_thresh_);
-                        match_thresh_ = json_get(s, "match_thresh", match_thresh_);
+                            json_number(s, "track_buffer", static_cast<float>(track_buffer_)));
+                        track_thresh_ = json_number(s, "track_thresh", track_thresh_);
+                        high_thresh_ = json_number(s, "high_thresh", high_thresh_);
+                        match_thresh_ = json_number(s, "match_thresh", match_thresh_);
                         std::cout << "[ ByteTrackAdapter ] config loaded from " << config_path
                                   << "\n";
                     }
@@ -94,7 +97,7 @@ namespace TestInfrastructure
              *
              * @return "bytetrack"
              */
-            std::string name() const override { return "bytetrack"; }
+            [[nodiscard]] std::string name() const override { return "bytetrack"; }
 
             /**
              * @brief Updates the tracker processing frequency.
@@ -114,8 +117,8 @@ namespace TestInfrastructure
              * @param dt Time interval (unused).
              * @return Collection of tracking results.
              */
-            std::vector<TrackResult> update(const std::vector<MOTDetection>& dets,
-                                            float dt = 1.0f) override
+            [[nodiscard]] std::vector<TrackResult> update(const std::vector<MOTDetection>& dets,
+                                                          float dt = 1.0f) override
             {
                 std::vector<byte_track::Object> objects;
                 objects.reserve(dets.size());
@@ -161,4 +164,4 @@ namespace TestInfrastructure
             }
     };
 
-} // namespace TestInfrastructure
+} // namespace TrackerBridge

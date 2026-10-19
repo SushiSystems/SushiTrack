@@ -17,16 +17,14 @@ from pathlib import Path
 
 # Ensure we can import from the local directory and the project root
 _THIS_DIR = Path(__file__).parent
-_PROJECT_ROOT = _THIS_DIR.parent.parent.parent
+_PROJECT_ROOT = _THIS_DIR.parent.parent
 _YOLOX_DIR = _PROJECT_ROOT / "third_party" / "yolox"
 _BUILD_DIR = _PROJECT_ROOT / "build"
-_CLI_DIR = _PROJECT_ROOT / "cli"
 
 sys.path.append(str(_THIS_DIR))
 sys.path.append(str(_YOLOX_DIR))
-sys.path.append(str(_CLI_DIR))
 
-from sushitrack_cli import console
+import messages as console
 from tracker_bridge import TrackerBridge
 from pipeline import VideoPipeline, YOLOXDetector, OSNetExtractor
 

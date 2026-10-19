@@ -16,8 +16,8 @@ License 1.0.0; see `LICENSE`. The material below keeps its own licence.
 | YOLOX | `third_party/yolox/` (git submodule) | https://github.com/Megvii-BaseDetection/YOLOX | commit `6ddff482`, 38 commits after 0.3.0 | Apache-2.0, Copyright (c) 2021-2022 Megvii Inc. All rights reserved.; text in `third_party/yolox/LICENSE` and `third_party/licenses/YOLOX_APACHE_2_0.txt` |
 
 The library links Eigen, JSON for Modern C++ and SushiLog. ByteTrack-cpp and OC_SORT_CPP are built only
-as reference trackers for the regression harness. TrackEval and YOLOX are used only by the
-Python scripts under `tests/regression/`.
+as reference trackers for the MOT benchmark under `applications/`. TrackEval and YOLOX are used
+only by the Python scripts under `applications/`.
 
 ## Fetched at build or install time
 
@@ -51,13 +51,13 @@ in its license block.
 | `source/tracking/tracker.cpp`, `include/SushiTrack/tracking/tracker.hpp` | ByteTrack-cpp | `src/BYTETracker.cpp`, `include/ByteTrack/BYTETracker.h` | MIT |
 | `source/association/lapjv_solver.cpp`, `include/SushiTrack/association/lapjv_solver.hpp` | ByteTrack-cpp | `linearAssignment` and `execLapjv` in `src/BYTETracker.cpp` | MIT |
 | `source/association/lapjv.cpp`, `include/SushiTrack/association/lapjv.hpp` | ByteTrack-cpp, which took the code from gatagat/lap | `src/lapjv.cpp`, `include/ByteTrack/lapjv.h` | MIT and BSD-2-Clause |
-| `tests/regression/inference/pipeline.py` | YOLOX | `preproc` in `yolox/data/data_augment.py`; the inference steps of `Predictor` in `tools/demo.py` | Apache-2.0 |
+| `applications/inference/pipeline.py` | YOLOX | `preproc` in `yolox/data/data_augment.py`; the inference steps of `Predictor` in `tools/demo.py` | Apache-2.0 |
 
 Upstream copyright lines: ByteTrack-cpp, Copyright (c) 2022 Vertical Beach (lp6m, medalotte)
 and Copyright (c) 2021 Yifu Zhang; gatagat/lap, Copyright (c) 2012-2025, Tomas Kazmar; YOLOX,
 Copyright (c) 2021-2022 Megvii Inc. All rights reserved.
 
-The other files under `source/`, `include/SushiTrack/` and `tests/regression/inference/` were
+The other files under `source/`, `include/SushiTrack/` and `applications/inference/` were
 read against `third_party/bytetrack`, `third_party/ocsort` and `third_party/yolox` and are not
 ports. The observation-centric momentum and re-update code in `source/tracking/tracklet.cpp` and
 `source/association/observation_momentum_decorator.cpp` follows the OC-SORT method and shares no code with OC_SORT_CPP.
@@ -85,7 +85,7 @@ python D:/Projects/sushiskills/tools/licensing/write_license_block.py D:/Project
     --upstream "include/SushiTrack/association/lapjv_solver.hpp=$BT" \
     --upstream "source/association/lapjv.cpp=$LAP" \
     --upstream "include/SushiTrack/association/lapjv.hpp=$LAP" \
-    --upstream "tests/regression/inference/pipeline.py=$YX"
+    --upstream "applications/inference/pipeline.py=$YX"
 ```
 
 ## Redistributed binaries
@@ -101,7 +101,7 @@ ignored by git and are not distributed. Their terms are unverified.
 
 ## Third-party data
 
-`tests/regression/evaluator/data/` holds 228 tracked files for 76 sequences: `gt/gt.txt`,
+`applications/benchmarks/mot_evaluation/data/` holds 228 tracked files for 76 sequences: `gt/gt.txt`,
 `det/det.txt` and `seqinfo.ini` each. No image is tracked. The repository's licence does not
 cover these files.
 

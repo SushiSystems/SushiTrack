@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- 2026-10-19 — applications: Made the Python evaluator and inference scripts print through their own `messages.py` instead of importing the `st` package (`applications/inference/messages.py`).
+- 2026-10-19 — applications: Drove SushiTrack in the bridge through its public C API instead of the C layer's private struct (`applications/tracker_bridge/sushitrack_adapter.hpp`).
+- 2026-10-19 — applications: Replaced the regression GoogleTest runner with the `mot_evaluation` benchmark that `st eval` runs, and moved the evaluator, data and inference out of `tests/` (`applications/benchmarks/`, `applications/inference/`).
 - 2026-10-19 — cli: Replaced `st test --suite` with `--label small, medium, large, quarantined`, running small and medium by default (`cli/sushitrack_cli/services/test_label.py`, `cli/sushitrack_cli/services/tests.py`).
 - 2026-10-19 — tests: Added tests for the 18 headers that had none, such as each cost calculator's matrix shape and each Kalman type's gate (`tests/association/test_cost_calculator.cpp`, `tests/filtering/test_gated_state_predictor.cpp`).
 - 2026-10-19 — tests: Moved every test into a mirror of the public headers, built as `sushitrack_tests` and labelled by the size its suite name opens with (`tests/CMakeLists.txt`, `cmake/SushiTrackTests.cmake`, `tests/README.md`).

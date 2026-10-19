@@ -34,5 +34,5 @@ worktrees/
 # Model weights, videos and benchmark output
 third_party/weight/
 third_party/video/
-tests/regression/evaluator/data/*/pred/
-tests/regression/evaluator/data/*/img1/
+applications/benchmarks/mot_evaluation/data/*/pred/
+applications/benchmarks/mot_evaluation/data/*/img1/

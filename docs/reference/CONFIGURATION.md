@@ -7,8 +7,8 @@ Each tracker owns a dedicated JSON file:
 | File | Tracker | Loaded by |
 |---|---|---|
 | `assets/sushitrack.json` | SushiTrack | the **library itself** |
-| `tests/bytetrack.json` | ByteTrack | regression harness |
-| `tests/ocsort.json` | OCSORT | regression harness |
+| `applications/tracker_bridge/bytetrack.json` | ByteTrack | MOT benchmark |
+| `applications/tracker_bridge/ocsort.json` | OCSORT | MOT benchmark |
 
 `sushitrack.json` is bound to the library, not the test harness: the C API parses it directly (`source/configuration/config_loader.cpp`), so a compiled `sushitrack.dll`/`.so` is retuned by editing the file with **no recompilation**. Resolution order: the `$SUSHITRACK_CONFIG` environment variable, then an upward search for `sushitrack.json` from the working directory. Inside the repository the file is `assets/sushitrack.json`, which no upward search reaches, so `st run`, `st test`, `st eval` and `st infer` set `SUSHITRACK_CONFIG` to it when the variable is unset. Any missing key falls back to the compiled default from `sushitrack_get_default_params`.
 

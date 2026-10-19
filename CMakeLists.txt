@@ -14,11 +14,12 @@ include(SushiTrackSushiLog)
 include(SushiTrackTests)
 
 option(SUSHITRACK_BUILD_TESTS "Build sushitrack_tests from the mirror under tests/" ON)
-option(BUILD_REGRESSION_TEST "Build the MOT regression runner and tracker_bridge" OFF)
+option(SUSHITRACK_BUILD_APPLICATIONS "Build tracker_bridge and the mot_evaluation benchmark" ON)
 
 add_subdirectory(source)
-add_subdirectory(third_party/bytetrack ${PROJECT_BINARY_DIR}/bytetrack)
-add_subdirectory(third_party/ocsort ${PROJECT_BINARY_DIR}/ocsort)
+if(SUSHITRACK_BUILD_APPLICATIONS)
+    add_subdirectory(applications)
+endif()
 
 enable_testing()
 add_subdirectory(tests)

@@ -3,7 +3,7 @@
 SushiTrack is a C++17 multi-object tracking library built on the ByteTrack two-stage association
 pipeline. Motion models, cost calculators, gating and the assignment solver sit behind
 interfaces and are selected at run time through the C API. The repository also holds a Python
-binding, the `st` developer CLI, a MOTChallenge and DanceTrack regression harness and a YOLOX
+binding, the `st` developer CLI, a MOTChallenge and DanceTrack benchmark and a YOLOX
 video inference pipeline.
 
 ## Getting started
@@ -28,8 +28,8 @@ video inference pipeline.
 
 | Document | Holds |
 | --- | --- |
-| [Test suites](guides/TESTING.md) | What the unit, integration and regression suites cover and how to run them |
-| [Evaluation pipeline](guides/EVALUATION.md) | How `st eval` chains the regression binary and TrackEval |
+| [Test suites](guides/TESTING.md) | The mirror of the tests, their sizes and how to run them |
+| [Evaluation pipeline](guides/EVALUATION.md) | How `st eval` chains the `mot_evaluation` benchmark and TrackEval |
 | [Inference pipeline](guides/INFERENCE.md) | The YOLOX video pipeline behind `st infer` |
 | [Deploy packages](guides/DEPLOY_PACKAGES.md) | The `package/` tree `st deploy` assembles for C, C++ and Python consumers |
 | [Ultralytics integration](guides/ULTRALYTICS_INTEGRATION.md) | How to put SushiTrack behind `model.track()` |
@@ -42,7 +42,7 @@ video inference pipeline.
 | [Command line](reference/CLI.md) | Every `st` command, its flags and the exit codes |
 | [C API](reference/C_API.md) | The entry points, status codes and track fields of `sushitrack_c.h` |
 | [Configuration](reference/CONFIGURATION.md) | `sushitrack.json` and every tracker parameter with its default |
-| [Data layout](reference/DATA_LAYOUT.md) | Where the regression harness reads sequences and writes predictions |
+| [Data layout](reference/DATA_LAYOUT.md) | Where the MOT benchmark reads sequences and writes predictions |
 | [Benchmarks](reference/BENCHMARKS.md) | The recorded MOT17, MOT20 and DanceTrack runs |
 | [Changelog](reference/CHANGELOG.md) | What changed, by release |
 | [Glossary](reference/GLOSSARY.md) | The words these documents use |

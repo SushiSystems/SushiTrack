@@ -11,14 +11,11 @@ from pathlib import Path
 
 _THIS_DIR = Path(__file__).parent
 _PROJECT_ROOT = _THIS_DIR.parent.parent.parent.parent
-_TOOLS_DIR = _PROJECT_ROOT / "cli"
 
 if str(_THIS_DIR) not in sys.path:
     sys.path.insert(0, str(_THIS_DIR))
-if str(_TOOLS_DIR) not in sys.path:
-    sys.path.insert(0, str(_TOOLS_DIR))
 
-from sushitrack_cli import console
+import messages as console
 from trackeval_runner import TrackEvalRunner
 
 
@@ -54,7 +51,7 @@ def resolve_data_dir(args) -> Path:
         return Path(args.data_dir)
 
     candidates = [
-        _PROJECT_ROOT / "tests" / "regression" / "evaluator" / "data",
+        _THIS_DIR.parent / "data",
         _PROJECT_ROOT / "data",
     ]
     for c in candidates:

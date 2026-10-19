@@ -29,10 +29,9 @@
 | C ABI | The binary interface of `include/SushiTrack/c_api/sushitrack_c.h`: the `sushitrack_*` functions and structs |
 | Binding | `bindings/python/sushitrack.py`, the `ctypes` wrapper over the C ABI |
 | Reference tracker | ByteTrack or OC-SORT as vendored under `third_party/`, built only to compare against |
-| Adapter | An `TrackerAdapter` in `tests/regression/`; it drives one tracker through the common harness |
-| `tracker_bridge` | The shared library built from `tests/regression/TrackerRegistry.cpp`; the inference pipeline loads the reference trackers through it |
-| Scenario | One sequence the regression binary runs, registered in `tests/regression/ScenarioList.h` |
-| Sequence | One folder under `tests/regression/evaluator/data/` with `det/det.txt`, `gt/gt.txt` and `seqinfo.ini` |
+| Adapter | A `TrackerAdapter` in `applications/tracker_bridge/`; it drives one tracker for the benchmark and the inference pipeline |
+| `tracker_bridge` | The shared library built from `applications/tracker_bridge/tracker_bridge.cpp`; the inference pipeline loads it with ctypes |
+| Sequence | One folder under `applications/benchmarks/mot_evaluation/data/` with `det/det.txt`, `gt/gt.txt` and `seqinfo.ini` |
 | Size | The label of a test, `small`, `medium` or `large`, taken from its suite's prefix; `st test --label` selects by it |
 | Private, public detections | In `st eval`, the `-YOLOX` sequences and the other MOT sequences |
 | TrackEval | The MOTChallenge evaluator under `third_party/TrackEval`; it computes HOTA, CLEAR and Identity metrics |

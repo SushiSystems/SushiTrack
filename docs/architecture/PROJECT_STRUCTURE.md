@@ -27,7 +27,7 @@ sushitrack/
 ├── bindings/python/                   # ctypes binding; see its README.md
 │
 ├── third_party/
-│   ├── bytetrack/  ocsort/            # reference trackers for the regression harness
+│   ├── bytetrack/  ocsort/            # reference trackers for the MOT benchmark
 │   ├── nlohmann/                      # JSON for Modern C++
 │   ├── licenses/                      # licence texts NOTICE.md cites
 │   ├── eigen/  TrackEval/  yolox/     # git submodules
@@ -37,17 +37,12 @@ sushitrack/
 │   ├── CMakeLists.txt                 # sushitrack_tests, by size label
 │   ├── README.md  *.hpp               # the helpers the tests share
 │   ├── <area>/test_<name>.cpp         # one file per public header, or a folder per unit
-│   ├── bytetrack.json  ocsort.json    # reference tracker configs
-│   └── regression/
-│       ├── RegressionTest.cpp         # GTest entry over (scenario x tracker)
-│       ├── ScenarioList.h             # MOT17, MOT20 and DanceTrack scenarios
-│       ├── TrackerAdapter.h          # adapter interface
-│       ├── SushiTrackAdapter.h  ByteTrackAdapter.h  OCSORTAdapter.h
-│       ├── TrackerRegistry.h  TrackerRegistry.cpp   # C entry points of tracker_bridge
-│       ├── MOTRunner.h                # det.txt reader and prediction writer
-│       ├── TestInfra.h                # per-frame timing; prints the "[ PERF ]" lines
-│       ├── evaluator/                 # TrackEval runner, report writer, data/ sequences
-│       └── inference/                 # demo.py, pipeline.py, tracker_bridge.py
+│   └── applications/                  # the tests of applications/, by the same mirror
+│
+├── applications/
+│   ├── tracker_bridge/                # the tracker adapters and the C library ctypes loads
+│   ├── benchmarks/mot_evaluation/     # the MOT benchmark, its evaluator/ and data/
+│   └── inference/                     # the YOLOX video pipeline behind st infer
 │
 ├── cli/                               # the st CLI; see CLI_PACKAGE.md
 │   ├── pyproject.toml  config.toml  sushistack.deps.toml

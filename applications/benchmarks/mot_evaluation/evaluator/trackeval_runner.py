@@ -11,13 +11,13 @@ from pathlib import Path
 from typing import Optional
 import sys
 
-_PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+_PROJECT_ROOT = Path(__file__).resolve().parents[4]
 _3RDPARTY_TRACKEVAL = _PROJECT_ROOT / "third_party" / "TrackEval"
 
 if _3RDPARTY_TRACKEVAL.exists() and str(_3RDPARTY_TRACKEVAL) not in sys.path:
     sys.path.insert(0, str(_3RDPARTY_TRACKEVAL))
 
-from sushitrack_cli import console
+import messages as console
 
 def _ensure_trackeval() -> bool:
     """

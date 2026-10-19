@@ -5,14 +5,15 @@
 # Commercial use requires a licence from Sushi Systems.
 """The MOT label-based benchmark pipeline behind `st eval`."""
 
-import sys
-
 from .. import console
 from ..env import load_build_env
 from ..errors import UnknownTrackerError
 from ..process import RUNNER
 from . import evaluate
 from .artifacts import find_binary
+
+#: The benchmark program `st eval` runs.
+BENCHMARK = "mot_evaluation"
 
 # Registry key -> the display name the C++ TrackerRegistry and demo.py use.
 TRACKERS = {
@@ -67,11 +68,14 @@ def sequences(paths, scenario=None, private=False, public=False):
     return selected
 
 
-def _gtest_filter(names, trackers):
-    """GTest filter over the ``<Sequence>_<tracker>`` test names."""
-    parts = [f"*{name.replace('-', '_')}_{tracker}*"
-             for tracker in trackers for name in names]
-    return ":".join(parts) if parts else "-*"
+def _benchmark_args(paths, names, trackers):
+    """The mot_evaluation arguments that run *trackers* over the sequences *names*."""
+    args = ["--data", str(paths.data_root()), "--settings", str(paths.bridge)]
+    for tracker in trackers:
+        args += ["--tracker", tracker]
+    for name in names:
+        args += ["--sequence", name]
+    return args
 
 
 def _parse_perf(stdout):
@@ -96,21 +100,18 @@ def _parse_perf(stdout):
     return perf
 
 
-def _run_regression(tool, paths, gtest_filter):
-    """Run regression_test under *gtest_filter* and parse its PERF lines from stdout."""
-    binary = find_binary(paths.build, "regression_test")
+def _run_benchmark(tool, paths, args):
+    """Run mot_evaluation with *args* and parse its PERF lines from stdout."""
+    binary = find_binary(paths.build, BENCHMARK)
     if not binary:
-        console.error("regression_test binary not found. Run `st build` first.")
+        console.error(f"{BENCHMARK} not found. Run `st build` first.")
         return 1, {}
 
-    console.command(f"{binary} --gtest_filter={gtest_filter}")
-    code, out, err = RUNNER.capture([str(binary), f"--gtest_filter={gtest_filter}"],
-                                    cwd=paths.root,
+    console.command(" ".join([str(binary), *args]))
+    code, out, err = RUNNER.capture([str(binary), *args], cwd=paths.root,
                                     env=load_build_env(tool, paths.build, paths.config))
     if code != 0:
-        console.error(f"regression_test failed (exit {code}).")
-        print(out)
-        print(err, file=sys.stderr)
+        console.error(f"{BENCHMARK} failed (exit {code}): {(err or out).strip()}")
         return code, {}
     return 0, _parse_perf(out)
 
@@ -139,7 +140,7 @@ def evaluate_sequences(cfg, paths, scenario=None, tracker="sushitrack",
 
     perf = {}
     if not eval_only:
-        code, perf = _run_regression(cfg.tool, paths, _gtest_filter(names, trackers))
+        code, perf = _run_benchmark(cfg.tool, paths, _benchmark_args(paths, names, trackers))
         if code != 0:
             return code
 

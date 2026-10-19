@@ -30,10 +30,11 @@ class BuildType(str, enum.Enum):
 
 LIBRARY_TARGET = "sushitrack"
 # TEST_TARGETS names every target the test build produces.
-TEST_TARGETS = ("sushitrack_tests", "regression_test",
-                "tracker_bridge")
+TEST_TARGETS = ("sushitrack_tests", "sushitrack_application_tests")
+#: The applications every build makes: the inference bridge and the MOT benchmark.
+APPLICATION_TARGETS = ("tracker_bridge", "mot_evaluation")
 # The CMake options those targets are gated behind.
-TEST_OPTIONS = ("SUSHITRACK_BUILD_TESTS", "BUILD_REGRESSION_TEST")
+TEST_OPTIONS = ("SUSHITRACK_BUILD_TESTS",)
 
 # The stamp file records the configuration the build tree was configured with.
 STAMP_NAME = ".sushitrack_config"
@@ -147,7 +148,7 @@ def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
         console.info("Build tree already configured for this configuration; "
                      "skipping cmake configure.")
 
-    targets = [LIBRARY_TARGET] + (list(TEST_TARGETS) if tests else [])
+    targets = [LIBRARY_TARGET, *APPLICATION_TARGETS] + (list(TEST_TARGETS) if tests else [])
     console.info("Building...")
     code = DRIVER.compile(cfg.tool, build_dir, paths.root, env, config=build_type,
                           targets=targets, jobs=jobs or cfg.jobs())

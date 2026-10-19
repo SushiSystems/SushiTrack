@@ -70,7 +70,7 @@ st run sushitrack_tests -- --gtest_shuffle --gtest_break_on_failure
 
 ## `st eval`
 
-The MOT label benchmark. Not a CTest suite: it runs `regression_test` over
+The MOT label benchmark. Not a CTest suite: it runs `mot_evaluation` over
 det.txt-backed scenarios, parses the per-sequence `[ PERF ]` timings out of its
 output, then runs TrackEval and prints a metrics table (HOTA / DetA / AssA /
 MOTA / IDF1 / IDSW / FP / FN / Lat).
@@ -95,16 +95,14 @@ st eval --trackeval --private
 ```
 
 The internal runner needs the evaluator's own dependencies (numpy, scipy,
-TrackEval) from `.config/conda/environment.yml`; `--trackeval` bypasses it. Scenarios registered
-in `tests/regression/ScenarioList.h`: full MOT17 train set (21 sequences across DPM/FRCNN/SDP
-detectors plus `-YOLOX` variants for each), MOT20 (`-01/-02/-03/-05` with `-YOLOX`
-variants), and DanceTrack sequences (`dancetrack0001`, `0002`, `0006`, `0008`,
-`0012`, `0015`, …).
+TrackEval) from `.config/conda/environment.yml`; `--trackeval` bypasses it. The sequences are the folders of
+`applications/benchmarks/mot_evaluation/data/` that hold `det/det.txt` and `gt/gt.txt`: the
+MOT17 train set, MOT20 and DanceTrack.
 
 ## `st infer`
 
 Launches the YOLOX-driven video inference pipeline
-(`tests/regression/inference/demo.py`), which loads `tracker_bridge.{dll,so}` via
+(`applications/inference/demo.py`), which loads `tracker_bridge.{dll,so}` via
 ctypes. Arguments after `--` are forwarded to `demo.py` untouched.
 
 | Flag | Default | Effect |
@@ -130,16 +128,16 @@ ctypes. Arguments after `--` are forwarded to `demo.py` untouched.
 ```bash
 st infer -n yolox-x -c third_party/weight/mot17x.pth.tar --source third_party/video/MOT17-04.mp4 --num-classes 1 --legacy
 
-st infer -n yolox-x -c third_party/weight/mot17x.pth.tar --source tests/regression/evaluator/data/MOT20-01/img1 --num-classes 1 --legacy
+st infer -n yolox-x -c third_party/weight/mot17x.pth.tar --source applications/benchmarks/mot_evaluation/data/MOT20-01/img1 --num-classes 1 --legacy
 
 st infer --source 0 --tracker sushitrack --no-save --no-screen --stress
 ```
 
 `--source` also accepts an image-sequence directory (`<path>/img1`), not just a video
-file or camera index. `tests/regression/evaluator/data/` already holds 76 real
+file or camera index. `applications/benchmarks/mot_evaluation/data/` already holds 76 real
 tracker benchmark sequences (MOT17, MOT20, DanceTrack) used by the regression
-suite. Any of their names works, e.g. `tests/regression/evaluator/data/MOT20-01/img1`
-or `tests/regression/evaluator/data/dancetrack0001/img1`.
+suite. Any of their names works, e.g. `applications/benchmarks/mot_evaluation/data/MOT20-01/img1`
+or `applications/benchmarks/mot_evaluation/data/dancetrack0001/img1`.
 
 If the YOLOX checkpoint filename contains `mot17` and `--tsize` is omitted/640,
 the pipeline overrides `tsize` to `(800, 1440)` to match the MOT17 training

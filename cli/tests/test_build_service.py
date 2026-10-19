@@ -74,11 +74,11 @@ def test_a_fresh_tree_is_configured_then_built(tmp_path, runner):
     configure, compile_ = runner.calls
     assert configure == ["cmake", "-S", str(tmp_path), "-B", str(paths.build),
                          "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Debug",
-                         "-DSUSHITRACK_BUILD_TESTS=ON", "-DBUILD_REGRESSION_TEST=ON"]
+                         "-DSUSHITRACK_BUILD_TESTS=ON"]
     assert compile_ == ["cmake", "--build", str(paths.build), "--config", "Debug",
                         "--parallel", "3", "--target", "sushitrack",
-                        "--target", "sushitrack_tests",
-                        "--target", "regression_test", "--target", "tracker_bridge"]
+                        "--target", "tracker_bridge", "--target", "mot_evaluation",
+                        "--target", "sushitrack_tests", "--target", "sushitrack_application_tests"]
 
 
 def test_a_matching_stamp_skips_configure(tmp_path, runner):

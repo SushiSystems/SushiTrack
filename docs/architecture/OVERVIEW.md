@@ -57,7 +57,7 @@ re-update terms.
 
 The library builds as a shared object and exposes a stable C ABI
 (`include/SushiTrack/c_api/sushitrack_c.h`). A Python `ctypes` binding, a MOTChallenge/DanceTrack
-regression harness, a GoogleTest unit and integration suite, and a YOLOX video
+benchmark, a GoogleTest suite that mirrors the headers, and a YOLOX video
 inference pipeline are included.
 
 Algorithm components are selected at runtime through configuration flags. The

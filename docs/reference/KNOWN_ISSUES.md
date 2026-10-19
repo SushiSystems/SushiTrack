@@ -80,17 +80,9 @@ Defects that stand in the tree. The work that closes each one is in
 
 ## Repository
 
-### KI-9 Test discovery writes JSON files into the repository root
-- Origin: own
-- Where: `tests/CMakeLists.txt`
-- Cause: the test programs run from the repository root when CTest lists their tests
-- Recognise: `cmake_test_discovery_*.json` files beside `README.md` after `st test`
-- Workaround: they are ignored by `.gitignore`
-- Fix: RW-8
-
 ### KI-10 234 MB of benchmark annotations are tracked in git
 - Origin: own
-- Where: `tests/regression/evaluator/data/`
+- Where: `applications/benchmarks/mot_evaluation/data/`
 - Cause: the MOT17, MOT20 and DanceTrack sequences were committed beside the evaluator
 - Recognise: a clone takes the 234 MB
 - Workaround: `git clone --filter=blob:none`
@@ -122,12 +114,12 @@ Defects that stand in the tree. The work that closes each one is in
 - Workaround: none
 - Fix: RW-1
 
-### KI-14 Python programs live inside the test tree
+### KI-14 Helper scripts sit inside the CLI package
 - Origin: own
-- Where: `tests/regression/evaluator/`, `tests/regression/inference/`, `cli/misc/`
-- Cause: the evaluator and the inference demo grew beside the regression runner, and three
-  helper scripts sit in the CLI package
-- Recognise: `st eval` and `st infer` run scripts from `tests/`
+- Where: `cli/misc/`
+- Cause: three scripts that clean predictions and stage TrackEval data sit beside the CLI
+  package instead of being `st` commands or tools
+- Recognise: `cli/misc/` holds a `.sh`, a `.bat` and a `.ps1`
 - Workaround: none
 - Fix: RW-1
 

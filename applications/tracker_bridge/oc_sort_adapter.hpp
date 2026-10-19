@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* OCSORTAdapter.h                                                        */
+/* oc_sort_adapter.hpp                                                    */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -20,8 +20,8 @@
 /**************************************************************************/
 
 /**
- * @file OCSORTAdapter.h
- * @brief Defines the regression test adapter for OC-SORT.
+ * @file oc_sort_adapter.hpp
+ * @brief Declares OCSORTAdapter, which drives the OC-SORT reference tracker.
  * @author Mustafa Garip
  */
 
@@ -35,11 +35,14 @@
 
 #include <Eigen/Dense>
 
-#include "OCSort.hpp"
-#include "TestInfra.h"
-#include "TrackerAdapter.h"
+#include <OCSort.hpp>
 
-namespace TestInfrastructure
+#include <json_settings.hpp>
+#include <mot_detection.hpp>
+#include <track_result.hpp>
+#include <tracker_adapter.hpp>
+
+namespace TrackerBridge
 {
     /**
      * @brief Implementation of TrackerAdapter for the OC-SORT algorithm.
@@ -66,21 +69,21 @@ namespace TestInfrastructure
             {
                 if (!config_path.empty() && std::filesystem::exists(config_path))
                 {
-                    JsonDoc doc = parse_json(config_path);
+                    const nlohmann::json doc = read_json_settings(config_path);
                     auto it = doc.find("ocsort");
                     if (it != doc.end())
                     {
-                        const JsonSection& s = it.value();
-                        det_thresh_ = json_get(s, "det_thresh", det_thresh_);
-                        max_age_ =
-                            static_cast<int>(json_get(s, "max_age", static_cast<float>(max_age_)));
+                        const nlohmann::json& s = it.value();
+                        det_thresh_ = json_number(s, "det_thresh", det_thresh_);
+                        max_age_ = static_cast<int>(
+                            json_number(s, "max_age", static_cast<float>(max_age_)));
                         min_hits_ = static_cast<int>(
-                            json_get(s, "min_hits", static_cast<float>(min_hits_)));
-                        iou_threshold_ = json_get(s, "iou_threshold", iou_threshold_);
-                        delta_t_ =
-                            static_cast<int>(json_get(s, "delta_t", static_cast<float>(delta_t_)));
-                        inertia_ = json_get(s, "inertia", inertia_);
-                        use_byte_ = json_get(s, "use_byte", 0.0f) > 0.5f;
+                            json_number(s, "min_hits", static_cast<float>(min_hits_)));
+                        iou_threshold_ = json_number(s, "iou_threshold", iou_threshold_);
+                        delta_t_ = static_cast<int>(
+                            json_number(s, "delta_t", static_cast<float>(delta_t_)));
+                        inertia_ = json_number(s, "inertia", inertia_);
+                        use_byte_ = json_number(s, "use_byte", 0.0f) > 0.5f;
                         std::cout << "[ OCSORTAdapter ] config loaded from " << config_path << "\n";
                     }
                 }
@@ -95,7 +98,10 @@ namespace TestInfrastructure
              *
              * @return "ocsort"
              */
-            std::string name() const override { return "ocsort"; }
+            [[nodiscard]] std::string name() const override { return "ocsort"; }
+
+            /// @brief Keeps the settings; OC-SORT counts its ages in frames.
+            void set_frame_rate(int /*fps*/) override {}
 
             /**
              * @brief Processes detections using the OC-SORT algorithm.
@@ -104,12 +110,11 @@ namespace TestInfrastructure
              * @param dt Time interval (unused).
              * @return Collection of tracking results.
              */
-            std::vector<TrackResult> update(const std::vector<MOTDetection>& dets,
-                                            float dt = 1.0f) override
+            [[nodiscard]] std::vector<TrackResult> update(const std::vector<MOTDetection>& dets,
+                                                          float dt = 1.0f) override
             {
                 if (dets.empty())
                 {
-                    // Update with empty matrix if necessary, but ocsort might handle empty input
                     Eigen::MatrixXf empty_dets(0, 6);
                     tracker_->update(empty_dets);
                     return {};
@@ -133,13 +138,13 @@ namespace TestInfrastructure
                 for (const auto& t : tracks)
                 {
                     TrackResult r;
-                    // OC-SORT returns [x1, y1, x2, y2, track_id, seed_id, label]
+                    // Each row is [x1, y1, x2, y2, track_id, seed_id, label].
                     r.x = t(0);
                     r.y = t(1);
                     r.w = t(2) - t(0);
                     r.h = t(3) - t(1);
                     r.track_id = static_cast<int>(t(4));
-                    r.score = 1.0f; // Score not explicitly returned in the same way
+                    r.score = 1.0f;
                     results.push_back(r);
                 }
                 return results;
@@ -157,4 +162,4 @@ namespace TestInfrastructure
             std::unique_ptr<ocsort::OCSort> tracker_;
     };
 
-} // namespace TestInfrastructure
+} // namespace TrackerBridge

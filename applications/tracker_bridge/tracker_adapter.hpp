@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* TrackerAdapter.h                                                       */
+/* tracker_adapter.hpp                                                    */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -20,8 +20,8 @@
 /**************************************************************************/
 
 /**
- * @file TrackerAdapter.h
- * @brief Defines the abstract interface for regression tracker adapters.
+ * @file tracker_adapter.hpp
+ * @brief Declares TrackerAdapter, the one interface the benchmark and the inference drive trackers by.
  * @author Mustafa Garip
  */
 
@@ -30,50 +30,30 @@
 #include <string>
 #include <vector>
 
-#include "TestInfra.h"
+#include <mot_detection.hpp>
+#include <track_result.hpp>
 
-namespace TestInfrastructure
+namespace TrackerBridge
 {
     /**
-     * @brief Interface for tracker implementation adapters.
-     *
-     * Provides an abstraction layer for benchmarking different tracking
-     * algorithms within the test infrastructure.
+     * @brief Runs one tracker frame by frame behind a common interface.
      */
     class TrackerAdapter
     {
         public:
-            /**
-             * @brief Destroys the TrackerAdapter instance.
-             */
             virtual ~TrackerAdapter() = default;
 
-            /**
-             * @brief Retrieves the identifier for the tracker implementation.
-             *
-             * @return Identifier string.
-             */
-            virtual std::string name() const = 0;
+            /// @brief Returns the tracker's name, as its predictions folder is called.
+            [[nodiscard]] virtual std::string name() const = 0;
 
             /**
-             * @brief Processes detections and returns tracking results.
-             *
-             * @param dets Collection of input detections.
-             * @param dt Time interval for state propagation.
-             * @return Collection of track results.
+             * @brief Runs one frame and returns the tracks to report.
+             * @param dt Seconds since the previous frame.
              */
-            virtual std::vector<TrackResult> update(const std::vector<MOTDetection>& dets,
-                                                    float dt = 1.0f) = 0;
+            [[nodiscard]] virtual std::vector<TrackResult>
+            update(const std::vector<MOTDetection>& dets, float dt = 1.0f) = 0;
 
-            /**
-             * @brief Configures the processing frequency for the tracker.
-             *
-             * Calibrates timing-dependent components such as motion models
-             * and persistence buffers for data sequences.
-             *
-             * @param fps Target frames-per-second.
-             */
-            virtual void set_frame_rate(int fps) {}
+            /// @brief Adapts the timing-dependent parts to @p fps frames per second.
+            virtual void set_frame_rate(int fps) = 0;
     };
-
-} // namespace TestInfrastructure
+} // namespace TrackerBridge

@@ -82,9 +82,9 @@ class Config:
     paths_third_party: str = "third_party"
     paths_config: str = "assets/sushitrack.json"
     paths_tests: str = "tests"
-    paths_regression: str = "tests/regression"
-    paths_evaluator: str = "tests/regression/evaluator"
-    paths_inference: str = "tests/regression/inference"
+    paths_bridge: str = "applications/tracker_bridge"
+    paths_evaluator: str = "applications/benchmarks/mot_evaluation/evaluator"
+    paths_inference: str = "applications/inference"
     paths_package: str = "package"
 
     build_type: str = "Release"
@@ -275,7 +275,7 @@ class Paths:
         self.third_party = self._resolve(cfg, cfg.paths_third_party)
         self.config = self._resolve(cfg, cfg.paths_config)
         self.tests = self._resolve(cfg, cfg.paths_tests)
-        self.regression = self._resolve(cfg, cfg.paths_regression)
+        self.bridge = self._resolve(cfg, cfg.paths_bridge)
         self.evaluator = self._resolve(cfg, cfg.paths_evaluator)
         self.inference = self._resolve(cfg, cfg.paths_inference)
         self.package = self._resolve(cfg, cfg.paths_package)
@@ -285,9 +285,8 @@ class Paths:
         return expanded if expanded.is_absolute() else self.root / expanded
 
     def data_root(self):
-        """Where MOT sequences live: the evaluator's own data/ wins when present,
-        matching how the regression binary and TrackEval both look it up."""
-        eval_data = self.evaluator / "data"
+        """Where MOT sequences live: the benchmark's data/ wins when present, else [paths] data."""
+        eval_data = self.evaluator.parent / "data"
         return eval_data if eval_data.exists() else self.data
 
     def as_dict(self):
@@ -302,7 +301,7 @@ class Paths:
             "third_party": self.third_party,
             "config": self.config,
             "tests": self.tests,
-            "regression": self.regression,
+            "bridge": self.bridge,
             "evaluator": self.evaluator,
             "inference": self.inference,
             "package": self.package,

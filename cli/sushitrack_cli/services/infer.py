@@ -5,7 +5,7 @@
 # Commercial use requires a licence from Sushi Systems.
 """The YOLOX video inference pipeline behind `st infer`.
 
-A front-end for tests/regression/inference/demo.py: this only translates flags and
+A front-end for applications/inference/demo.py: this only translates flags and
 launches it. The pipeline needs tracker_bridge from a `st build` plus its own
 Python dependencies (torch, opencv) — those belong to the demo, not to this CLI.
 """

@@ -11,11 +11,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-_TOOLS_DIR = Path(__file__).parent.parent.parent.parent / "cli"
-if str(_TOOLS_DIR) not in sys.path:
-    sys.path.insert(0, str(_TOOLS_DIR))
-
-from sushitrack_cli import console
+import messages as console
 RED, GREEN, YELLOW, BLUE, RESET = "\033[91m", "\033[92m", "\033[93m", "\033[94m", "\033[0m"
 
 #: @brief ANSI escape sequence for bold text.

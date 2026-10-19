@@ -1,9 +1,9 @@
 # Data layout
 
-The regression harness reads from `tests/regression/evaluator/data/`:
+The MOT benchmark reads from `applications/benchmarks/mot_evaluation/data/`:
 
 ```
-tests/regression/evaluator/data/
+applications/benchmarks/mot_evaluation/data/
 ├── MOT17-02-DPM/
 │   ├── det/det.txt                   # MOT-format detections
 │   ├── gt/gt.txt                     # MOT-format ground truth

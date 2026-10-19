@@ -27,7 +27,7 @@ def test_run_matches_through_the_shared_index(tmp_path, monkeypatch, recorder):
     assert seen == {"cmd": [str(tmp_path / "t.exe"), "--a"], "env": {"X": "1"}}
 
 
-def test_regression_capture_keeps_streams_apart(tmp_path, monkeypatch, recorder):
+def test_benchmark_capture_keeps_streams_apart(tmp_path, monkeypatch, recorder):
     recorder(label)
     monkeypatch.setattr(label, "find_binary", lambda build, name: sys.executable)
     monkeypatch.setattr(label, "load_build_env", lambda tool, d, config: None)
@@ -35,7 +35,14 @@ def test_regression_capture_keeps_streams_apart(tmp_path, monkeypatch, recorder)
     monkeypatch.setattr(label, "RUNNER",
                         SimpleNamespace(capture=lambda cmd, cwd=None, env=None: (0, out, "")))
     paths = SimpleNamespace(root=tmp_path, build=tmp_path, config=tmp_path)
-    assert label._run_regression(SimpleNamespace(), paths, "*") == (0, {"bytetrack": {"S": 5.0}})
+    assert label._run_benchmark(SimpleNamespace(), paths, []) == (0, {"bytetrack": {"S": 5.0}})
+
+
+def test_benchmark_args_name_every_tracker_and_sequence(tmp_path):
+    paths = SimpleNamespace(data_root=lambda: tmp_path / "data", bridge=tmp_path / "bridge")
+    assert label._benchmark_args(paths, ["S1", "S2"], ["sushitrack"]) == [
+        "--data", str(tmp_path / "data"), "--settings", str(tmp_path / "bridge"),
+        "--tracker", "sushitrack", "--sequence", "S1", "--sequence", "S2"]
 
 
 def test_deploy_no_longer_imports_discovery():

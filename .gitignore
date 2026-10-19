@@ -12,8 +12,8 @@ out/
 package/
 
 # Benchmark output and frames beside the sequences
-tests/regression/evaluator/data/*/pred/
-tests/regression/evaluator/data/*/img1/
+applications/benchmarks/mot_evaluation/data/*/pred/
+applications/benchmarks/mot_evaluation/data/*/img1/
 
 # CMake generated files
 CMakeCache.txt

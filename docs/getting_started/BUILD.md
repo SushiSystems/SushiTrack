@@ -20,7 +20,7 @@ The CMake options `st build` sets:
 | Option | Default | Effect |
 |---|---|---|
 | `SUSHITRACK_BUILD_TESTS` | ON | Builds `sushitrack_tests` from the mirror under `tests/`; `--no-test` turns it off |
-| `BUILD_REGRESSION_TEST` | OFF | Builds the `regression_test` runner and the `tracker_bridge` library; `st build` turns it on with the tests |
+| `SUSHITRACK_BUILD_APPLICATIONS` | ON | Builds `tracker_bridge` and the `mot_evaluation` benchmark under `applications/` |
 | `SUSHITRACK_ENABLE_LOGGING` | ON | Compiles log calls below ERROR; OFF keeps ERROR and FATAL only |
 | `SUSHILOG_DIR` | set by `st` | The SushiLog checkout `cli/sushistack.deps.toml` pins |
 
@@ -31,7 +31,8 @@ because a single-config generator bakes the build type into its cache and would 
 silently hand back the previous one.
 
 Artefacts land in `build/bin`: `sushitrack.{dll,so}`, `sushilog.{dll,so}`,
-`sushitrack_tests{,.exe}`, `regression_test{,.exe}` and `tracker_bridge.{dll,so}`. How the tests
+`sushitrack_tests{,.exe}`, `sushitrack_application_tests{,.exe}`, `mot_evaluation{,.exe}` and
+`tracker_bridge.{dll,so}`. How the tests
 run is in [Test suites](../guides/TESTING.md); how the tree is laid out is in
 [Build system](../architecture/BUILD_SYSTEM.md).
 

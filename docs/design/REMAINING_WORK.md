@@ -53,12 +53,6 @@ The single backlog of this repository. Defects that stand in the tree are in
   medium` passes
 - Source: `docs/agent/2026_10_19_SKILL_ALIGNMENT/PLAN.md`
 
-### RW-8 Write test discovery under build/
-- State: open
-- Done when: no `cmake_test_discovery_*.json` file appears in the repository root after
-  `st test`, and its ignore rules are gone
-- Source: `docs/design/SUSHITRACK_MIGRATION.md` §5
-
 ### RW-9 Run st build and st test in CI on Windows and Linux
 - State: open
 - Done when: `.github/workflows/ci.yml` builds and runs the small and medium tests on both

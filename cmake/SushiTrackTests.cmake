@@ -29,9 +29,14 @@ endfunction()
 # name in QUARANTINED, a GoogleTest `Suite.Case` name, also carries the label `quarantined`.
 #
 #   sushitrack_add_sized_test_program(<target> [QUARANTINED <Suite.Case>...]
-#       TEST_SOURCES <file>... [ENVIRONMENT <VAR=value>...])
+#       TEST_SOURCES <file>... [LINK <target>...] [ENVIRONMENT <VAR=value>...])
+#
+# LINK names the libraries under test; sushitrack_static when none is given.
 function(sushitrack_add_sized_test_program target)
-    cmake_parse_arguments(ARG "" "" "QUARANTINED;TEST_SOURCES;ENVIRONMENT" ${ARGN})
+    cmake_parse_arguments(ARG "" "" "QUARANTINED;TEST_SOURCES;LINK;ENVIRONMENT" ${ARGN})
+    if(NOT ARG_LINK)
+        set(ARG_LINK sushitrack_static)
+    endif()
     sushitrack_test_suites_of(suites ${ARG_TEST_SOURCES})
     foreach(suite IN LISTS suites)
         if(NOT suite MATCHES "^(Small|Medium|Large)_")
@@ -41,7 +46,7 @@ function(sushitrack_add_sized_test_program target)
     endforeach()
 
     add_executable(${target} ${ARG_TEST_SOURCES})
-    target_link_libraries(${target} PRIVATE sushitrack_static GTest::gtest_main)
+    target_link_libraries(${target} PRIVATE ${ARG_LINK} GTest::gtest_main)
     target_include_directories(${target} PRIVATE
         ${PROJECT_SOURCE_DIR}/tests
         ${PROJECT_SOURCE_DIR}/third_party)

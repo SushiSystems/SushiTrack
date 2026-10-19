@@ -39,17 +39,9 @@ st run sushitrack_tests -- --gtest_filter='Small_TrackletTest.*'
 
 `st test` and the build set `SUSHITRACK_CONFIG` to `assets/sushitrack.json` for the tests.
 
-## Regression runner (`regression_test`)
-
-A parameterised GoogleTest program that iterates over `Scenario × tracker`. For each pair it:
-
-1. Reads `det.txt` frames via `MOTRunner`.
-2. Drives the tracker through `TrackerAdapter` (`SushiTrackAdapter`, `ByteTrackAdapter`, `OCSORTAdapter`).
-3. Writes predictions to `<sequence>/pred/<tracker>/<sequence>.txt`.
-4. Emits a `[ PERF <tracker> ] <sequence>: <us/frame> us/frame` line read back by the CLI (`cli/sushitrack_cli/services/label.py`).
-
-`st eval` runs it. SushiTrack loads `assets/sushitrack.json` through `SUSHITRACK_CONFIG`; ByteTrack
-and OCSORT read `tests/bytetrack.json` and `tests/ocsort.json`.
+The applications under `applications/` have their own mirror, `tests/applications/`, built
+into `sushitrack_application_tests`. The MOT benchmark is a program, not a test; it is in
+[Evaluation pipeline](EVALUATION.md).
 
 ## CLI tests (`cli/tests/`)
 

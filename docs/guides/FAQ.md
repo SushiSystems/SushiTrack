@@ -17,7 +17,7 @@ observation-centric re-update are optional and off in the compiled defaults. The
 [architecture overview](../architecture/OVERVIEW.md) describes each stage.
 
 The repository also holds a Python binding, the `st` developer CLI, a MOTChallenge and DanceTrack
-regression harness and a YOLOX video inference pipeline.
+benchmark and a YOLOX video inference pipeline.
 
 ## What do I need to build SushiTrack?
 
@@ -202,4 +202,4 @@ write to hello@sushisystems.io with what you want to build and who will use it; 
 
 Third-party code and data keep their own licences, listed in [`NOTICE.md`](../../NOTICE.md). The
 repository's licence does not cover the MOT17, MOT20 and DanceTrack files under
-`tests/regression/evaluator/data/`.
+`applications/benchmarks/mot_evaluation/data/`.
