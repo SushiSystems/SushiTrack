@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from importlib.metadata import version
 from pathlib import Path
@@ -40,6 +41,11 @@ K_VISIBLE = {
 def _invoke(*args: str):
     """Runs st with *args* through Typer's test runner."""
     return CliRunner().invoke(cli.app, list(args))
+
+
+def _plain(text: str) -> str:
+    """Returns *text* without the ANSI styling Typer forces on a CI runner."""
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
 
 
 def _described() -> set[str]:
@@ -121,7 +127,7 @@ def test_docs_bundle_without_a_release_is_a_usage_error():
     """Exits 2 and names `--release` when `st docs bundle` is given none."""
     result = _invoke("docs", "bundle")
     assert result.exit_code == 2
-    assert "--release" in result.output
+    assert "--release" in _plain(result.output)
 
 
 def test_bare_docs_prints_the_group_help_and_exits_two():
