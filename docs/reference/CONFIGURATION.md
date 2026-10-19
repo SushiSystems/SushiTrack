@@ -6,11 +6,11 @@ Each tracker owns a dedicated JSON file:
 
 | File | Tracker | Loaded by |
 |---|---|---|
-| `sushitrack.json` (repository root) | SushiTrack | the **library itself** |
+| `assets/sushitrack.json` | SushiTrack | the **library itself** |
 | `tests/bytetrack.json` | ByteTrack | regression harness |
 | `tests/ocsort.json` | OCSORT | regression harness |
 
-`sushitrack.json` is bound to the library, not the test harness: the C API parses it directly (`source/config_loader.cpp`), so a compiled `sushitrack.dll`/`.so` is retuned by editing the file with **no recompilation**. Resolution order: the `$SUSHITRACK_CONFIG` environment variable, then an upward search for `sushitrack.json` from the working directory (so a binary launched from `build/bin` still finds the file at the project root). Any missing key falls back to the compiled default from `sushitrack_get_default_params`.
+`sushitrack.json` is bound to the library, not the test harness: the C API parses it directly (`source/config_loader.cpp`), so a compiled `sushitrack.dll`/`.so` is retuned by editing the file with **no recompilation**. Resolution order: the `$SUSHITRACK_CONFIG` environment variable, then an upward search for `sushitrack.json` from the working directory. Inside the repository the file is `assets/sushitrack.json`, which no upward search reaches, so `st run`, `st test`, `st eval` and `st infer` set `SUSHITRACK_CONFIG` to it when the variable is unset. Any missing key falls back to the compiled default from `sushitrack_get_default_params`.
 
 The schema is layered `basic` / `advanced`. The outer `"sushitrack"` wrapper is optional: a file whose root is already the `basic`/`advanced` object is also accepted:
 

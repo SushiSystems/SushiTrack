@@ -21,12 +21,12 @@ regression harness and a YOLOX video inference pipeline.
 
 ## What do I need to build SushiTrack?
 
-A C++17 compiler, CMake 3.14 or later, Ninja, GoogleTest and Python 3.11. `environment.yml`
+A C++17 compiler, CMake 3.14 or later, Ninja, GoogleTest and Python 3.11. `.config/conda/environment.yml`
 defines a conda environment that installs Python, CMake, Ninja, GoogleTest and the Python
 packages the evaluator and the inference pipeline use:
 
 ```bash
-conda env create -f environment.yml
+conda env create -f .config/conda/environment.yml
 conda activate sushitrack
 ```
 
@@ -47,7 +47,7 @@ pipx install cli/
 Until 0.7.0 is published, `pipx install cli/` cannot resolve that requirement. Install sushicore
 from a checkout into one environment with `pip install -e /path/to/sushicore`, then the CLI beside
 it with `pip install -e cli`. The conda environment pins `sushicore==0.4.0`, so an environment
-built from `environment.yml` needs the same step; see
+built from `.config/conda/environment.yml` needs the same step; see
 [Installing](../getting_started/INSTALL.md#cli-pipx).
 
 `st --help` lists every command and `st --version` prints the installed version of
@@ -117,7 +117,7 @@ A deploy package is platform-specific: `st build --deploy` copies the artefacts 
 system it runs on, a `.dll` and `.lib` on Windows or a `.so` on Linux. There is no
 cross-compilation, so shipping both platforms means running the deploy once on each.
 
-`st container build` builds an image from `Dockerfile` on a CUDA 12.1, Ubuntu 22.04 base, and
+`st container build` builds an image from `.config/docker/Dockerfile` on a CUDA 12.1, Ubuntu 22.04 base, and
 `st container run` starts it with the repository mounted at `/workspace/sushitrack`. See
 [Installing](../getting_started/INSTALL.md#docker).
 

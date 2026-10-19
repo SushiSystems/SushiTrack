@@ -106,7 +106,7 @@ def _run_regression(tool, paths, gtest_filter):
     console.command(f"{binary} --gtest_filter={gtest_filter}")
     code, out, err = RUNNER.capture([str(binary), f"--gtest_filter={gtest_filter}"],
                                     cwd=paths.root,
-                                    env=load_build_env(tool, paths.build))
+                                    env=load_build_env(tool, paths.build, paths.config))
     if code != 0:
         console.error(f"regression_test failed (exit {code}).")
         print(out)

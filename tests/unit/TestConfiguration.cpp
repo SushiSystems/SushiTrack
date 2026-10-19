@@ -52,7 +52,7 @@ std::string configPath()
     const char* env = std::getenv("SUSHITRACK_CONFIG");
     if (env != nullptr && env[0] != '\0')
         return std::string(env);
-    return std::string("sushitrack.json");
+    return std::string("assets/sushitrack.json");
 }
 
 /**

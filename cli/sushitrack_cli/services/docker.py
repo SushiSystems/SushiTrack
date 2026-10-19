@@ -3,18 +3,18 @@
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
 # Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
 # Commercial use requires a licence from Sushi Systems.
-"""Docker image and container management.
-
-Replaces cli/docker/build.{sh,bat} and cli/docker/run.{sh,bat}.
-"""
+"""Builds the Docker image and runs the developer container."""
 
 from .. import console
 from ..process import RUNNER
 
+#: The Dockerfile, from the repository root; its ignore file sits beside it.
+DOCKERFILE = ".config/docker/Dockerfile"
+
 
 def build(cfg, paths, no_cache=False, forwarded=()):
     console.header("Docker build")
-    command = ["docker", "build", "-t", cfg.docker_image]
+    command = ["docker", "build", "-f", str(paths.root / DOCKERFILE), "-t", cfg.docker_image]
     if no_cache:
         console.info("Rebuilding every layer (--no-cache).")
         command.append("--no-cache")

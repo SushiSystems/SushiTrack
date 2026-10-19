@@ -1,5 +1,6 @@
-# Build artifacts
+# Build trees
 build/
+build-*/
 bin/
 obj/
 
@@ -8,25 +9,20 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
 .pytest_cache/
 
 # Version control
 .git/
-.gitignore
 
-# GTest cache files
+# GoogleTest discovery files
 cmake_test_discovery_*.json
 
 # OS files
 .DS_Store
 Thumbs.db
 
-# Docker files
-Dockerfile
-Dockerfile.cli
-.dockerignore
-
-# Package and docs build outputs
+# Package and documentation build output
 package/
 docs/html/
 
@@ -35,6 +31,8 @@ docs/html/
 worktrees/
 .superpowers/
 
-# Data
+# Model weights, videos and benchmark output
+third_party/weight/
+third_party/video/
 tests/regression/evaluator/data/*/pred/
 tests/regression/evaluator/data/*/img1/

@@ -67,5 +67,5 @@ include(GoogleTest)
 # here has to change when a suite grouping changes.
 gtest_discover_tests(unit_test
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    PROPERTIES LABELS "unit"
+    PROPERTIES LABELS "unit" ENVIRONMENT "SUSHITRACK_CONFIG=${CMAKE_SOURCE_DIR}/assets/sushitrack.json"
 )

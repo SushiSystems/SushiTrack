@@ -32,10 +32,7 @@ RUN pip3 install --no-cache-dir \
 
 COPY . /workspace/sushitrack/
 
-# Installs the `st` and `sushitrack` console-script entry points onto PATH
-# (pip's default install location for a non-`--user` root install on Debian,
-# /usr/local/bin, is already on PATH in this image). No separate symlink step:
-# the CLI is a pip package (cli/pyproject.toml), not shell wrapper scripts.
+# Puts the st and sushitrack entry points on PATH under /usr/local/bin.
 RUN pip3 install --no-cache-dir /workspace/sushitrack/cli
 
 CMD ["/bin/bash"]

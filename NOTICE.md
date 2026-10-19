@@ -25,14 +25,14 @@ Nothing in this table is stored in the repository.
 
 | Component | Declared in | Version | Licence |
 | --- | --- | --- | --- |
-| GoogleTest | `cli/sushistack.deps.toml`, `environment.yml` | 1.17.0 in `environment.yml`; unpinned in the fragment | BSD-3-Clause |
+| GoogleTest | `cli/sushistack.deps.toml`, `.config/conda/environment.yml` | 1.17.0 in `.config/conda/environment.yml`; unpinned in the fragment | BSD-3-Clause |
 | typer, rich, tomli, pytest | `cli/pyproject.toml` | lower bounds only | MIT |
-| sushicore | `cli/pyproject.toml`, `environment.yml` | `>=0.7.0` and `==0.4.0` | A Sushi Systems package under its own licence |
-| PyTorch, torchvision, torchaudio | `environment.yml`, `Dockerfile` | 2.5.1, 0.20.1 and 2.5.1 in `Dockerfile`; unpinned in `environment.yml` | unverified |
-| `pytorch-cuda` 12.1 and the `nvidia/cuda:12.1.1-devel-ubuntu22.04` base image | `environment.yml`, `Dockerfile` | as named | NVIDIA's own terms; unverified |
-| The other conda and pip packages | `environment.yml` | pinned there | unverified, not read one by one |
+| sushicore | `cli/pyproject.toml`, `.config/conda/environment.yml` | `>=0.7.0` and `==0.4.0` | A Sushi Systems package under its own licence |
+| PyTorch, torchvision, torchaudio | `.config/conda/environment.yml`, `.config/docker/Dockerfile` | 2.5.1, 0.20.1 and 2.5.1 in `.config/docker/Dockerfile`; unpinned in `.config/conda/environment.yml` | unverified |
+| `pytorch-cuda` 12.1 and the `nvidia/cuda:12.1.1-devel-ubuntu22.04` base image | `.config/conda/environment.yml`, `.config/docker/Dockerfile` | as named | NVIDIA's own terms; unverified |
+| The other conda and pip packages | `.config/conda/environment.yml` | pinned there | unverified, not read one by one |
 
-A Docker image built from `Dockerfile` holds NVIDIA's CUDA libraries and falls under NVIDIA's
+A Docker image built from `.config/docker/Dockerfile` holds NVIDIA's CUDA libraries and falls under NVIDIA's
 terms. No built image is published.
 
 ## Ported files

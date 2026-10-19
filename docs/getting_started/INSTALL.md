@@ -12,10 +12,10 @@
 | Python | 3.11 |
 | Docker (optional) | Engine ≥ 20.10 with NVIDIA Container Toolkit for CUDA inference |
 
-Python runtime dependencies are defined by `environment.yml` (the source of
-truth): `numpy==2.4.4`, `pandas==3.0.2`, `scipy==1.17.1`, `pytest==9.0.3`, `absl-py==2.4.0`, `matplotlib==3.10.9`, `opencv-python==4.13.0.92`, `pillow==12.2.0`, `pycocotools==2.0.11`, `rich==15.0.0`, `sushicore==0.4.0`, `tqdm==4.67.3`. PyTorch (`torch`/`torchvision`/`torchaudio`) is installed from the conda `pytorch` channel with `pytorch-cuda=12.1`. The `Dockerfile` installs the same pip set without `sushicore`, which the CLI install resolves, and pins PyTorch to `torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1` from the cu121 wheel index.
+Python runtime dependencies are defined by `.config/conda/environment.yml` (the source of
+truth): `numpy==2.4.4`, `pandas==3.0.2`, `scipy==1.17.1`, `pytest==9.0.3`, `absl-py==2.4.0`, `matplotlib==3.10.9`, `opencv-python==4.13.0.92`, `pillow==12.2.0`, `pycocotools==2.0.11`, `rich==15.0.0`, `sushicore==0.4.0`, `tqdm==4.67.3`. PyTorch (`torch`/`torchvision`/`torchaudio`) is installed from the conda `pytorch` channel with `pytorch-cuda=12.1`. The `.config/docker/Dockerfile` installs the same pip set without `sushicore`, which the CLI install resolves, and pins PyTorch to `torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1` from the cu121 wheel index.
 
-`environment.yml` pins `sushicore==0.4.0`, while the CLI requires `sushicore>=0.7.0`. An
+`.config/conda/environment.yml` pins `sushicore==0.4.0`, while the CLI requires `sushicore>=0.7.0`. An
 environment built from the file needs the newer `sushicore` installed by hand, as shown under
 [CLI (pipx)](#cli-pipx); the mismatch is in [Known issues](../reference/KNOWN_ISSUES.md).
 
@@ -48,17 +48,17 @@ command and `st --version` prints the installed version of `sushitrack-cli`.
 ## Conda environment
 
 ```bash
-conda env create -f environment.yml
+conda env create -f .config/conda/environment.yml
 conda activate sushitrack
 ```
 
-`environment.yml` installs Python 3.11, CMake, Ninja, GoogleTest, PyTorch from the conda `pytorch` channel (`pytorch-cuda=12.1`), and the remaining pip dependency set (numpy/pandas/scipy/opencv/sushicore/rich/pytest/etc.).
+`.config/conda/environment.yml` installs Python 3.11, CMake, Ninja, GoogleTest, PyTorch from the conda `pytorch` channel (`pytorch-cuda=12.1`), and the remaining pip dependency set (numpy/pandas/scipy/opencv/sushicore/rich/pytest/etc.).
 
 ## Docker
 
 ```bash
-st container build   # builds image from ./Dockerfile (CUDA 12.1, Ubuntu 22.04)
+st container build   # builds the image from .config/docker/Dockerfile (CUDA 12.1, Ubuntu 22.04)
 st container run     # docker run -it --rm -v $(pwd):/workspace/sushitrack sushitrack bash
 ```
 
-The Dockerfile pins the same wheel versions as `environment.yml`, except `sushicore`, which it leaves to the CLI install. The project root is bind-mounted at `/workspace/sushitrack`; output files written inside the container are immediately visible on the host. The image installs the CLI with `pip3 install`, which puts `st` and `sushitrack` on `PATH`, so `st` works interactively and as `docker run ... st build` alike.
+The Dockerfile pins the same wheel versions as `.config/conda/environment.yml`, except `sushicore`, which it leaves to the CLI install. The project root is bind-mounted at `/workspace/sushitrack`; output files written inside the container are immediately visible on the host. The image installs the CLI with `pip3 install`, which puts `st` and `sushitrack` on `PATH`, so `st` works interactively and as `docker run ... st build` alike.

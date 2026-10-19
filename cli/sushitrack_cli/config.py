@@ -80,7 +80,7 @@ class Config:
     paths_build: str = "build"
     paths_data: str = "data"
     paths_third_party: str = "third_party"
-    paths_config: str = "sushitrack.json"
+    paths_config: str = "assets/sushitrack.json"
     paths_tests: str = "tests"
     paths_regression: str = "tests/regression"
     paths_evaluator: str = "tests/regression/evaluator"
@@ -118,7 +118,7 @@ ENV_OVERRIDES = {
     "paths_include": "ST_INCLUDE_DIR",
     "paths_build": "ST_BUILD_DIR",
     "paths_data": "ST_DATA_DIR",
-    "paths_third_party": "ST_3RDPARTY_DIR",
+    "paths_third_party": "ST_THIRD_PARTY_DIR",
     "paths_config": "ST_CONFIG_FILE",
     "build_type": "ST_BUILD_TYPE",
     "build_jobs": "ST_JOBS",

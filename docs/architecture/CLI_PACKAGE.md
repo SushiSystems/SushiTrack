@@ -21,7 +21,7 @@ The CLI lives in `cli/` as the package `sushitrack-cli`. Its commands are in the
 | `cli/misc/clean_preds.sh` / `cli/misc/clean_preds.bat` | Recursively removes `pred/` directories under the evaluator data root |
 | `cli/misc/construct_trackeval_data.ps1` | Creates the official TrackEval directory tree by symlinking GT (MOT17-SDP as representative for each sequence) and copying per-tracker predictions for `sushitrack`/`bytetrack`/`ocsort` |
 
-`Dockerfile`: CUDA 12.1 devel base, installs `build-essential`, `cmake`, `git`, `python3`, `python3-pip`, `libgtest-dev`, `libgl1-mesa-glx`, `libglib2.0-0`, then pip-installs the pinned wheel set, copies the project, and installs the CLI with `pip3 install`, which puts `st` on `PATH`.
+`.config/docker/Dockerfile`: CUDA 12.1 devel base, installs `build-essential`, `cmake`, `git`, `python3`, `python3-pip`, `libgtest-dev`, `libgl1-mesa-glx`, `libglib2.0-0`, then pip-installs the pinned wheel set, copies the project, and installs the CLI with `pip3 install`, which puts `st` on `PATH`.
 
 ## Decisions the sources cite
 

@@ -103,7 +103,7 @@ st eval --trackeval --private
 ```
 
 The internal runner needs the evaluator's own dependencies (numpy, scipy,
-TrackEval) from `environment.yml`; `--trackeval` bypasses it. Scenarios registered
+TrackEval) from `.config/conda/environment.yml`; `--trackeval` bypasses it. Scenarios registered
 in `tests/regression/ScenarioList.h`: full MOT17 train set (21 sequences across DPM/FRCNN/SDP
 detectors plus `-YOLOX` variants for each), MOT20 (`-01/-02/-03/-05` with `-YOLOX`
 variants), and DanceTrack sequences (`dancetrack0001`, `0002`, `0006`, `0008`,

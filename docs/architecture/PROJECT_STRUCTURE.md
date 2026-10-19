@@ -8,9 +8,6 @@ sushitrack/
 ├── README.md  LICENSE  NOTICE.md  COMMERCIAL.md
 ├── AGENTS.md  CLAUDE.md               # agent instructions
 ├── CMakeLists.txt                     # library, vendored trackers, tests
-├── Dockerfile                         # CUDA 12.1 base, pip wheels, the st CLI
-├── environment.yml                    # conda env: python 3.11, cmake, gtest, ninja, pip wheels
-├── sushitrack.json                    # runtime config the library loads
 │
 ├── include/SushiTrack/
 │   ├── sushitrack_c.h                 # C API

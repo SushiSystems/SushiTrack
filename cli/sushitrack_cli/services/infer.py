@@ -13,6 +13,7 @@ Python dependencies (torch, opencv) — those belong to the demo, not to this CL
 import sys
 
 from .. import console
+from ..env import load_build_env
 from ..process import RUNNER
 from .label import TRACKERS, resolve_tracker
 
@@ -62,4 +63,5 @@ def run(cfg, paths, args):
 
     console.header("Infer")
     console.info(f"Tracker: {TRACKERS[key]}  |  source: {args.source}")
-    return RUNNER.run(command, paths.root)
+    return RUNNER.run(command, paths.root,
+                      env=load_build_env(cfg.tool, paths.build, paths.config))

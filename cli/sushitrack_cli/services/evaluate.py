@@ -28,8 +28,8 @@ def _load_evaluator(paths):
         # The message names the evaluator's own dependencies: numpy, scipy, TrackEval.
         console.error(
             f"Internal evaluator unavailable: {exc}.\n"
-            f"Its dependencies come from environment.yml "
-            f"(conda env create -f environment.yml), or install the missing "
+            f"Its dependencies come from .config/conda/environment.yml "
+            f"(conda env create -f .config/conda/environment.yml), or install the missing "
             f"package directly.\n"
             f"To score without it, run `st eval --trackeval` and use the "
             f"official TrackEval script.")
@@ -112,7 +112,7 @@ def _stage_official_data(paths, sequences, trackers, trackeval_dir):
 
 
 def run_official(paths, sequences, trackers):
-    """Run 3rdparty/TrackEval's run_mot_challenge.py over the staged results."""
+    """Run third_party/TrackEval's run_mot_challenge.py over the staged results."""
     trackeval_dir = paths.third_party / "TrackEval"
     script = trackeval_dir / "scripts" / "run_mot_challenge.py"
     if not script.exists():

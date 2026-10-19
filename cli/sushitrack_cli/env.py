@@ -18,6 +18,8 @@ from sushicore.provision.probe import find_vcvars
 from . import console
 
 CACHE_NAME = ".sushitrack_env.json"
+#: The variable the library reads its configuration path from.
+TRACKER_CONFIG_VARIABLE = "SUSHITRACK_CONFIG"
 
 
 def cache_key(tool) -> str:
@@ -47,16 +49,25 @@ def _snapshot(tool) -> dict[str, str] | None:
     return snapshot_vcvars(vcvars, console)
 
 
-def load_build_env(tool, build_dir) -> dict[str, str]:
+def load_build_env(tool, build_dir, tracker_config=None) -> dict[str, str]:
     """Return the environment for build, test and run children.
 
     Args:
         tool: The resolved `cfg.tool` settings.
         build_dir: Where the snapshot cache lives.
+        tracker_config: The `sushitrack.json` a child loads when `SUSHITRACK_CONFIG` is unset.
 
     Returns:
         `os.environ` off Windows or without a snapshot; else it merged with one.
     """
+    env = _compiler_env(tool, build_dir)
+    if tracker_config is not None:
+        env.setdefault(TRACKER_CONFIG_VARIABLE, str(tracker_config))
+    return env
+
+
+def _compiler_env(tool, build_dir) -> dict[str, str]:
+    """Return `os.environ`, merged with the vcvars snapshot on Windows."""
     if not tool.is_windows:
         return dict(os.environ)
     cache_file = Path(build_dir) / CACHE_NAME

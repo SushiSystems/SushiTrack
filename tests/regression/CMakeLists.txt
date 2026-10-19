@@ -97,5 +97,5 @@ enable_testing()
 include(GoogleTest)
 gtest_discover_tests(regression_test
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    PROPERTIES LABELS "regression"
+    PROPERTIES LABELS "regression" ENVIRONMENT "SUSHITRACK_CONFIG=${CMAKE_SOURCE_DIR}/assets/sushitrack.json"
 )

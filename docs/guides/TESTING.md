@@ -44,7 +44,7 @@ Direct invocation:
 ```bash
 ./build/bin/Release/regression_test
 ./build/bin/Release/regression_test --gtest_filter="*MOT17_04_DPM_sushitrack*"
-SUSHITRACK_CONFIG=./sushitrack.json ./build/bin/Release/regression_test
+SUSHITRACK_CONFIG=./assets/sushitrack.json ./build/bin/Release/regression_test
 ```
 
 ## Integration tests (`integration_test`)

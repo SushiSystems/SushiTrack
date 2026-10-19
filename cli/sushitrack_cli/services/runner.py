@@ -52,4 +52,4 @@ def run(cfg, paths, target=None, select=False, forwarded=()):
 
     console.header(f"Run {binary.name}")
     return RUNNER.run([str(binary), *forwarded], paths.root,
-                      env=load_build_env(cfg.tool, paths.build))
+                      env=load_build_env(cfg.tool, paths.build, paths.config))
