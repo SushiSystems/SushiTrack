@@ -16,15 +16,6 @@ Defects that stand in the tree. The work that closes each one is in
 - Workaround: install a log callback and treat an ERROR line during the call as a failure
 - Fix: RW-13
 
-### KI-2 A throwing log callback crosses the C boundary
-- Origin: own
-- Where: `source/logging/logger.cpp`, `source/c_api/sushitrack_c.cpp`
-- Cause: the handler of a C entry point logs at ERROR level, and a callback that throws there
-  throws again from inside the handler
-- Recognise: the process terminates inside a C call while a log callback is installed
-- Workaround: a log callback that never throws
-- Fix: RW-14
-
 ### KI-3 A late failure in sushitrack_create_ex hands back a handle that is then dropped
 - Origin: own
 - Where: `source/c_api/sushitrack_c.cpp`
@@ -38,7 +29,7 @@ Defects that stand in the tree. The work that closes each one is in
 
 ### KI-4 An environment built from environment.yml cannot run st
 - Origin: own
-- Where: `environment.yml`, `cli/pyproject.toml`
+- Where: `.config/conda/environment.yml`, `cli/pyproject.toml`
 - Cause: the environment pins `sushicore==0.4.0` and the CLI requires `sushicore>=0.7.0`
 - Recognise: pip reports a resolution conflict on sushicore when the CLI is installed
 - Workaround: install sushicore 0.7.0 into the environment by hand
@@ -46,7 +37,7 @@ Defects that stand in the tree. The work that closes each one is in
 
 ### KI-5 The image build names no source for sushicore 0.7.0
 - Origin: own
-- Where: `Dockerfile`
+- Where: `.config/docker/Dockerfile`
 - Cause: the image installs the CLI with `pip3 install` and no index or path for sushicore
 - Recognise: the image build fails at the CLI install step
 - Workaround: none
@@ -99,7 +90,7 @@ Defects that stand in the tree. The work that closes each one is in
 
 ### KI-11 The ignore files name paths that do not exist and miss ones that do
 - Origin: own
-- Where: `.gitignore`, `.dockerignore`
+- Where: `.gitignore`, `.config/docker/Dockerfile.dockerignore`
 - Cause: `.sushitrack_env.json` and `Dockerfile.cli` are named; `build-asan/`, `.worktrees/`
   and `*.egg-info` are not
 - Recognise: `git status` lists a worktree or an asan build tree

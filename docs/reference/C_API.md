@@ -41,12 +41,7 @@ The track-output `feat` pointer references memory owned by the tracker and is on
 
 ## Logging
 
-```c
-void my_logger(sushitrack_log_level_t level, const char* msg) { /* … */ }
-sushitrack_set_log_callback(my_logger);  /* pass NULL to unregister */
-```
-
-`sushitrack_log_level_t` is `SUSHITRACK_LOG_DEBUG=0`, `SUSHITRACK_LOG_INFO=1`, `SUSHITRACK_LOG_WARN=2`, `SUSHITRACK_LOG_ERROR=3`. The callback is stored atomically and safe to set/clear from any thread.
+The C API holds no logging call. The library logs through SushiLog, and a C host takes the records with SushiLog's `sl_set_log_sink` from `SushiLog/log/log_c_sink.h`; see [Overview](../architecture/OVERVIEW.md#logging).
 
 ## Track output fields
 

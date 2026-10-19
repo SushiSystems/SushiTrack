@@ -21,267 +21,99 @@
 
 /**
  * @file TestLogger.cpp
- * @brief Unit tests for logging system and log callbacks.
+ * @brief Tests the SUSHITRACK_LOG macros and SUSHITRACK_THROW on SushiLog.
  * @author Mustafa Garip
  */
 
-#include <atomic>
+#include <stdexcept>
 #include <string>
 #include <thread>
 
 #include <gtest/gtest.h>
 
-#include <SushiTrack/c_api/c_types.hpp>
 #include <SushiTrack/logging/logger.hpp>
 
-namespace
-{
+#include "captured_log.hpp"
 
-    static std::atomic<int> g_call_count{0};
-    static sushitrack_log_level_t g_last_level{SUSHITRACK_LOG_DEBUG};
-    static std::string g_last_message;
-
-    /**
-     * @brief Test callback that records invocation metadata into module-level state.
-     * @param level   Severity level forwarded from the logger.
-     * @param message Formatted message string forwarded from the logger.
-     */
-    void recording_callback(sushitrack_log_level_t level, const char* message)
-    {
-        g_last_level = level;
-        g_last_message = message ? message : "";
-        g_call_count.fetch_add(1, std::memory_order_relaxed);
-    }
-
-} // namespace
+using namespace SushiTrack;
 
 /**
- * @brief Fixture that installs and tears down the recording callback.
+ * @brief A WARN call reaches the sink with SushiTrack's project, module and formatted message.
  */
-class LoggerCallbackTest : public ::testing::Test
+TEST(LoggerTest, WarnCarriesTheProjectModuleAndFormattedMessage)
 {
-    protected:
-        void SetUp() override
-        {
-            g_call_count = 0;
-            g_last_level = SUSHITRACK_LOG_DEBUG;
-            g_last_message.clear();
-            SushiTrack::Logger::set_callback(recording_callback);
-        }
+    CapturedLog log;
+    SUSHITRACK_LOG_WARN(K_SUSHITRACK_LOG_CATEGORY, "track {} lost after {} frames", 7, 30);
 
-        void TearDown() override { SushiTrack::Logger::set_callback(nullptr); }
-};
-
-/**
- * @brief A registered callback receives a message emitted via Logger::log.
- */
-TEST_F(LoggerCallbackTest, CallbackReceivesLoggedMessage)
-{
-    SushiTrack::Logger::log(SUSHITRACK_LOG_INFO, "hello %s", "world");
-    EXPECT_EQ(g_call_count.load(), 1);
+    const auto records = log.records();
+    ASSERT_EQ(records.size(), 1u);
+    EXPECT_EQ(records[0].level, SushiLog::LogLevel::Warn);
+    EXPECT_EQ(records[0].project, "sushitrack");
+    EXPECT_EQ(records[0].module, "sushitrack");
+    EXPECT_EQ(records[0].message, "track 7 lost after 30 frames");
 }
 
 /**
- * @brief The level delivered to the callback matches the level passed to log.
+ * @brief A record below the category's level is not delivered.
  */
-TEST_F(LoggerCallbackTest, CallbackReceivesCorrectLevel)
+TEST(LoggerTest, RecordBelowTheCategoryLevelIsDropped)
 {
-    SushiTrack::Logger::log(SUSHITRACK_LOG_WARN, "warning message");
-    EXPECT_EQ(g_last_level, SUSHITRACK_LOG_WARN);
+    CapturedLog log(SushiLog::LogLevel::Error);
+    SUSHITRACK_LOG_WARN(K_SUSHITRACK_LOG_CATEGORY, "below the level");
+    SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY, "at the level");
+
+    EXPECT_EQ(log.count("below the level"), 0);
+    EXPECT_EQ(log.count("at the level"), 1);
 }
 
 /**
- * @brief Setting the callback to nullptr suppresses output; the callback is not invoked.
+ * @brief SUSHITRACK_THROW throws std::runtime_error holding the formatted message.
  */
-TEST_F(LoggerCallbackTest, NullCallbackSuppressesOutput)
-{
-    SushiTrack::Logger::set_callback(nullptr);
-    SushiTrack::Logger::log(SUSHITRACK_LOG_ERROR, "should not arrive");
-    EXPECT_EQ(g_call_count.load(), 0);
-}
-
-/**
- * @brief Logger::throw_runtime_error throws a std::runtime_error.
- */
-TEST_F(LoggerCallbackTest, ThrowRuntimeErrorThrows)
-{
-    EXPECT_THROW(SushiTrack::Logger::throw_runtime_error("fatal error %d", 42), std::runtime_error);
-}
-
-/**
- * @brief The exception thrown by throw_runtime_error contains the formatted text.
- */
-TEST_F(LoggerCallbackTest, ThrowRuntimeErrorMessageContainsFormattedText)
+TEST(LoggerTest, ThrowCarriesTheFormattedMessage)
 {
     try
     {
-        SushiTrack::Logger::throw_runtime_error("sentinel_token_%d", 99);
-        FAIL() << "Expected std::runtime_error was not thrown";
+        SUSHITRACK_THROW("sentinel_token_{}", 99);
+        FAIL() << "SUSHITRACK_THROW did not throw";
     }
-    catch (const std::runtime_error& e)
+    catch (const std::runtime_error& error)
     {
-        EXPECT_NE(std::string(e.what()).find("sentinel_token_"), std::string::npos);
-    }
-}
-
-/**
- * @brief Concurrent Logger::log calls from two threads both reach the callback
- *        without data races or missed invocations.
- */
-TEST(LoggerThreadSafetyTest, ConcurrentCallsDeliverAllMessages)
-{
-    g_call_count.store(0);
-    SushiTrack::Logger::set_callback(recording_callback);
-
-    constexpr int K_MESSAGES_PER_THREAD = 50;
-
-    std::thread t1(
-        [K_MESSAGES_PER_THREAD]()
-        {
-            for (int i = 0; i < K_MESSAGES_PER_THREAD; ++i)
-                SushiTrack::Logger::log(SUSHITRACK_LOG_DEBUG, "t1 msg %d", i);
-        });
-    std::thread t2(
-        [K_MESSAGES_PER_THREAD]()
-        {
-            for (int i = 0; i < K_MESSAGES_PER_THREAD; ++i)
-                SushiTrack::Logger::log(SUSHITRACK_LOG_INFO, "t2 msg %d", i);
-        });
-
-    t1.join();
-    t2.join();
-
-    EXPECT_EQ(g_call_count.load(), 2 * K_MESSAGES_PER_THREAD);
-
-    SushiTrack::Logger::set_callback(nullptr);
-}
-
-// LoggerLevelRoutingTest — Verified Omission #4 (Logger level filtering)
-
-/**
- * @brief Fixture exercising per-level routing.
- */
-class LoggerLevelRoutingTest : public ::testing::Test
-{
-    protected:
-        void SetUp() override
-        {
-            g_call_count = 0;
-            g_last_level = SUSHITRACK_LOG_DEBUG;
-            g_last_message.clear();
-            SushiTrack::Logger::set_callback(recording_callback);
-        }
-
-        void TearDown() override { SushiTrack::Logger::set_callback(nullptr); }
-};
-
-/**
- * @brief Every documented severity level is forwarded with the exact level
- *        argument the caller passed to Logger::log.
- */
-TEST_F(LoggerLevelRoutingTest, AllFourLevelsArePassedThroughUnchanged)
-{
-    const sushitrack_log_level_t levels[] = {
-        SUSHITRACK_LOG_DEBUG,
-        SUSHITRACK_LOG_INFO,
-        SUSHITRACK_LOG_WARN,
-        SUSHITRACK_LOG_ERROR,
-    };
-
-    for (sushitrack_log_level_t lv : levels)
-    {
-        g_call_count = 0;
-        g_last_level = SUSHITRACK_LOG_DEBUG; // poison value distinct from WARN/ERROR/INFO
-        SushiTrack::Logger::log(lv, "level routing probe");
-        EXPECT_EQ(g_call_count.load(), 1);
-        EXPECT_EQ(g_last_level, lv) << "level was rewritten by the logger";
+        EXPECT_NE(std::string(error.what()).find("sentinel_token_99"), std::string::npos);
     }
 }
 
 /**
- * @brief An empty format string must not crash the logger and must still
- *        route through to the registered callback with the correct level.
- *
- * Note: passing a null format pointer is undefined behaviour for vsnprintf,
- * which the logger uses internally, so we instead exercise the documented
- * boundary case of an empty (but non-null) format string.
+ * @brief SUSHITRACK_THROW only throws; the code that catches it logs it.
  */
-TEST_F(LoggerLevelRoutingTest, EmptyFormatStringDoesNotCrash)
+TEST(LoggerTest, ThrowLogsNothing)
 {
-    SushiTrack::Logger::log(SUSHITRACK_LOG_INFO, "");
-    EXPECT_GE(g_call_count.load(), 0);
-    SUCCEED();
-}
-
-// LoggerCallbackHotSwapTest — Verified Omission #4 (atomic callback updates)
-
-/**
- * @brief Replacing the callback mid-flight must not lose messages. We log a
- *        message with callback A, swap to callback B, then log again and
- *        confirm B observed the second message.
- */
-TEST(LoggerCallbackHotSwapTest, ReplacementCallbackReceivesSubsequentMessages)
-{
-    static std::atomic<int> a_count{0};
-    static std::atomic<int> b_count{0};
-
-    auto a_cb = [](sushitrack_log_level_t, const char*)
-    {
-        a_count.fetch_add(1, std::memory_order_relaxed);
-    };
-    auto b_cb = [](sushitrack_log_level_t, const char*)
-    {
-        b_count.fetch_add(1, std::memory_order_relaxed);
-    };
-
-    SushiTrack::Logger::set_callback(a_cb);
-    SushiTrack::Logger::log(SUSHITRACK_LOG_INFO, "first");
-    SushiTrack::Logger::set_callback(b_cb);
-    SushiTrack::Logger::log(SUSHITRACK_LOG_INFO, "second");
-    SushiTrack::Logger::set_callback(nullptr);
-
-    EXPECT_EQ(a_count.load(), 1);
-    EXPECT_EQ(b_count.load(), 1);
+    CapturedLog log;
+    EXPECT_THROW(SUSHITRACK_THROW("thrown {}", 1), std::runtime_error);
+    EXPECT_TRUE(log.records().empty());
 }
 
 /**
- * @brief Concurrent set_callback / log invocations must remain race-free.
- *
- * One thread continuously swaps between two callbacks while a second thread
- * issues log messages. The total messages observed by the two callbacks must
- * equal the number of log calls (no message is lost or double-delivered).
+ * @brief Calls from two threads both reach the sink, every record intact.
  */
-TEST(LoggerCallbackHotSwapTest, ConcurrentSetCallbackAndLogIsRaceFree)
+TEST(LoggerTest, ConcurrentCallsReachTheSink)
 {
-    static std::atomic<int> total{0};
-    auto cb = [](sushitrack_log_level_t, const char*)
-    {
-        total.fetch_add(1, std::memory_order_relaxed);
-    };
-
-    SushiTrack::Logger::set_callback(cb);
-
-    constexpr int K_ITERATIONS = 200;
-    std::atomic<bool> stop{false};
-
-    std::thread swapper(
-        [&stop, cb]()
+    CapturedLog log;
+    static constexpr int K_PER_THREAD = 50;
+    std::thread first(
+        []
         {
-            while (!stop.load(std::memory_order_relaxed))
-            {
-                SushiTrack::Logger::set_callback(cb);
-                SushiTrack::Logger::set_callback(cb);
-            }
+            for (int i = 0; i < K_PER_THREAD; ++i)
+                SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY, "t1 msg {}", i);
         });
+    std::thread second(
+        []
+        {
+            for (int i = 0; i < K_PER_THREAD; ++i)
+                SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY, "t2 msg {}", i);
+        });
+    first.join();
+    second.join();
 
-    for (int i = 0; i < K_ITERATIONS; ++i)
-        SushiTrack::Logger::log(SUSHITRACK_LOG_DEBUG, "race probe %d", i);
-
-    stop.store(true, std::memory_order_relaxed);
-    swapper.join();
-
-    // The callback was the same function pointer for every swap, so every logged message must have been delivered exactly once.
-    EXPECT_GE(total.load(), K_ITERATIONS);
-
-    SushiTrack::Logger::set_callback(nullptr);
+    EXPECT_EQ(log.count("t1 msg"), K_PER_THREAD);
+    EXPECT_EQ(log.count("t2 msg"), K_PER_THREAD);
 }

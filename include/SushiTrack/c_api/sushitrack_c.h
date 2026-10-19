@@ -52,22 +52,6 @@ extern "C"
         SUSHITRACK_BUFFER_OVERFLOW = -5         ///< Target buffer capacity exceeded.
     } sushitrack_status_t;
 
-    /**
-     * @brief Defines system logging severity levels.
-     */
-    typedef enum
-    {
-        SUSHITRACK_LOG_DEBUG = 0, ///< Detailed diagnostic information.
-        SUSHITRACK_LOG_INFO = 1,  ///< Informational system messages.
-        SUSHITRACK_LOG_WARN = 2,  ///< Non-terminating operational warnings.
-        SUSHITRACK_LOG_ERROR = 3  ///< Terminating operational errors.
-    } sushitrack_log_level_t;
-
-    /**
-     * @brief Defines function pointer signature for custom log handling.
-     */
-    typedef void (*sushitrack_log_callback_t)(sushitrack_log_level_t level, const char* message);
-
     /** @brief Opaque handle representing a tracker instance. */
     typedef void* sushitrack_tracker_t;
 
@@ -257,12 +241,6 @@ extern "C"
      */
     SUSHITRACK_API sushitrack_status_t
     sushitrack_load_params_from_json(const char* path, sushitrack_params_t* params);
-
-    /**
-     * @brief Configures a global callback function for system logging.
-     * @param callback Function pointer to logging implementation.
-     */
-    SUSHITRACK_API void sushitrack_set_log_callback(sushitrack_log_callback_t callback);
 
 #ifdef __cplusplus
 }

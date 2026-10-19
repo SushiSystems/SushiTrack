@@ -563,7 +563,7 @@ control.
 `include/SushiTrack/c_api/sushitrack_c.h` exposes an opaque `sushitrack_tracker_t` and the entry points
 `sushitrack_get_default_params`, `sushitrack_create`, `sushitrack_create_ex`
 (status-returning), `sushitrack_create_from_config`, `sushitrack_load_params_from_json`,
-`sushitrack_update`, `sushitrack_destroy_tracker`, and `sushitrack_set_log_callback`. The ABI
+`sushitrack_update` and `sushitrack_destroy_tracker`. The ABI
 is dependency-free (no Eigen or C++ headers leak through), so a C consumer needs
 only `sushitrack_c.h`. Status codes are `sushitrack_status_t`.
 
@@ -586,18 +586,21 @@ README.
 
 ## Logging
 
-`Logger` (`source/logging/logger.cpp`) routes `SUSHITRACK_LOG_DEBUG/INFO/WARN/ERROR` to a
-single global callback registered via `sushitrack_set_log_callback`. The callback
-pointer is stored atomically; setting or clearing it is thread-safe. Passing
-`NULL` unregisters.
+SushiTrack logs through SushiLog, the one logger of every Sushi library, with the macros of
+`include/SushiTrack/logging/logger.hpp`. Every call names `K_SUSHITRACK_LOG_CATEGORY`, whose
+project and module are both `sushitrack`. `SUSHITRACK_LOG_LEVEL` sets its level, `warn` when
+unset: `debug` adds the track lifecycle events, and `trace` the per-frame association summaries,
+which only a debug build compiles. Records go to stderr. A C or Python host takes them with
+SushiLog's `sl_set_log_sink`; the Python binding's `Tracker.set_log_callback` does that for a
+callable. `SUSHITRACK_THROW` throws without logging, and the C entry point that catches the
+exception logs it once.
 
 ---
 
 ## Thread safety
 
 `Tracklet` state accessors (`get_mean`, `get_covariance`, `get_measurement`) are
-mutex-protected. The `KalmanFilter` projected-LLT cache is mutex-protected. The
-log callback is atomic. A single tracker instance is not designed for concurrent
+mutex-protected. The `KalmanFilter` projected-LLT cache is mutex-protected. A single tracker instance is not designed for concurrent
 `update` calls; construct one instance per stream.
 
 ---

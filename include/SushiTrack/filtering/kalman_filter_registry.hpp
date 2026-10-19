@@ -83,8 +83,7 @@ namespace SushiTrack
                 {
                     return it->second(enable_xyah);
                 }
-                SUSHITRACK_LOG_ERROR(
-                    "[KalmanFilterRegistry] Unregistered Kalman type requested: %d", type);
+                SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY, "Unregistered Kalman type requested: {}", type);
                 return nullptr;
             }
 

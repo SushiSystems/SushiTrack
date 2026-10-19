@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- 2026-10-19 — cli: Passed the pinned SushiLog to CMake as SUSHILOG_DIR and shipped its runtime library in both deploy packages (`cli/sushistack.deps.toml`, `cli/sushitrack_cli/services/build.py`, `cli/sushitrack_cli/services/deploy.py`).
+- 2026-10-19 — bindings: Made `Tracker.set_log_callback` set SushiLog's sink and numbered `LogLevel` as SushiLog does, TRACE 0 to FATAL 5 (`bindings/python/sushitrack.py`).
+- 2026-10-19 — c_api: Removed `sushitrack_set_log_callback`, `sushitrack_log_level_t` and `sushitrack_log_callback_t`; a host takes records through SushiLog's sink (`include/SushiTrack/c_api/sushitrack_c.h`).
+- 2026-10-19 — logging: Logged through SushiLog under `K_SUSHITRACK_LOG_CATEGORY`, set by SUSHITRACK_LOG_LEVEL, with the per-frame summaries at TRACE (`include/SushiTrack/logging/logger.hpp`, `cmake/SushiTrackSushiLog.cmake`).
 - 2026-10-19 — core: Dropped the unused total cost `LAPJVSolver::exec_lapjv` summed after every solve (`source/association/lapjv_solver.cpp`).
 - 2026-10-19 — core: Renamed the C++ methods to snake_case and the constants to K_ names, so `Tracker::getTracks` is now `Tracker::get_tracks` (`include/SushiTrack/tracking/tracker.hpp`, `include/SushiTrack/tracking/tracklet.hpp`).
 - 2026-10-19 — core: Dropped the I prefix from the interfaces and renamed `IKalmanFilter` to `GatedStatePredictor` (`include/SushiTrack/association/cost_calculator.hpp`, `include/SushiTrack/filtering/gated_state_predictor.hpp`).
@@ -9,7 +13,8 @@
 - 2026-10-19 — core: Split the cost calculators, gate validators, Kalman factories, timing policies and track states into one header and one source per type (`include/SushiTrack/association/`, `source/association/`).
 - 2026-10-19 — build: Moved the build policy and the Eigen target into `cmake/` and the library targets into `source/CMakeLists.txt` (`cmake/SushiTrackBuildPolicy.cmake`, `docs/architecture/BUILD_SYSTEM.md`).
 - 2026-10-19 — cli: Renamed the ST_3RDPARTY_DIR variable to ST_THIRD_PARTY_DIR and set SUSHITRACK_CONFIG for the programs st runs (`cli/sushitrack_cli/config.py`, `cli/sushitrack_cli/env.py`).
-- 2026-10-19 — build: Moved the Dockerfile and the conda environment under `.config/`, the default tracker configuration to `assets/`, and added `.clang-format` and `.editorconfig` (`.config/README.md`, `assets/sushitrack.json`).
+- 2026-10-19 — build: Added the clang-format and EditorConfig files the editors find at the root (`.clang-format`, `.editorconfig`).
+- 2026-10-19 — build: Moved the Dockerfile and the conda environment under .config and the default tracker configuration under assets (`.config/README.md`, `assets/sushitrack.json`).
 - 2026-10-19 — docs: Rewrote the backlog and the known issues as numbered entries with state, acceptance and fix fields (`docs/design/REMAINING_WORK.md`, `docs/reference/KNOWN_ISSUES.md`).
 - 2026-10-19 — tools: Copied the ten shared checkers and `check_all.py` from SushiSkills and ran them in CI (`tools/check_all.py`, `tools/checking/`, `tools/settings.py`, `.github/workflows/ci.yml`).
 - 2026-10-07 — ci: Passed the repository's secrets to the CI the release job calls (`.github/workflows/release.yml`).

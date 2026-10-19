@@ -16,7 +16,7 @@ import shutil
 
 from .. import console
 from ..config import IS_WINDOWS
-from .artifacts import find_file, import_lib_name, shared_lib_name
+from .artifacts import find_file, import_lib_name, shared_lib_name, sushilog_lib_name
 
 KINDS = ("cpp", "python")
 
@@ -178,11 +178,23 @@ def _copy_config(paths, pkg_dir):
         shutil.copy2(config, pkg_dir / "sushitrack.json")
 
 
+def _find_runtimes(paths):
+    """Return SushiTrack's and SushiLog's runtime libraries, or None after naming the missing one."""
+    found = []
+    for name in (shared_lib_name(), sushilog_lib_name()):
+        library = find_file(paths.build, name)
+        if not library:
+            console.error(f"{name} not found. Run `st build` first.")
+            return None
+        found.append(library)
+    return found
+
+
 def _deploy_cpp(paths, pkg_dir):
-    runtime = find_file(paths.build, shared_lib_name())
-    if not runtime:
-        console.error(f"{shared_lib_name()} not found. Run `st build` first.")
+    runtimes = _find_runtimes(paths)
+    if runtimes is None:
         return False
+    runtime, sushilog = runtimes
     import_lib = find_file(paths.build, import_lib_name())
     if not import_lib:
         console.error(f"{import_lib_name()} not found. Run `st build` first.")
@@ -203,6 +215,9 @@ def _deploy_cpp(paths, pkg_dir):
     if IS_WINDOWS:
         (pkg_dir / "bin").mkdir(parents=True, exist_ok=True)
         shutil.copy2(runtime, pkg_dir / "bin" / shared_lib_name())
+        shutil.copy2(sushilog, pkg_dir / "bin" / sushilog_lib_name())
+    else:
+        shutil.copy2(sushilog, pkg_dir / "lib" / sushilog_lib_name())
 
     _copy_config(paths, pkg_dir)
     (pkg_dir / "example").mkdir(parents=True, exist_ok=True)
@@ -217,10 +232,10 @@ def _deploy_cpp(paths, pkg_dir):
 
 
 def _deploy_python(paths, pkg_dir):
-    runtime = find_file(paths.build, shared_lib_name())
-    if not runtime:
-        console.error(f"{shared_lib_name()} not found. Run `st build` first.")
+    runtimes = _find_runtimes(paths)
+    if runtimes is None:
         return False
+    runtime, sushilog = runtimes
 
     binding = paths.root / "bindings" / "python" / "sushitrack.py"
     if not binding.exists():
@@ -232,6 +247,7 @@ def _deploy_python(paths, pkg_dir):
     shutil.copy2(binding, module_dir / binding.name)
     # Bundled beside the module because the binding's find_library() looks there first
     shutil.copy2(runtime, module_dir / shared_lib_name())
+    shutil.copy2(sushilog, module_dir / sushilog_lib_name())
     (module_dir / "__init__.py").write_text(
         f"from .{binding.stem} import *  # noqa: F401,F403\n", encoding="utf-8")
 

@@ -347,12 +347,11 @@ namespace SushiTrack
                 j = find_path_dense(n, cost, *pfree_i, y, v, pred, cols, d);
                 if (j < 0)
                 {
-                    SUSHITRACK_RUNTIME_ERROR("[LAPJV] Error occurred in _ca_dense(): j < 0");
+                    SUSHITRACK_THROW("Error occurred in _ca_dense(): j < 0");
                 }
                 if (j >= static_cast<int>(n))
                 {
-                    SUSHITRACK_RUNTIME_ERROR(
-                        "[LAPJV] Error occurred in _ca_dense(): j >= n (j=%d, n=%zu)", j, n);
+                    SUSHITRACK_THROW("Error occurred in _ca_dense(): j >= n (j={}, n={})", j, n);
                 }
                 while (i != *pfree_i)
                 {
@@ -362,8 +361,8 @@ namespace SushiTrack
                     k++;
                     if (k >= n)
                     {
-                        SUSHITRACK_RUNTIME_ERROR(
-                            "[LAPJV] Error occurred in _ca_dense(): k >= n (k=%zu, n=%zu)", k, n);
+                        SUSHITRACK_THROW("Error occurred in _ca_dense(): k >= n (k={}, n={})", k,
+                                         n);
                     }
                 }
             }

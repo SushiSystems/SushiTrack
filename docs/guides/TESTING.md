@@ -14,7 +14,7 @@ GTest-based, deterministic, no external data. Targets compiled when `-DBUILD_UNI
 - `TestAssignmentSolvers`: LAPJV correctness on dense and sparse matrices
 - `TestTrackerTentative`: adaptive confirmation logic
 - `TestTrackerBuffers`: track_buffer expiry under both timing modes
-- `TestLogger`: callback dispatch, va_list path
+- `TestLogger`: the SushiLog front: record fields, the level gate, `SUSHITRACK_THROW`
 - `TestSushiTrackC` / `TestCAPIErrors`: C-API surface and error codes
 - `TestTracker` / `TestIntegration`: end-to-end flow
 - `TestBoundaryConditions`: empty inputs, oversized output buffer, null args

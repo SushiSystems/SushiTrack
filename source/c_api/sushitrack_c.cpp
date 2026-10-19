@@ -68,6 +68,8 @@ struct sushitrack_tracker_impl_t
         std::vector<std::vector<float>> last_features;
 };
 
+using SushiTrack::K_SUSHITRACK_LOG_CATEGORY;
+
 namespace
 {
     int populate_tracks(sushitrack_tracker_impl_t* impl,
@@ -95,7 +97,8 @@ namespace
         if (results.size() > static_cast<std::size_t>(max_tracks))
         {
             SUSHITRACK_LOG_WARN(
-                "[SushiTrack] Output buffer capacity exceeded. Truncating lower priority tracks.");
+                K_SUSHITRACK_LOG_CATEGORY,
+                "Output buffer capacity exceeded. Truncating lower priority tracks.");
         }
 
         int count = std::min(static_cast<int>(results.size()), max_tracks);
@@ -310,7 +313,8 @@ extern "C"
                 else
                 {
                     active_gate_validator = SushiTrack::NullGateValidator::get_instance();
-                    SUSHITRACK_LOG_WARN("[SushiTrack] Gating disabled due to invalid kalman_type.");
+                    SUSHITRACK_LOG_WARN(K_SUSHITRACK_LOG_CATEGORY,
+                                        "Gating disabled due to invalid kalman_type.");
                 }
             }
             else
@@ -421,23 +425,27 @@ extern "C"
 
             *out_tracker = static_cast<sushitrack_tracker_t>(impl);
 
-            SUSHITRACK_LOG_INFO("[SushiTrack] Tracker instance created successfully.");
+            SUSHITRACK_LOG_INFO(K_SUSHITRACK_LOG_CATEGORY,
+                                "Tracker instance created successfully.");
 
             return SUSHITRACK_SUCCESS;
         }
         catch (const std::bad_alloc&)
         {
-            SUSHITRACK_LOG_ERROR("[SushiTrack] Tracker creation failed: out of memory.");
+            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
+                                 "Tracker creation failed: out of memory.");
             return SUSHITRACK_OUT_OF_MEMORY;
         }
         catch (const std::exception& e)
         {
-            SUSHITRACK_LOG_ERROR("[SushiTrack] Tracker creation failed: %s", e.what());
+            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY, "Tracker creation failed: {}",
+                                 e.what());
             return SUSHITRACK_RUNTIME_ERROR;
         }
         catch (...)
         {
-            SUSHITRACK_LOG_ERROR("[SushiTrack] Tracker creation failed: unknown exception.");
+            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
+                                 "Tracker creation failed: unknown exception.");
             return SUSHITRACK_RUNTIME_ERROR;
         }
     }
@@ -455,13 +463,13 @@ extern "C"
 
         try
         {
-            SUSHITRACK_LOG_INFO("[SushiTrack] Destroying tracker instance.");
+            SUSHITRACK_LOG_INFO(K_SUSHITRACK_LOG_CATEGORY, "Destroying tracker instance.");
             owner.reset();
         }
         catch (...)
         {
-            SUSHITRACK_LOG_ERROR(
-                "[SushiTrack] Destroy threw an unknown exception; the tracker is released.");
+            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
+                                 "Destroy threw an unknown exception; the tracker is released.");
         }
     }
 
@@ -514,13 +522,13 @@ extern "C"
         }
         catch (const std::exception& e)
         {
-            SUSHITRACK_LOG_ERROR("[SushiTrack] Update failed: %s", e.what());
+            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY, "Update failed: {}", e.what());
             return 0;
         }
         catch (...)
         {
-            SUSHITRACK_LOG_ERROR(
-                "[SushiTrack] Update failed: unknown exception; returning zero tracks.");
+            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
+                                 "Update failed: unknown exception; returning zero tracks.");
             return 0;
         }
     }
@@ -546,24 +554,15 @@ extern "C"
         }
         catch (const std::exception& e)
         {
-            SUSHITRACK_LOG_ERROR("[SushiTrack] Get tracklets failed: %s", e.what());
+            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY, "Get tracklets failed: {}", e.what());
             return 0;
         }
         catch (...)
         {
-            SUSHITRACK_LOG_ERROR(
-                "[SushiTrack] Get tracklets failed: unknown exception; returning zero tracks.");
+            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
+                                 "Get tracklets failed: unknown exception; returning zero tracks.");
             return 0;
         }
-    }
-
-    /**
-     * @brief Configures a global callback function for system logging.
-     * @param callback Function pointer to logging implementation.
-     */
-    void sushitrack_set_log_callback(sushitrack_log_callback_t callback)
-    {
-        SushiTrack::Logger::set_callback(callback);
     }
 
 } // extern "C"

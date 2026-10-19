@@ -137,8 +137,9 @@ namespace SushiTrack
 
         if (gated_pairs > 0)
         {
-            SUSHITRACK_LOG_DEBUG("[Distance] Gating: gated out %zu of %zu pairs (Mahalanobis).",
-                                 gated_pairs, a.size() * b.size());
+            SUSHITRACK_LOG_TRACE(K_SUSHITRACK_LOG_CATEGORY,
+                                 "Gating: gated out {} of {} pairs (Mahalanobis).", gated_pairs,
+                                 a.size() * b.size());
         }
     }
 

@@ -101,8 +101,9 @@ namespace SushiTrack
             effective_dt = 1.0f / static_cast<float>(std::max(1, config_.frame_rate));
         }
 
-        SUSHITRACK_LOG_DEBUG("[Tracker] Frame %llu: Updating with %zu detections, dt=%.4f",
-                             (unsigned long long)frame_id_ + 1, objects.size(), effective_dt);
+        SUSHITRACK_LOG_TRACE(K_SUSHITRACK_LOG_CATEGORY,
+                             "Frame {}: Updating with {} detections, dt={}", frame_id_ + 1,
+                             objects.size(), SushiLog::fixed(effective_dt, 4));
 
         frame_id_++;
 
@@ -159,9 +160,9 @@ namespace SushiTrack
                 s->predict(effective_dt);
         }
 
-        SUSHITRACK_LOG_DEBUG("[Tracker] Pools: tracklet=%zu, tentative=%zu, non_active=%zu",
-                             tracklet_pool.size(), tentative_pool.size(),
-                             non_active_tracklets.size());
+        SUSHITRACK_LOG_TRACE(
+            K_SUSHITRACK_LOG_CATEGORY, "Pools: tracklet={}, tentative={}, non_active={}",
+            tracklet_pool.size(), tentative_pool.size(), non_active_tracklets.size());
 
         std::vector<TrackletPtr> active_pool;
         std::vector<TrackletPtr> lost_pool;
@@ -184,15 +185,16 @@ namespace SushiTrack
         match_high_confidence(active_pool, det_high, activated_tracklets, refind_tracklets,
                               track_remaining, det_high_remaining);
 
-        SUSHITRACK_LOG_DEBUG(
-            "[Tracker] High-conf match: matches=%zu, remaining_tracks=%zu, remaining_dets=%zu",
-            activated_tracklets.size() + refind_tracklets.size(), track_remaining.size(),
-            det_high_remaining.size());
+        SUSHITRACK_LOG_TRACE(K_SUSHITRACK_LOG_CATEGORY,
+                             "High-conf match: matches={}, remaining_tracks={}, remaining_dets={}",
+                             activated_tracklets.size() + refind_tracklets.size(),
+                             track_remaining.size(), det_high_remaining.size());
 
         match_low_confidence(track_remaining, det_low, activated_tracklets, lost_tracklets_curr,
                              det_low_remaining, effective_dt);
 
-        SUSHITRACK_LOG_DEBUG("[Tracker] Low-conf match: newly_lost=%zu, remaining_dets=%zu",
+        SUSHITRACK_LOG_TRACE(K_SUSHITRACK_LOG_CATEGORY,
+                             "Low-conf match: newly_lost={}, remaining_dets={}",
                              lost_tracklets_curr.size(), det_low_remaining.size());
 
         std::vector<TrackletPtr> det_final_remaining;
@@ -206,7 +208,8 @@ namespace SushiTrack
                 if (t->get_track_state() == TrackState::Lost)
                     lost_tracklets_curr.push_back(t);
             }
-            SUSHITRACK_LOG_DEBUG("[Tracker] Lost recovery: recovered=%zu", refind_tracklets.size());
+            SUSHITRACK_LOG_TRACE(K_SUSHITRACK_LOG_CATEGORY, "Lost recovery: recovered={}",
+                                 refind_tracklets.size());
         }
         else
         {
@@ -232,10 +235,11 @@ namespace SushiTrack
                 joint_tracklets(removed_tracklets_curr, removed_tentative_curr);
             tentative_tracklets_ = tentative_next;
 
-            SUSHITRACK_LOG_DEBUG("[Tracker] Tentative stage: promoted=%zu, remaining=%zu, "
-                                 "removed=%zu, new_inits=%zu",
-                                 activated_tracklets.size(), tentative_tracklets_.size(),
-                                 removed_tentative_curr.size(), det_for_new_init.size());
+            SUSHITRACK_LOG_TRACE(
+                K_SUSHITRACK_LOG_CATEGORY,
+                "Tentative stage: promoted={}, remaining={}, removed={}, new_inits={}",
+                activated_tracklets.size(), tentative_tracklets_.size(),
+                removed_tentative_curr.size(), det_for_new_init.size());
         }
         else
         {
@@ -249,10 +253,10 @@ namespace SushiTrack
         finalize_lists(activated_tracklets, refind_tracklets, lost_tracklets_curr,
                        removed_tracklets_curr);
 
-        SUSHITRACK_LOG_DEBUG(
-            "[Tracker] Cycle complete: tracked=%zu, lost=%zu, tentative=%zu, removed=%zu",
-            tracked_tracklets_.size(), lost_tracklets_.size(), tentative_tracklets_.size(),
-            removed_tracklets_curr.size());
+        SUSHITRACK_LOG_TRACE(K_SUSHITRACK_LOG_CATEGORY,
+                             "Cycle complete: tracked={}, lost={}, tentative={}, removed={}",
+                             tracked_tracklets_.size(), lost_tracklets_.size(),
+                             tentative_tracklets_.size(), removed_tracklets_curr.size());
 
         std::vector<TrackletPtr> output;
         output.reserve(tracked_tracklets_.size() + lost_tracklets_.size() +
@@ -348,9 +352,9 @@ namespace SushiTrack
                 {
                     track->re_activate(*det, frame_id_);
                     refind_tracklets.push_back(track);
-                    SUSHITRACK_LOG_DEBUG(
-                        "[Tracker] Track %llu recovered from Lost state (Global LAPJV).",
-                        (unsigned long long)track->get_track_id());
+                    SUSHITRACK_LOG_DEBUG(K_SUSHITRACK_LOG_CATEGORY,
+                                         "Track {} recovered from Lost state (Global LAPJV).",
+                                         track->get_track_id());
                 }
             }
 
@@ -419,9 +423,10 @@ namespace SushiTrack
                 {
                     track->re_activate(*det, frame_id_);
                     refind_tracklets.push_back(track);
-                    SUSHITRACK_LOG_DEBUG("[Tracker] Track %llu recovered from Lost state "
-                                         "(High-conf cascade, age=%zu).",
-                                         (unsigned long long)track->get_track_id(), age);
+                    SUSHITRACK_LOG_DEBUG(
+                        K_SUSHITRACK_LOG_CATEGORY,
+                        "Track {} recovered from Lost state (High-conf cascade, age={}).",
+                        track->get_track_id(), age);
                 }
                 matched_det_indices.insert(static_cast<size_t>(m[1]));
             }
@@ -484,8 +489,8 @@ namespace SushiTrack
                 track->mark_as_lost(dt);
 
                 lost_tracklets_curr.push_back(track);
-                SUSHITRACK_LOG_DEBUG("[Tracker] Track %llu marked as Lost.",
-                                     (unsigned long long)track->get_track_id());
+                SUSHITRACK_LOG_DEBUG(K_SUSHITRACK_LOG_CATEGORY, "Track {} marked as Lost.",
+                                     track->get_track_id());
             }
         }
 
@@ -546,8 +551,9 @@ namespace SushiTrack
                 track->re_activate(*det, frame_id_);
                 activated_tracklets.push_back(track);
                 SUSHITRACK_LOG_DEBUG(
-                    "[Tracker] Track %llu recovered from Lost state (Visual Recovery, age=%zu).",
-                    (unsigned long long)track->get_track_id(), age);
+                    K_SUSHITRACK_LOG_CATEGORY,
+                    "Track {} recovered from Lost state (Visual Recovery, age={}).",
+                    track->get_track_id(), age);
                 matched_det_indices.insert(static_cast<size_t>(m[1]));
             }
 
@@ -610,8 +616,8 @@ namespace SushiTrack
             {
                 t->confirm(frame_id_, t->get_track_id());
                 activated_tracklets.push_back(t);
-                SUSHITRACK_LOG_DEBUG("[Tracker] Tentative track %llu confirmed.",
-                                     (unsigned long long)t->get_track_id());
+                SUSHITRACK_LOG_DEBUG(K_SUSHITRACK_LOG_CATEGORY, "Tentative track {} confirmed.",
+                                     t->get_track_id());
             }
             else
             {
@@ -674,15 +680,16 @@ namespace SushiTrack
                 t->mark_as_removed();
                 removed_tentative_curr.push_back(t);
                 if (config_.time_aware)
-                    SUSHITRACK_LOG_DEBUG(
-                        "[Tracker] Tentative track %llu aged out (lost=%.3fs, limit=%.3fs).",
-                        (unsigned long long)t->get_track_id(), t->get_accumulated_lost_time(),
-                        config_.tentative_max_age_seconds);
+                    SUSHITRACK_LOG_DEBUG(K_SUSHITRACK_LOG_CATEGORY,
+                                         "Tentative track {} aged out (lost={}s, limit={}s).",
+                                         t->get_track_id(),
+                                         SushiLog::fixed(t->get_accumulated_lost_time(), 3),
+                                         SushiLog::fixed(config_.tentative_max_age_seconds, 3));
                 else
-                    SUSHITRACK_LOG_DEBUG(
-                        "[Tracker] Tentative track %llu aged out (misses=%d, limit=%d).",
-                        (unsigned long long)t->get_track_id(), t->get_frames_since_observation(),
-                        config_.tentative_max_miss_frames);
+                    SUSHITRACK_LOG_DEBUG(K_SUSHITRACK_LOG_CATEGORY,
+                                         "Tentative track {} aged out (misses={}, limit={}).",
+                                         t->get_track_id(), t->get_frames_since_observation(),
+                                         config_.tentative_max_miss_frames);
             }
             else
             {
@@ -709,8 +716,8 @@ namespace SushiTrack
 
             det->activate_tentative(create_kalman_filter(), frame_id_, initial_id);
             tentative_curr.push_back(det);
-            SUSHITRACK_LOG_DEBUG("[Tracker] Initialized new tentative track %llu.",
-                                 (unsigned long long)initial_id);
+            SUSHITRACK_LOG_DEBUG(K_SUSHITRACK_LOG_CATEGORY, "Initialized new tentative track {}.",
+                                 initial_id);
         }
     }
 
@@ -735,9 +742,9 @@ namespace SushiTrack
                 if (iou(det->get_rect(), trk->get_rect()) > config_.tentative_init_suppress_iou)
                 {
                     overlaps = true;
-                    SUSHITRACK_LOG_DEBUG(
-                        "[Tracker] Suppressed new tentative overlapping confirmed track %llu.",
-                        (unsigned long long)trk->get_track_id());
+                    SUSHITRACK_LOG_DEBUG(K_SUSHITRACK_LOG_CATEGORY,
+                                         "Suppressed new tentative overlapping confirmed track {}.",
+                                         trk->get_track_id());
                     break;
                 }
             }
@@ -774,8 +781,8 @@ namespace SushiTrack
             track->update(*det, frame_id_);
 
             activated_tracklets.push_back(track);
-            SUSHITRACK_LOG_DEBUG("[Tracker] Unconfirmed track %llu updated.",
-                                 (unsigned long long)track->get_track_id());
+            SUSHITRACK_LOG_DEBUG(K_SUSHITRACK_LOG_CATEGORY, "Unconfirmed track {} updated.",
+                                 track->get_track_id());
         }
 
         for (int idx : u_unconfirmed)
@@ -783,8 +790,9 @@ namespace SushiTrack
             auto& track = non_active_tracklets[idx];
             track->mark_as_removed();
             removed_tracklets_curr.push_back(track);
-            SUSHITRACK_LOG_DEBUG("[Tracker] Unconfirmed track %llu aged out and removed.",
-                                 (unsigned long long)track->get_track_id());
+            SUSHITRACK_LOG_DEBUG(K_SUSHITRACK_LOG_CATEGORY,
+                                 "Unconfirmed track {} aged out and removed.",
+                                 track->get_track_id());
         }
 
         for (int idx : u_det)
@@ -796,8 +804,7 @@ namespace SushiTrack
             size_t initial_id = ++track_id_count_;
             track->activate(create_kalman_filter(), frame_id_, initial_id);
             activated_tracklets.push_back(track);
-            SUSHITRACK_LOG_DEBUG("[Tracker] New track %llu activated.",
-                                 (unsigned long long)initial_id);
+            SUSHITRACK_LOG_DEBUG(K_SUSHITRACK_LOG_CATEGORY, "New track {} activated.", initial_id);
         }
     }
 
@@ -834,10 +841,10 @@ namespace SushiTrack
             {
                 s->mark_as_removed();
                 removed_tracklets_curr.push_back(s);
-                SUSHITRACK_LOG_INFO("[Tracker] Track %llu expired after being lost for %.2f "
-                                    "seconds (scaled buffer=%d).",
-                                    (unsigned long long)s->get_track_id(), accumulated,
-                                    scaled_buffer);
+                SUSHITRACK_LOG_DEBUG(
+                    K_SUSHITRACK_LOG_CATEGORY,
+                    "Track {} expired after being lost for {} seconds (scaled buffer={}).",
+                    s->get_track_id(), SushiLog::fixed(accumulated, 2), scaled_buffer);
             }
         }
     }

@@ -32,6 +32,11 @@ def shared_lib_name() -> str:
     return "sushitrack.dll" if IS_WINDOWS else "libsushitrack.so"
 
 
+def sushilog_lib_name() -> str:
+    """Return SushiLog's runtime library's file name on this platform."""
+    return "sushilog.dll" if IS_WINDOWS else "libsushilog.so"
+
+
 def import_lib_name() -> str:
     """Return the library a C++ consumer links against on this platform."""
     return "sushitrack.lib" if IS_WINDOWS else "libsushitrack.so"

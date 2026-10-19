@@ -92,8 +92,8 @@ namespace SushiTrack
             }
         }
 
-        SUSHITRACK_LOG_DEBUG("[Solver] Problem size: %d x %d, active: %d x %d", n_rows, n_cols,
-                             num_active_rows, num_active_cols);
+        SUSHITRACK_LOG_TRACE(K_SUSHITRACK_LOG_CATEGORY, "Problem size: {} x {}, active: {} x {}",
+                             n_rows, n_cols, num_active_rows, num_active_cols);
 
         if (num_active_rows == 0 || num_active_cols == 0)
         {
@@ -177,7 +177,7 @@ namespace SushiTrack
             }
         }
 
-        SUSHITRACK_LOG_DEBUG("[Solver] Assignments found: %zu", matches.size());
+        SUSHITRACK_LOG_TRACE(K_SUSHITRACK_LOG_CATEGORY, "Assignments found: {}", matches.size());
     }
 
     /**
@@ -225,9 +225,8 @@ namespace SushiTrack
         {
             if (nr != nc)
             {
-                SUSHITRACK_RUNTIME_ERROR(
-                    "[Solver] LAPJV requires square matrix if not extending (nr=%d, nc=%d)", nr,
-                    nc);
+                SUSHITRACK_THROW("LAPJV requires square matrix if not extending (nr={}, nc={})", nr,
+                                 nc);
             }
 
             n = nr;
@@ -246,9 +245,9 @@ namespace SushiTrack
 
         if (result != 0)
         {
-            SUSHITRACK_RUNTIME_ERROR("[Solver] LAPJV assignment failed - cost matrix may be "
-                                     "numerically unstable (result=%d)",
-                                     result);
+            SUSHITRACK_THROW(
+                "LAPJV assignment failed - cost matrix may be numerically unstable (result={})",
+                result);
         }
 
         for (int i = 0; i < nr; ++i)

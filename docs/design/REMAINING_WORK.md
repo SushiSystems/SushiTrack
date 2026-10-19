@@ -82,11 +82,6 @@ The single backlog of this repository. Defects that stand in the tree are in
 - Done when: both calls return a `sushitrack_status_t` a caller can tell from a frame with no
   tracks
 
-### RW-14 Keep a throwing log callback inside the C boundary
-- State: open
-- Done when: a test whose callback throws at ERROR level sees the C entry point return its
-  failure value
-
 ### RW-15 Release the tracker when sushitrack_create_ex fails late
 - State: open
 - Done when: `sushitrack_create_ex` leaves `*out_tracker` null on every failure and a throwing

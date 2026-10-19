@@ -177,8 +177,8 @@ namespace SushiTrack
         auto llt = projected_cov.llt();
         if (llt.info() != Eigen::Success)
         {
-            SUSHITRACK_LOG_WARN(
-                "[KalmanFilter] Matrix update conditioning failure. Regularizing covariance.");
+            SUSHITRACK_LOG_WARN(K_SUSHITRACK_LOG_CATEGORY,
+                                "Matrix update conditioning failure. Regularizing covariance.");
             projected_cov.diagonal().array() += 1e-6f;
             llt = projected_cov.llt();
         }
@@ -219,8 +219,8 @@ namespace SushiTrack
 
         if (cached_llt_.info() != Eigen::Success)
         {
-            SUSHITRACK_LOG_WARN(
-                "[KalmanFilter] Matrix projection conditioning failure. Regularizing covariance.");
+            SUSHITRACK_LOG_WARN(K_SUSHITRACK_LOG_CATEGORY,
+                                "Matrix projection conditioning failure. Regularizing covariance.");
             projected_cov.diagonal().array() += 1e-6f;
             cached_llt_ = projected_cov.llt();
         }
@@ -250,8 +250,9 @@ namespace SushiTrack
             auto llt = projected_cov.llt();
             if (llt.info() != Eigen::Success)
             {
-                SUSHITRACK_LOG_WARN("[KalmanFilter] Score-aware gate conditioning failure. "
-                                    "Regularizing covariance.");
+                SUSHITRACK_LOG_WARN(
+                    K_SUSHITRACK_LOG_CATEGORY,
+                    "Score-aware gate conditioning failure. Regularizing covariance.");
                 projected_cov.diagonal().array() += 1e-6f;
                 llt = projected_cov.llt();
             }

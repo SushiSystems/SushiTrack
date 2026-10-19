@@ -15,7 +15,7 @@ License 1.0.0; see `LICENSE`. The material below keeps its own licence.
 | TrackEval | `third_party/TrackEval/` (git submodule) | https://github.com/JonathonLuiten/TrackEval | commit `12c8791b` | MIT, Copyright (c) 2020 Jonathon Luiten; text in `third_party/TrackEval/LICENSE` |
 | YOLOX | `third_party/yolox/` (git submodule) | https://github.com/Megvii-BaseDetection/YOLOX | commit `6ddff482`, 38 commits after 0.3.0 | Apache-2.0, Copyright (c) 2021-2022 Megvii Inc. All rights reserved.; text in `third_party/yolox/LICENSE` and `third_party/licenses/YOLOX_APACHE_2_0.txt` |
 
-The library links Eigen and JSON for Modern C++. ByteTrack-cpp and OC_SORT_CPP are built only
+The library links Eigen, JSON for Modern C++ and SushiLog. ByteTrack-cpp and OC_SORT_CPP are built only
 as reference trackers for the regression harness. TrackEval and YOLOX are used only by the
 Python scripts under `tests/regression/`.
 
@@ -25,6 +25,7 @@ Nothing in this table is stored in the repository.
 
 | Component | Declared in | Version | Licence |
 | --- | --- | --- | --- |
+| SushiLog | `cli/sushistack.deps.toml` | `v0.2.3`, commit `5f714a7b`; `st setup` fetches it, or a sibling checkout `../sushilog` is used; `st deploy` ships `sushilog.dll` or `libsushilog.so` | A Sushi Systems library under PolyForm Noncommercial 1.0.0 |
 | GoogleTest | `cli/sushistack.deps.toml`, `.config/conda/environment.yml` | 1.17.0 in `.config/conda/environment.yml`; unpinned in the fragment | BSD-3-Clause |
 | typer, rich, tomli, pytest | `cli/pyproject.toml` | lower bounds only | MIT |
 | sushicore | `cli/pyproject.toml`, `.config/conda/environment.yml` | `>=0.7.0` and `==0.4.0` | A Sushi Systems package under its own licence |

@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* c_types.hpp                                                            */
+/* sushitrack_log_category.hpp                                            */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -20,18 +20,23 @@
 /**************************************************************************/
 
 /**
- * @file c_types.hpp
- * @brief Common status codes, log levels, and type aliases for SushiTrack.
+ * @file sushitrack_log_category.hpp
+ * @brief Declares K_SUSHITRACK_LOG_PROJECT and K_SUSHITRACK_LOG_CATEGORY, under which SushiTrack logs.
  * @author Mustafa Garip
  */
 
 #pragma once
 
-#include <SushiTrack/c_api/sushitrack_c.h>
+#include <SushiLog/log/log_category.hpp>
+#include <SushiLog/log/log_project.hpp>
 
 namespace SushiTrack
 {
-    using Status = sushitrack_status_t;
-    using LogLevel = sushitrack_log_level_t;
-    using LogCallback = sushitrack_log_callback_t;
+    /** @brief Names SushiTrack's records, whose levels SUSHITRACK_LOG_LEVEL sets. */
+    inline constexpr SushiLog::LogProject K_SUSHITRACK_LOG_PROJECT{"sushitrack",
+                                                                   "SUSHITRACK_LOG_LEVEL"};
+
+    /** @brief Names the records of the one SushiTrack module. */
+    inline constexpr SushiLog::LogCategory K_SUSHITRACK_LOG_CATEGORY =
+        SushiLog::make_log_category(K_SUSHITRACK_LOG_PROJECT, "sushitrack");
 } // namespace SushiTrack

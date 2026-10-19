@@ -33,22 +33,7 @@
 
 #include <SushiTrack/c_api/sushitrack_c.h>
 
-namespace
-{
-
-    static std::atomic<int> g_log_count{0};
-
-    /**
-     * @brief Counting log callback used in SetLogCallback tests.
-     * @param level   Severity level (unused in count-only assertions).
-     * @param message Formatted message string (unused in count-only assertions).
-     */
-    void counting_callback(sushitrack_log_level_t /*level*/, const char* /*message*/)
-    {
-        g_log_count.fetch_add(1, std::memory_order_relaxed);
-    }
-
-} // namespace
+#include "captured_log.hpp"
 
 /**
  * @brief Fixture providing a default-initialised params struct.
@@ -256,44 +241,32 @@ TEST_F(SushiTrackCUpdateTest, RemovedTrackAbsentFromNextUpdate)
 }
 
 /**
- * @brief Fixture for sushitrack_set_log_callback tests.
+ * @brief Creating and destroying a tracker logs both lifecycle events at INFO through SushiLog.
  */
-class SushiTrackCLogCallbackTest : public ::testing::Test
+TEST(SushiTrackCLogTest, CreateAndDestroyLogTheirLifecycleEvents)
 {
-    protected:
-        void SetUp() override { g_log_count.store(0); }
-
-        void TearDown() override { sushitrack_set_log_callback(nullptr); }
-};
-
-/**
- * @brief SetLogCallback with a valid function causes subsequent Create calls to
- *        deliver at least one log event to the callback.
- */
-TEST_F(SushiTrackCLogCallbackTest, ValidCallbackReceivesLogEvents)
-{
-    sushitrack_set_log_callback(counting_callback);
+    SushiTrack::CapturedLog log(SushiLog::LogLevel::Info);
 
     sushitrack_params_t params{};
     sushitrack_get_default_params(&params);
     sushitrack_tracker_t hdl = sushitrack_create(&params);
     sushitrack_destroy(hdl);
 
-    EXPECT_GE(g_log_count.load(), 0);
+    EXPECT_EQ(log.count("Tracker instance created"), 1);
+    EXPECT_EQ(log.count("Destroying tracker instance"), 1);
 }
 
 /**
- * @brief SetLogCallback with nullptr silences further log events.
+ * @brief At the default WARN level, creating a tracker logs nothing.
  */
-TEST_F(SushiTrackCLogCallbackTest, NullCallbackSilencesLogEvents)
+TEST(SushiTrackCLogTest, DefaultLevelKeepsLifecycleEventsQuiet)
 {
-    sushitrack_set_log_callback(counting_callback);
-    sushitrack_set_log_callback(nullptr);
+    SushiTrack::CapturedLog log(SushiLog::LogLevel::Warn);
 
     sushitrack_params_t params{};
     sushitrack_get_default_params(&params);
     sushitrack_tracker_t hdl = sushitrack_create(&params);
     sushitrack_destroy(hdl);
 
-    EXPECT_EQ(g_log_count.load(), 0);
+    EXPECT_TRUE(log.records().empty());
 }

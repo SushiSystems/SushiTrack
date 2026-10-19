@@ -129,6 +129,8 @@ def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
                  + (f"  |  generator: {generator_name}" if generator_name else ""))
 
     env = load_build_env(cfg.tool, build_dir)
+    # Each pinned Sushi library reaches CMake as -D<NAME>_DIR; CMake never downloads.
+    defines = (*defines, *cfg.tool.sushi_definitions(paths.root))
     stamp_key = _stamp_key(build_type, tests, generator_name, defines)
 
     if _needs_configure(build_dir, generator_name, stamp_key, paths.root):

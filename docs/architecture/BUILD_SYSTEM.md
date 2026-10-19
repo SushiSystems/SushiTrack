@@ -38,7 +38,7 @@ on ARM it would fail to compile.
 ## The object twin
 
 The tests and the applications reach classes the shared library keeps hidden, such as `Rect`,
-`LAPJVSolver`, the cost calculators and `Logger`. Exporting them would widen the public surface,
+`LAPJVSolver` and the cost calculators. Exporting them would widen the public surface,
 so `sushitrack_static` compiles the same sources a second time with `SUSHITRACK_STATIC`, which
 turns `SUSHITRACK_API` into nothing. The define is public, so a consumer's own translation units
 do not see `__declspec(dllimport)` for a library that has no DLL.

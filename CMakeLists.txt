@@ -10,6 +10,7 @@ project(sushitrack VERSION 1.0.0 LANGUAGES CXX C)
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(SushiTrackBuildPolicy)
 include(SushiTrackEigen)
+include(SushiTrackSushiLog)
 
 option(BUILD_MOT_TEST "Deprecated alias for BUILD_REGRESSION_TEST" OFF)
 

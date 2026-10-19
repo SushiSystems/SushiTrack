@@ -70,11 +70,11 @@ Visual features are L2-normalised and exponentially smoothed (`feature_momentum`
 
 ## C API
 
-`sushitrack_c.h` exposes an opaque `sushitrack_tracker_t` plus `sushitrack_get_default_params`, `sushitrack_create`, `sushitrack_create_ex`, `sushitrack_update`, `sushitrack_destroy`, `sushitrack_set_log_callback`. Suitable for FFI integration from Python, Rust, or any C-FFI language.
+`sushitrack_c.h` exposes an opaque `sushitrack_tracker_t` plus `sushitrack_get_default_params`, `sushitrack_create`, `sushitrack_create_ex`, `sushitrack_update`, `sushitrack_destroy`. Suitable for FFI integration from Python, Rust, or any C-FFI language.
 
 ## Logging
 
-`SUSHITRACK_LOG_DEBUG/INFO/WARN/ERROR` macros route to a single global callback registered via `sushitrack_set_log_callback`. The callback is stored atomically; setting/clearing it is thread-safe.
+SushiTrack logs through SushiLog under `K_SUSHITRACK_LOG_CATEGORY`; `SUSHITRACK_LOG_LEVEL` sets the level. The details are in [Overview](OVERVIEW.md#logging).
 
 ## Thread safety
 

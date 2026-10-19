@@ -52,7 +52,7 @@ tracker.close()                       # or use `with Tracker(...) as tracker:`
 `score`, `label`, `state`, `kinematic_state`, `age`, `last_seen_frame`, `lost_time`,
 `is_activated`, `is_confirmed`, `hits`, `frames_since_last_update`, `maneuver_probability` and
 `feat`. `Status`, `TrackState`, `KinematicState` and `LogLevel` are `IntEnum`s.
-`set_log_callback(fn)` registers a `fn(level, message)` logger.
+`set_log_callback(fn)` makes `fn(level, message)` the sink of SushiLog, the process's logger, which `sushilog.dll` or `libsushilog.so` beside the library provides; `None` restores stderr. `LogLevel` follows SushiLog's numbering, `TRACE` 0 to `FATAL` 5, and `SUSHITRACK_LOG_LEVEL` sets which records arrive.
 
 ## Constructor arguments
 

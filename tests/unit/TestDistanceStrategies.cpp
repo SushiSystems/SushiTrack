@@ -50,6 +50,8 @@
 #include <SushiTrack/logging/logger.hpp>
 #include <SushiTrack/tracking/tracklet.hpp>
 
+#include "captured_log.hpp"
+
 using namespace SushiTrack;
 
 // Helpers
@@ -1058,42 +1060,16 @@ TEST(ObservationMomentumDecoratorTest, ManeuverScaleDoesNotAffectCruisingTrack)
 
 // GatingLogVolumeTest
 
-namespace
-{
-
-    static int g_gating_lines = 0;
-    static std::string g_last_gating_line;
-
-    /**
-     * @brief Counts the log lines that report gated pairs and keeps the last one.
-     * @param message Formatted message forwarded from the logger.
-     */
-    void count_gating_lines(sushitrack_log_level_t, const char* message)
-    {
-        const std::string line = message ? message : "";
-        if (line.find("gated out") == std::string::npos)
-            return;
-
-        ++g_gating_lines;
-        g_last_gating_line = line;
-    }
-
-} // namespace
-
 /**
  * @brief Fixture that counts gating log lines for one track and three far detections.
+ *
+ * The line is TRACE, which a release build compiles out, so a call logs at most one line.
  */
 class GatingLogVolumeTest : public ::testing::Test
 {
     protected:
-        void SetUp() override
-        {
-            g_gating_lines = 0;
-            g_last_gating_line.clear();
-            Logger::set_callback(count_gating_lines);
-        }
-
-        void TearDown() override { Logger::set_callback(nullptr); }
+        /// @brief Collects the records of each test.
+        std::unique_ptr<CapturedLog> log_ = std::make_unique<CapturedLog>();
 
         /** @brief Activates and predicts a track so that its Kalman gate is live. */
         static std::shared_ptr<Tracklet> live(std::shared_ptr<Tracklet> track)
@@ -1103,15 +1079,19 @@ class GatingLogVolumeTest : public ::testing::Test
             return track;
         }
 
-        /** @brief Expects three sentinel cells and one log line that counts all three pairs. */
-        static void expect_one_line_for_three_gated_pairs(const CostMatrix& m)
+        /** @brief Expects three sentinel cells and at most one log line, counting all three pairs. */
+        void expect_one_line_for_three_gated_pairs(const CostMatrix& m) const
         {
             for (size_t j = 0; j < 3; ++j)
                 EXPECT_GE(m(0, j), 1e3f);
 
-            EXPECT_EQ(g_gating_lines, 1);
-            EXPECT_NE(g_last_gating_line.find("3 of 3"), std::string::npos)
-                << "logged: " << g_last_gating_line;
+            const int lines = log_->count("gated out");
+            EXPECT_LE(lines, 1);
+            if (lines == 1)
+            {
+                const std::string line = log_->last("gated out");
+                EXPECT_NE(line.find("3 of 3"), std::string::npos) << "logged: " << line;
+            }
         }
 };
 

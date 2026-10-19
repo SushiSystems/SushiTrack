@@ -71,12 +71,14 @@ class KinematicState(IntEnum):
 
 
 class LogLevel(IntEnum):
-    """Logging levels passed to a registered log callback."""
+    """Logging levels passed to a registered log callback, numbered as SushiLog's."""
 
-    DEBUG = 0
-    INFO = 1
-    WARN = 2
-    ERROR = 3
+    TRACE = 0
+    DEBUG = 1
+    INFO = 2
+    WARN = 3
+    ERROR = 4
+    FATAL = 5
 
 
 class SushiTrackError(RuntimeError):
@@ -177,7 +179,29 @@ class SushiTrackParams(Structure):
     ]
 
 
-LOG_CALLBACK = C.CFUNCTYPE(None, c_int, c_char_p)
+class SushiLogRecord(Structure):
+    """Holds one record SushiLog hands a C sink; no string is NUL-terminated."""
+
+    _fields_ = [
+        ("size", C.c_uint32),
+        ("level", C.c_uint8),
+        ("project", c_void_p),
+        ("project_size", C.c_size_t),
+        ("module", c_void_p),
+        ("module_size", C.c_size_t),
+        ("file", c_void_p),
+        ("file_size", C.c_size_t),
+        ("line", C.c_uint32),
+        ("thread", C.c_uint32),
+        ("time_ns", c_int64),
+        ("message", c_void_p),
+        ("message_size", C.c_size_t),
+        ("text", c_void_p),
+        ("text_size", C.c_size_t),
+    ]
+
+
+LOG_SINK = C.CFUNCTYPE(None, POINTER(SushiLogRecord), c_void_p)
 
 
 @dataclass(frozen=True, slots=True)
@@ -305,12 +329,16 @@ class _NativeBindings:
             self.destroy.argtypes = [c_void_p]
             self.destroy.restype = None
 
-        self.set_log_callback = _resolve_fn(
-            lib, "sushitrack_set_log_callback", "sushitrack_SetLogCallback"
-        )
-        if self.set_log_callback:
-            self.set_log_callback.argtypes = [LOG_CALLBACK]
-            self.set_log_callback.restype = None
+
+def _load_sushilog(lib_dir: str) -> C.CDLL:
+    """Loads the SushiLog shared library that sits beside the SushiTrack one."""
+    name = "sushilog.dll" if platform.system() == "Windows" else "libsushilog.so"
+    lib = C.CDLL(os.path.join(lib_dir, name))
+    lib.sl_set_log_sink.argtypes = [LOG_SINK, c_void_p]
+    lib.sl_set_log_sink.restype = None
+    lib.sl_set_log_synchronous.argtypes = [c_int]
+    lib.sl_set_log_synchronous.restype = None
+    return lib
 
 
 class Tracker:
@@ -336,6 +364,7 @@ class Tracker:
             if os.path.isdir(lib_dir):
                 os.add_dll_directory(lib_dir)
         raw_lib = C.CDLL(resolved_lib)
+        self._lib_dir = os.path.dirname(os.path.abspath(resolved_lib))
         self._bind = _NativeBindings(raw_lib)
 
         cfg = config_path if config_path is not None else config
@@ -438,18 +467,25 @@ class Tracker:
         )
 
     def set_log_callback(self, callback: Callable[[LogLevel, str], None] | None) -> None:
-        """Registers a Python callback fn(level: LogLevel, message: str) for logging."""
-        if not self._bind.set_log_callback:
-            return
-        if callback is None:
-            self._log_cb = LOG_CALLBACK()
-        else:
-            def _trampoline(level: int, message: bytes | None) -> None:
-                text = message.decode("utf-8", "replace") if message else ""
-                callback(LogLevel(level), text)
+        """Makes fn(level: LogLevel, message: str) SushiLog's sink, for the whole process.
 
-            self._log_cb = LOG_CALLBACK(_trampoline)
-        self._bind.set_log_callback(self._log_cb)
+        Records reach the callback on the thread that logged them. None restores stderr.
+        """
+        sushilog = _load_sushilog(self._lib_dir)
+        if callback is None:
+            sushilog.sl_set_log_sink(LOG_SINK(), None)
+            sushilog.sl_set_log_synchronous(0)
+            self._log_cb = None
+            return
+
+        def _sink(record: Any, _user: Any) -> None:
+            value = record.contents
+            text = C.string_at(value.message, value.message_size).decode("utf-8", "replace")
+            callback(LogLevel(value.level), text)
+
+        self._log_cb = LOG_SINK(_sink)
+        sushilog.sl_set_log_synchronous(1)
+        sushilog.sl_set_log_sink(self._log_cb, None)
 
     def close(self) -> None:
         """Destroys the native tracker instance. Safe to call multiple times."""

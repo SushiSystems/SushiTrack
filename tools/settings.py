@@ -20,5 +20,5 @@ K_INTERNAL_MARK = "INTERNAL"
 K_PRIVATE_DEPENDS_ALSO: tuple[str, ...] = ()
 K_CLOSED = False
 K_MACRO_PREFIXES: tuple[str, ...] = ()
-K_LOG_PREFIX = ""
+K_LOG_PREFIX = "SUSHITRACK"
 K_CONSOLE_PATHS: tuple[str, ...] = ("cli/sushitrack_cli/console.py", "applications/")

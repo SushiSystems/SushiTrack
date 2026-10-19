@@ -261,6 +261,8 @@ namespace SushiTrack
 
 } // namespace SushiTrack
 
+using SushiTrack::K_SUSHITRACK_LOG_CATEGORY;
+
 extern "C"
 {
     /**
@@ -284,34 +286,36 @@ extern "C"
             resolved = SushiTrack::resolve_config_path(path);
             if (resolved.empty())
             {
-                SUSHITRACK_LOG_INFO(
-                    "[SushiTrack] No configuration file found -- using provided parameters.");
+                SUSHITRACK_LOG_INFO(K_SUSHITRACK_LOG_CATEGORY,
+                                    "No configuration file found -- using provided parameters.");
                 return SUSHITRACK_SUCCESS;
             }
 
             std::ifstream file(resolved);
             if (!file.is_open())
             {
-                SUSHITRACK_LOG_WARN("[SushiTrack] Configuration file could not be opened: %s",
-                                    resolved.c_str());
+                SUSHITRACK_LOG_WARN(K_SUSHITRACK_LOG_CATEGORY,
+                                    "Configuration file could not be opened: {}", resolved.c_str());
                 return SUSHITRACK_SUCCESS;
             }
 
             nlohmann::json doc = nlohmann::json::parse(file, nullptr, true, true);
             overlay(doc, *params);
 
-            SUSHITRACK_LOG_INFO("[SushiTrack] Configuration loaded from %s", resolved.c_str());
+            SUSHITRACK_LOG_INFO(K_SUSHITRACK_LOG_CATEGORY, "Configuration loaded from {}",
+                                resolved.c_str());
             return SUSHITRACK_SUCCESS;
         }
         catch (const std::exception& e)
         {
-            SUSHITRACK_LOG_ERROR("[SushiTrack] Failed to parse configuration %s: %s",
+            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY, "Failed to parse configuration {}: {}",
                                  resolved.c_str(), e.what());
             return SUSHITRACK_RUNTIME_ERROR;
         }
         catch (...)
         {
-            SUSHITRACK_LOG_ERROR("[SushiTrack] Failed to load configuration %s: unknown exception.",
+            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
+                                 "Failed to load configuration {}: unknown exception.",
                                  resolved.c_str());
             return SUSHITRACK_RUNTIME_ERROR;
         }

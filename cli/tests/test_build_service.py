@@ -28,12 +28,22 @@ class RecordingRunner:
         return 0
 
 
-def _cfg(generator="", windows=True):
+def _cfg(generator="", windows=True, sushi=()):
     """Build a Config slice with st's tool settings."""
     tool = SimpleNamespace(cmake_exe="", ctest_exe="", generator=generator,
                            is_windows=windows, platform="x", vs_vcvars="",
-                           expand=lambda v: v)
+                           expand=lambda v: v, sushi_definitions=lambda root: list(sushi))
     return SimpleNamespace(tool=tool, build_type="Release", jobs=lambda: 4)
+
+
+def test_a_pinned_sushi_library_reaches_the_configure(tmp_path, runner):
+    """Hands each pinned Sushi library to CMake as -D<NAME>_DIR and records it in the stamp."""
+    paths = SimpleNamespace(root=tmp_path, build=tmp_path / "build")
+    cfg = _cfg(sushi=["-DSUSHILOG_DIR=/stack/sushilog"])
+    assert build_svc.build(cfg, paths, tests=False) == 0
+    assert "-DSUSHILOG_DIR=/stack/sushilog" in runner.calls[0]
+    stamp = (paths.build / build_svc.STAMP_NAME).read_text(encoding="utf-8")
+    assert "-DSUSHILOG_DIR=/stack/sushilog" in stamp
 
 
 @pytest.fixture

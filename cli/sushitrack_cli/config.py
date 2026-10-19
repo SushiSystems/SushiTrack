@@ -19,8 +19,8 @@ from pathlib import Path
 
 from sushicore.config_base import load_tool_config
 from sushicore.module_config import ModuleConfig
-from sushicore.provision.config import ProvisionSettings
 from sushicore.profile import ModuleProfile
+from sushicore.stack_config import StackConfig
 from sushicore.workspace import read_toml
 
 #: root_marker exists only at the SushiTrack root; see docs/architecture/CLI_PACKAGE.md.
@@ -59,7 +59,7 @@ class Appearance:
 
 
 @dataclass
-class ToolSettings(ProvisionSettings):
+class ToolSettings(StackConfig):
     """Holds the ``[tool]`` section: host build tools and provisioned toolchain roots."""
 
     generator: str = ""

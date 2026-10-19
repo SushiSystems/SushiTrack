@@ -21,64 +21,61 @@
 
 /**
  * @file logger.hpp
- * @brief Internal logging utility for the SushiTrack engine.
+ * @brief Declares the SUSHITRACK_LOG macros on SushiLog and SUSHITRACK_THROW.
  * @author Mustafa Garip
  */
 
 #pragma once
 
-#include <cstdarg>
-#include <cstdio>
 #include <stdexcept>
-#include <string>
 
-#include <SushiTrack/c_api/sushitrack_c.h>
+#include <SushiLog/log/log_front.hpp>
+#include <SushiLog/log/log_level.hpp>
+#include <SushiLog/text/text_format.hpp>
+#include <SushiLog/text/value_text.hpp>
+
+#include <SushiTrack/logging/sushitrack_log_category.hpp>
+
+#ifndef SUSHITRACK_ENABLE_LOGGING
+#define SUSHITRACK_ENABLE_LOGGING 1
+#endif
 
 namespace SushiTrack
 {
-    /**
-     * @brief Utility for handling system logs.
-     */
-    class Logger final
-    {
-        public:
-            /**
-             * @brief Sets the global log callback.
-             * @param callback Function pointer to the logging implementation.
-             */
-            static void set_callback(sushitrack_log_callback_t callback);
-
-            /**
-             * @brief Emits a log message with formatting support.
-             * @param level   Severity level.
-             * @param format  Printf-style format string.
-             * @param ...     Variable arguments for formatting.
-             */
-            static void log(sushitrack_log_level_t level, const char* format, ...);
-
-            /**
-             * @brief Internal helper for va_list logging.
-             */
-            static void log_v(sushitrack_log_level_t level, const char* format, va_list args);
-
-            /**
-             * @brief Logs an error and throws a std::runtime_error.
-             * @param format Printf-style format string.
-             * @param ...    Variable arguments.
-             */
-            static void throw_runtime_error(const char* format, ...);
-    };
+    /** @brief Holds the most detailed level this translation unit compiles SUSHITRACK_LOG calls for. */
+    constexpr SushiLog::LogLevel K_LOG_LEVEL_CEILING =
+        SushiLog::log_level_ceiling(SUSHITRACK_ENABLE_LOGGING != 0);
 } // namespace SushiTrack
 
-/**
- * @brief Convenience macros for logging.
- */
-#define SUSHITRACK_LOG_DEBUG(...) SushiTrack::Logger::log(SUSHITRACK_LOG_DEBUG, __VA_ARGS__)
-#define SUSHITRACK_LOG_INFO(...) SushiTrack::Logger::log(SUSHITRACK_LOG_INFO, __VA_ARGS__)
-#define SUSHITRACK_LOG_WARN(...) SushiTrack::Logger::log(SUSHITRACK_LOG_WARN, __VA_ARGS__)
-#define SUSHITRACK_LOG_ERROR(...) SushiTrack::Logger::log(SUSHITRACK_LOG_ERROR, __VA_ARGS__)
+/** @brief Logs one record at @p level in @p category through SushiLog. */
+#define SUSHITRACK_LOG_AT(level, category, ...)                                                    \
+    SL_LOG_FRONT_AT(SushiTrack::K_LOG_LEVEL_CEILING, level, category, __VA_ARGS__)
+
+/** @brief Logs step-by-step flow in @p category. */
+#define SUSHITRACK_LOG_TRACE(category, ...)                                                        \
+    SUSHITRACK_LOG_AT(SushiLog::LogLevel::Trace, category, __VA_ARGS__)
+
+/** @brief Logs internal state at a decision point in @p category. */
+#define SUSHITRACK_LOG_DEBUG(category, ...)                                                        \
+    SUSHITRACK_LOG_AT(SushiLog::LogLevel::Debug, category, __VA_ARGS__)
+
+/** @brief Logs a lifecycle event in @p category. */
+#define SUSHITRACK_LOG_INFO(category, ...)                                                         \
+    SUSHITRACK_LOG_AT(SushiLog::LogLevel::Info, category, __VA_ARGS__)
+
+/** @brief Logs a recovery or a fallback in @p category. */
+#define SUSHITRACK_LOG_WARN(category, ...)                                                         \
+    SUSHITRACK_LOG_AT(SushiLog::LogLevel::Warn, category, __VA_ARGS__)
+
+/** @brief Logs a failed operation in @p category. */
+#define SUSHITRACK_LOG_ERROR(category, ...)                                                        \
+    SUSHITRACK_LOG_AT(SushiLog::LogLevel::Error, category, __VA_ARGS__)
+
+/** @brief Logs, in @p category, why the process cannot continue. */
+#define SUSHITRACK_LOG_FATAL(category, ...)                                                        \
+    SUSHITRACK_LOG_AT(SushiLog::LogLevel::Fatal, category, __VA_ARGS__)
 
 /**
- * @brief Logs an error and throws a std::runtime_error.
+ * @brief Throws std::runtime_error with the formatted message; the code that catches it logs it.
  */
-#define SUSHITRACK_RUNTIME_ERROR(...) SushiTrack::Logger::throw_runtime_error(__VA_ARGS__)
+#define SUSHITRACK_THROW(...) throw std::runtime_error(SushiLog::format_text(__VA_ARGS__))
