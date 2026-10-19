@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-19 — docs: Rewrote the backlog and the known issues as numbered entries with state, acceptance and fix fields (`docs/design/REMAINING_WORK.md`, `docs/reference/KNOWN_ISSUES.md`).
 - 2026-10-19 — tools: Copied the ten shared checkers and `check_all.py` from SushiSkills and ran them in CI (`tools/check_all.py`, `tools/checking/`, `tools/settings.py`, `.github/workflows/ci.yml`).
 - 2026-10-07 — ci: Passed the repository's secrets to the CI the release job calls (`.github/workflows/release.yml`).
 - 2026-10-07 — ci: Added the release job that builds the documentation bundle after CI and attaches it to the tag's release (`.github/workflows/release.yml`, `ci.yml`).

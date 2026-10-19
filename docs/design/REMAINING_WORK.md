@@ -1,75 +1,116 @@
 # Remaining work
 
-The single backlog of this repository. Defects that are open are listed in
-[Known issues](../reference/KNOWN_ISSUES.md) and are not repeated here; this page holds the work
-and the decisions that close them.
+Next id: RW-20
+
+The single backlog of this repository. Defects that stand in the tree are in
+[Known issues](../reference/KNOWN_ISSUES.md); each one names the entry here that closes it.
+
+## Next
+
+- RW-1 Every finding of the shared checkers in this tree is closed by it
+
+## Decisions waiting for the owner
+
+### RW-2 Decide whether v1.0.0 was a release
+- State: decision
+- Done when: the commit is tagged `v1.0.0`, or the changelog section is renamed
+- Source: `docs/agent/2026_10_05_ESTATE_AUDIT/REPORT.md`
+
+### RW-3 Decide where the Python binding lives
+- State: decision
+- Done when: SushiSkills' `repository-layout` names a home for a language binding and
+  `bindings/python/` sits there
+
+### RW-4 Decide whether the benchmark data leaves git
+- State: decision
+- Done when: the MOT and DanceTrack sequences are fetched on demand or kept in Git LFS, or the
+  owner rules that they stay tracked
+
+### RW-5 Decide which of AGENTS.md and CLAUDE.md is the source of the agent instructions
+- State: decision
+- Done when: one file holds the directives and the other points at it
+
+### RW-6 Decide whether contributions from outside are accepted
+- State: decision
+- Done when: the owner has named the contributor agreement, or ruled contributions out
+
+### RW-7 Decide whether the SushiTrack migration is closed
+- State: decision
+- Done when: `docs/design/SUSHITRACK_MIGRATION.md` carries a `Shipped` status, or a phase
+  with work left
+- Source: `docs/design/SUSHITRACK_MIGRATION.md` §5
+
+## Repository
+
+### RW-1 Align the repository with SushiSkills
+- State: open
+- Done when: `python tools/check_all.py .` prints nothing, and `st test --label small --label
+  medium` passes
+- Source: `docs/agent/2026_10_19_SKILL_ALIGNMENT/PLAN.md`
+
+### RW-8 Write test discovery under build/
+- State: open
+- Done when: no `cmake_test_discovery_*.json` file appears in the repository root after
+  `st test`, and its ignore rules are gone
+- Source: `docs/design/SUSHITRACK_MIGRATION.md` §5
+
+### RW-9 Run st build and st test in CI on Windows and Linux
+- State: open
+- Done when: `.github/workflows/ci.yml` builds and runs the small and medium tests on both
+  systems
 
 ## Tracker
 
-Three changes alter tracking output or the IMM internals. They wait for a benchmark re-run that
-can validate them.
+### RW-10 Suppress duplicates within the tracked pool
+- State: unmeasured
+- Done when: a benchmark run shows `removeDuplicateTracklets` over the tracked pool drops the
+  same-object duplicate identities of dense scenes without losing HOTA
 
-- Within-pool duplicate suppression. `removeDuplicateTracklets` deduplicates the tracked pool
-  against the lost pool only. Running it on the tracked pool against itself would drop the
-  same-object duplicate identities that occur in dense scenes.
-- IMM mixture-covariance gating. IMM gating runs on the collapsed 8-D estimate through a
-  stateless `KalmanFilter` helper. Gating on the mode-probability-weighted mixture innovation
-  covariance would tighten the gate under a manoeuvre.
-- Lazy coordinated-turn update. The IMM runs the sigma-point time update of the coordinated-turn
-  model every frame. Gating it on the manoeuvre probability would cut the largest IMM cost when
-  no track is turning.
+### RW-11 Gate the IMM on the mixture innovation covariance
+- State: unmeasured
+- Done when: a benchmark run compares the gate on the mode-weighted covariance with the gate
+  on the collapsed 8-D estimate
 
-## Migration leftovers
+### RW-12 Run the coordinated-turn update only under a manoeuvre
+- State: unmeasured
+- Done when: a benchmark run shows the IMM cost per frame falls with tracking output unchanged
 
-From [SushiTrack migration and rebranding](SUSHITRACK_MIGRATION.md), section 5.
+## C ABI
 
-- Add `.clang-format` and `.editorconfig` at the root.
-- Make test discovery write under `build/` while the tests keep the repository root as their
-  run directory, then drop the `cmake_test_discovery_*.json` ignore rules.
+### RW-13 Report a failure from sushitrack_update and sushitrack_get_tracklets
+- State: open
+- Done when: both calls return a `sushitrack_status_t` a caller can tell from a frame with no
+  tracks
+
+### RW-14 Keep a throwing log callback inside the C boundary
+- State: open
+- Done when: a test whose callback throws at ERROR level sees the C entry point return its
+  failure value
+
+### RW-15 Release the tracker when sushitrack_create_ex fails late
+- State: open
+- Done when: `sushitrack_create_ex` leaves `*out_tracker` null on every failure and a throwing
+  `Tracker` constructor leaks nothing
 
 ## Install and release
 
-- Raise the `sushicore` pin in `environment.yml` to what `cli/pyproject.toml` requires, and give
-  the `Dockerfile` the same source.
-- Make `CMakeLists.txt` the one source of the version; generate the binding's and the CLI's
-  numbers from it and drop `__version__ = "2.0.0"`.
-- Propose the next release: `## Unreleased` holds more than the fifteen entries that trigger a
-  proposal, and two of them break an interface: the Typer command layer and the licence.
-- Add the CI workflow that runs the checkers, the tool tests, `st build` and `st test` on
-  Windows and Linux.
+### RW-16 Take sushicore from one source in every install path
+- State: open
+- Done when: `environment.yml`, the Dockerfile and `cli/pyproject.toml` name the same sushicore
+  version and the same source
+
+### RW-17 Generate every version number from CMakeLists.txt
+- State: open
+- Done when: the binding and the CLI read the version `project()` declares, and
+  `__version__ = "2.0.0"` is gone
+
+### RW-18 Check for GoogleTest in st doctor
+- State: open
+- Done when: the GoogleTest fragment in `cli/sushistack.deps.toml` carries a check command
+  and describes the default `st build` truly
 
 ## Documentation
 
-- Close the last finding of `check_source_comments.py`: it reads the two `#include` lines inside
-  the `_CPP_EXAMPLE` string of `cli/sushitrack_cli/services/deploy.py` as a comment run. The
-  checker does not test that every symbol carries a `@brief`.
-- Import `sushitrack_cli` in `tests/regression/inference/pipeline.py` and `demo.py` without
-  appending `cli/` to `sys.path`.
-- Check `docs/architecture/OVERVIEW.md`, `docs/reference/CLI.md` and
-  `docs/reference/CONFIGURATION.md` against the sources line by line.
-- Record the date, commit and machine of the next benchmark run in
-  `docs/reference/BENCHMARKS.md`.
-- Point the fix message in `cli/sushitrack_cli/services/checks.py` and the description in
-  `cli/sushistack.deps.toml` at the pages that replaced the one-file manual.
-
-## Open decisions
-
-The owner decides each of these.
-
-- Whether the migration is closed. If it is, `SUSHITRACK_MIGRATION.md` moves to
-  `docs/archive/design/`.
-- Whether `v1.0.0` was a release: tag the commit, or rename the changelog section.
-- Where `bindings/`, the Docker files, `environment.yml` and the default `sushitrack.json`
-  belong, since the layout names none of them at the root.
-- Whether the headers move under `include/SushiTrack/<area>/`. The include paths are public
-  interface.
-- Whether `cli/` and `tests/` count as modules and carry their own `README.md`. Today the CLI
-  package is described in `docs/architecture/CLI_PACKAGE.md` and the suites in
-  `docs/guides/TESTING.md`.
-- Whether the benchmark data leaves git (fetched on demand, or Git LFS) and a small fixture
-  stays.
-- Whether the evaluator and inference pipelines move out of `tests/regression/`, and whether
-  the scripts in `cli/misc/` become `st` commands.
-- Which of `AGENTS.md` and `CLAUDE.md` is the source for agent instructions; both state the
-  same directives today.
-- Whether contributions from outside are accepted, and under which contributor agreement.
+### RW-19 Record the machine, commit and date of the next benchmark run
+- State: unmeasured
+- Done when: `docs/reference/BENCHMARKS.md` names them beside every table

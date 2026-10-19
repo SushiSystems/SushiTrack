@@ -1,58 +1,153 @@
 # Known issues
 
-Defects the estate audit of 2026-10-05 found that are still open. The audit is
-`docs/agent/2026_10_05_ESTATE_AUDIT/REPORT.md`. Work that is planned and not a defect is in
+Next id: KI-17
+
+Defects that stand in the tree. The work that closes each one is in
 [Remaining work](../design/REMAINING_WORK.md).
 
 ## C ABI
 
-| Issue | Where |
-| --- | --- |
-| `sushitrack_update` and `sushitrack_get_tracklets` return 0 on a caught exception and on a rejected argument, which a caller cannot tell from a frame with no tracks; the ABI has no status return on these calls and no last-error call | `source/sushitrack_c.cpp`, `include/SushiTrack/sushitrack_c.h` |
-| A log callback that throws while a C entry point's handler logs at ERROR level throws again from inside the handler and crosses the C boundary | `source/logger.cpp`, `source/sushitrack_c.cpp` |
-| `sushitrack_create_ex` can return `SUSHITRACK_RUNTIME_ERROR` with `*out_tracker` already set when its last log line throws, and `sushitrack_create` then drops that handle; a throwing `Tracker` constructor leaks the implementation object | `source/sushitrack_c.cpp` |
+### KI-1 A failed update reads as a frame with no tracks
+- Origin: own
+- Where: `source/sushitrack_c.cpp`, `include/SushiTrack/sushitrack_c.h`
+- Cause: `sushitrack_update` and `sushitrack_get_tracklets` return 0 on a caught exception and
+  on a rejected argument, and the ABI has no status return or last-error call on them
+- Recognise: a frame with detections returns 0 tracks and the log holds an ERROR line
+- Workaround: install a log callback and treat an ERROR line during the call as a failure
+- Fix: RW-13
+
+### KI-2 A throwing log callback crosses the C boundary
+- Origin: own
+- Where: `source/logger.cpp`, `source/sushitrack_c.cpp`
+- Cause: the handler of a C entry point logs at ERROR level, and a callback that throws there
+  throws again from inside the handler
+- Recognise: the process terminates inside a C call while a log callback is installed
+- Workaround: a log callback that never throws
+- Fix: RW-14
+
+### KI-3 A late failure in sushitrack_create_ex hands back a handle that is then dropped
+- Origin: own
+- Where: `source/sushitrack_c.cpp`
+- Cause: `*out_tracker` is set before the last log line, which can throw; a throwing `Tracker`
+  constructor leaks the implementation object
+- Recognise: `SUSHITRACK_RUNTIME_ERROR` from `sushitrack_create_ex` with `*out_tracker` not null
+- Workaround: none
+- Fix: RW-15
 
 ## Installing and versions
 
-| Issue | Where |
-| --- | --- |
-| The conda environment pins `sushicore==0.4.0` and the CLI requires `sushicore>=0.7.0`, so an environment built from the file cannot run `st` | `environment.yml`, `cli/pyproject.toml` |
-| The image build installs the CLI with `pip3 install` and names no source for `sushicore` 0.7.0 | `Dockerfile` |
-| Four version numbers disagree: the library and the binding say 1.0.0, the CLI package 0.1.0 and its `__version__` 2.0.0 | `CMakeLists.txt`, `bindings/python/pyproject.toml`, `cli/pyproject.toml`, `cli/sushitrack_cli/__init__.py` |
-| The changelog has a `v1.0.0` section and no `v1.0.0` tag exists | `docs/reference/CHANGELOG.md`, git |
-| The `v1.0.0` section says an open-source version was released; the repository was private and nothing was published | `docs/reference/CHANGELOG.md` |
-| The GoogleTest fragment says the test targets are off by default, while `st build` builds them unless `--no-test` is given, and it carries no check command, so `st doctor` never looks for GoogleTest | `cli/sushistack.deps.toml` |
+### KI-4 An environment built from environment.yml cannot run st
+- Origin: own
+- Where: `environment.yml`, `cli/pyproject.toml`
+- Cause: the environment pins `sushicore==0.4.0` and the CLI requires `sushicore>=0.7.0`
+- Recognise: pip reports a resolution conflict on sushicore when the CLI is installed
+- Workaround: install sushicore 0.7.0 into the environment by hand
+- Fix: RW-16
 
-## Repository hygiene
+### KI-5 The image build names no source for sushicore 0.7.0
+- Origin: own
+- Where: `Dockerfile`
+- Cause: the image installs the CLI with `pip3 install` and no index or path for sushicore
+- Recognise: the image build fails at the CLI install step
+- Workaround: none
+- Fix: RW-16
 
-| Issue | Where |
-| --- | --- |
-| Test discovery writes `cmake_test_discovery_*.json` into the repository root | `tests/unit/CMakeLists.txt`, `tests/integration/CMakeLists.txt`, `tests/regression/CMakeLists.txt` |
-| 234 MB of benchmark annotation data is tracked in git, with 22 files stored twice | `tests/regression/evaluator/data/` |
-| The ignore file names `.sushitrack_env.json`, not the `.sushitrack_env.json` the CLI writes, and has no rule for `build-asan/`, `.worktrees/`, `worktrees/` or `.superpowers/` | `.gitignore` |
-| The ignore file hides every `*.pth`, `*.tar` and `*.db`, which would also hide a fixture added on purpose | `.gitignore` |
-| The Docker ignore file names `Dockerfile.cli`, which does not exist, and does not exclude `*.egg-info` | `.dockerignore` |
-| The submodule sections are still named `3rdparty/...` while their paths are `third_party/...` | `.gitmodules` |
-| An environment variable and a docstring still say `3rdparty` | `cli/sushitrack_cli/config.py`, `cli/sushitrack_cli/services/evaluate.py` |
-| No CI workflow exists | `.github/` |
+### KI-6 Four version numbers disagree
+- Origin: own
+- Where: `CMakeLists.txt`, `bindings/python/pyproject.toml`, `cli/pyproject.toml`,
+  `cli/sushitrack_cli/__init__.py`
+- Cause: the library and the binding say 1.0.0, the CLI package 0.1.0 and its `__version__`
+  2.0.0, each typed by hand
+- Recognise: `st --version` and the library report different numbers
+- Workaround: none
+- Fix: RW-17
 
-## Layout
+### KI-7 The changelog has a v1.0.0 section that no tag marks
+- Origin: own
+- Where: `docs/reference/CHANGELOG.md`
+- Cause: the section was written for a release that was never tagged or published
+- Recognise: `git tag` lists nothing
+- Workaround: none
+- Fix: RW-2
 
-| Issue | Where |
-| --- | --- |
-| The root holds entries the layout does not name (`bindings/`, `Dockerfile`, `.dockerignore`, `environment.yml`, `sushitrack.json`) and lacks `.clang-format`, `.editorconfig` and `cmake/` | repository root |
-| The root build file holds compiler flags, the Eigen lookup and target definitions, where the layout allows `project()`, options and `add_subdirectory` | `CMakeLists.txt` |
-| The headers and sources are flat, without the `<area>` level, and four headers hold more than one primary symbol | `include/SushiTrack/`, `source/` |
-| Test files are `PascalCase` and their headers end in `.h` | `tests/unit/`, `tests/integration/`, `tests/regression/` |
-| Two tracker configs sit loose in the test root instead of a fixtures folder | `tests/bytetrack.json`, `tests/ocsort.json` |
-| Python applications live inside the test tree | `tests/regression/evaluator/`, `tests/regression/inference/` |
-| A second script folder sits inside the CLI package | `cli/misc/` |
+### KI-8 st doctor never looks for GoogleTest
+- Origin: own
+- Where: `cli/sushistack.deps.toml`
+- Cause: the fragment carries no check command, and says the test targets are off by default
+  while `st build` builds them unless `--no-test` is given
+- Recognise: `st doctor` passes and `st build` fails at `find_package(GTest)`
+- Workaround: `st build --no-test`
+- Fix: RW-18
+
+## Repository
+
+### KI-9 Test discovery writes JSON files into the repository root
+- Origin: own
+- Where: `tests/CMakeLists.txt`
+- Cause: the test programs run from the repository root when CTest lists their tests
+- Recognise: `cmake_test_discovery_*.json` files beside `README.md` after `st test`
+- Workaround: they are ignored by `.gitignore`
+- Fix: RW-8
+
+### KI-10 234 MB of benchmark annotations are tracked in git
+- Origin: own
+- Where: `tests/regression/evaluator/data/`
+- Cause: the MOT17, MOT20 and DanceTrack sequences were committed beside the evaluator
+- Recognise: a clone takes the 234 MB
+- Workaround: `git clone --filter=blob:none`
+- Fix: RW-4
+
+### KI-11 The ignore files name paths that do not exist and miss ones that do
+- Origin: own
+- Where: `.gitignore`, `.dockerignore`
+- Cause: `.sushitrack_env.json` and `Dockerfile.cli` are named; `build-asan/`, `.worktrees/`
+  and `*.egg-info` are not
+- Recognise: `git status` lists a worktree or an asan build tree
+- Workaround: none
+- Fix: RW-1
+
+### KI-12 The submodules and two strings still say 3rdparty
+- Origin: own
+- Where: `.gitmodules`, `cli/sushitrack_cli/config.py`, `cli/sushitrack_cli/services/evaluate.py`
+- Cause: the folder was renamed to `third_party/` and the names were not
+- Recognise: `git submodule status` names `3rdparty/...` sections
+- Workaround: none
+- Fix: RW-1
+
+### KI-13 The layout of the tree departs from repository-layout
+- Origin: own
+- Where: repository root, `CMakeLists.txt`, `include/SushiTrack/`, `source/`, `tests/`
+- Cause: configuration files sit in the root, the root build file holds logic, headers are flat
+  and hold more than one type, and the test tree is split by kind instead of mirroring the source
+- Recognise: `python tools/testing/check_test_mirror.py .` reports findings
+- Workaround: none
+- Fix: RW-1
+
+### KI-14 Python programs live inside the test tree
+- Origin: own
+- Where: `tests/regression/evaluator/`, `tests/regression/inference/`, `cli/misc/`
+- Cause: the evaluator and the inference demo grew beside the regression runner, and three
+  helper scripts sit in the CLI package
+- Recognise: `st eval` and `st infer` run scripts from `tests/`
+- Workaround: none
+- Fix: RW-1
 
 ## Documentation
 
-| Issue | Where |
-| --- | --- |
-| A fix message and a dependency description cite sections of the old one-file manual; the sections are now `docs/reference/DATA_LAYOUT.md` and `docs/getting_started/INSTALL.md` | `cli/sushitrack_cli/services/checks.py`, `cli/sushistack.deps.toml` |
-| The date, commit and machine of the recorded benchmark runs are not written down | `docs/reference/BENCHMARKS.md` |
-| The pipeline, IMM and lifecycle descriptions have not been checked against the sources; the cited paths have | `docs/architecture/OVERVIEW.md` |
-| The flag tables, parameter defaults and scenario counts were carried over from the old manual and not compared with the code one by one | `docs/reference/CLI.md`, `docs/reference/CONFIGURATION.md` |
+### KI-15 A fix message and a dependency description cite the old one-file manual
+- Origin: own
+- Where: `cli/sushitrack_cli/services/checks.py`, `cli/sushistack.deps.toml`
+- Cause: the sections moved to `docs/reference/DATA_LAYOUT.md` and
+  `docs/getting_started/INSTALL.md`
+- Recognise: the cited section is not in `docs/README.md`
+- Workaround: read the two pages named above
+- Fix: RW-1
+
+### KI-16 The manual names symbols and paths the source does not hold
+- Origin: own
+- Where: `docs/architecture/OVERVIEW.md`, `docs/reference/CLI.md`,
+  `docs/reference/CONFIGURATION.md`, `docs/guides/TESTING.md`, `docs/CONTRIBUTING.md`
+- Cause: the pages were carried over from the old manual without a line-by-line check
+- Recognise: `python tools/documentation/check_docs_truth.py .` reports findings
+- Workaround: the source is authoritative
+- Fix: RW-1
