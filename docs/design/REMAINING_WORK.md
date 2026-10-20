@@ -11,6 +11,10 @@ The single backlog of this repository. Defects that stand in the tree are in
 - State: decision
 - Done when: SushiSkills' `repository-layout` names a home for a language binding and
   `bindings/python/` sits there
+- Where: `bindings/python/`
+
+The Python binding sits in a root folder the layout does not name. `bindings/` beside `cli/` and
+`applications/` in the root. Cause: `repository-layout` names no home for a language binding.
 
 ### RW-5 Decide which of AGENTS.md and CLAUDE.md is the source of the agent instructions
 - State: decision
@@ -60,11 +64,21 @@ The single backlog of this repository. Defects that stand in the tree are in
 - State: open
 - Done when: `.config/conda/environment.yml`, the Dockerfile and `cli/pyproject.toml` name the same sushicore
   version and the same source
+- Where: `.config/docker/Dockerfile`
+
+The image build names no source for sushicore 0.7.0. The image build fails at the CLI install step.
+Cause: the image installs the CLI with `pip3 install` and no index or path for sushicore.
 
 ### RW-17 Generate every version number from CMakeLists.txt
 - State: open
 - Done when: the binding and the CLI read the version `project()` declares, and
   `__version__ = "2.0.0"` is gone
+- Where: `CMakeLists.txt`, `bindings/python/pyproject.toml`, `cli/pyproject.toml`,
+  `cli/sushitrack_cli/__init__.py`
+
+Four version numbers disagree. `st --version` and the library report different numbers. Cause: the
+library and the binding say 1.0.0, the CLI package 0.1.0 and its `__version__` 2.0.0, each typed by
+hand.
 
 ### RW-18 Check for GoogleTest in st doctor
 - State: open
