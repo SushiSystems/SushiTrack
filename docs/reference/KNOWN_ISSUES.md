@@ -25,11 +25,11 @@ Defects that stand in the tree. The work that closes each one is in
 
 ## Repository
 
-### KI-10 A clone downloads 234 MB of benchmark annotations that the tree no longer holds
+### KI-10 A clone downloads about 45 MiB of benchmark annotations that the tree no longer holds
 - Origin: own
 - Where: `applications/benchmarks/`, in the git history of each benchmark's data folder
 - Cause: the MOT17, MOT20 and DanceTrack sequences were committed before they left git, and the
   history keeps them
-- Recognise: a clone takes the 234 MB
+- Recognise: a full clone fetches 326 annotation blobs, about 45 MiB packed and 164 MiB unpacked
 - Workaround: `git clone --filter=blob:none`
 - Fix: none, the owner kept the history when the data left git
