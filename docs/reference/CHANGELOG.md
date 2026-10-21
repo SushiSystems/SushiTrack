@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-21 — ci: Added the nightly workflow, which runs `ci.yml` with ThreadSanitizer against SushiLog's main, then the quarantined tests without gating (`.github/workflows/nightly.yml`, `ci.yml`, `.github/actions/sushilog/action.yml`).
 - 2026-10-21 — ci: Pinned the actions of `release.yml` to the commit hashes `ci.yml` uses (`.github/workflows/release.yml`).
 - 2026-10-21 — docs: Corrected the size KI-10 gives for the benchmark annotations in the history (`KNOWN_ISSUES.md`).
 - 2026-10-20 — docs: Moved 3 known issues with a scheduled fix and no workaround into the backlog entries that fix them (`KNOWN_ISSUES.md`, `REMAINING_WORK.md`).

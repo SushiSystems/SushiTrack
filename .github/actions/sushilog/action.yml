@@ -1,7 +1,7 @@
 name: SushiLog checkout
 description: >-
   Clones SushiLog beside the workspace and exports SUSHILOG_DIR for the configure. A push to main
-  builds against SushiLog's main, so an upstream change that breaks this repository shows before
+  and the nightly run build against SushiLog's main, so an upstream change that breaks this repository shows before
   the pin moves; every other run builds against the commit pinned in cli/sushistack.deps.toml.
 
 runs:
@@ -13,7 +13,7 @@ runs:
         EVENT: ${{ github.event_name }}
         REF: ${{ github.ref }}
       run: |
-        if [ "$EVENT" = "push" ] && [ "$REF" = "refs/heads/main" ]; then
+        if [ "$EVENT" = "schedule" ] || { [ "$EVENT" = "push" ] && [ "$REF" = "refs/heads/main" ]; }; then
           ref=main
         else
           ref=$(python -c "import tomllib; print(tomllib.load(open('cli/sushistack.deps.toml', 'rb'))['sushi']['sushilog']['commit'])")

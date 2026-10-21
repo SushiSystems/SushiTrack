@@ -4,8 +4,8 @@ name: CI
 # check main requires; release.yml calls this workflow before it builds the documentation bundle.
 #
 # Pre-merge: the checkers and the CLI's own tests, the build and the small and medium tests on
-# Linux and Windows, and the small tests again under ASan and UBSan on Linux. A push to main adds
-# ThreadSanitizer. Every build lane takes SushiLog from .github/actions/sushilog. Large tests need
+# Linux and Windows, and the small tests again under ASan and UBSan on Linux. A push to main and
+# the nightly run add ThreadSanitizer. Every build lane takes SushiLog from .github/actions/sushilog. Large tests need
 # hardware and run on no runner.
 
 on:
@@ -125,7 +125,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      RUN: ${{ !matrix.post_merge_only || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
+      RUN: ${{ !matrix.post_merge_only || github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
       ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
       UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1

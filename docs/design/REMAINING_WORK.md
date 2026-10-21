@@ -1,6 +1,6 @@
 # Remaining work
 
-Next id: RW-24
+Next id: RW-25
 
 The single backlog of this repository. Defects that stand in the tree are in
 [Known issues](../reference/KNOWN_ISSUES.md); each one names the entry here that closes it.
@@ -52,6 +52,14 @@ The Python binding sits in a root folder the layout does not name. `bindings/` b
 - State: open
 - Done when: `st infer` detects with a SushiAI model and reads and draws frames with OpenCV,
   with no PyTorch or YOLOX import left in `applications/inference/`
+
+## Continuous integration
+
+### RW-24 Run the MOT benchmarks in the nightly workflow
+- State: blocked
+- Blocked by: external: no runner holds the MOT17, MOT20 and DanceTrack sequences, which are not in git
+- Done when: `nightly.yml` runs `st eval` on a runner that holds the sequences and records the figures
+- Where: `.github/workflows/nightly.yml`
 
 ## Install and release
 
