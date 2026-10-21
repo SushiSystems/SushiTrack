@@ -1,12 +1,12 @@
 # tools
 
-The ten checkers every Sushi Systems repository carries, the license block writer and their
+The eleven checkers every Sushi Systems repository carries, the license block writer and their
 tests. Every file here except this README and `settings.py` is a copy of `tools/` in SushiSkills,
 made by `checking/copy_shared_tools.py`; a rule is fixed there first and copied here.
 
 | Path | Checks | Takes |
 | --- | --- | --- |
-| `check_all.py` | Nothing itself; runs the ten checkers and the checker tests, and prints only what failed | Repository root |
+| `check_all.py` | Nothing itself; runs the eleven checkers and the checker tests, and prints only what failed | Repository root |
 | `checking/checker.py` | Nothing itself; runs a checker's rule table and prints findings | |
 | `checking/copy_shared_tools.py` | Nothing; copies the shared tools from a SushiSkills checkout, or lists the files that differ with `--report` | Repository root, `--from` |
 | `checking/ignored_paths.py` | Nothing itself; names the files and folders git ignores, which no checker reads | |
@@ -15,6 +15,7 @@ made by `checking/copy_shared_tools.py`; a rule is fixed there first and copied 
 | `documentation/check_docs_layout.py` | The `docs/` tree, required documents, names, work folders, status lines, links, reachability, archive candidates | Repository root |
 | `documentation/check_changelog.py` | Changelog headings and entry shape | Repository root |
 | `documentation/check_backlog.py` | The shape of `REMAINING_WORK.md` and `KNOWN_ISSUES.md` | Repository root |
+| `documentation/check_design_format.py` | Design documents: the five sections in order, a status line of at most 160 characters, the phase table and its states, no commit hash, no line that dates built or merged work | Repository root |
 | `documentation/check_docs_truth.py` | The manual against the source | Repository root, `--source` |
 | `documentation/design_status.py` | Nothing itself; reads the status lines of design documents and work folders | |
 | `layering/check_layering.py` | Declared tiers and the includes between modules | Repository root |

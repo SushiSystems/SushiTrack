@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-21 — docs: Reshaped the migration design document into the five sections with a phase table, and copied the design format checker (`docs/design/SUSHITRACK_MIGRATION.md`, `tools/documentation/check_design_format.py`).
 - 2026-10-21 — ci: Added the nightly workflow, which runs `ci.yml` with ThreadSanitizer against SushiLog's main, then the quarantined tests without gating (`.github/workflows/nightly.yml`, `ci.yml`, `.github/actions/sushilog/action.yml`).
 - 2026-10-21 — ci: Pinned the actions of `release.yml` to the commit hashes `ci.yml` uses (`.github/workflows/release.yml`).
 - 2026-10-21 — docs: Corrected the size KI-10 gives for the benchmark annotations in the history (`KNOWN_ISSUES.md`).

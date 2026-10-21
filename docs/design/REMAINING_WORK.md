@@ -28,7 +28,7 @@ The Python binding sits in a root folder the layout does not name. `bindings/` b
 - State: decision
 - Done when: `docs/design/SUSHITRACK_MIGRATION.md` carries a `Shipped` status, or a phase
   with work left
-- Source: `docs/design/SUSHITRACK_MIGRATION.md` §5
+- Source: `docs/design/SUSHITRACK_MIGRATION.md`
 
 ## Tracker
 
