@@ -1,6 +1,6 @@
 # Remaining work
 
-Next id: RW-25
+Next id: RW-26
 
 The single backlog of this repository. Defects that stand in the tree are in
 [Known issues](../reference/KNOWN_ISSUES.md); each one names the entry here that closes it.
@@ -98,3 +98,11 @@ hand.
 ### RW-19 Record the machine, commit and date of the next benchmark run
 - State: unmeasured
 - Done when: `docs/reference/BENCHMARKS.md` names them beside every table
+
+## Documentation architecture
+
+### RW-25 Write the About line of each design topic by hand
+- State: open
+- Done when: each topic has an `**About:**` line of one sentence written for a cold reader
+
+The topic model generated the lines from the first sentence of each document or from its title.
