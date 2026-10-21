@@ -3,9 +3,13 @@
 Every live topic has exactly one document in this folder. The backlog is
 [Remaining work](REMAINING_WORK.md).
 
-| Topic | Document | Status |
+## Topics
+
+<!-- topics:begin -->
+| Topic | State | About |
 | --- | --- | --- |
-| Migration from SushiTrack and rebranding | [SUSHITRACK_MIGRATION.md](SUSHITRACK_MIGRATION.md) | Open: P1 has two items left, P2 to P4 are built |
+| [SUSHITRACK_MIGRATION](SUSHITRACK_MIGRATION/README.md) | Open | The repository came from a project that carried another name, another licence and a layout of its own. |
+<!-- topics:end -->
 
 The design of the Typer command layer shipped and is archived as
-`docs/archive/design/CLI_TYPER_MIGRATION.md`.
+the cli typer migration document in the version history.

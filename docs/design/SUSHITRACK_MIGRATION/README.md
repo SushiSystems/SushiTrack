@@ -1,6 +1,8 @@
 # SushiTrack Migration and Rebranding
 
 **Status:** Open — P1 has two items left, P2 to P4 are built
+**About:** The repository came from a project that carried another name, another licence and a layout of its own.
+**Modules:** none
 
 ## Problem
 
@@ -41,7 +43,7 @@ The Sushi Systems single-module structure: public headers in `include/SushiTrack
 `source/`, vendored code in `third_party/`, checkers in `tools/`, tests in `tests/unit`,
 `tests/integration` and `tests/regression`, the CLI package in `cli/` and the binding in
 `bindings/python/`. The tree as it landed is drawn in
-[Project structure](../architecture/PROJECT_STRUCTURE.md). The root also holds `.clang-format`
+[Project structure](../../architecture/PROJECT_STRUCTURE.md). The root also holds `.clang-format`
 and `.editorconfig`.
 
 ### Licensing and source file headers
@@ -109,9 +111,15 @@ All C API declarations use the full prefix `sushitrack_`:
 | P3 | Developer CLI and Python bindings: `sushitrack_cli`, the `st` and `sushitrack` entry points, `sushitrack` module | built |
 | P4 | Test suite and full verification: tests on `<SushiTrack/*.hpp>`, `st build`, `st test`, the checkers | built |
 
+### Work
+
+<!-- work:begin -->
+No open work.
+<!-- work:end -->
+
 ## Open questions
 
-P1 leaves two items, each also in [the backlog](REMAINING_WORK.md):
+P1 leaves two items, each also in [the backlog](../REMAINING_WORK.md):
 
 - `.clang-format` and `.editorconfig` do not exist at the root.
 - The test discovery files are still written to the root: `gtest_discover_tests` runs with

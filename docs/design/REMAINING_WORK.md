@@ -26,9 +26,9 @@ The Python binding sits in a root folder the layout does not name. `bindings/` b
 
 ### RW-7 Decide whether the SushiTrack migration is closed
 - State: decision
-- Done when: `docs/design/SUSHITRACK_MIGRATION.md` carries a `Shipped` status, or a phase
+- Done when: `docs/design/SUSHITRACK_MIGRATION/README.md` carries a `Shipped` status, or a phase
   with work left
-- Source: `docs/design/SUSHITRACK_MIGRATION.md`
+- Source: `docs/design/SUSHITRACK_MIGRATION/README.md`
 
 ## Tracker
 

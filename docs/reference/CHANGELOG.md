@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- 2026-10-21 — docs: Reshaped the migration design document into the five sections with a phase table, and copied the design format checker (`docs/design/SUSHITRACK_MIGRATION.md`, `tools/documentation/check_design_format.py`).
+- 2026-10-21 — docs: Reshaped the migration design document into the five sections with a phase table, and copied the design format checker (`docs/design/SUSHITRACK_MIGRATION/README.md`, `tools/documentation/check_design_format.py`).
 - 2026-10-21 — ci: Added the nightly workflow, which runs `ci.yml` with ThreadSanitizer against SushiLog's main, then the quarantined tests without gating (`.github/workflows/nightly.yml`, `ci.yml`, `.github/actions/sushilog/action.yml`).
 - 2026-10-21 — ci: Pinned the actions of `release.yml` to the commit hashes `ci.yml` uses (`.github/workflows/release.yml`).
 - 2026-10-21 — docs: Corrected the size KI-10 gives for the benchmark annotations in the history (`KNOWN_ISSUES.md`).
@@ -13,7 +13,7 @@
 - 2026-10-19 — docs: Folded the untagged v1.0.0 section into Unreleased, since v0.1.0 is the first release, and planned it with the SushiAI and OpenCV inference (`docs/design/REMAINING_WORK.md`).
 - 2026-10-19 — applications: Took the MOT17, MOT20 and DanceTrack sequences out of git; each machine keeps them under the benchmark's `data/` folder (`.gitignore`, `docs/reference/DATA_LAYOUT.md`).
 - 2026-10-19 — c_api: Made `sushitrack_update` and `sushitrack_get_tracklets` return a status and the count through `out_count`, and `sushitrack_create_ex` null its handle on every failure (`include/SushiTrack/c_api/sushitrack_c.h`).
-- 2026-10-19 — docs: Rewrote the root README in the documentation skill's order, with a Status section, and closed the skill alignment work (`README.md`, `docs/agent/2026_10_19_SKILL_ALIGNMENT/REPORT.md`).
+- 2026-10-19 — docs: Rewrote the root README in the documentation skill's order, with a Status section, and closed the skill alignment work (`README.md`, the skill alignment report in the version history).
 - 2026-10-19 — docs: Corrected the names and paths the manual cited, marked its uncompiled examples and split two pages under the ceiling (`docs/architecture/MOTION_ESTIMATORS.md`, `docs/.docs_truth_allow`).
 - 2026-10-19 — cli: Mirrored the CLI tests on the package, gave each file a size and added `st test --cli`, which runs them by label (`cli/tests/`, `cli/sushitrack_cli/services/tests.py`).
 - 2026-10-19 — cli: Shipped `LICENSE`, `NOTICE.md` and the third-party licence texts in both deploy packages, written from template files (`cli/sushitrack_cli/services/deploy.py`, `cli/sushitrack_cli/templates/`).
@@ -51,7 +51,7 @@
 - 2026-10-05 — core: Replaced the per-pair gating log lines with one line per cost-matrix call (`source/distance_strategies.cpp`).
 - 2026-10-05 — core: Passed exception text and the unregistered Kalman type to the logger as arguments of a literal format (`source/sushitrack_c.cpp`, `include/SushiTrack/kalman_filter_registry.hpp`).
 - 2026-10-05 — docs: Shortened eleven comment paragraphs and docstrings and moved their reasoning into the manual (`docs/architecture/CLI_PACKAGE.md`, `docs/guides/TESTING.md`, `docs/guides/DEPLOY_PACKAGES.md`, `docs/guides/INFERENCE.md`).
-- 2026-10-05 — docs: Split the manual into pages under an index, added the required documents and archived the finished Typer and migration records (`docs/README.md`, `docs/reference/`, `docs/design/`, `docs/archive/`, `tools/`).
+- 2026-10-05 — docs: Split the manual into pages under an index, added the required documents and archived the finished Typer and migration records (`docs/README.md`, `docs/reference/`, `docs/design/`, `tools/`).
 - 2026-10-05 — cli: Renamed st docker to st container; the old word still runs, hidden, until 2027-03-25 (`cli/sushitrack_cli/cli.py`, `cli/sushitrack_cli/aliases.py`).
 - 2026-10-05 — cli: Added --version and --describe and took config, env and the entry point from sushicore (`cli/sushitrack_cli/cli.py`, `cli/sushitrack_cli/services/diag.py`, `cli/sushitrack_cli/__main__.py`).
 - 2026-10-05 — cli: Changed st eval with no matching sequence and st clean with a surviving directory to exit 1 (`cli/sushitrack_cli/services/label.py`, `cli/sushitrack_cli/services/build.py`).

@@ -22,3 +22,7 @@ K_CLOSED = False
 K_MACRO_PREFIXES: tuple[str, ...] = ()
 K_LOG_PREFIX = "SUSHITRACK"
 K_CONSOLE_PATHS: tuple[str, ...] = ("cli/sushitrack_cli/console.py", "applications/")
+K_DESIGN_TOPICS = True
+K_FOLDER_CEILING = 60
+K_CLOSED_GRACE_DAYS = 0
+K_ARCHIVE_UNTRACKED = True

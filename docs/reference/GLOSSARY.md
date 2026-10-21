@@ -41,3 +41,10 @@
 | Deploy package | The `package/` tree `st deploy` assembles for a consumer outside this repository |
 | `st` | The developer CLI of this repository, also installed as `sushitrack` |
 | `sushicore` | The Sushi Systems package that gives every Sushi CLI its console, configuration layering and build driver |
+
+## Design topics
+
+A topic is a module or a subject that spans modules, and it has one design document.
+The list is generated in `docs/design/README.md`.
+
+**SUSHITRACK_MIGRATION**: The repository came from a project that carried another name, another licence and a layout of its own. See [the design](../design/SUSHITRACK_MIGRATION/README.md).
