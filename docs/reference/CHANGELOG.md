@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-21 — ci: Pinned the actions of `release.yml` to the commit hashes `ci.yml` uses (`.github/workflows/release.yml`).
 - 2026-10-21 — docs: Corrected the size KI-10 gives for the benchmark annotations in the history (`KNOWN_ISSUES.md`).
 - 2026-10-20 — docs: Moved 3 known issues with a scheduled fix and no workaround into the backlog entries that fix them (`KNOWN_ISSUES.md`, `REMAINING_WORK.md`).
 - 2026-10-19 — ci: Built and ran the small and medium tests on Windows and Linux, the small tests under ASan and UBSan, and TSan on main, behind one gate job (`.github/workflows/ci.yml`).
