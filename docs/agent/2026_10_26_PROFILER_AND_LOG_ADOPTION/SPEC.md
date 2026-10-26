@@ -1,6 +1,6 @@
 # Profiler and log adoption
 
-**Status:** Open — analysis written 2026-10-26; parked until SushiAI's inference profile ships, then its decisions are taken against SushiProfiler v0.2.0 or later.
+**Status:** Open — analysis written 2026-10-26; section 9 holds the decisions; implementation runs with every build at the end.
 
 This work has no `**Implements:**` or `**Designs:**` line: `docs/design/README.md` lists one
 topic, `SUSHITRACK_MIGRATION`, and its phase table has no profiling phase. Decision 1 asks where
@@ -434,3 +434,29 @@ SOLID and dependency observations, none fixed here:
 Not covered: the `third_party/` code (ByteTrack, OC-SORT, YOLOX, TrackEval), `cli/` outside the
 files cited, `tools/`, `.github/`, `cmake/SushiTrackSanitizers.cmake`, the guides under
 `docs/guides/`, the other cost calculators line by line, and any run or measurement.
+
+## 9. Decisions
+
+The owner delegated every question of section 5 to the orchestrator on 2026-10-26, asking for the
+engineering choice that holds as the stack grows, all code written first and every build at the end.
+
+| # | Decision |
+| --- | --- |
+| 1 | (a) A design topic `SUSHITRACK_PROFILING` carrying P8; it does not wait for the v0.1.0 release |
+| 2 | (a) Optional, a CMake option on by default; the pin sits in `cli/sushistack.deps.toml` either way |
+| 3 | (c) SushiProfiler v0.2.0 is a shared library; SushiTrack links it |
+| 4 | (c) No profiling call in the C ABI; the Python path waits for SushiProfiler P9 |
+| 5 | (a) The host marks the frame period (`mot_runner.cpp`); the library records zones and counters only |
+| 6 | `SUSHITRACK_ZONE` beside `SUSHITRACK_LOG_*`; option `SUSHITRACK_PROFILE_LEVEL`; timeline `sushitrack.frame`; one group per area (`Associate`, `Filter`, `Detect`, `Track`); keys listed in `docs/reference/PROFILER_KEYS.md` |
+| 7 | (a) `include/SushiTrack/profiling/profiling.hpp` beside `logging/logger.hpp`; the contributor lives in the library |
+| 8 | (a) One record per tracker and sequence, a session each, under `build/profiles/`, ignored by git; the nightly check waits for RW-24 |
+| 9 | (b) `[ PERF ]` stays for one release beside the record; `st eval` reads the record file itself, with no tool dependency on `sp` |
+| 10 | (c) The tables stay by hand, each with a link to its record, until SushiProfiler RW-18 writes tables |
+| 11 | (a) No Python records until P9 |
+| 12 | (b) The reader refuses a wrong-typed value, an unknown key, a missing explicit file and an unregistered `kalman_type` with `INVALID_ARGUMENT`; the test pinning the old success changes |
+| 13 | One category per area: `tracking`, `association`, `filtering`, `configuration`, `c_api` |
+| 14 | (a) Applications log through the project macros; `tracker_process_c` returns a status; an empty frame still runs the tracker's update, so tracks age |
+| 15 | Delete `load_config_from_json`, a breaking entry |
+| 16 | (b) A counter in `Tracker` reported as one line every N frames, until SushiLog RW-3 and RW-4 |
+| 17 | Level 1 in release and 2 in debug; the budget is under 1 % with the gate closed |
+| 18 | Python tests wait for RW-3's binding home; Python logging is SushiLog RW-12's |
