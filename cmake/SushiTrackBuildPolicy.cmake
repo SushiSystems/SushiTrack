@@ -30,6 +30,7 @@ if(MSVC)
 else()
     add_compile_options(-Wall -O3 -ffast-math -funroll-loops -DNDEBUG)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i686)$")
-        add_compile_options(-mavx2)
+        # Eigen emits FMA whenever AVX2 is on under an MSVC-compatible compiler, as /arch:AVX2 allows.
+        add_compile_options(-mavx2 -mfma)
     endif()
 endif()
