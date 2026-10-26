@@ -31,6 +31,8 @@
 
 #include <gtest/gtest.h>
 
+#include <captured_log.hpp>
+#include <mot_engine_log_category.hpp>
 #include <mot_sequence.hpp>
 
 using namespace MOTEngine;
@@ -79,4 +81,52 @@ TEST(Medium_MOTSequenceTest, ReadsTheFrameRateOrFallsBack)
     EXPECT_EQ(read_frame_rate(path.string(), 30), 25);
     std::filesystem::remove(path);
     EXPECT_EQ(read_frame_rate(path.string(), 30), 30);
+}
+
+/**
+ * @brief A detections file that cannot be opened reads as empty and logs one WARN naming it, where
+ *        it once returned an empty map without a word.
+ */
+TEST(Medium_MOTSequenceTest, UnreadableDetectionsLogAWarnAndReadNothing)
+{
+    SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_MOT_ENGINE_LOG_CATEGORY});
+
+    const MOTFrames frames = read_mot_detections("this/path/does/not/exist/det.txt");
+
+    EXPECT_TRUE(frames.empty());
+    EXPECT_EQ(log.count("this/path/does/not/exist/det.txt cannot be opened"), 1);
+    EXPECT_EQ(log.level_of("cannot be opened"), SushiLog::LogLevel::Warn);
+}
+
+/**
+ * @brief Skipped rows are counted in one WARN with the file and the number of rows read.
+ */
+TEST(Medium_MOTSequenceTest, SkippedRowsAreCountedInOneWarn)
+{
+    SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_MOT_ENGINE_LOG_CATEGORY});
+    const std::filesystem::path path = write_temp(
+        "sushitrack_mot_sequence_skipped.txt", "1,-1,10,20,30,40,0.9\n2,-1,1,2\n3,-1,x,2,3,4,5\n");
+
+    const MOTFrames frames = read_mot_detections(path.string());
+    std::filesystem::remove(path);
+
+    EXPECT_EQ(frames.size(), 1U);
+    EXPECT_EQ(log.count("skipped 2 of 3 rows"), 1);
+}
+
+/**
+ * @brief A missing seqinfo.ini or a missing frameRate gives the fallback and one WARN each.
+ */
+TEST(Medium_MOTSequenceTest, FrameRateFallbackIsLogged)
+{
+    SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_MOT_ENGINE_LOG_CATEGORY});
+    const std::filesystem::path path =
+        write_temp("sushitrack_mot_sequence_no_rate.ini", "[Sequence]\nname=x\n");
+
+    EXPECT_EQ(read_frame_rate("this/path/does/not/exist/seqinfo.ini", 30), 30);
+    EXPECT_EQ(read_frame_rate(path.string(), 30), 30);
+    std::filesystem::remove(path);
+
+    EXPECT_EQ(log.count("seqinfo.ini cannot be opened; using 30 frames per second"), 1);
+    EXPECT_EQ(log.count("holds no positive frameRate; using 30 frames per second"), 1);
 }

@@ -26,12 +26,15 @@
  */
 
 #include <algorithm>
+#include <limits>
 #include <vector>
 
 #include <gtest/gtest.h>
 
 #include <SushiTrack/association/cost_matrix.hpp>
 #include <SushiTrack/association/lapjv_solver.hpp>
+
+#include <captured_log.hpp>
 
 using namespace SushiTrack;
 
@@ -358,4 +361,52 @@ TEST(Small_LAPJVSolverTest, PermutationMatrixMatchesOptimally)
     EXPECT_EQ(row_to_col[0], 2);
     EXPECT_EQ(row_to_col[1], 0);
     EXPECT_EQ(row_to_col[2], 1);
+}
+
+// Records
+
+/**
+ * @brief Non-zero counts over an empty matrix log one ERROR naming the size, and every row and
+ *        column stays unmatched.
+ */
+TEST(Small_LAPJVSolverTest, EmptyMatrixWithCountsLogsAnError)
+{
+    CapturedLog log;
+    LAPJVSolver solver;
+    CostMatrix cost;
+    std::vector<std::vector<int>> matches;
+    std::vector<int> a_unm, b_unm;
+
+    solver.solve(cost, 2, 3, 1.0f, matches, a_unm, b_unm);
+
+    EXPECT_TRUE(matches.empty());
+    EXPECT_EQ(a_unm.size(), 2U);
+    EXPECT_EQ(b_unm.size(), 3U);
+    EXPECT_EQ(log.count("Cost matrix is empty for 2 x 3"), 1);
+    EXPECT_EQ(log.level_of("Cost matrix is empty"), SushiLog::LogLevel::Error);
+}
+
+/**
+ * @brief A matrix holding a NaN logs one WARN however many times it is solved, and the NaN pair
+ *        stays unmatched.
+ */
+TEST(Small_LAPJVSolverTest, NonFiniteCostLogsOneWarnAndStaysUnmatched)
+{
+    CapturedLog log;
+    LAPJVSolver solver;
+    CostMatrix cost;
+    cost.resize(2, 2, 1.0f);
+    cost(0, 0) = std::numeric_limits<float>::quiet_NaN();
+    cost(1, 1) = 0.0f;
+
+    for (int call = 0; call < 3; ++call)
+    {
+        std::vector<std::vector<int>> matches;
+        std::vector<int> a_unm, b_unm;
+        solver.solve(cost, 2, 2, 0.5f, matches, a_unm, b_unm);
+        EXPECT_LE(matches.size(), 2U);
+    }
+
+    EXPECT_EQ(log.count("holds 1 non-finite costs"), 1);
+    EXPECT_EQ(log.level_of("non-finite"), SushiLog::LogLevel::Warn);
 }

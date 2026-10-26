@@ -53,6 +53,15 @@ extern "C"
             int feat_dim;      /**< Length of feat. */
     } CDetection;
 
+    /** @brief Tells how tracker_process_c ended. */
+    typedef enum
+    {
+        TRACKER_BRIDGE_OK = 0,               /**< The frame ran and every track was written. */
+        TRACKER_BRIDGE_INVALID_ARGUMENT = 1, /**< A pointer was null or a count negative. */
+        TRACKER_BRIDGE_TRUNCATED = 2,        /**< Tracks past max_results were left out. */
+        TRACKER_BRIDGE_ERROR = 3             /**< The tracker threw; no track was written. */
+    } tracker_bridge_status_t;
+
     /** @brief Holds one track handed back to C. */
     typedef struct
     {
@@ -76,11 +85,14 @@ extern "C"
 
     /**
      * @brief Runs one frame and writes at most @p max_results tracks.
-     * @param num_results Receives the number of tracks written.
+     * @param num_results Receives the number of tracks written. It is left alone when @p tracker,
+     *        @p results or @p num_results is null, and 0 for any other refusal or error.
+     * @return TRACKER_BRIDGE_OK, TRACKER_BRIDGE_TRUNCATED, TRACKER_BRIDGE_INVALID_ARGUMENT or
+     *         TRACKER_BRIDGE_ERROR; each refusal and error is logged under `tracker_bridge`.
      */
-    TRACKER_BRIDGE_API void tracker_process_c(void* tracker, const CDetection* detections,
-                                              int num_detections, CTrackResult* results,
-                                              int* num_results, int max_results);
+    TRACKER_BRIDGE_API tracker_bridge_status_t tracker_process_c(
+        void* tracker, const CDetection* detections, int num_detections, CTrackResult* results,
+        int* num_results, int max_results);
 
 #ifdef __cplusplus
 }

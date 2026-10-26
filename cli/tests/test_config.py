@@ -151,3 +151,25 @@ def test_load_config_warns_once_per_legacy_key(tmp_path, monkeypatch):
     assert len(said) == 2
     assert all("config.local.toml" in line for line in said)
     assert "[tool] cmake_exe" in said[0]
+
+
+def test_a_key_no_setting_reads_is_warned_and_ignored(tmp_path, monkeypatch):
+    monkeypatch.setattr(config_module, "config_dir", lambda root=None: tmp_path)
+    (tmp_path / "config.local.toml").write_text('[build]\nno_such_key = 1\n', encoding="utf-8")
+    said = []
+    monkeypatch.setattr(config_module, "_warn", said.append)
+
+    config_module.load_config(tmp_path)
+
+    assert len(said) == 1
+    assert "build.no_such_key" in said[0]
+    assert "config.local.toml" in said[0]
+
+
+def test_an_integer_field_that_cannot_read_its_value_keeps_it_and_warns(monkeypatch):
+    said = []
+    monkeypatch.setattr(config_module, "_warn", said.append)
+
+    assert config_module._coerce(4, "many", "env:ST_JOBS") == 4
+
+    assert said == ["env:ST_JOBS: 'many' is not an integer; keeping 4"]

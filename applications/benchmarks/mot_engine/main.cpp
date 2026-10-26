@@ -40,7 +40,10 @@
 #include <fstream>
 #endif
 
+#include <SushiTrack/logging/logger.hpp>
+
 #include <byte_track_adapter.hpp>
+#include <mot_engine_log_category.hpp>
 #include <mot_runner.hpp>
 #include <oc_sort_adapter.hpp>
 #include <sushitrack_adapter.hpp>
@@ -55,13 +58,14 @@ namespace
             std::filesystem::path settings;     /**< bytetrack.json and ocsort.json. */
             std::vector<std::string> trackers;  /**< sushitrack, bytetrack, ocsort. */
             std::vector<std::string> sequences; /**< Every sequence under data when empty. */
+            std::filesystem::path profiles = "build/profiles"; /**< Profile folder; empty: none. */
     };
 
     /** @brief Prints how to call the program on stderr. */
     void print_usage()
     {
         std::cerr << "usage: mot_engine --data DIR --settings DIR [--tracker NAME]... "
-                     "[--sequence NAME]...\n";
+                     "[--sequence NAME]... [--profiles DIR | --no-profile]\n";
     }
 
     /** @brief Reads the command line; returns false after naming what is wrong. */
@@ -70,6 +74,11 @@ namespace
         for (int i = 1; i < argc; ++i)
         {
             const std::string flag = argv[i];
+            if (flag == "--no-profile")
+            {
+                args.profiles.clear();
+                continue;
+            }
             if (i + 1 >= argc)
             {
                 std::cerr << "mot_engine: " << flag << " needs a value\n";
@@ -84,6 +93,8 @@ namespace
                 args.trackers.push_back(value);
             else if (flag == "--sequence")
                 args.sequences.push_back(value);
+            else if (flag == "--profiles")
+                args.profiles = value;
             else
             {
                 std::cerr << "mot_engine: unknown flag " << flag << "\n";
@@ -166,13 +177,26 @@ int main(int argc, char** argv)
         print_usage();
         return 2;
     }
-    if (!std::filesystem::is_directory(args.data))
+    std::error_code directory_error;
+    if (!std::filesystem::is_directory(args.data, directory_error))
     {
         std::cerr << "mot_engine: no data folder at " << args.data.string() << "\n";
         return 1;
     }
     if (args.sequences.empty())
-        args.sequences = all_sequences(args.data);
+    {
+        try
+        {
+            args.sequences = all_sequences(args.data);
+        }
+        catch (const std::filesystem::filesystem_error& error)
+        {
+            SUSHITRACK_LOG_ERROR(MOTEngine::K_MOT_ENGINE_LOG_CATEGORY,
+                                 "Cannot list the sequences under {}: {}.", args.data.string(),
+                                 error.what());
+            return 1;
+        }
+    }
 
     print_hardware_info();
     for (const std::string& tracker : args.trackers)
@@ -188,10 +212,15 @@ int main(int argc, char** argv)
             try
             {
                 const MOTEngine::RunResult result =
-                    MOTEngine::run_mot_sequence(args.data, sequence, *adapter);
-                std::cout << "[ PERF " << adapter->name() << " ] " << sequence << ": "
-                          << result.mean_us() << " us/frame  (" << result.frames_processed
-                          << " frames)\n";
+                    MOTEngine::run_mot_sequence(args.data, sequence, *adapter, {}, args.profiles);
+                const std::string perf = MOTEngine::perf_line(adapter->name(), sequence, result);
+                if (!perf.empty())
+                    std::cout << perf << "\n";
+                if (!result.profile.empty())
+                {
+                    std::cout << "[ PROFILE " << adapter->name() << " ] " << sequence << ": "
+                              << result.profile.string() << "\n";
+                }
             }
             catch (const std::exception& error)
             {

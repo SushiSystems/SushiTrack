@@ -29,6 +29,7 @@
 
 #include <vector>
 
+#include <SushiTrack/association/association_log_category.hpp>
 #include <SushiTrack/logging/logger.hpp>
 #include <SushiTrack/tracking/tracklet.hpp>
 
@@ -98,7 +99,7 @@ namespace SushiTrack
 
         if (gated_pairs > 0)
         {
-            SUSHITRACK_LOG_TRACE(K_SUSHITRACK_LOG_CATEGORY,
+            SUSHITRACK_LOG_TRACE(K_ASSOCIATION_LOG_CATEGORY,
                                  "PureReID: gated out {} of {} pairs (Mahalanobis).", gated_pairs,
                                  a.size() * b.size());
         }

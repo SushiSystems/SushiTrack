@@ -1,6 +1,6 @@
 # Remaining work
 
-Next id: RW-26
+Next id: RW-29
 
 The single backlog of this repository. Defects that stand in the tree are in
 [Known issues](../reference/KNOWN_ISSUES.md); each one names the entry here that closes it.
@@ -45,6 +45,29 @@ The Python binding sits in a root folder the layout does not name. `bindings/` b
 ### RW-12 Run the coordinated-turn update only under a manoeuvre
 - State: unmeasured
 - Done when: a benchmark run shows the IMM cost per frame falls with tracking output unchanged
+
+## Profiling and logging
+
+### RW-26 Measure the profiling overhead and the drops of a benchmark run
+- State: open
+- Done when: a baseline record and a profiled record of MOT17 and DanceTrack give the per-frame cost
+  with the profiler off, with the gate closed and recording, and the drops, read against the budget
+  of under 1 % with the gate closed
+- Source: `docs/design/SUSHITRACK_PROFILING/README.md`
+
+### RW-27 Record the Python pipeline and binding through SushiProfiler
+- State: blocked
+- Blocked by: external: SushiProfiler P9, the Python binding of its zones and records
+- Done when: `applications/inference/pipeline.py` records decode, detect, ReID and draw as zones
+  of one record with the tracker's
+- Source: `docs/design/SUSHITRACK_PROFILING/README.md`
+
+### RW-28 Log from the Python binding and the inference scripts
+- State: blocked
+- Blocked by: RW-3
+- Done when: `bindings/python/sushitrack.py` and `applications/inference/` log through the Python
+  helper of SushiLog's RW-12, with tests in the home RW-3 names
+- Source: `docs/design/SUSHITRACK_PROFILING/README.md`
 
 ## Inference
 

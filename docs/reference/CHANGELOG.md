@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- 2026-10-26 — config: Made the reader refuse an unknown key, a wrong-typed value, a fractional integer and a named missing file with `SUSHITRACK_INVALID_ARGUMENT`; a missing named file no longer succeeds (`params_overlay.cpp`).
+- 2026-10-26 — config: Made `sushitrack_create_from_config` return no tracker for a refused file; it built one from the defaults, so callers that ignored a null now fail (`config_loader.cpp`).
+- 2026-10-26 — config: Removed `load_config_from_json`, which had no caller (`include/SushiTrack/configuration/config_loader.hpp`).
+- 2026-10-26 — c_api: Made `sushitrack_create_ex` refuse an unregistered `kalman_type` instead of crashing at the first track, and logged each refused or adjusted argument (`source/c_api/sushitrack_c.cpp`).
+- 2026-10-26 — logging: Replaced `K_SUSHITRACK_LOG_CATEGORY` with one category per area; `SUSHITRACK_LOG_LEVEL=sushitrack=<level>` no longer matches (`include/SushiTrack/logging/sushitrack_log_project.hpp`).
+- 2026-10-26 — logging: Logged a duplicate drop, a low-pool confirmation, an empty cost matrix, a non-finite cost, a feature of the wrong length and a second Kalman registration (`source/tracking/tracker.cpp`).
+- 2026-10-26 — logging: Added `LogThrottle` and `SUSHITRACK_LOG_WARN_LIMITED`, which write a recurring event once per thousand with the count left out (`log_throttle.hpp`).
+- 2026-10-26 — profiling: Recorded the stages, counters and track events of `Tracker::update` through SushiProfiler behind `SUSHITRACK_ENABLE_PROFILER` (`include/SushiTrack/profiling/profiling.hpp`).
+- 2026-10-26 — applications: Made `tracker_process_c` return a status where it returned void, and catch every exception; the Python bridge raises on an error (`tracker_bridge.h`).
+- 2026-10-26 — applications: Logged the bridge and `mot_engine` through the project macros, and wrote a profile record per pair (`applications/benchmarks/mot_engine/frame_recorder.hpp`).
+- 2026-10-26 — cli: Made `st eval` read each latency from the profile record, with `[ PERF ]` as the fallback and `N/A` for neither (`cli/sushitrack_cli/services/profile_record.py`).
+- 2026-10-26 — cli: Warned on an unknown config key, a bad integer, an uncreatable cache folder and a PERF line that does not parse (`cli/sushitrack_cli/config.py`).
+- 2026-10-26 — docs: Opened the SushiTrack profiling design topic and the profiler keys page (`docs/design/SUSHITRACK_PROFILING/README.md`).
 - 2026-10-26 — deps: Upgraded sushicore to 0.9.5 and moved the Sushi library pins to `[sushisystems.<name>]` tables (`cli/sushistack.deps.toml`).
 - 2026-10-21 — docs: Reshaped the migration design document into the five sections with a phase table, and copied the design format checker (`docs/design/SUSHITRACK_MIGRATION/README.md`, `tools/documentation/check_design_format.py`).
 - 2026-10-21 — ci: Added the nightly workflow, which runs `ci.yml` with ThreadSanitizer against SushiLog's main, then the quarantined tests without gating (`.github/workflows/nightly.yml`, `ci.yml`, `.github/actions/sushilog/action.yml`).

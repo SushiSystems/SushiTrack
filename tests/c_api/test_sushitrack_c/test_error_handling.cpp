@@ -37,7 +37,8 @@
 #include <gtest/gtest.h>
 
 #include <SushiTrack/c_api/sushitrack_c.h>
-#include <SushiTrack/logging/sushitrack_log_category.hpp>
+#include <SushiTrack/c_api/c_api_log_category.hpp>
+#include <SushiTrack/tracking/tracking_log_category.hpp>
 
 namespace
 {
@@ -523,7 +524,8 @@ class Small_SushiTrackCBoundaryExceptionTest : public ::testing::Test
             ASSERT_NE(hdl_, nullptr);
 
             SushiLog::set_log_synchronous(true);
-            SushiLog::set_log_level(SushiTrack::K_SUSHITRACK_LOG_CATEGORY,
+            SushiLog::set_log_level(SushiTrack::K_C_API_LOG_CATEGORY, SushiLog::LogLevel::Trace);
+            SushiLog::set_log_level(SushiTrack::K_TRACKING_LOG_CATEGORY,
                                     SushiLog::LogLevel::Trace);
             SushiLog::set_log_sink(
                 [](const SushiLog::LogRecord&)
@@ -535,7 +537,8 @@ class Small_SushiTrackCBoundaryExceptionTest : public ::testing::Test
         void TearDown() override
         {
             SushiLog::set_log_sink(nullptr);
-            SushiLog::set_log_level(SushiTrack::K_SUSHITRACK_LOG_CATEGORY,
+            SushiLog::set_log_level(SushiTrack::K_C_API_LOG_CATEGORY, SushiLog::LogLevel::Warn);
+            SushiLog::set_log_level(SushiTrack::K_TRACKING_LOG_CATEGORY,
                                     SushiLog::LogLevel::Warn);
             SushiLog::set_log_synchronous(false);
             if (hdl_ != nullptr)

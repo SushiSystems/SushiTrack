@@ -45,6 +45,7 @@ video inference pipeline.
 | [Configuration](reference/CONFIGURATION.md) | `sushitrack.json` and every tracker parameter with its default |
 | [Data layout](reference/DATA_LAYOUT.md) | Where the MOT benchmark reads sequences and writes predictions |
 | [Benchmarks](reference/BENCHMARKS.md) | The recorded MOT17, MOT20 and DanceTrack runs |
+| [Profiler keys](reference/PROFILER_KEYS.md) | The zones, counters, instants and facts SushiTrack records through SushiProfiler |
 | [Changelog](reference/CHANGELOG.md) | What changed, by release |
 | [Glossary](reference/GLOSSARY.md) | The words these documents use |
 | [Known issues](reference/KNOWN_ISSUES.md) | Defects that are recorded and not yet fixed |

@@ -64,3 +64,23 @@ TEST(Small_KalmanFilterRegistryTest, UnregisteredTypeLogsTheTypeAndReturnsNull)
     EXPECT_NE(logged.find("Unregistered Kalman type requested: 987654"), std::string::npos)
         << "logged: " << logged;
 }
+
+/**
+ * @brief Registering one type twice logs one WARN naming it, and the later creator wins.
+ */
+TEST(Small_KalmanFilterRegistryTest, RegisteringATypeTwiceWarnsAndTheLaterCreatorWins)
+{
+    CapturedLog log;
+    KalmanFilterRegistry& registry = KalmanFilterRegistry::get_instance();
+    const auto none = [](bool)
+    {
+        return std::unique_ptr<GatedStatePredictor>();
+    };
+    registry.register_creator(987001, none);
+    EXPECT_EQ(log.count("registered twice"), 0);
+
+    registry.register_creator(987001, none);
+
+    EXPECT_EQ(log.count("Kalman type 987001 registered twice"), 1);
+    EXPECT_EQ(log.level_of("registered twice"), SushiLog::LogLevel::Warn);
+}

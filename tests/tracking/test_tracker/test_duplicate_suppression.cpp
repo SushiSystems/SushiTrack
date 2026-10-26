@@ -33,6 +33,7 @@
 #include <SushiTrack/c_api/sushitrack_c.h>
 
 #include <c_detection_builders.hpp>
+#include <captured_log.hpp>
 
 using namespace CDetections;
 
@@ -180,4 +181,33 @@ namespace
             << "Coincident detections produced two lasting identities for one object.";
     }
 
+} // namespace
+
+namespace
+{
+    /**
+     * @brief A duplicate drop writes one DEBUG naming the dropped track, the kept one and the frame.
+     */
+    TEST_F(Small_TrackerDuplicateSuppressionTest, DuplicateDropLogsBothTrackIds)
+    {
+        SushiTrack::CapturedLog log(SushiLog::LogLevel::Debug);
+        std::vector<sushitrack_track_t> out(8);
+
+        for (int i = 0; i < 6; ++i)
+        {
+            sushitrack_object_t d = make_det(100.0f, 200.0f);
+            CDetections::update_frame(hdl_, &d, 1, out.data(), 8, 0.04f);
+        }
+        sushitrack_object_t dets[2] = {make_det(100.0f, 200.0f), make_det(103.0f, 200.0f)};
+        CDetections::update_frame(hdl_, dets, 2, out.data(), 8, 0.04f);
+        for (int i = 0; i < 4; ++i)
+        {
+            sushitrack_object_t d = make_det(100.0f, 200.0f);
+            CDetections::update_frame(hdl_, &d, 1, out.data(), 8, 0.04f);
+        }
+
+        EXPECT_GE(log.count("dropped as a duplicate of track"), 1);
+        EXPECT_EQ(log.level_of("dropped as a duplicate of track"), SushiLog::LogLevel::Debug);
+        EXPECT_NE(log.last("dropped as a duplicate of track").find("Frame "), std::string::npos);
+    }
 } // namespace

@@ -32,6 +32,7 @@
 #include <SushiTrack/c_api/sushitrack_c.h>
 
 #include <c_detection_builders.hpp>
+#include <captured_log.hpp>
 
 // Small_TrackerTentativeInitSuppressTest — tentative_init_suppress_iou (#8)
 
@@ -457,4 +458,60 @@ TEST_F(Small_TrackerTentativeDisabledTest, WithTentativeDisabledNewTrackIsImmedi
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 1);
     EXPECT_EQ(out[0].is_confirmed, 1);
+}
+
+// Lifecycle records
+
+/**
+ * @brief A tentative track confirmed by a low-score detection logs the same DEBUG a high-score
+ *        confirmation does.
+ */
+TEST(Small_TrackerTentativeRecordsTest, LowPoolConfirmationLogsTheConfirmation)
+{
+    SushiTrack::CapturedLog log(SushiLog::LogLevel::Debug);
+    sushitrack_params_t p = {};
+    sushitrack_get_default_params(&p);
+    p.enable_tentative = 1;
+    p.time_aware = 0;
+    p.track_thresh = 0.3f;
+    p.high_thresh = 0.5f;
+    p.tentative_fast_thresh = 0.05f;
+    p.tentative_fast_hits = 1;
+    p.tentative_match_thresh = 0.9f;
+    sushitrack_tracker_t hdl = sushitrack_create(&p);
+    ASSERT_NE(hdl, nullptr);
+    std::vector<sushitrack_track_t> out(4);
+
+    sushitrack_object_t high = obj(100.0f, 200.0f);
+    CDetections::update_frame(hdl, &high, 1, out.data(), 4, 0.04f);
+    sushitrack_object_t low = obj(100.0f, 200.0f);
+    low.score = 0.1f;
+    CDetections::update_frame(hdl, &low, 1, out.data(), 4, 0.04f);
+    sushitrack_destroy(hdl);
+
+    EXPECT_EQ(log.count("tentative track 1 confirmed"), 1);
+}
+
+/**
+ * @brief Every DEBUG record one update makes starts with that update's frame number.
+ */
+TEST(Small_TrackerTentativeRecordsTest, EveryLifecycleRecordCarriesItsFrame)
+{
+    SushiTrack::CapturedLog log(SushiLog::LogLevel::Debug);
+    sushitrack_params_t p = suppress_params(0.7f);
+    sushitrack_tracker_t hdl = sushitrack_create(&p);
+    ASSERT_NE(hdl, nullptr);
+    std::vector<sushitrack_track_t> out(10);
+    confirm_track(hdl, out);
+    sushitrack_destroy(hdl);
+
+    int lifecycle = 0;
+    for (const SushiTrack::CapturedRecord& record : log.records())
+    {
+        if (record.module != "tracking" || record.level != SushiLog::LogLevel::Debug)
+            continue;
+        ++lifecycle;
+        EXPECT_EQ(record.message.rfind("Frame ", 0), 0U) << record.message;
+    }
+    EXPECT_GT(lifecycle, 0);
 }

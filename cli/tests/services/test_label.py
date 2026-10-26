@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pytest
 
+import json
 import sys
 from types import SimpleNamespace
 
@@ -76,3 +77,48 @@ def test_clean_predictions_removes_every_pred_folder(tmp_path, recorder):
     assert label.clean_predictions(paths) == 0
     assert not (sequence / "pred").exists()
     assert (sequence / "det").exists()
+
+
+def test_parse_perf_warns_on_a_line_it_cannot_read(recorder):
+    """Skips a malformed PERF line, keeps the good one and says which line it skipped."""
+    spy = recorder(label)
+    out = ("[ PERF sushitrack ] S1: not-a-number us/frame\n"
+           "[ PERF sushitrack ] S2: 12.5 us/frame  (3 frames)")
+    assert label._parse_perf(out) == {"sushitrack": {"S2": 12.5}}
+    assert spy.said("Skipped a PERF line that does not parse")
+    assert spy.said("S1")
+
+
+def test_benchmark_args_pass_the_profiles_folder_when_given(tmp_path):
+    paths = SimpleNamespace(bridge=tmp_path / "bridge")
+    args = label._benchmark_args(paths, tmp_path / "data", ["S1"], ["sushitrack"],
+                                 tmp_path / "profiles")
+    assert args[:4] == ["--data", str(tmp_path / "data"), "--settings", str(tmp_path / "bridge")]
+    assert ["--profiles", str(tmp_path / "profiles")] == args[4:6]
+
+
+def _record(path, lengths_ns):
+    """Write a record holding one frame period of each length in *lengths_ns*."""
+    periods, start = [], 0
+    for index, length in enumerate(lengths_ns):
+        periods.append({"index": index, "timeline": 1, "warmup": False,
+                        "begin_ns": start, "end_ns": start + length})
+        start += length
+    path.write_text(json.dumps({"sushiprofiler_record": 2, "names": ["", "sushitrack.frame"],
+                                "periods": periods}), encoding="utf-8")
+
+
+def test_a_profile_record_replaces_the_perf_figure_and_prints_its_quartiles(tmp_path, recorder):
+    """The median of the record wins over the PERF line; a pair with no record keeps its figure."""
+    spy = recorder(label)
+    _record(tmp_path / "sushitrack_S1.sprec.json", [10_000, 20_000, 30_000, 40_000, 50_000])
+    perf = {"sushitrack": {"S1": 99.0, "S2": 7.0}}
+    result = label._use_records(tmp_path, ["sushitrack"], ["S1", "S2"], perf)
+    assert result == {"sushitrack": {"S1": 30.0, "S2": 7.0}}
+    assert spy.said("median 30.0 us/frame (quartiles 20.0 to 40.0, 5 frames)")
+
+
+def test_a_pair_with_neither_record_nor_perf_has_no_timing(tmp_path, recorder):
+    """Leaves the pair out, so the report prints N/A and not a zero."""
+    recorder(label)
+    assert label._use_records(tmp_path, ["sushitrack"], ["S1"], {}) == {}

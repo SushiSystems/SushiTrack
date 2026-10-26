@@ -76,8 +76,8 @@ st run sushitrack_tests -- --gtest_shuffle --gtest_break_on_failure
 ## `st eval`
 
 The MOT label benchmark. Not a CTest suite: it runs `mot_engine` over
-det.txt-backed scenarios, parses the per-sequence `[ PERF ]` timings out of its
-output, then runs TrackEval and prints a metrics table (HOTA / DetA / AssA /
+det.txt-backed scenarios, reads the per-frame latency of each pair from its profile record in
+`build/profiles/` (the `[ PERF ]` line when a pair has none), then runs TrackEval and prints a metrics table (HOTA / DetA / AssA /
 MOTA / IDF1 / IDSW / FP / FN / Lat).
 
 | Flag | Effect |

@@ -2,9 +2,7 @@
 
 **Status:** Open — analysis written 2026-10-26; section 9 holds the decisions; implementation runs with every build at the end.
 
-This work has no `**Implements:**` or `**Designs:**` line: `docs/design/README.md` lists one
-topic, `SUSHITRACK_MIGRATION`, and its phase table has no profiling phase. Decision 1 asks where
-the intent lives; the orchestrator adds the line once the topic exists.
+**Implements:** SUSHITRACK_PROFILING#P1, SUSHITRACK_PROFILING#P2, SUSHITRACK_PROFILING#P3, SUSHITRACK_PROFILING#P4, SUSHITRACK_PROFILING#P5, SUSHITRACK_PROFILING#P6, SUSHITRACK_PROFILING#P7
 
 SushiTrack is read at commit `main`; SushiProfiler at `633cacd` (v0.1.0 not tagged yet);
 SushiLog at tag `v0.2.3`, the version `cli/sushistack.deps.toml:17` pins. A line marked

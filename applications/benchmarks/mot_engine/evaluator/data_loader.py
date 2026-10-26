@@ -9,6 +9,8 @@ import os
 from dataclasses import dataclass
 from typing import List
 
+import messages as console
+
 
 @dataclass
 class Detection:
@@ -48,6 +50,17 @@ def _detect_benchmark(filepath: str) -> str:
     return "MOT17"
 
 
+def _report_skipped(filepath: str, skipped: int, rows: int) -> None:
+    """
+    @brief Warns that rows of a file were skipped.
+    @param filepath Path to the file.
+    @param skipped Rows with fewer than six fields.
+    @param rows Rows read.
+    """
+    if skipped:
+        console.warn(f"{filepath}: skipped {skipped} of {rows} rows with fewer than six fields")
+
+
 def load_gt_file(filepath: str) -> dict:
     """
     @brief Parses MOTChallenge ground-truth file.
@@ -56,7 +69,10 @@ def load_gt_file(filepath: str) -> dict:
     """
     data: dict = {}
     if not os.path.exists(filepath):
+        console.warn(f"{filepath} does not exist; it holds no rows")
         return data
+    rows = 0
+    skipped = 0
 
     benchmark   = _detect_benchmark(filepath)
     distractors = (DISTRACTOR_CLASSES_MOT20 if benchmark == "MOT20"
@@ -65,7 +81,9 @@ def load_gt_file(filepath: str) -> dict:
     with open(filepath, "r", encoding="utf-8") as f:
         for line in f:
             parts = line.strip().split(",")
+            rows += 1
             if len(parts) < 6:
+                skipped += 1
                 continue
 
             frame  = int(parts[0])
@@ -91,6 +109,7 @@ def load_gt_file(filepath: str) -> dict:
                 role=role,
             ))
 
+    _report_skipped(filepath, skipped, rows)
     return data
 
 
@@ -102,12 +121,17 @@ def load_pred_file(filepath: str) -> dict:
     """
     data: dict = {}
     if not os.path.exists(filepath):
+        console.warn(f"{filepath} does not exist; it holds no rows")
         return data
+    rows = 0
+    skipped = 0
 
     with open(filepath, "r", encoding="utf-8") as f:
         for line in f:
             parts = line.strip().split(",")
+            rows += 1
             if len(parts) < 6:
+                skipped += 1
                 continue
 
             frame  = int(parts[0])
@@ -121,4 +145,5 @@ def load_pred_file(filepath: str) -> dict:
                 score=conf,
             ))
 
+    _report_skipped(filepath, skipped, rows)
     return data

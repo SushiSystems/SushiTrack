@@ -14,6 +14,7 @@ from ..errors import UnknownTrackerError
 from ..process import RUNNER
 from . import evaluate
 from .artifacts import find_binary
+from .profile_record import read_latency
 
 #: The benchmark program `st eval` runs.
 BENCHMARK = "mot_engine"
@@ -71,9 +72,15 @@ def sequences(paths, benchmark, scenario=None, private=False, public=False):
     return selected
 
 
-def _benchmark_args(paths, data_root, names, trackers):
-    """The mot_engine arguments that run *trackers* over the sequences *names* of *data_root*."""
+def _benchmark_args(paths, data_root, names, trackers, profiles=None):
+    """The mot_engine arguments that run *trackers* over the sequences *names* of *data_root*.
+
+    *profiles* is the folder the profile records go in; `mot_engine` writes them in its default
+    folder when it is None.
+    """
     args = ["--data", str(data_root), "--settings", str(paths.bridge)]
+    if profiles is not None:
+        args += ["--profiles", str(profiles)]
     for tracker in trackers:
         args += ["--tracker", tracker]
     for name in names:
@@ -98,8 +105,27 @@ def _parse_perf(stdout):
             sequence, _, timing = line[end + 2:].strip().partition(":")
             micros = float(timing.split("us/frame")[0].strip())
         except (ValueError, IndexError):
+            console.warn(f"Skipped a PERF line that does not parse: {line.strip()!r}")
             continue
         perf.setdefault(tracker, {})[sequence.strip()] = micros
+    return perf
+
+
+def _use_records(profiles, trackers, names, perf):
+    """Replace each PERF figure with the median of its profile record, where one exists.
+
+    Prints the median with its quartiles per record. A pair with no record keeps its PERF
+    figure, and one with neither has no timing.
+    """
+    for tracker in trackers:
+        for name in names:
+            latency = read_latency(Path(profiles) / f"{tracker}_{name}.sprec.json")
+            if latency is None:
+                continue
+            perf.setdefault(tracker, {})[name] = latency.median_us
+            console.info(f"  {tracker} {name}: median {latency.median_us:.1f} us/frame "
+                         f"(quartiles {latency.low_us:.1f} to {latency.high_us:.1f}, "
+                         f"{latency.periods} frames)")
     return perf
 
 
@@ -162,10 +188,12 @@ def _evaluate_benchmark(cfg, paths, benchmark, names, trackers, compare, eval_on
                  f"{', '.join(TRACKERS[t] for t in trackers)}")
     perf = {}
     if not eval_only:
+        profiles = paths.build / "profiles"
         code, perf = _run_benchmark(cfg.tool, paths,
-                                    _benchmark_args(paths, data_root, names, trackers))
+                                    _benchmark_args(paths, data_root, names, trackers, profiles))
         if code != 0:
             return code
+        perf = _use_records(profiles, trackers, names, perf)
     if trackeval:
         return evaluate.run_official(paths, data_root, names, trackers)
     export_dir = None if export is None else str(Path(export) / benchmark)

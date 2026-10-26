@@ -79,7 +79,9 @@ def _compiler_env(tool, build_dir) -> dict[str, str]:
             return dict(os.environ)
         try:
             Path(build_dir).mkdir(parents=True, exist_ok=True)
-        except OSError:
+        except OSError as error:
+            console.warn(f"Cannot make {build_dir} ({error}); "
+                         f"the environment snapshot is not cached.")
             return merge_env(os.environ, snapshot)
         write_cache(cache_file, key, snapshot)
     return merge_env(os.environ, snapshot)

@@ -29,16 +29,35 @@
 
 #include <chrono>
 #include <fstream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
+#include <vector>
 
+#include <SushiTrack/logging/logger.hpp>
+
+#include <frame_recorder.hpp>
+#include <mot_engine_log_category.hpp>
 #include <mot_sequence.hpp>
 
 namespace MOTEngine
 {
+    std::string perf_line(const std::string& tracker, const std::string& sequence,
+                          const RunResult& result)
+    {
+        if (result.frames_processed == 0)
+            return {};
+        std::ostringstream line;
+        line << "[ PERF " << tracker << " ] " << sequence << ": " << result.mean_us()
+             << " us/frame  (" << result.frames_processed << " frames)";
+        return line.str();
+    }
+
     RunResult run_mot_sequence(const std::filesystem::path& data_root, const std::string& sequence,
                                TrackerBridge::TrackerAdapter& adapter,
-                               const std::filesystem::path& predictions)
+                               const std::filesystem::path& predictions,
+                               const std::filesystem::path& profiles)
     {
         const std::filesystem::path base = data_root / sequence;
         const std::filesystem::path detections = base / "det" / "det.txt";
@@ -51,7 +70,12 @@ namespace MOTEngine
 
         const MOTFrames frames = read_mot_detections(detections.string());
         if (frames.empty())
+        {
+            SUSHITRACK_LOG_WARN(K_MOT_ENGINE_LOG_CATEGORY,
+                                "{}: {} holds no detections; the sequence is skipped.", sequence,
+                                detections.string());
             return {};
+        }
 
         const std::filesystem::path folder =
             (predictions.empty() ? base / "pred" : predictions) / adapter.name();
@@ -62,19 +86,32 @@ namespace MOTEngine
             throw std::runtime_error("cannot write " + output.string());
 
         RunResult result;
+        FrameRecorder recorder(profiles, adapter.name(), sequence, frames.size());
+        std::vector<std::pair<int, std::vector<TrackerBridge::TrackResult>>> reported;
+        reported.reserve(frames.size());
         for (const auto& [frame, dets] : frames)
         {
+            recorder.begin_frame();
             const auto start = std::chrono::steady_clock::now();
-            const std::vector<TrackerBridge::TrackResult> tracks = adapter.update(dets, dt);
+            std::vector<TrackerBridge::TrackResult> tracks = adapter.update(dets, dt);
             result.total_tracking_us +=
                 std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - start)
                     .count();
+            reported.emplace_back(frame, std::move(tracks));
+            ++result.frames_processed;
+        }
+
+        const FrameRecording recording = recorder.finish();
+        result.profile = recording.path;
+        result.profile_dropped = recording.dropped;
+
+        for (const auto& [frame, tracks] : reported)
+        {
             for (const TrackerBridge::TrackResult& t : tracks)
             {
                 out << frame << "," << t.track_id << "," << t.x << "," << t.y << "," << t.w << ","
                     << t.h << "," << t.score << ",-1,-1,-1\n";
             }
-            ++result.frames_processed;
         }
         return result;
     }

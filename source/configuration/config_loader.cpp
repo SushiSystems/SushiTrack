@@ -21,7 +21,7 @@
 
 /**
  * @file config_loader.cpp
- * @brief Implements JSON configuration loading and path resolution helpers.
+ * @brief Implements configuration path resolution and the C entry points that load a file.
  * @author Mustafa Garip
  */
 
@@ -35,147 +35,43 @@
 #include <nlohmann/json.hpp>
 
 #include <SushiTrack/c_api/sushitrack_c.h>
+#include <SushiTrack/configuration/configuration_log_category.hpp>
 #include <SushiTrack/logging/logger.hpp>
 
+#include <configuration/params_overlay.hpp>
+
 namespace fs = std::filesystem;
+
+using SushiTrack::K_CONFIGURATION_LOG_CATEGORY;
 
 namespace
 {
     constexpr const char* K_DEFAULT_CONFIG_NAME = "sushitrack.json";
+    constexpr const char* K_CONFIG_VARIABLE = "SUSHITRACK_CONFIG";
     constexpr int K_MAX_SEARCH_DEPTH = 8;
 
-    template <typename T>
-    T get_int(const nlohmann::json& sec, const char* key, T def)
+    /**
+     * @brief Holds a file the caller asked for by name, and where the name came from.
+     */
+    struct RequestedFile
     {
-        auto it = sec.find(key);
-        if (it == sec.end())
-        {
-            return def;
-        }
-        if (it->is_boolean())
-        {
-            return static_cast<T>(it->get<bool>() ? 1 : 0);
-        }
-        if (it->is_number())
-        {
-            return static_cast<T>(it->get<double>());
-        }
-        return def;
-    }
+            std::string path;   /**< The file named, or empty when the caller named none. */
+            const char* origin; /**< What named it: the path argument or the variable. */
+    };
 
-    float get_float(const nlohmann::json& sec, const char* key, float def)
+    /**
+     * @brief Returns the file the caller named: the path argument first, then SUSHITRACK_CONFIG.
+     */
+    RequestedFile requested_file(const char* path)
     {
-        auto it = sec.find(key);
-        if (it == sec.end() || !it->is_number())
+        if (path && path[0] != '\0')
+            return {path, "the path argument"};
+        if (const char* env = std::getenv(K_CONFIG_VARIABLE))
         {
-            return def;
+            if (env[0] != '\0')
+                return {env, K_CONFIG_VARIABLE};
         }
-        return it->get<float>();
-    }
-
-    template <typename ParamsT>
-    void overlay(const nlohmann::json& doc, ParamsT& p)
-    {
-        const nlohmann::json& st = doc.contains("sushitrack") ? doc.at("sushitrack") : doc;
-
-        if (st.contains("basic"))
-        {
-            const auto& b = st.at("basic");
-            p.time_aware = get_int(b, "time_aware", p.time_aware);
-            p.frame_rate = get_int(b, "frame_rate", p.frame_rate);
-            p.track_buffer = get_int(b, "track_buffer", p.track_buffer);
-            p.track_thresh = get_float(b, "track_thresh", p.track_thresh);
-            p.high_thresh = get_float(b, "high_thresh", p.high_thresh);
-            p.match_thresh = get_float(b, "match_thresh", p.match_thresh);
-            p.enable_tentative = get_int(b, "enable_tentative", p.enable_tentative);
-            p.enable_reid = get_int(b, "enable_reid", p.enable_reid);
-            p.enable_mahalanobis = get_int(b, "enable_mahalanobis", p.enable_mahalanobis);
-            p.enable_ocm = get_int(b, "enable_ocm", p.enable_ocm);
-            p.enable_oru = get_int(b, "enable_oru", p.enable_oru);
-        }
-
-        if (!st.contains("advanced"))
-        {
-            return;
-        }
-        const auto& adv = st.at("advanced");
-
-        if (adv.contains("association"))
-        {
-            const auto& s = adv.at("association");
-            p.primary_assoc_mode = get_int(s, "primary_assoc_mode", p.primary_assoc_mode);
-            p.fuse_score = get_int(s, "fuse_score", p.fuse_score);
-            p.iou_match_thresh = get_float(s, "iou_match_thresh", p.iou_match_thresh);
-            p.unconfirmed_iou_thresh =
-                get_float(s, "unconfirmed_iou_thresh", p.unconfirmed_iou_thresh);
-            p.duplicate_iou_thresh = get_float(s, "duplicate_iou_thresh", p.duplicate_iou_thresh);
-        }
-
-        if (adv.contains("coordinate_system"))
-        {
-            const auto& s = adv.at("coordinate_system");
-            p.enable_xyah = get_int(s, "enable_xyah", p.enable_xyah);
-            p.iou_type = get_int(s, "iou_type", p.iou_type);
-            p.iou_plus_one = get_int(s, "iou_plus_one", p.iou_plus_one);
-            p.kalman_type = get_int(s, "kalman_type", p.kalman_type);
-        }
-
-        if (adv.contains("reid_params"))
-        {
-            const auto& s = adv.at("reid_params");
-            p.feature_momentum = get_float(s, "feature_momentum", p.feature_momentum);
-            p.reid_high_thresh = get_float(s, "reid_high_thresh", p.reid_high_thresh);
-            p.reid_high_iou_weight = get_float(s, "reid_high_iou_weight", p.reid_high_iou_weight);
-            p.reid_low_thresh = get_float(s, "reid_low_thresh", p.reid_low_thresh);
-            p.reid_low_iou_weight = get_float(s, "reid_low_iou_weight", p.reid_low_iou_weight);
-            p.reid_recovery_thresh = get_float(s, "reid_recovery_thresh", p.reid_recovery_thresh);
-            p.max_feature_history = get_int(s, "max_feature_history", p.max_feature_history);
-            p.reid_direct_assignment_weight =
-                get_float(s, "reid_direct_assignment_weight", p.reid_direct_assignment_weight);
-        }
-
-        if (adv.contains("tentative_logic"))
-        {
-            const auto& s = adv.at("tentative_logic");
-            p.tentative_match_thresh =
-                get_float(s, "tentative_match_thresh", p.tentative_match_thresh);
-            p.tentative_confirm_hits =
-                get_int(s, "tentative_confirm_hits", p.tentative_confirm_hits);
-            p.tentative_max_age_seconds =
-                get_float(s, "tentative_max_age_seconds", p.tentative_max_age_seconds);
-            p.tentative_max_miss_frames =
-                get_int(s, "tentative_max_miss_frames", p.tentative_max_miss_frames);
-            p.tentative_init_suppress_iou =
-                get_float(s, "tentative_init_suppress_iou", p.tentative_init_suppress_iou);
-            p.tentative_fast_thresh =
-                get_float(s, "tentative_fast_thresh", p.tentative_fast_thresh);
-            p.tentative_fast_hits = get_int(s, "tentative_fast_hits", p.tentative_fast_hits);
-            p.tentative_slow_thresh =
-                get_float(s, "tentative_slow_thresh", p.tentative_slow_thresh);
-            p.tentative_slow_hits_offset =
-                get_int(s, "tentative_slow_hits_offset", p.tentative_slow_hits_offset);
-            p.tentative_vslow_hits_offset =
-                get_int(s, "tentative_vslow_hits_offset", p.tentative_vslow_hits_offset);
-        }
-
-        if (adv.contains("ocm"))
-        {
-            const auto& s = adv.at("ocm");
-            p.ocm_vdc_weight = get_float(s, "ocm_vdc_weight", p.ocm_vdc_weight);
-            p.ocm_delta_t = get_int(s, "ocm_delta_t", p.ocm_delta_t);
-            p.ocm_min_velocity = get_float(s, "ocm_min_velocity", p.ocm_min_velocity);
-            p.ocm_max_age = get_int(s, "ocm_max_age", p.ocm_max_age);
-            p.ocm_maneuver_weight_scale =
-                get_float(s, "ocm_maneuver_weight_scale", p.ocm_maneuver_weight_scale);
-        }
-
-        if (adv.contains("mahalanobis_gating"))
-        {
-            const auto& s = adv.at("mahalanobis_gating");
-            p.gating_thresh = get_float(s, "gating_thresh", p.gating_thresh);
-            p.motion_cost_weight = get_float(s, "motion_cost_weight", p.motion_cost_weight);
-            p.max_area_ratio = get_float(s, "max_area_ratio", p.max_area_ratio);
-        }
+        return {std::string(), ""};
     }
 } // namespace
 
@@ -198,7 +94,7 @@ namespace SushiTrack
             return std::string();
         }
 
-        if (const char* env = std::getenv("SUSHITRACK_CONFIG"))
+        if (const char* env = std::getenv(K_CONFIG_VARIABLE))
         {
             if (env[0] != '\0' && fs::exists(env, ec))
             {
@@ -207,6 +103,13 @@ namespace SushiTrack
         }
 
         fs::path dir = fs::current_path(ec);
+        if (ec)
+        {
+            SUSHITRACK_LOG_DEBUG(K_CONFIGURATION_LOG_CATEGORY,
+                                 "The current directory is unreadable ({}); the search for {} "
+                                 "ends empty.",
+                                 ec.message(), K_DEFAULT_CONFIG_NAME);
+        }
         for (int depth = 0; depth <= K_MAX_SEARCH_DEPTH && !dir.empty(); ++depth)
         {
             fs::path candidate = dir / K_DEFAULT_CONFIG_NAME;
@@ -229,53 +132,25 @@ namespace SushiTrack
 
         return std::string();
     }
-
-    /**
-     * @brief Loads tracker configuration parameters from a JSON file.
-     * @return True when file was found and parsed successfully, false otherwise.
-     */
-    bool load_config_from_json(const char* path, TrackerConfig& config)
-    {
-        const std::string resolved = resolve_config_path(path);
-        if (resolved.empty())
-        {
-            return false;
-        }
-
-        try
-        {
-            std::ifstream file(resolved);
-            if (!file.is_open())
-            {
-                return false;
-            }
-            nlohmann::json doc = nlohmann::json::parse(file, nullptr, true, true);
-            overlay(doc, config);
-            return true;
-        }
-        catch (const std::exception&)
-        {
-            return false;
-        }
-    }
-
 } // namespace SushiTrack
-
-using SushiTrack::K_SUSHITRACK_LOG_CATEGORY;
 
 extern "C"
 {
     /**
      * @brief Overlays a JSON configuration file onto a parameters structure.
      * @param path Explicit file path, or NULL to use standard resolution.
-     * @param params Parameters structure updated in place.
-     * @return Status code indicating success or failure reason.
+     * @param params Parameters structure updated in place; untouched on any failure.
+     * @return SUCCESS when the file applied or none was asked for and none was found,
+     *         INVALID_ARGUMENT for a null params, a named file that does not exist or a
+     *         document the reader refuses, RUNTIME_ERROR for a file that cannot be read or parsed.
      */
     sushitrack_status_t sushitrack_load_params_from_json(const char* path,
                                                          sushitrack_params_t* params)
     {
         if (!params)
         {
+            SUSHITRACK_LOG_ERROR(K_CONFIGURATION_LOG_CATEGORY,
+                                 "Configuration load refused: params is null; nothing was read.");
             return SUSHITRACK_INVALID_ARGUMENT;
         }
 
@@ -283,10 +158,21 @@ extern "C"
 
         try
         {
+            const RequestedFile requested = requested_file(path);
+            std::error_code ec;
+            if (!requested.path.empty() && !fs::exists(requested.path, ec))
+            {
+                SUSHITRACK_LOG_ERROR(K_CONFIGURATION_LOG_CATEGORY,
+                                     "Configuration load refused: {} names {}, which does not "
+                                     "exist; params is unchanged.",
+                                     requested.origin, requested.path);
+                return SUSHITRACK_INVALID_ARGUMENT;
+            }
+
             resolved = SushiTrack::resolve_config_path(path);
             if (resolved.empty())
             {
-                SUSHITRACK_LOG_INFO(K_SUSHITRACK_LOG_CATEGORY,
+                SUSHITRACK_LOG_INFO(K_CONFIGURATION_LOG_CATEGORY,
                                     "No configuration file found -- using provided parameters.");
                 return SUSHITRACK_SUCCESS;
             }
@@ -294,29 +180,37 @@ extern "C"
             std::ifstream file(resolved);
             if (!file.is_open())
             {
-                SUSHITRACK_LOG_WARN(K_SUSHITRACK_LOG_CATEGORY,
-                                    "Configuration file could not be opened: {}", resolved.c_str());
-                return SUSHITRACK_SUCCESS;
+                SUSHITRACK_LOG_ERROR(K_CONFIGURATION_LOG_CATEGORY,
+                                     "Configuration load failed: {} exists but cannot be opened; "
+                                     "params is unchanged.",
+                                     resolved);
+                return SUSHITRACK_RUNTIME_ERROR;
             }
 
-            nlohmann::json doc = nlohmann::json::parse(file, nullptr, true, true);
-            overlay(doc, *params);
+            const nlohmann::json document = nlohmann::json::parse(file, nullptr, true, true);
+            const std::string refusal = SushiTrack::Detail::overlay_params(document, *params);
+            if (!refusal.empty())
+            {
+                SUSHITRACK_LOG_ERROR(K_CONFIGURATION_LOG_CATEGORY,
+                                     "Configuration {} refused: {}; params is unchanged.",
+                                     resolved, refusal);
+                return SUSHITRACK_INVALID_ARGUMENT;
+            }
 
-            SUSHITRACK_LOG_INFO(K_SUSHITRACK_LOG_CATEGORY, "Configuration loaded from {}",
-                                resolved.c_str());
+            SUSHITRACK_LOG_INFO(K_CONFIGURATION_LOG_CATEGORY, "Configuration loaded from {}",
+                                resolved);
             return SUSHITRACK_SUCCESS;
         }
         catch (const std::exception& e)
         {
-            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY, "Failed to parse configuration {}: {}",
-                                 resolved.c_str(), e.what());
+            SUSHITRACK_LOG_ERROR(K_CONFIGURATION_LOG_CATEGORY,
+                                 "Failed to parse configuration {}: {}", resolved, e.what());
             return SUSHITRACK_RUNTIME_ERROR;
         }
         catch (...)
         {
-            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
-                                 "Failed to load configuration {}: unknown exception.",
-                                 resolved.c_str());
+            SUSHITRACK_LOG_ERROR(K_CONFIGURATION_LOG_CATEGORY,
+                                 "Failed to load configuration {}: unknown exception.", resolved);
             return SUSHITRACK_RUNTIME_ERROR;
         }
     }
@@ -324,13 +218,15 @@ extern "C"
     /**
      * @brief Instantiates a tracker directly from a JSON configuration file.
      * @param path Explicit file path, or NULL to use standard resolution order.
-     * @return Handle to initialized tracker instance, or NULL on failure.
+     * @return Handle to initialized tracker instance, or NULL when the file is refused or the
+     *         tracker cannot be built; the reason is logged.
      */
     sushitrack_tracker_t sushitrack_create_from_config(const char* path)
     {
         sushitrack_params_t params;
         sushitrack_get_default_params(&params);
-        sushitrack_load_params_from_json(path, &params);
+        if (sushitrack_load_params_from_json(path, &params) != SUSHITRACK_SUCCESS)
+            return nullptr;
         return sushitrack_create(&params);
     }
 

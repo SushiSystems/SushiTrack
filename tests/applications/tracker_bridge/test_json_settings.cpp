@@ -30,7 +30,9 @@
 
 #include <gtest/gtest.h>
 
+#include <captured_log.hpp>
 #include <json_settings.hpp>
+#include <tracker_bridge_log_category.hpp>
 
 using namespace TrackerBridge;
 
@@ -70,4 +72,25 @@ TEST(Small_JsonSettingsTest, AbsentOrNonNumericKeyGivesTheFallback)
     const nlohmann::json section = {{"name", "x"}};
     EXPECT_FLOAT_EQ(json_number(section, "name", 1.5f), 1.5f);
     EXPECT_FLOAT_EQ(json_number(section, "missing", 2.5f), 2.5f);
+}
+
+/**
+ * @brief A missing file, a missing section and a key that is not a number each log one WARN, on
+ *        the one stream every adapter uses.
+ */
+TEST(Small_JsonSettingsTest, UnusableSettingsAreLogged)
+{
+    SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_TRACKER_BRIDGE_LOG_CATEGORY});
+
+    const nlohmann::json missing = read_json_settings("this/path/does/not/exist.json");
+    const nlohmann::json& section =
+        json_section(missing, "bytetrack", "this/path/does/not/exist.json");
+    const nlohmann::json typed = {{"track_buffer", "many"}};
+    const float value = json_number(typed, "track_buffer", 30.f);
+
+    EXPECT_TRUE(section.empty());
+    EXPECT_FLOAT_EQ(value, 30.f);
+    EXPECT_EQ(log.count("this/path/does/not/exist.json cannot be opened"), 1);
+    EXPECT_EQ(log.count("has no \"bytetrack\" section"), 1);
+    EXPECT_EQ(log.count("Setting track_buffer is not a number; keeping 30"), 1);
 }

@@ -47,6 +47,7 @@
 #include <SushiTrack/association/pure_reid_cost_calculator.hpp>
 #include <SushiTrack/association/reid_first_cost_calculator.hpp>
 #include <SushiTrack/association/siou_cost_calculator.hpp>
+#include <SushiTrack/c_api/c_api_log_category.hpp>
 #include <SushiTrack/detection/object.hpp>
 #include <SushiTrack/filtering/gate_validator.hpp>
 #include <SushiTrack/filtering/generic_kalman_factory.hpp>
@@ -54,7 +55,10 @@
 #include <SushiTrack/filtering/kalman_filter_registry.hpp>
 #include <SushiTrack/filtering/nsa_kalman_filter.hpp>
 #include <SushiTrack/filtering/null_gate_validator.hpp>
+#include <SushiTrack/logging/log_throttle.hpp>
 #include <SushiTrack/logging/logger.hpp>
+#include <SushiTrack/profiling/profiler_keys.hpp>
+#include <SushiTrack/profiling/profiling.hpp>
 #include <SushiTrack/tracking/track_state.hpp>
 #include <SushiTrack/tracking/tracker.hpp>
 
@@ -69,7 +73,8 @@ struct sushitrack_tracker_impl_t
         std::vector<std::vector<float>> last_features;
 };
 
-using SushiTrack::K_SUSHITRACK_LOG_CATEGORY;
+using SushiTrack::K_C_API_LOG_CATEGORY;
+namespace Keys = SushiTrack::ProfilerKeys;
 
 namespace
 {
@@ -82,6 +87,7 @@ namespace
                                         sushitrack_track_t* out_tracks, int max_tracks,
                                         int* out_count)
     {
+        SUSHITRACK_ZONE(Keys::K_ZONE_OUTPUT, Keys::K_GROUP_TRACK);
         std::sort(results.begin(), results.end(),
                   [](const auto& a, const auto& b)
                   {
@@ -103,10 +109,12 @@ namespace
         const bool overflow = results.size() > static_cast<std::size_t>(max_tracks);
         if (overflow)
         {
-            SUSHITRACK_LOG_WARN(K_SUSHITRACK_LOG_CATEGORY,
-                                "{} tracks exceed the output buffer of {}; writing the first {} "
-                                "by state and returning SUSHITRACK_BUFFER_OVERFLOW",
-                                results.size(), max_tracks, max_tracks);
+            static SushiTrack::LogThrottle overflow_throttle;
+            SUSHITRACK_LOG_WARN_LIMITED(K_C_API_LOG_CATEGORY, overflow_throttle,
+                                        "{} tracks exceed the output buffer of {}; writing the "
+                                        "first {} by state and returning "
+                                        "SUSHITRACK_BUFFER_OVERFLOW",
+                                        results.size(), max_tracks, max_tracks);
         }
 
         int count = std::min(static_cast<int>(results.size()), max_tracks);
@@ -141,6 +149,10 @@ namespace
                 static_cast<int>(impl->tracker->get_global_frame_id() - res->get_frame_id());
         }
 
+        SUSHITRACK_COUNTER(Keys::K_COUNTER_TRACKS_WRITTEN, Keys::K_UNIT_TRACKS, Set, count);
+        SUSHITRACK_COUNTER(Keys::K_COUNTER_TRACKS_DROPPED, Keys::K_UNIT_TRACKS, Set,
+                           results.size() - static_cast<std::size_t>(count));
+
         *out_count = count;
         return overflow ? SUSHITRACK_BUFFER_OVERFLOW : SUSHITRACK_SUCCESS;
     }
@@ -151,6 +163,42 @@ namespace
     bool is_track_buffer_valid(const sushitrack_track_t* out_tracks, int max_tracks)
     {
         return max_tracks >= 0 && (out_tracks != nullptr || max_tracks == 0);
+    }
+
+    /**
+     * @brief Logs the ERROR that names the argument @p entry refused, and returns INVALID_ARGUMENT.
+     */
+    sushitrack_status_t refuse_track_buffer(const char* entry, int max_tracks)
+    {
+        SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
+                             "{} refused: out_tracks is null or max_tracks is {}; no tracks were "
+                             "written.",
+                             entry, max_tracks);
+        return SUSHITRACK_INVALID_ARGUMENT;
+    }
+
+    /**
+     * @brief Warns about each parameter value the tracker would clamp or ignore.
+     */
+    void warn_about_adjusted_params(const SushiTrack::TrackerConfig& config)
+    {
+        if (config.frame_rate < 1)
+        {
+            SUSHITRACK_LOG_WARN(K_C_API_LOG_CATEGORY,
+                                "frame_rate {} is below 1; the tracker clamps it to 1.",
+                                config.frame_rate);
+        }
+        if (config.track_buffer < 1)
+        {
+            SUSHITRACK_LOG_WARN(K_C_API_LOG_CATEGORY,
+                                "track_buffer {} is below 1; the tracker clamps it to 1.",
+                                config.track_buffer);
+        }
+        if (config.iou_type < 0 || config.iou_type > 3)
+        {
+            SUSHITRACK_LOG_WARN(K_C_API_LOG_CATEGORY,
+                                "iou_type {} is unknown; using plain IoU.", config.iou_type);
+        }
     }
 } // namespace
 
@@ -253,10 +301,20 @@ extern "C"
                                              sushitrack_tracker_t* out_tracker)
     {
         if (!out_tracker)
+        {
+            SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
+                                 "sushitrack_create_ex refused: out_tracker is null; no tracker "
+                                 "was created.");
             return SUSHITRACK_INVALID_ARGUMENT;
+        }
         *out_tracker = nullptr;
         if (!params)
+        {
+            SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
+                                 "sushitrack_create_ex refused: params is null; no tracker was "
+                                 "created.");
             return SUSHITRACK_INVALID_ARGUMENT;
+        }
 
         try
         {
@@ -316,31 +374,23 @@ extern "C"
             config.ocm_max_age = params->ocm_max_age;
             config.ocm_maneuver_weight_scale = params->ocm_maneuver_weight_scale;
 
+            warn_about_adjusted_params(config);
+
+            // The registry logs the ERROR that names the unregistered type.
+            auto gate_kf = SushiTrack::KalmanFilterRegistry::get_instance().create(
+                config.kalman_type, config.enable_xyah);
+            if (!gate_kf)
+                return SUSHITRACK_INVALID_ARGUMENT;
+
             auto kf_factory = std::make_shared<SushiTrack::GenericKalmanFactory>(
                 config.kalman_type, config.enable_xyah);
 
             std::shared_ptr<SushiTrack::GateValidator> active_gate_validator;
 
             if (config.enable_mahalanobis)
-            {
-                auto gate_kf = SushiTrack::KalmanFilterRegistry::get_instance().create(
-                    config.kalman_type, config.enable_xyah);
-
-                if (gate_kf)
-                {
-                    active_gate_validator = std::move(gate_kf);
-                }
-                else
-                {
-                    active_gate_validator = SushiTrack::NullGateValidator::get_instance();
-                    SUSHITRACK_LOG_WARN(K_SUSHITRACK_LOG_CATEGORY,
-                                        "Gating disabled due to invalid kalman_type.");
-                }
-            }
+                active_gate_validator = std::move(gate_kf);
             else
-            {
                 active_gate_validator = SushiTrack::NullGateValidator::get_instance();
-            }
 
             auto solver = std::make_unique<SushiTrack::LAPJVSolver>();
 
@@ -443,7 +493,7 @@ extern "C"
                 config, kf_factory, std::move(solver), high_conf_metric, low_conf_metric,
                 tentative_metric, duplicate_metric, lost_recovery_metric);
 
-            SUSHITRACK_LOG_INFO(K_SUSHITRACK_LOG_CATEGORY,
+            SUSHITRACK_LOG_INFO(K_C_API_LOG_CATEGORY,
                                 "Tracker instance created successfully.");
 
             *out_tracker = static_cast<sushitrack_tracker_t>(impl.release());
@@ -451,19 +501,19 @@ extern "C"
         }
         catch (const std::bad_alloc&)
         {
-            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
+            SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
                                  "Tracker creation failed: out of memory.");
             return SUSHITRACK_OUT_OF_MEMORY;
         }
         catch (const std::exception& e)
         {
-            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY, "Tracker creation failed: {}",
+            SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY, "Tracker creation failed: {}",
                                  e.what());
             return SUSHITRACK_RUNTIME_ERROR;
         }
         catch (...)
         {
-            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
+            SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
                                  "Tracker creation failed: unknown exception.");
             return SUSHITRACK_RUNTIME_ERROR;
         }
@@ -482,12 +532,12 @@ extern "C"
 
         try
         {
-            SUSHITRACK_LOG_INFO(K_SUSHITRACK_LOG_CATEGORY, "Destroying tracker instance.");
+            SUSHITRACK_LOG_INFO(K_C_API_LOG_CATEGORY, "Destroying tracker instance.");
             owner.reset();
         }
         catch (...)
         {
-            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
+            SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
                                  "Destroy threw an unknown exception; the tracker is released.");
         }
     }
@@ -511,11 +561,30 @@ extern "C"
                                           int* out_count)
     {
         if (!out_count)
+        {
+            SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
+                                 "sushitrack_update refused: out_count is null; the frame was "
+                                 "not applied.");
             return SUSHITRACK_INVALID_ARGUMENT;
+        }
         *out_count = 0;
-        if (!tracker || n_objects < 0 || (n_objects > 0 && !objects) ||
-            !is_track_buffer_valid(out_tracks, max_tracks))
+        if (!tracker)
+        {
+            SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
+                                 "sushitrack_update refused: tracker is null; the frame was not "
+                                 "applied.");
             return SUSHITRACK_INVALID_ARGUMENT;
+        }
+        if (n_objects < 0 || (n_objects > 0 && !objects))
+        {
+            SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
+                                 "sushitrack_update refused: n_objects is {} and objects is {}; "
+                                 "the frame was not applied.",
+                                 n_objects, objects ? "set" : "null");
+            return SUSHITRACK_INVALID_ARGUMENT;
+        }
+        if (!is_track_buffer_valid(out_tracks, max_tracks))
+            return refuse_track_buffer("sushitrack_update", max_tracks);
         auto* impl = static_cast<sushitrack_tracker_impl_t*>(tracker);
 
         try
@@ -523,16 +592,31 @@ extern "C"
             SushiTrack::ObjectVector detections;
             detections.reserve(static_cast<std::size_t>(n_objects));
 
+            int without_feature = 0;
             for (int i = 0; i < n_objects; ++i)
             {
                 const auto& obj = objects[i];
 
                 std::vector<float> feat_vec;
-                if (impl->config.enable_reid && obj.feat && obj.feat_dim > 0)
-                    feat_vec.assign(obj.feat, obj.feat + obj.feat_dim);
+                if (impl->config.enable_reid)
+                {
+                    if (obj.feat && obj.feat_dim > 0)
+                        feat_vec.assign(obj.feat, obj.feat + obj.feat_dim);
+                    else
+                        ++without_feature;
+                }
 
                 SushiTrack::Rect<float> rect(obj.x, obj.y, obj.width, obj.height);
                 detections.emplace_back(rect, obj.label, obj.score, std::move(feat_vec));
+            }
+
+            if (without_feature > 0)
+            {
+                static SushiTrack::LogThrottle feature_throttle;
+                SUSHITRACK_LOG_WARN_LIMITED(K_C_API_LOG_CATEGORY, feature_throttle,
+                                            "enable_reid is on but {} of {} detections carry no "
+                                            "feature; matching uses their overlap alone.",
+                                            without_feature, n_objects);
             }
 
             impl->last_results = impl->tracker->update(detections, dt);
@@ -541,7 +625,7 @@ extern "C"
         catch (const std::bad_alloc&)
         {
             *out_count = 0;
-            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
+            SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
                                  "Update of {} detections failed: out of memory; returning "
                                  "SUSHITRACK_OUT_OF_MEMORY",
                                  n_objects);
@@ -550,7 +634,7 @@ extern "C"
         catch (const std::exception& e)
         {
             *out_count = 0;
-            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
+            SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
                                  "Update of {} detections failed: {}; returning "
                                  "SUSHITRACK_RUNTIME_ERROR",
                                  n_objects, e.what());
@@ -559,7 +643,7 @@ extern "C"
         catch (...)
         {
             *out_count = 0;
-            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
+            SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
                                  "Update of {} detections failed: unknown exception; returning "
                                  "SUSHITRACK_RUNTIME_ERROR",
                                  n_objects);
@@ -576,10 +660,22 @@ extern "C"
                                                  int* out_count)
     {
         if (!out_count)
+        {
+            SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
+                                 "sushitrack_get_tracklets refused: out_count is null; no tracks "
+                                 "were written.");
             return SUSHITRACK_INVALID_ARGUMENT;
+        }
         *out_count = 0;
-        if (!tracker || !is_track_buffer_valid(out_tracks, max_tracks))
+        if (!tracker)
+        {
+            SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
+                                 "sushitrack_get_tracklets refused: tracker is null; no tracks "
+                                 "were written.");
             return SUSHITRACK_INVALID_ARGUMENT;
+        }
+        if (!is_track_buffer_valid(out_tracks, max_tracks))
+            return refuse_track_buffer("sushitrack_get_tracklets", max_tracks);
         auto* impl = static_cast<sushitrack_tracker_impl_t*>(tracker);
 
         try
@@ -590,7 +686,7 @@ extern "C"
         catch (const std::bad_alloc&)
         {
             *out_count = 0;
-            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
+            SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
                                  "Reading the tracklets failed: out of memory; returning "
                                  "SUSHITRACK_OUT_OF_MEMORY");
             return SUSHITRACK_OUT_OF_MEMORY;
@@ -598,7 +694,7 @@ extern "C"
         catch (const std::exception& e)
         {
             *out_count = 0;
-            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
+            SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
                                  "Reading the tracklets failed: {}; returning "
                                  "SUSHITRACK_RUNTIME_ERROR",
                                  e.what());
@@ -607,7 +703,7 @@ extern "C"
         catch (...)
         {
             *out_count = 0;
-            SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY,
+            SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
                                  "Reading the tracklets failed: unknown exception; returning "
                                  "SUSHITRACK_RUNTIME_ERROR");
             return SUSHITRACK_RUNTIME_ERROR;

@@ -74,7 +74,7 @@ Visual features are L2-normalised and exponentially smoothed (`feature_momentum`
 
 ## Logging
 
-SushiTrack logs through SushiLog under `K_SUSHITRACK_LOG_CATEGORY`; `SUSHITRACK_LOG_LEVEL` sets the level. The details are in [Overview](OVERVIEW.md#logging).
+SushiTrack logs through SushiLog under one category per area, `tracking`, `association`, `filtering`, `configuration` and `c_api`; `SUSHITRACK_LOG_LEVEL` sets the level of all of them or of one, as in `warn,association=trace`. It records its frame stages, counters and track events through SushiProfiler when built with `SUSHITRACK_ENABLE_PROFILER`. The details are in [Overview](OVERVIEW.md#logging) and [Overview](OVERVIEW.md#profiling).
 
 ## Thread safety
 

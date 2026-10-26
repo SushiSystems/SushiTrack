@@ -25,6 +25,7 @@
  * @author Mustafa Garip
  */
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -33,7 +34,9 @@
 
 #include <mot_detection.hpp>
 #include <track_result.hpp>
+#include <captured_log.hpp>
 #include <tracker_adapter.hpp>
+#include <tracker_bridge_log_category.hpp>
 #include <tracker_registry.hpp>
 
 using namespace TrackerBridge;
@@ -82,4 +85,25 @@ TEST(Small_TrackerRegistryTest, FindsANameInAnyCase)
 TEST(Small_TrackerRegistryTest, UnknownNameBuildsNothing)
 {
     EXPECT_EQ(TrackerRegistry::get_instance().create("no-such-tracker"), nullptr);
+}
+
+/**
+ * @brief A second registration under one name logs one WARN, and the names come back sorted.
+ */
+TEST(Small_TrackerRegistryTest, RegisteringANameTwiceWarnsAndNamesAreSorted)
+{
+    SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_TRACKER_BRIDGE_LOG_CATEGORY});
+    TrackerRegistry& registry = TrackerRegistry::get_instance();
+    const auto make = []
+    {
+        return std::make_unique<SilentAdapter>();
+    };
+
+    registry.register_tracker("DuplicateProbe", make);
+    registry.register_tracker("duplicateprobe", make);
+
+    EXPECT_EQ(log.count("Tracker duplicateprobe registered twice"), 1);
+    const std::vector<std::string> names = registry.registered_names();
+    EXPECT_TRUE(std::is_sorted(names.begin(), names.end()));
+    EXPECT_NE(std::find(names.begin(), names.end(), "duplicateprobe"), names.end());
 }

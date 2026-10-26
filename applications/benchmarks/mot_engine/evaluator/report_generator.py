@@ -118,10 +118,10 @@ def _fmt_row(tracker: str, seq: str, m: dict, ref: Optional[dict] = None) -> str
     fp   = m.get("FP",   m.get("CLR_FP", 0))
     fn   = m.get("FN",   m.get("CLR_FN", 0))
 
-    lat_us = m.get("Latency_us", 0.0)
-    if lat_us == 0.0:
-        fps = m.get("FPS", 0.0)
-        lat_us = (1_000_000.0 / fps) if fps > 0 else 0.0
+    lat_us = m.get("Latency_us")
+    if lat_us is None:
+        fps = m.get("FPS")
+        lat_us = (1_000_000.0 / fps) if fps else None
 
     def c(val, key, reverse=False):
         return _colored(val, ref.get(key) if ref else None, reverse)
@@ -137,7 +137,7 @@ def _fmt_row(tracker: str, seq: str, m: dict, ref: Optional[dict] = None) -> str
         _ansi_rjust(str(idsw),         6),
         _ansi_rjust(str(fp),           9),
         _ansi_rjust(str(fn),           9),
-        _ansi_rjust(f"{lat_us:.0f}" if lat_us > 0 else "-", 10),
+        _ansi_rjust(f"{lat_us:.0f}" if lat_us else "N/A", 10),
     ]
     return "".join(cells)
 
@@ -172,6 +172,7 @@ def _aggregate_seqs(tracker_results: dict, seqs: list) -> dict:
     perf_keys  = {"FPS", "Latency_us"}
 
     total_frames = 0
+    perf_frames = {k: 0 for k in perf_keys}
     agg: dict = {}
 
     for seq in seqs:
@@ -180,16 +181,22 @@ def _aggregate_seqs(tracker_results: dict, seqs: list) -> dict:
             continue
         w = m.get("num_frames", 1) or 1
         total_frames += w
-        for k in rate_keys | perf_keys:
-            v = m.get(k, 0.0)
-            agg[k] = agg.get(k, 0.0) + v * w
+        for k in rate_keys:
+            agg[k] = agg.get(k, 0.0) + m.get(k, 0.0) * w
+        for k in perf_keys:
+            if k in m:
+                agg[k] = agg.get(k, 0.0) + m[k] * w
+                perf_frames[k] += w
         for k in count_keys:
             agg[k] = agg.get(k, 0) + m.get(k, 0)
 
     if total_frames > 0:
-        for k in rate_keys | perf_keys:
+        for k in rate_keys:
             if k in agg:
                 agg[k] /= total_frames
+    for k in perf_keys:
+        if perf_frames[k]:
+            agg[k] /= perf_frames[k]
 
     agg["num_frames"] = total_frames
     return agg

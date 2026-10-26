@@ -40,6 +40,12 @@ class CTrackResult(Structure):
         ("score", c_float)
     ]
 
+TRACKER_BRIDGE_OK = 0
+TRACKER_BRIDGE_INVALID_ARGUMENT = 1
+TRACKER_BRIDGE_TRUNCATED = 2
+TRACKER_BRIDGE_ERROR = 3
+
+
 class TrackerBridge:
     def __init__(self, tracker_name: str, build_dir: str = "build"):
         self.tracker_name = tracker_name
@@ -94,7 +100,7 @@ class TrackerBridge:
             POINTER(c_int),
             c_int
         ]
-        self.lib.tracker_process_c.restype = None
+        self.lib.tracker_process_c.restype = c_int
 
     def update(self, detections: list, embeddings=None):
         """Processes detections and returns tracked results."""
@@ -120,10 +126,7 @@ class TrackerBridge:
 
     def _update_shim(self, detections: list, embeddings=None):
         num_dets = len(detections)
-        if num_dets == 0:
-            return []
-
-        det_array = (CDetection * num_dets)()
+        det_array = (CDetection * num_dets)() if num_dets else None
         feat_refs = []
 
         for i, det in enumerate(detections):
@@ -149,7 +152,7 @@ class TrackerBridge:
         res_array = (CTrackResult * max_results)()
         num_res = c_int(0)
 
-        self.lib.tracker_process_c(
+        status = self.lib.tracker_process_c(
             self.tracker_ptr,
             det_array,
             num_dets,
@@ -157,6 +160,10 @@ class TrackerBridge:
             ctypes.byref(num_res),
             max_results
         )
+        if status in (TRACKER_BRIDGE_INVALID_ARGUMENT, TRACKER_BRIDGE_ERROR):
+            raise RuntimeError(
+                f"tracker_process_c failed with status {status}; the tracker_bridge log names why"
+            )
 
         results = []
         for i in range(num_res.value):

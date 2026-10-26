@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <stdexcept>
 
 #include <SushiLog/log/log_front.hpp>
@@ -34,7 +35,7 @@
 #include <SushiLog/text/text_format.hpp>
 #include <SushiLog/text/value_text.hpp>
 
-#include <SushiTrack/logging/sushitrack_log_category.hpp>
+#include <SushiTrack/logging/sushitrack_log_project.hpp>
 
 #ifndef SUSHITRACK_ENABLE_LOGGING
 #define SUSHITRACK_ENABLE_LOGGING 1
@@ -74,6 +75,25 @@ namespace SushiTrack
 /** @brief Logs, in @p category, why the process cannot continue. */
 #define SUSHITRACK_LOG_FATAL(category, ...)                                                        \
     SUSHITRACK_LOG_AT(SushiLog::LogLevel::Fatal, category, __VA_ARGS__)
+
+/**
+ * @brief Writes a WARN record when @p throttle admits it, and names how many were left out.
+ *
+ * The caller includes log_throttle.hpp. Takes at least one format argument after @p format; the
+ * count of suppressed events follows
+ * them and the macro adds its own `{}` to the end of the message.
+ */
+#define SUSHITRACK_LOG_WARN_LIMITED(category, throttle, format, ...)                               \
+    do                                                                                             \
+    {                                                                                              \
+        std::uint64_t sushitrack_suppressed = 0U;                                                  \
+        if ((throttle).admit(sushitrack_suppressed))                                               \
+        {                                                                                          \
+            SUSHITRACK_LOG_WARN(category, format " ({} similar events suppressed since the "       \
+                                                 "last record)",                                   \
+                                __VA_ARGS__, sushitrack_suppressed);                               \
+        }                                                                                          \
+    } while (false)
 
 /**
  * @brief Throws std::runtime_error with the formatted message; the code that catches it logs it.

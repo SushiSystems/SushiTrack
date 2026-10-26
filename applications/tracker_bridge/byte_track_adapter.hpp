@@ -27,8 +27,6 @@
 
 #pragma once
 
-#include <filesystem>
-#include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -37,7 +35,10 @@
 #include <ByteTrack/Object.h>
 #include <ByteTrack/Rect.h>
 
+#include <SushiTrack/logging/logger.hpp>
+
 #include <json_settings.hpp>
+#include <tracker_bridge_log_category.hpp>
 #include <mot_detection.hpp>
 #include <track_result.hpp>
 #include <tracker_adapter.hpp>
@@ -65,28 +66,19 @@ namespace TrackerBridge
                   high_thresh_(0.6f),
                   match_thresh_(0.8f)
             {
-                if (!config_path.empty() && std::filesystem::exists(config_path))
+                if (!config_path.empty())
                 {
                     const nlohmann::json doc = read_json_settings(config_path);
-                    auto it = doc.find("bytetrack");
-                    if (it != doc.end())
-                    {
-                        const nlohmann::json& s = it.value();
-                        frame_rate_ = static_cast<int>(
-                            json_number(s, "frame_rate", static_cast<float>(frame_rate_)));
-                        track_buffer_ = static_cast<int>(
-                            json_number(s, "track_buffer", static_cast<float>(track_buffer_)));
-                        track_thresh_ = json_number(s, "track_thresh", track_thresh_);
-                        high_thresh_ = json_number(s, "high_thresh", high_thresh_);
-                        match_thresh_ = json_number(s, "match_thresh", match_thresh_);
-                        std::cout << "[ ByteTrackAdapter ] config loaded from " << config_path
-                                  << "\n";
-                    }
-                }
-                else if (!config_path.empty())
-                {
-                    std::cout << "[ ByteTrackAdapter ] config not found at " << config_path
-                              << " -- using defaults\n";
+                    const nlohmann::json& s = json_section(doc, "bytetrack", config_path);
+                    frame_rate_ = static_cast<int>(
+                        json_number(s, "frame_rate", static_cast<float>(frame_rate_)));
+                    track_buffer_ = static_cast<int>(
+                        json_number(s, "track_buffer", static_cast<float>(track_buffer_)));
+                    track_thresh_ = json_number(s, "track_thresh", track_thresh_);
+                    high_thresh_ = json_number(s, "high_thresh", high_thresh_);
+                    match_thresh_ = json_number(s, "match_thresh", match_thresh_);
+                    SUSHITRACK_LOG_INFO(K_TRACKER_BRIDGE_LOG_CATEGORY,
+                                        "ByteTrack settings read from {}.", config_path);
                 }
 
                 rebuild_tracker();

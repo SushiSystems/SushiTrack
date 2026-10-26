@@ -26,6 +26,7 @@
  */
 
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -36,6 +37,7 @@
 #include <SushiTrack/c_api/sushitrack_c.h>
 
 #include <c_detection_builders.hpp>
+#include <captured_log.hpp>
 
 namespace
 {
@@ -500,17 +502,235 @@ TEST(Medium_ConfigLoaderLibraryApiTest, NullParamsAreRejected)
 }
 
 /**
- * @brief A missing file is non-fatal: params are left at defaults and SUCCESS
- *        is returned, so configuration stays optional.
+ * @brief A named file that does not exist is refused: the status says so, params stays at its
+ *        defaults and one ERROR names the file.
  */
-TEST(Medium_ConfigLoaderLibraryApiTest, MissingFileLeavesDefaultsAndSucceeds)
+TEST(Medium_ConfigLoaderLibraryApiTest, MissingNamedFileIsRefusedAndLogged)
 {
+    SushiTrack::CapturedLog log;
     sushitrack_params_t before{};
     sushitrack_get_default_params(&before);
     sushitrack_params_t after = before;
 
     EXPECT_EQ(sushitrack_load_params_from_json("this/path/does/not/exist.json", &after),
-              SUSHITRACK_SUCCESS);
+              SUSHITRACK_INVALID_ARGUMENT);
     EXPECT_EQ(after.frame_rate, before.frame_rate);
     EXPECT_EQ(after.enable_reid, before.enable_reid);
+    EXPECT_EQ(log.count("this/path/does/not/exist.json, which does not exist"), 1);
+    EXPECT_EQ(log.level_of("does not exist"), SushiLog::LogLevel::Error);
+}
+
+namespace
+{
+    /**
+     * @brief Sets an environment variable for one scope and puts the old value back.
+     */
+    class ScopedEnvironment final
+    {
+        public:
+            /// @brief Sets @p name to @p value.
+            ScopedEnvironment(const char* name, const std::string& value) : name_(name)
+            {
+                const char* old = std::getenv(name);
+                had_old_ = old != nullptr;
+                if (had_old_)
+                    old_ = old;
+                set(value);
+            }
+
+            ScopedEnvironment(const ScopedEnvironment&) = delete;
+            ScopedEnvironment& operator=(const ScopedEnvironment&) = delete;
+            ScopedEnvironment(ScopedEnvironment&&) = delete;
+            ScopedEnvironment& operator=(ScopedEnvironment&&) = delete;
+
+            /// @brief Restores the value the variable had.
+            ~ScopedEnvironment()
+            {
+                set(old_);
+            }
+
+        private:
+            /// @brief Sets the variable, or clears it when it had no value and @p value is empty.
+            void set(const std::string& value) const
+            {
+#ifdef _WIN32
+                _putenv_s(name_.c_str(), value.c_str());
+#else
+                if (value.empty() && !had_old_)
+                    unsetenv(name_.c_str());
+                else
+                    setenv(name_.c_str(), value.c_str(), 1);
+#endif
+            }
+
+            /// @brief The variable's name.
+            std::string name_;
+            /// @brief Whether the variable had a value before.
+            bool had_old_ = false;
+            /// @brief The value it had.
+            std::string old_;
+    };
+
+    /**
+     * @brief Writes @p text to a file named @p name in a temporary folder and returns its path.
+     */
+    std::string write_temp_config(const std::string& name, const std::string& text)
+    {
+        const std::filesystem::path folder =
+            std::filesystem::temp_directory_path() / "sushitrack_config_loader_tests";
+        std::filesystem::create_directories(folder);
+        const std::filesystem::path path = folder / name;
+        std::ofstream(path) << text;
+        return path.string();
+    }
+} // namespace
+
+/**
+ * @brief SUSHITRACK_CONFIG naming a file that does not exist is refused like a named path, so a
+ *        typo in the variable does not fall back to a search silently.
+ */
+TEST(Medium_ConfigLoaderLibraryApiTest, MissingFileNamedByTheEnvironmentIsRefusedAndLogged)
+{
+    const ScopedEnvironment environment("SUSHITRACK_CONFIG", "no/such/sushitrack_env.json");
+    SushiTrack::CapturedLog log;
+    sushitrack_params_t params{};
+    sushitrack_get_default_params(&params);
+
+    EXPECT_EQ(sushitrack_load_params_from_json(nullptr, &params), SUSHITRACK_INVALID_ARGUMENT);
+    EXPECT_EQ(log.count("SUSHITRACK_CONFIG names no/such/sushitrack_env.json"), 1);
+}
+
+/**
+ * @brief With no path, no variable and no file in the search, the load succeeds and says so at
+ *        INFO.
+ */
+TEST(Medium_ConfigLoaderLibraryApiTest, NothingNamedAndNothingFoundSucceedsAtInfo)
+{
+    const ScopedEnvironment environment("SUSHITRACK_CONFIG", "");
+    const std::filesystem::path previous = std::filesystem::current_path();
+    const std::filesystem::path empty_folder =
+        std::filesystem::temp_directory_path() / "sushitrack_config_loader_empty";
+    std::filesystem::create_directories(empty_folder);
+    std::filesystem::current_path(empty_folder);
+    SushiTrack::CapturedLog log;
+    sushitrack_params_t params{};
+    sushitrack_get_default_params(&params);
+
+    const sushitrack_status_t status = sushitrack_load_params_from_json(nullptr, &params);
+
+    std::filesystem::current_path(previous);
+    EXPECT_EQ(status, SUSHITRACK_SUCCESS);
+    EXPECT_EQ(log.level_of("No configuration file found"), SushiLog::LogLevel::Info);
+}
+
+/**
+ * @brief A value of the wrong kind is refused with its dotted path, params stays untouched and
+ *        one ERROR carries the same path.
+ */
+TEST(Medium_ConfigLoaderStrictReaderTest, WrongTypedValueIsRefusedWithItsPath)
+{
+    SushiTrack::CapturedLog log;
+    const std::string path = write_temp_config(
+        "wrong_kind.json",
+        R"({"sushitrack": {"basic": {"frame_rate": "fast", "track_buffer": 90}}})");
+    sushitrack_params_t before{};
+    sushitrack_get_default_params(&before);
+    sushitrack_params_t after = before;
+
+    EXPECT_EQ(sushitrack_load_params_from_json(path.c_str(), &after), SUSHITRACK_INVALID_ARGUMENT);
+    EXPECT_EQ(after.frame_rate, before.frame_rate);
+    EXPECT_EQ(after.track_buffer, before.track_buffer);
+    EXPECT_EQ(log.count("sushitrack.basic.frame_rate: expected an integer, got a string"), 1);
+}
+
+/**
+ * @brief A number with a fraction in an integer field is refused, not truncated.
+ */
+TEST(Medium_ConfigLoaderStrictReaderTest, FractionInAnIntegerFieldIsRefused)
+{
+    SushiTrack::CapturedLog log;
+    const std::string path =
+        write_temp_config("fraction.json", R"({"basic": {"frame_rate": 29.97}})");
+    sushitrack_params_t params{};
+    sushitrack_get_default_params(&params);
+    const int before = params.frame_rate;
+
+    EXPECT_EQ(sushitrack_load_params_from_json(path.c_str(), &params),
+              SUSHITRACK_INVALID_ARGUMENT);
+    EXPECT_EQ(params.frame_rate, before);
+    EXPECT_EQ(log.count("basic.frame_rate: expected an integer, got 29.97"), 1);
+}
+
+/**
+ * @brief A key no section reads is refused, whether it sits in a section or beside one.
+ */
+TEST(Medium_ConfigLoaderStrictReaderTest, UnknownKeyIsRefusedWhereverItSits)
+{
+    SushiTrack::CapturedLog log;
+    sushitrack_params_t params{};
+    sushitrack_get_default_params(&params);
+
+    const std::string in_section =
+        write_temp_config("typo_in_section.json", R"({"basic": {"frame_rat": 30}})");
+    EXPECT_EQ(sushitrack_load_params_from_json(in_section.c_str(), &params),
+              SUSHITRACK_INVALID_ARGUMENT);
+    EXPECT_EQ(log.count("basic.frame_rat: unknown key"), 1);
+
+    const std::string in_advanced = write_temp_config(
+        "typo_in_advanced.json", R"({"sushitrack": {"advanced": {"asociation": {}}}})");
+    EXPECT_EQ(sushitrack_load_params_from_json(in_advanced.c_str(), &params),
+              SUSHITRACK_INVALID_ARGUMENT);
+    EXPECT_EQ(log.count("sushitrack.advanced.asociation: unknown key"), 1);
+
+    const std::string at_root =
+        write_temp_config("typo_at_root.json", R"({"sushitrack": {}, "extra": 1})");
+    EXPECT_EQ(sushitrack_load_params_from_json(at_root.c_str(), &params),
+              SUSHITRACK_INVALID_ARGUMENT);
+    EXPECT_EQ(log.count("extra: unknown key"), 1);
+}
+
+/**
+ * @brief A flag written true or false and an integer written with a zero fraction are accepted.
+ */
+TEST(Medium_ConfigLoaderStrictReaderTest, FlagsAndWholeNumbersApply)
+{
+    const std::string path = write_temp_config(
+        "flags.json",
+        R"({"basic": {"enable_reid": true, "frame_rate": 30.0, "match_thresh": 0.6}})");
+    sushitrack_params_t params{};
+    sushitrack_get_default_params(&params);
+
+    EXPECT_EQ(sushitrack_load_params_from_json(path.c_str(), &params), SUSHITRACK_SUCCESS);
+    EXPECT_EQ(params.enable_reid, 1);
+    EXPECT_EQ(params.frame_rate, 30);
+    EXPECT_FLOAT_EQ(params.match_thresh, 0.6f);
+}
+
+/**
+ * @brief A document that is not valid JSON keeps its RUNTIME_ERROR status and logs one ERROR.
+ */
+TEST(Medium_ConfigLoaderStrictReaderTest, MalformedJsonReturnsRuntimeError)
+{
+    SushiTrack::CapturedLog log;
+    const std::string path = write_temp_config("malformed.json", "{ not json");
+    sushitrack_params_t params{};
+    sushitrack_get_default_params(&params);
+
+    EXPECT_EQ(sushitrack_load_params_from_json(path.c_str(), &params), SUSHITRACK_RUNTIME_ERROR);
+    EXPECT_EQ(log.count("Failed to parse configuration"), 1);
+}
+
+/**
+ * @brief sushitrack_create_from_config returns no tracker for a refused file, where it once built
+ *        one from the defaults without a word.
+ */
+TEST(Medium_ConfigLoaderCreateTest, RefusedFileGivesNoTracker)
+{
+    SushiTrack::CapturedLog log;
+    const std::string path =
+        write_temp_config("refused_for_create.json", R"({"basic": {"frame_rate": "x"}})");
+
+    EXPECT_EQ(sushitrack_create_from_config(path.c_str()), nullptr);
+    EXPECT_EQ(log.count("refused_for_create.json"), 1);
+    EXPECT_EQ(sushitrack_create_from_config("no/such/file.json"), nullptr);
 }

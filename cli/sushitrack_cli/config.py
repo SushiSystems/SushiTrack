@@ -168,35 +168,51 @@ def _warn(message):
     console.warn(message)
 
 
-def _coerce(current, raw):
-    """Coerce a config/env value to the type of the existing field value."""
+def _coerce(current, raw, name=""):
+    """Coerce a config/env value to the type of the existing field value.
+
+    A value an integer field cannot read keeps the current one and says so under *name*.
+    """
     if isinstance(current, bool):
         return str(raw).strip().lower() in ("1", "true", "yes", "on")
     if isinstance(current, int) and not isinstance(raw, bool):
         try:
             return int(raw)
         except (TypeError, ValueError):
+            _warn(f"{name}: {raw!r} is not an integer; keeping {current}")
             return current
     return raw
 
 
+def _legacy_pairs(document):
+    """The (section, key) pairs `legacy_tool_keys` already names, so they are not warned twice."""
+    pairs = set()
+    for old, _new in legacy_tool_keys(document):
+        header, _, key = old.rpartition("] ")
+        pairs.add((header.lstrip("[").split(".")[-1], key))
+    return pairs
+
+
 def _apply_document(cfg, document, origin):
     known = {f.name for f in fields(cfg)}
+    legacy = _legacy_pairs(document)
     for section, values in _merge_platform(document).items():
         if not isinstance(values, dict):
             continue
         for key, value in values.items():
             name = f"{section}_{key}"
             if name in known:
-                setattr(cfg, name, _coerce(getattr(cfg, name), value))
+                setattr(cfg, name, _coerce(getattr(cfg, name), value, f"{origin}: {section}.{key}"))
                 cfg.sources[name] = origin
+            elif (section, key) not in legacy:
+                _warn(f"{origin}: {section}.{key} is not a setting and is ignored")
 
 
 def _apply_env(cfg):
     for name, var in ENV_OVERRIDES.items():
         raw = os.environ.get(var)
         if raw is not None and raw != "":
-            setattr(cfg, name, _coerce(getattr(cfg, name), raw))
+            setattr(cfg, name, _coerce(getattr(cfg, name), raw, f"env:{var}"))
             cfg.sources[name] = f"env:{var}"
 
 

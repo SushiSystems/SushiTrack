@@ -21,7 +21,7 @@
 
 /**
  * @file config_loader.hpp
- * @brief Declares configuration file loading helpers for tracker parameters.
+ * @brief Declares the helper that finds the tracker configuration file.
  * @author Mustafa Garip
  */
 
@@ -29,9 +29,7 @@
 
 #include <string>
 
-#include <SushiTrack/c_api/sushitrack_c.h>
 #include <SushiTrack/c_api/sushitrack_export.hpp>
-#include <SushiTrack/tracking/tracker_config.hpp>
 
 namespace SushiTrack
 {
@@ -41,12 +39,4 @@ namespace SushiTrack
      * @return Resolved path string, or empty string when no file found.
      */
     SUSHITRACK_API std::string resolve_config_path(const char* path);
-
-    /**
-     * @brief Loads tracker configuration parameters from a JSON file.
-     * @param path File path or null for auto-discovery.
-     * @param config Target TrackerConfig structure updated in place.
-     * @return True when file was found and parsed successfully, false otherwise.
-     */
-    SUSHITRACK_API bool load_config_from_json(const char* path, TrackerConfig& config);
 } // namespace SushiTrack

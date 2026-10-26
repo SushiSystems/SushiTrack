@@ -40,12 +40,17 @@
 #include <SushiTrack/filtering/kalman_factory.hpp>
 #include <SushiTrack/filtering/kalman_filter.hpp>
 #include <SushiTrack/logging/logger.hpp>
+#include <SushiTrack/profiling/profiler_keys.hpp>
+#include <SushiTrack/profiling/profiling.hpp>
 #include <SushiTrack/tracking/frame_timing_policy.hpp>
 #include <SushiTrack/tracking/track_state.hpp>
+#include <SushiTrack/tracking/tracking_log_category.hpp>
 #include <SushiTrack/tracking/wall_clock_timing_policy.hpp>
 
 namespace SushiTrack
 {
+    namespace Keys = ProfilerKeys;
+
     /**
      * @brief Initializes a new Tracker instance with algorithm components.
      * @param config Configuration parameters for tracking.
@@ -95,13 +100,14 @@ namespace SushiTrack
      */
     std::vector<Tracker::TrackletPtr> Tracker::update(const ObjectVector& objects, float dt)
     {
+        SUSHITRACK_ZONE(Keys::K_ZONE_UPDATE, Keys::K_GROUP_TRACK);
         float effective_dt = dt;
         if (!config_.time_aware)
         {
             effective_dt = 1.0f / static_cast<float>(std::max(1, config_.frame_rate));
         }
 
-        SUSHITRACK_LOG_TRACE(K_SUSHITRACK_LOG_CATEGORY,
+        SUSHITRACK_LOG_TRACE(K_TRACKING_LOG_CATEGORY,
                              "Frame {}: Updating with {} detections, dt={}", frame_id_ + 1,
                              objects.size(), SushiLog::fixed(effective_dt, 4));
 
@@ -115,20 +121,29 @@ namespace SushiTrack
         std::vector<TrackletPtr> det_high;
         std::vector<TrackletPtr> det_low;
 
-        for (const auto& obj : objects)
         {
-            TrackletPtr tracklet = std::make_shared<Tracklet>(
-                nullptr, obj.rect, obj.label, obj.prob, obj.feature, config_.feature_momentum,
-                config_.enable_xyah, config_.max_feature_history, config_.ocm_delta_t,
-                config_.enable_oru);
+            SUSHITRACK_ZONE(Keys::K_ZONE_SPLIT, Keys::K_GROUP_DETECT);
+            for (const auto& obj : objects)
+            {
+                TrackletPtr tracklet = std::make_shared<Tracklet>(
+                    nullptr, obj.rect, obj.label, obj.prob, obj.feature, config_.feature_momentum,
+                    config_.enable_xyah, config_.max_feature_history, config_.ocm_delta_t,
+                    config_.enable_oru);
 
-            tracklet->set_timing_policy(timing_policy_);
+                tracklet->set_timing_policy(timing_policy_);
 
-            if (obj.prob >= config_.track_thresh)
-                det_high.push_back(tracklet);
-            else
-                det_low.push_back(tracklet);
+                if (obj.prob >= config_.track_thresh)
+                    det_high.push_back(tracklet);
+                else
+                    det_low.push_back(tracklet);
+            }
         }
+        SUSHITRACK_COUNTER(Keys::K_COUNTER_DETECTIONS_IN, Keys::K_UNIT_DETECTIONS, Set,
+                           objects.size());
+        SUSHITRACK_COUNTER_FINE(Keys::K_COUNTER_DETECTIONS_HIGH, Keys::K_UNIT_DETECTIONS, Set,
+                                det_high.size());
+        SUSHITRACK_COUNTER_FINE(Keys::K_COUNTER_DETECTIONS_LOW, Keys::K_UNIT_DETECTIONS, Set,
+                                det_low.size());
 
         std::vector<TrackletPtr> tracklet_pool;
         std::vector<TrackletPtr> tentative_pool;
@@ -144,6 +159,7 @@ namespace SushiTrack
         }
         else
         {
+            SUSHITRACK_ZONE(Keys::K_ZONE_PREDICT, Keys::K_GROUP_FILTER);
             std::vector<TrackletPtr> active_tracklets;
             for (auto& s : tracked_tracklets_)
             {
@@ -161,8 +177,14 @@ namespace SushiTrack
         }
 
         SUSHITRACK_LOG_TRACE(
-            K_SUSHITRACK_LOG_CATEGORY, "Pools: tracklet={}, tentative={}, non_active={}",
+            K_TRACKING_LOG_CATEGORY, "Pools: tracklet={}, tentative={}, non_active={}",
             tracklet_pool.size(), tentative_pool.size(), non_active_tracklets.size());
+        SUSHITRACK_COUNTER_FINE(Keys::K_COUNTER_TRACKS_POOL, Keys::K_UNIT_TRACKS, Set,
+                                tracklet_pool.size());
+        SUSHITRACK_COUNTER_FINE(Keys::K_COUNTER_TRACKS_TENTATIVE_IN, Keys::K_UNIT_TRACKS, Set,
+                                tentative_pool.size());
+        SUSHITRACK_COUNTER_FINE(Keys::K_COUNTER_TRACKS_NON_ACTIVE, Keys::K_UNIT_TRACKS, Set,
+                                non_active_tracklets.size());
 
         std::vector<TrackletPtr> active_pool;
         std::vector<TrackletPtr> lost_pool;
@@ -185,17 +207,26 @@ namespace SushiTrack
         match_high_confidence(active_pool, det_high, activated_tracklets, refind_tracklets,
                               track_remaining, det_high_remaining);
 
-        SUSHITRACK_LOG_TRACE(K_SUSHITRACK_LOG_CATEGORY,
+        SUSHITRACK_LOG_TRACE(K_TRACKING_LOG_CATEGORY,
                              "High-conf match: matches={}, remaining_tracks={}, remaining_dets={}",
                              activated_tracklets.size() + refind_tracklets.size(),
                              track_remaining.size(), det_high_remaining.size());
+        SUSHITRACK_COUNTER(Keys::K_COUNTER_MATCHES_HIGH, Keys::K_UNIT_TRACKS, Set,
+                           activated_tracklets.size() + refind_tracklets.size());
 
+        [[maybe_unused]] const size_t activated_before_low = activated_tracklets.size();
         match_low_confidence(track_remaining, det_low, activated_tracklets, lost_tracklets_curr,
                              det_low_remaining, effective_dt);
 
-        SUSHITRACK_LOG_TRACE(K_SUSHITRACK_LOG_CATEGORY,
+        SUSHITRACK_LOG_TRACE(K_TRACKING_LOG_CATEGORY,
                              "Low-conf match: newly_lost={}, remaining_dets={}",
                              lost_tracklets_curr.size(), det_low_remaining.size());
+        SUSHITRACK_COUNTER_FINE(Keys::K_COUNTER_MATCHES_LOW, Keys::K_UNIT_TRACKS, Set,
+                                activated_tracklets.size() - activated_before_low);
+        SUSHITRACK_COUNTER(Keys::K_COUNTER_TRACKS_NEWLY_LOST, Keys::K_UNIT_TRACKS, Set,
+                           lost_tracklets_curr.size());
+        SUSHITRACK_COUNTER_FINE(Keys::K_COUNTER_DETECTIONS_LOW_REMAINING, Keys::K_UNIT_DETECTIONS,
+                                Set, det_low_remaining.size());
 
         std::vector<TrackletPtr> det_final_remaining;
         if (lost_recovery_metric_ && !lost_pool.empty())
@@ -208,16 +239,21 @@ namespace SushiTrack
                 if (t->get_track_state() == TrackState::Lost)
                     lost_tracklets_curr.push_back(t);
             }
-            SUSHITRACK_LOG_TRACE(K_SUSHITRACK_LOG_CATEGORY, "Lost recovery: recovered={}",
+            SUSHITRACK_LOG_TRACE(K_TRACKING_LOG_CATEGORY, "Lost recovery: recovered={}",
                                  refind_tracklets.size());
         }
         else
         {
             det_final_remaining = det_high_remaining;
         }
+        SUSHITRACK_COUNTER(Keys::K_COUNTER_TRACKS_RECOVERED, Keys::K_UNIT_TRACKS, Set,
+                           refind_tracklets.size());
 
+        [[maybe_unused]] const size_t activated_before_stage = activated_tracklets.size();
+        [[maybe_unused]] const size_t ids_before_stage = track_id_count_;
         if (config_.enable_tentative)
         {
+            SUSHITRACK_ZONE(Keys::K_ZONE_TENTATIVE, Keys::K_GROUP_ASSOCIATE);
             std::vector<TrackletPtr> tentative_next;
             std::vector<TrackletPtr> removed_tentative_curr;
 
@@ -236,27 +272,42 @@ namespace SushiTrack
             tentative_tracklets_ = tentative_next;
 
             SUSHITRACK_LOG_TRACE(
-                K_SUSHITRACK_LOG_CATEGORY,
+                K_TRACKING_LOG_CATEGORY,
                 "Tentative stage: promoted={}, remaining={}, removed={}, new_inits={}",
                 activated_tracklets.size(), tentative_tracklets_.size(),
                 removed_tentative_curr.size(), det_for_new_init.size());
         }
         else
         {
+            SUSHITRACK_ZONE(Keys::K_ZONE_UNCONFIRMED, Keys::K_GROUP_ASSOCIATE);
             match_unconfirmed(non_active_tracklets, det_final_remaining, activated_tracklets,
                               removed_tracklets_curr);
             tentative_tracklets_.clear();
         }
+        SUSHITRACK_COUNTER(Keys::K_COUNTER_TENTATIVE_CONFIRMED, Keys::K_UNIT_TRACKS, Set,
+                           activated_tracklets.size() - activated_before_stage);
+        SUSHITRACK_COUNTER_FINE(Keys::K_COUNTER_TENTATIVE_REMOVED, Keys::K_UNIT_TRACKS, Set,
+                                removed_tracklets_curr.size());
+        SUSHITRACK_COUNTER_FINE(Keys::K_COUNTER_TRACKS_STARTED, Keys::K_UNIT_TRACKS, Set,
+                                track_id_count_ - ids_before_stage);
 
         cleanup_lost(removed_tracklets_curr);
 
         finalize_lists(activated_tracklets, refind_tracklets, lost_tracklets_curr,
                        removed_tracklets_curr);
 
-        SUSHITRACK_LOG_TRACE(K_SUSHITRACK_LOG_CATEGORY,
+        SUSHITRACK_LOG_TRACE(K_TRACKING_LOG_CATEGORY,
                              "Cycle complete: tracked={}, lost={}, tentative={}, removed={}",
                              tracked_tracklets_.size(), lost_tracklets_.size(),
                              tentative_tracklets_.size(), removed_tracklets_curr.size());
+        SUSHITRACK_COUNTER(Keys::K_COUNTER_ALIVE_TRACKED, Keys::K_UNIT_TRACKS, Set,
+                           tracked_tracklets_.size());
+        SUSHITRACK_COUNTER(Keys::K_COUNTER_ALIVE_LOST, Keys::K_UNIT_TRACKS, Set,
+                           lost_tracklets_.size());
+        SUSHITRACK_COUNTER_FINE(Keys::K_COUNTER_ALIVE_TENTATIVE, Keys::K_UNIT_TRACKS, Set,
+                                tentative_tracklets_.size());
+        SUSHITRACK_COUNTER_FINE(Keys::K_COUNTER_REMOVED, Keys::K_UNIT_TRACKS, Set,
+                                removed_tracklets_curr.size());
 
         std::vector<TrackletPtr> output;
         output.reserve(tracked_tracklets_.size() + lost_tracklets_.size() +
@@ -271,6 +322,23 @@ namespace SushiTrack
     }
 
     /**
+     * @brief Fills @p out with the costs @p metric gives for @p tracks against @p detections.
+     * @param metric Cost calculator of the stage.
+     * @param tracks Rows of the matrix.
+     * @param detections Columns of the matrix.
+     * @param out Matrix filled in place.
+     */
+    void Tracker::calculate_costs(CostCalculator& metric, const std::vector<TrackletPtr>& tracks,
+                                  const std::vector<TrackletPtr>& detections,
+                                  CostMatrix& out) const
+    {
+        SUSHITRACK_ZONE_FINE(Keys::K_ZONE_COST_MATRIX, Keys::K_GROUP_ASSOCIATE);
+        metric.calculate(tracks, detections, out);
+        SUSHITRACK_COUNTER_FINE(Keys::K_COUNTER_COST_CELLS, Keys::K_UNIT_CELLS, Add,
+                                tracks.size() * detections.size());
+    }
+
+    /**
      * @brief Propagates all tracked and lost tracklets to the current timestamp.
      * @param tracklet_pool Output collection of predicted tracked and lost tracklets.
      * @param tentative_tracks Output collection of predicted tentative tracklets.
@@ -279,6 +347,7 @@ namespace SushiTrack
     void Tracker::predict_tracks(std::vector<TrackletPtr>& tracklet_pool,
                                  std::vector<TrackletPtr>& tentative_tracks, float dt)
     {
+        SUSHITRACK_ZONE(Keys::K_ZONE_PREDICT, Keys::K_GROUP_FILTER);
         std::vector<TrackletPtr> tracked_pool;
         tracked_pool.reserve(tracked_tracklets_.size());
 
@@ -310,6 +379,7 @@ namespace SushiTrack
                                         std::vector<TrackletPtr>& track_remaining,
                                         std::vector<TrackletPtr>& det_high_remaining)
     {
+        SUSHITRACK_ZONE(Keys::K_ZONE_MATCH_HIGH, Keys::K_GROUP_ASSOCIATE);
         if (config_.primary_assoc_mode == 1)
         {
             // Global LAPJV: single cost matrix and solve over all candidates.
@@ -333,7 +403,7 @@ namespace SushiTrack
             std::vector<std::vector<int>> matches;
             std::vector<int> u_track, u_det;
 
-            high_conf_metric_->calculate(tracklet_pool, det_high, main_cost_matrix_);
+            calculate_costs(*high_conf_metric_, tracklet_pool, det_high, main_cost_matrix_);
 
             solver_->solve(main_cost_matrix_, (int)tracklet_pool.size(), (int)det_high.size(),
                            config_.match_thresh, matches, u_track, u_det);
@@ -352,9 +422,11 @@ namespace SushiTrack
                 {
                     track->re_activate(*det, frame_id_);
                     refind_tracklets.push_back(track);
-                    SUSHITRACK_LOG_DEBUG(K_SUSHITRACK_LOG_CATEGORY,
-                                         "Track {} recovered from Lost state (Global LAPJV).",
-                                         track->get_track_id());
+                    SUSHITRACK_INSTANT(Keys::K_INSTANT_TRACK_RECOVERED);
+                    SUSHITRACK_LOG_DEBUG(
+                        K_TRACKING_LOG_CATEGORY,
+                        "Frame {}: track {} recovered from Lost state (Global LAPJV).", frame_id_,
+                        track->get_track_id());
                 }
             }
 
@@ -400,7 +472,8 @@ namespace SushiTrack
             std::vector<std::vector<int>> matches;
             std::vector<int> u_track, u_det;
 
-            high_conf_metric_->calculate(track_group, det_high_remaining, main_cost_matrix_);
+            calculate_costs(*high_conf_metric_, track_group, det_high_remaining,
+                            main_cost_matrix_);
 
             solver_->solve(main_cost_matrix_, (int)track_group.size(),
                            (int)det_high_remaining.size(), config_.match_thresh, matches, u_track,
@@ -423,10 +496,12 @@ namespace SushiTrack
                 {
                     track->re_activate(*det, frame_id_);
                     refind_tracklets.push_back(track);
+                    SUSHITRACK_INSTANT(Keys::K_INSTANT_TRACK_RECOVERED);
                     SUSHITRACK_LOG_DEBUG(
-                        K_SUSHITRACK_LOG_CATEGORY,
-                        "Track {} recovered from Lost state (High-conf cascade, age={}).",
-                        track->get_track_id(), age);
+                        K_TRACKING_LOG_CATEGORY,
+                        "Frame {}: track {} recovered from Lost state (High-conf cascade, "
+                        "age={}).",
+                        frame_id_, track->get_track_id(), age);
                 }
                 matched_det_indices.insert(static_cast<size_t>(m[1]));
             }
@@ -462,10 +537,11 @@ namespace SushiTrack
                                        std::vector<TrackletPtr>& lost_tracklets_curr,
                                        std::vector<TrackletPtr>& det_low_remaining, float dt)
     {
+        SUSHITRACK_ZONE(Keys::K_ZONE_MATCH_LOW, Keys::K_GROUP_ASSOCIATE);
         std::vector<std::vector<int>> matches_iou;
         std::vector<int> u_track_iou, u_det_iou;
 
-        low_conf_metric_->calculate(track_remaining, det_low, iou_cost_matrix_);
+        calculate_costs(*low_conf_metric_, track_remaining, det_low, iou_cost_matrix_);
 
         solver_->solve(iou_cost_matrix_, (int)track_remaining.size(), (int)det_low.size(),
                        config_.iou_match_thresh, matches_iou, u_track_iou, u_det_iou);
@@ -489,8 +565,9 @@ namespace SushiTrack
                 track->mark_as_lost(dt);
 
                 lost_tracklets_curr.push_back(track);
-                SUSHITRACK_LOG_DEBUG(K_SUSHITRACK_LOG_CATEGORY, "Track {} marked as Lost.",
-                                     track->get_track_id());
+                SUSHITRACK_INSTANT(Keys::K_INSTANT_TRACK_LOST);
+                SUSHITRACK_LOG_DEBUG(K_TRACKING_LOG_CATEGORY, "Frame {}: track {} marked as Lost.",
+                                     frame_id_, track->get_track_id());
             }
         }
 
@@ -510,6 +587,7 @@ namespace SushiTrack
                                       std::vector<TrackletPtr>& activated_tracklets,
                                       std::vector<TrackletPtr>& det_final_remaining)
     {
+        SUSHITRACK_ZONE(Keys::K_ZONE_LOST_RECOVERY, Keys::K_GROUP_ASSOCIATE);
         det_final_remaining = det_remaining;
 
         if (lost_tracks.empty() || det_final_remaining.empty())
@@ -534,7 +612,8 @@ namespace SushiTrack
             std::vector<std::vector<int>> matches;
             std::vector<int> u_lost, u_det;
 
-            lost_recovery_metric_->calculate(track_group, det_final_remaining, main_cost_matrix_);
+            calculate_costs(*lost_recovery_metric_, track_group, det_final_remaining,
+                            main_cost_matrix_);
 
             solver_->solve(main_cost_matrix_, (int)track_group.size(),
                            (int)det_final_remaining.size(), config_.reid_recovery_thresh, matches,
@@ -550,10 +629,11 @@ namespace SushiTrack
 
                 track->re_activate(*det, frame_id_);
                 activated_tracklets.push_back(track);
+                SUSHITRACK_INSTANT(Keys::K_INSTANT_TRACK_RECOVERED);
                 SUSHITRACK_LOG_DEBUG(
-                    K_SUSHITRACK_LOG_CATEGORY,
-                    "Track {} recovered from Lost state (Visual Recovery, age={}).",
-                    track->get_track_id(), age);
+                    K_TRACKING_LOG_CATEGORY,
+                    "Frame {}: track {} recovered from Lost state (Visual Recovery, age={}).",
+                    frame_id_, track->get_track_id(), age);
                 matched_det_indices.insert(static_cast<size_t>(m[1]));
             }
 
@@ -596,7 +676,8 @@ namespace SushiTrack
         std::vector<std::vector<int>> matches_high;
         std::vector<int> u_tent_high, u_det_high;
 
-        tentative_metric_->calculate(tentative_tracks, det_high_remaining, iou_cost_matrix_);
+        calculate_costs(*tentative_metric_, tentative_tracks, det_high_remaining,
+                        iou_cost_matrix_);
 
         solver_->solve(iou_cost_matrix_, (int)tentative_tracks.size(),
                        (int)det_high_remaining.size(), config_.tentative_match_thresh, matches_high,
@@ -616,7 +697,9 @@ namespace SushiTrack
             {
                 t->confirm(frame_id_, t->get_track_id());
                 activated_tracklets.push_back(t);
-                SUSHITRACK_LOG_DEBUG(K_SUSHITRACK_LOG_CATEGORY, "Tentative track {} confirmed.",
+                SUSHITRACK_INSTANT(Keys::K_INSTANT_TRACK_CONFIRMED);
+                SUSHITRACK_LOG_DEBUG(K_TRACKING_LOG_CATEGORY,
+                                     "Frame {}: tentative track {} confirmed.", frame_id_,
                                      t->get_track_id());
             }
             else
@@ -640,7 +723,8 @@ namespace SushiTrack
         std::vector<std::vector<int>> matches_low;
         std::vector<int> u_tent_low, u_det_low;
 
-        tentative_metric_->calculate(tentative_remaining, det_low_remaining, iou_cost_matrix_);
+        calculate_costs(*tentative_metric_, tentative_remaining, det_low_remaining,
+                        iou_cost_matrix_);
 
         solver_->solve(iou_cost_matrix_, (int)tentative_remaining.size(),
                        (int)det_low_remaining.size(), config_.tentative_match_thresh, matches_low,
@@ -659,6 +743,10 @@ namespace SushiTrack
             {
                 t->confirm(frame_id_, t->get_track_id());
                 activated_tracklets.push_back(t);
+                SUSHITRACK_INSTANT(Keys::K_INSTANT_TRACK_CONFIRMED);
+                SUSHITRACK_LOG_DEBUG(K_TRACKING_LOG_CATEGORY,
+                                     "Frame {}: tentative track {} confirmed.", frame_id_,
+                                     t->get_track_id());
             }
             else
             {
@@ -679,17 +767,19 @@ namespace SushiTrack
             {
                 t->mark_as_removed();
                 removed_tentative_curr.push_back(t);
+                SUSHITRACK_INSTANT(Keys::K_INSTANT_TRACK_REMOVED);
                 if (config_.time_aware)
-                    SUSHITRACK_LOG_DEBUG(K_SUSHITRACK_LOG_CATEGORY,
-                                         "Tentative track {} aged out (lost={}s, limit={}s).",
-                                         t->get_track_id(),
-                                         SushiLog::fixed(t->get_accumulated_lost_time(), 3),
-                                         SushiLog::fixed(config_.tentative_max_age_seconds, 3));
+                    SUSHITRACK_LOG_DEBUG(
+                        K_TRACKING_LOG_CATEGORY,
+                        "Frame {}: tentative track {} aged out (lost={}s, limit={}s).", frame_id_,
+                        t->get_track_id(), SushiLog::fixed(t->get_accumulated_lost_time(), 3),
+                        SushiLog::fixed(config_.tentative_max_age_seconds, 3));
                 else
-                    SUSHITRACK_LOG_DEBUG(K_SUSHITRACK_LOG_CATEGORY,
-                                         "Tentative track {} aged out (misses={}, limit={}).",
-                                         t->get_track_id(), t->get_frames_since_observation(),
-                                         config_.tentative_max_miss_frames);
+                    SUSHITRACK_LOG_DEBUG(
+                        K_TRACKING_LOG_CATEGORY,
+                        "Frame {}: tentative track {} aged out (misses={}, limit={}).", frame_id_,
+                        t->get_track_id(), t->get_frames_since_observation(),
+                        config_.tentative_max_miss_frames);
             }
             else
             {
@@ -716,7 +806,8 @@ namespace SushiTrack
 
             det->activate_tentative(create_kalman_filter(), frame_id_, initial_id);
             tentative_curr.push_back(det);
-            SUSHITRACK_LOG_DEBUG(K_SUSHITRACK_LOG_CATEGORY, "Initialized new tentative track {}.",
+            SUSHITRACK_LOG_DEBUG(K_TRACKING_LOG_CATEGORY,
+                                 "Frame {}: initialized new tentative track {}.", frame_id_,
                                  initial_id);
         }
     }
@@ -742,9 +833,10 @@ namespace SushiTrack
                 if (iou(det->get_rect(), trk->get_rect()) > config_.tentative_init_suppress_iou)
                 {
                     overlaps = true;
-                    SUSHITRACK_LOG_DEBUG(K_SUSHITRACK_LOG_CATEGORY,
-                                         "Suppressed new tentative overlapping confirmed track {}.",
-                                         trk->get_track_id());
+                    SUSHITRACK_LOG_DEBUG(
+                        K_TRACKING_LOG_CATEGORY,
+                        "Frame {}: suppressed new tentative overlapping confirmed track {}.",
+                        frame_id_, trk->get_track_id());
                     break;
                 }
             }
@@ -767,7 +859,8 @@ namespace SushiTrack
         std::vector<std::vector<int>> matches;
         std::vector<int> u_unconfirmed, u_det;
 
-        tentative_metric_->calculate(non_active_tracklets, det_high_remaining, iou_cost_matrix_);
+        calculate_costs(*tentative_metric_, non_active_tracklets, det_high_remaining,
+                        iou_cost_matrix_);
 
         solver_->solve(iou_cost_matrix_, (int)non_active_tracklets.size(),
                        (int)det_high_remaining.size(), config_.unconfirmed_iou_thresh, matches,
@@ -781,7 +874,9 @@ namespace SushiTrack
             track->update(*det, frame_id_);
 
             activated_tracklets.push_back(track);
-            SUSHITRACK_LOG_DEBUG(K_SUSHITRACK_LOG_CATEGORY, "Unconfirmed track {} updated.",
+            SUSHITRACK_INSTANT(Keys::K_INSTANT_TRACK_CONFIRMED);
+            SUSHITRACK_LOG_DEBUG(K_TRACKING_LOG_CATEGORY,
+                                 "Frame {}: unconfirmed track {} updated.", frame_id_,
                                  track->get_track_id());
         }
 
@@ -790,9 +885,10 @@ namespace SushiTrack
             auto& track = non_active_tracklets[idx];
             track->mark_as_removed();
             removed_tracklets_curr.push_back(track);
-            SUSHITRACK_LOG_DEBUG(K_SUSHITRACK_LOG_CATEGORY,
-                                 "Unconfirmed track {} aged out and removed.",
-                                 track->get_track_id());
+            SUSHITRACK_INSTANT(Keys::K_INSTANT_TRACK_REMOVED);
+            SUSHITRACK_LOG_DEBUG(K_TRACKING_LOG_CATEGORY,
+                                 "Frame {}: unconfirmed track {} aged out and removed.",
+                                 frame_id_, track->get_track_id());
         }
 
         for (int idx : u_det)
@@ -804,7 +900,8 @@ namespace SushiTrack
             size_t initial_id = ++track_id_count_;
             track->activate(create_kalman_filter(), frame_id_, initial_id);
             activated_tracklets.push_back(track);
-            SUSHITRACK_LOG_DEBUG(K_SUSHITRACK_LOG_CATEGORY, "New track {} activated.", initial_id);
+            SUSHITRACK_LOG_DEBUG(K_TRACKING_LOG_CATEGORY, "Frame {}: new track {} activated.",
+                                 frame_id_, initial_id);
         }
     }
 
@@ -814,6 +911,7 @@ namespace SushiTrack
      */
     void Tracker::cleanup_lost(std::vector<TrackletPtr>& removed_tracklets_curr)
     {
+        SUSHITRACK_ZONE(Keys::K_ZONE_CLEANUP_LOST, Keys::K_GROUP_TRACK);
         for (auto& s : lost_tracklets_)
         {
             float buffer_scale = 1.0f;
@@ -841,10 +939,12 @@ namespace SushiTrack
             {
                 s->mark_as_removed();
                 removed_tracklets_curr.push_back(s);
+                SUSHITRACK_INSTANT(Keys::K_INSTANT_TRACK_REMOVED);
                 SUSHITRACK_LOG_DEBUG(
-                    K_SUSHITRACK_LOG_CATEGORY,
-                    "Track {} expired after being lost for {} seconds (scaled buffer={}).",
-                    s->get_track_id(), SushiLog::fixed(accumulated, 2), scaled_buffer);
+                    K_TRACKING_LOG_CATEGORY,
+                    "Frame {}: track {} expired after being lost for {} seconds (scaled "
+                    "buffer={}).",
+                    frame_id_, s->get_track_id(), SushiLog::fixed(accumulated, 2), scaled_buffer);
             }
         }
     }
@@ -859,6 +959,7 @@ namespace SushiTrack
                                  const std::vector<TrackletPtr>& lost_tracklets_curr,
                                  const std::vector<TrackletPtr>& removed_tracklets_curr)
     {
+        SUSHITRACK_ZONE(Keys::K_ZONE_FINALIZE, Keys::K_GROUP_TRACK);
         tracked_tracklets_ = joint_tracklets(activated_tracklets, refind_tracklets);
 
         std::vector<TrackletPtr> new_lost;
@@ -968,7 +1069,7 @@ namespace SushiTrack
                                              std::vector<TrackletPtr>& __restrict a_res,
                                              std::vector<TrackletPtr>& __restrict b_res) const
     {
-        duplicate_metric_->calculate(a, b, iou_cost_matrix_);
+        calculate_costs(*duplicate_metric_, a, b, iou_cost_matrix_);
 
         std::vector<bool> a_dup(a.size(), false), b_dup(b.size(), false);
         for (size_t i = 0; i < a.size(); ++i)
@@ -979,7 +1080,21 @@ namespace SushiTrack
                 {
                     const int ta = (int)(a[i]->get_frame_id() - a[i]->get_start_frame_id());
                     const int tb = (int)(b[j]->get_frame_id() - b[j]->get_start_frame_id());
-                    if (ta > tb)
+                    const bool drops_second = ta > tb;
+                    const std::vector<bool>& dropped = drops_second ? b_dup : a_dup;
+                    const size_t dropped_index = drops_second ? j : i;
+                    if (!dropped[dropped_index])
+                    {
+                        const TrackletPtr& dropped_track =
+                            drops_second ? b[dropped_index] : a[dropped_index];
+                        const TrackletPtr& kept_track = drops_second ? a[i] : b[j];
+                        SUSHITRACK_INSTANT(Keys::K_INSTANT_TRACK_REMOVED);
+                        SUSHITRACK_LOG_DEBUG(
+                            K_TRACKING_LOG_CATEGORY,
+                            "Frame {}: track {} dropped as a duplicate of track {}.", frame_id_,
+                            dropped_track->get_track_id(), kept_track->get_track_id());
+                    }
+                    if (drops_second)
                         b_dup[j] = true;
                     else
                         a_dup[i] = true;

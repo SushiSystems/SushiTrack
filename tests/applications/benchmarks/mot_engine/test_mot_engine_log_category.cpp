@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* sushitrack_log_category.hpp                                            */
+/* test_mot_engine_log_category.cpp                                       */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -20,23 +20,22 @@
 /**************************************************************************/
 
 /**
- * @file sushitrack_log_category.hpp
- * @brief Declares K_SUSHITRACK_LOG_PROJECT and K_SUSHITRACK_LOG_CATEGORY, under which SushiTrack logs.
+ * @file test_mot_engine_log_category.cpp
+ * @brief Tests the category the mot_engine application logs under.
  * @author Mustafa Garip
  */
 
-#pragma once
+#include <gtest/gtest.h>
 
-#include <SushiLog/log/log_category.hpp>
-#include <SushiLog/log/log_project.hpp>
+#include <mot_engine_log_category.hpp>
 
-namespace SushiTrack
+using namespace MOTEngine;
+
+/**
+ * @brief The category belongs to `sushitrack` and its module is `mot_engine`.
+ */
+TEST(Small_MotEngineLogCategoryTest, NamesTheProjectAndTheModule)
 {
-    /** @brief Names SushiTrack's records, whose levels SUSHITRACK_LOG_LEVEL sets. */
-    inline constexpr SushiLog::LogProject K_SUSHITRACK_LOG_PROJECT{"sushitrack",
-                                                                   "SUSHITRACK_LOG_LEVEL"};
-
-    /** @brief Names the records of the one SushiTrack module. */
-    inline constexpr SushiLog::LogCategory K_SUSHITRACK_LOG_CATEGORY =
-        SushiLog::make_log_category(K_SUSHITRACK_LOG_PROJECT, "sushitrack");
-} // namespace SushiTrack
+    EXPECT_EQ(K_MOT_ENGINE_LOG_CATEGORY.project().name(), "sushitrack");
+    EXPECT_EQ(K_MOT_ENGINE_LOG_CATEGORY.module(), "mot_engine");
+}

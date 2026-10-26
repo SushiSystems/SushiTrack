@@ -15,8 +15,9 @@ A benchmark is a folder with a `data/` folder of sequences, each a folder that h
 dataset is a new folder and nothing else. Git does not track the `data/` folders; the
 [Data layout](../../docs/reference/DATA_LAYOUT.md) names where each machine gets them.
 
-`mot_engine` takes `--data DIR --settings DIR [--tracker NAME]... [--sequence NAME]...`,
-writes each tracker's predictions to `<sequence>/pred/<tracker>/<sequence>.txt` and prints one
-`[ PERF <tracker> ] <sequence>: <us> us/frame` line per pair. It exits 0 when every run ran, 1
+`mot_engine` takes `--data DIR --settings DIR [--tracker NAME]... [--sequence NAME]... [--profiles DIR | --no-profile]`,
+writes each tracker's predictions to `<sequence>/pred/<tracker>/<sequence>.txt`, writes one
+profile record per pair under `--profiles` (`build/profiles` by default) and prints one
+`[ PERF <tracker> ] <sequence>: <us> us/frame` line and one `[ PROFILE ]` line per pair. It exits 0 when every run ran, 1
 when an input is missing and 2 for a bad command line. The
 [Evaluation pipeline](../../docs/guides/EVALUATION.md) describes the engine and the evaluator.

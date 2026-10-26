@@ -47,4 +47,6 @@
 A topic is a module or a subject that spans modules, and it has one design document.
 The list is generated in `docs/design/README.md`.
 
+**SUSHITRACK_PROFILING**: SushiTrack records its frame, stages, counters and track events through SushiProfiler. See [the design](../design/SUSHITRACK_PROFILING/README.md).
+
 **SUSHITRACK_MIGRATION**: The repository came from a project that carried another name, another licence and a layout of its own. See [the design](../design/SUSHITRACK_MIGRATION/README.md).

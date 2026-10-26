@@ -33,8 +33,8 @@ The schema is layered `basic` / `advanced`. The outer `"sushitrack"` wrapper is 
 
 C API entry points (`include/SushiTrack/c_api/sushitrack_c.h`):
 
-- `sushitrack_load_params_from_json(path, &params)`: overlay a file onto a seeded `sushitrack_params_t` (`path = NULL` uses the resolution order above). A missing file is non-fatal.
-- `sushitrack_create_from_config(path)`: seed defaults, overlay the file, and create in one call.
+- `sushitrack_load_params_from_json(path, &params)`: overlay a file onto a seeded `sushitrack_params_t` (`path = NULL` uses the resolution order above). It returns `SUSHITRACK_INVALID_ARGUMENT`, with `params` untouched and one ERROR in the log, for a null `params`, a named file that does not exist (the path argument or `$SUSHITRACK_CONFIG`), a key no section reads, a value of the wrong kind, and a number with a fraction in an integer field. A file that is not valid JSON gives `SUSHITRACK_RUNTIME_ERROR`. With nothing named and nothing found it succeeds.
+- `sushitrack_create_from_config(path)`: seed defaults, overlay the file, and create in one call. It returns no tracker when the file is refused.
 - `sushitrack_create(NULL)`: shorthand for `sushitrack_create_from_config(NULL)`. Passing an explicit `sushitrack_params_t*` bypasses file loading entirely (programmatic control).
 
 The Python binding mirrors this: `Tracker(config="auto")` resolves `sushitrack.json` through the library, `config="<path>"` loads an explicit file, and keyword overrides still win over the file.

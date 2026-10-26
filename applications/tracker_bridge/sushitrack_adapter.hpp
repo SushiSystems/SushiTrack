@@ -32,10 +32,12 @@
 #include <vector>
 
 #include <SushiTrack/c_api/sushitrack_c.h>
+#include <SushiTrack/logging/logger.hpp>
 
 #include <mot_detection.hpp>
 #include <track_result.hpp>
 #include <tracker_adapter.hpp>
+#include <tracker_bridge_log_category.hpp>
 
 namespace TrackerBridge
 {
@@ -52,10 +54,17 @@ namespace TrackerBridge
             explicit SushiTrackAdapter(const std::string& config_path = "")
             {
                 sushitrack_get_default_params(&params_);
-                if (sushitrack_load_params_from_json(config_path.empty() ? nullptr
-                                                                         : config_path.c_str(),
-                                                     &params_) != SUSHITRACK_SUCCESS)
+                const sushitrack_status_t status = sushitrack_load_params_from_json(
+                    config_path.empty() ? nullptr : config_path.c_str(), &params_);
+                if (status != SUSHITRACK_SUCCESS)
+                {
                     sushitrack_get_default_params(&params_);
+                    SUSHITRACK_LOG_WARN(K_TRACKER_BRIDGE_LOG_CATEGORY,
+                                        "SushiTrack parameters from {} did not load (status {}); "
+                                        "using the default parameters.",
+                                        config_path.empty() ? "the default search" : config_path,
+                                        static_cast<int>(status));
+                }
                 rebuild_tracker();
             }
 

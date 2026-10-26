@@ -33,8 +33,12 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
+
+#include <SushiTrack/logging/logger.hpp>
 
 #include <tracker_adapter.hpp>
+#include <tracker_bridge_log_category.hpp>
 
 namespace TrackerBridge
 {
@@ -57,7 +61,26 @@ namespace TrackerBridge
             /// @brief Registers @p creator under @p name, folded to lower case.
             void register_tracker(const std::string& name, Creator creator)
             {
-                creators_[folded(name)] = std::move(creator);
+                const std::string key = folded(name);
+                if (creators_.count(key) != 0U)
+                {
+                    SUSHITRACK_LOG_WARN(K_TRACKER_BRIDGE_LOG_CATEGORY,
+                                        "Tracker {} registered twice; the later creator replaces "
+                                        "the first.",
+                                        key);
+                }
+                creators_[key] = std::move(creator);
+            }
+
+            /// @brief Returns the registered names, sorted.
+            [[nodiscard]] std::vector<std::string> registered_names() const
+            {
+                std::vector<std::string> names;
+                names.reserve(creators_.size());
+                for (const auto& entry : creators_)
+                    names.push_back(entry.first);
+                std::sort(names.begin(), names.end());
+                return names;
             }
 
             /// @brief Returns a new adapter for @p name, or nullptr when none is registered.

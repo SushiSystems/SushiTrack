@@ -33,6 +33,7 @@
 #include <unordered_map>
 #include <utility>
 
+#include <SushiTrack/filtering/filtering_log_category.hpp>
 #include <SushiTrack/filtering/gated_state_predictor.hpp>
 #include <SushiTrack/logging/logger.hpp>
 
@@ -66,6 +67,13 @@ namespace SushiTrack
              */
             void register_creator(int type, KalmanCreator creator)
             {
+                if (creators_.count(type) != 0U)
+                {
+                    SUSHITRACK_LOG_WARN(K_FILTERING_LOG_CATEGORY,
+                                        "Kalman type {} registered twice; the later creator "
+                                        "replaces the first.",
+                                        type);
+                }
                 creators_[type] = std::move(creator);
             }
 
@@ -83,7 +91,7 @@ namespace SushiTrack
                 {
                     return it->second(enable_xyah);
                 }
-                SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY, "Unregistered Kalman type requested: {}", type);
+                SUSHITRACK_LOG_ERROR(K_FILTERING_LOG_CATEGORY, "Unregistered Kalman type requested: {}", type);
                 return nullptr;
             }
 

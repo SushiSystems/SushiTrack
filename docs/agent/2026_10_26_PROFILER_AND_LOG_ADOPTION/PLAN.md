@@ -332,3 +332,24 @@ decisions shown:
 
 A3 and C3 both change `tracker.cpp`, and A2, A4 and C3 all change `sushitrack_c.cpp`, so those
 tasks never share a wave.
+
+## Decisions I took
+
+Each is a choice the rulings of SPEC section 9 leave open; the reason is one line.
+
+| # | Choice | Reason |
+| --- | --- | --- |
+| I1 | One category header per area under `include/SushiTrack/<area>/`; the project moved to `logging/sushitrack_log_project.hpp`; `K_SUSHITRACK_LOG_CATEGORY` is removed | The logging skill gives each module its own category header, and a kept alias would hide which area logs |
+| I2 | Recurring events use a per-call-site `LogThrottle` (first event, then one in a thousand, with the suppressed count), not a counter in `Tracker` | The filters, the solver and the tracklet have no `Tracker` to report through; the throttle is deleted when SushiLog RW-3 lands |
+| I3 | `SUSHITRACK_CONFIG` naming a missing file is refused like a named path | It is the caller's explicit choice, and refusing needs no rate limit |
+| I4 | A configuration file that exists but cannot be opened returns `SUSHITRACK_RUNTIME_ERROR` | The read failed, which is not an invalid argument |
+| I5 | `sushitrack_create_from_config` returns null when the load is refused | Decision 12 refuses the file; building defaults would hide the refusal |
+| I6 | Applications log under `tracker_bridge` and `mot_engine`, each with its own category header | Decision 14 sends applications to the project macros and every module owns one category |
+| I7 | `tracker_process_c` returns `tracker_bridge_status_t`: OK, INVALID_ARGUMENT, TRUNCATED, ERROR | Decision 14 asks for a status; the truncation needs its own value |
+| I8 | `RunResult` keeps `total_tracking_us` | Decision 9 keeps the `[ PERF ]` line beside the record, and the line needs the figure |
+| I9 | A sequence with no detections prints no `[ PERF ]` line and the exit code stays 0 | The run did not fail; the missing line is what `evaluate.py` can read as "not measured" |
+| I10 | Eight counters and the stage zones are level 1; the other counters, instants and the solve and cost zones are level 2 | SPEC 1.8 says to cut counters at level 1 first to stay inside the budget |
+| I11 | The tracker and the sequence are environment facts (`mot.tracker`, `mot.sequence`), not period tags | A period tag takes a lock each frame (SushiProfiler S8) |
+| I12 | The record is written with `write_record` by `FrameRecorder`, not through a writer | It needs no terminal stream and no registry writer |
+| I13 | Python tasks B3, B4, C11 and the Python half of C8 stay open; only the `tracker_bridge.py` binding of the new status and the empty-frame fix are written | Decisions 4, 11 and 18 leave them no home or workaround; decision 14 forces the binding change |
+| I14 | `log_throttle.hpp` is included by the files that use it, not by `logger.hpp` | A widely included public header gains no include and nothing rebuilds for it |

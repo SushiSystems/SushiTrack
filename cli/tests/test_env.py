@@ -113,3 +113,16 @@ def test_a_configured_vcvars_wins_over_detection(monkeypatch, tmp_path):
     bat.write_text("", encoding="utf-8")
     monkeypatch.setattr(env, "find_vcvars", lambda: tmp_path / "other.bat")
     assert env.vcvars_path(_tool(vcvars=str(bat))) == bat
+
+
+def test_a_cache_folder_that_cannot_be_made_warns_and_still_returns_the_snapshot(
+        tmp_path, monkeypatch, recorder):
+    """Carries on with the snapshot, uncached, and says why."""
+    spy = recorder(env)
+    blocker = tmp_path / "file"
+    blocker.write_text("x", encoding="utf-8")
+    monkeypatch.setattr(env, "read_cache", lambda cache_file, key: None)
+    monkeypatch.setattr(env, "_snapshot", lambda tool: {"SNAPSHOT_VARIABLE": "1"})
+    merged = env.load_build_env(_tool(), blocker / "build")
+    assert merged["SNAPSHOT_VARIABLE"] == "1"
+    assert spy.said("environment snapshot is not cached")

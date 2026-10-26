@@ -15,8 +15,12 @@ pair it:
    `SushiTrackAdapter` through SushiTrack's C API, `ByteTrackAdapter` and `OCSORTAdapter` through
    the reference libraries.
 3. Writes the tracks to `<sequence>/pred/<tracker>/<sequence>.txt` (`mot_runner.hpp`).
-4. Prints `[ PERF <tracker> ] <sequence>: <us> us/frame`, which `st eval` reads back
-   (`cli/sushitrack_cli/services/label.py`).
+4. Writes a SushiProfiler record, `<tracker>_<sequence>.sprec.json` under `build/profiles/`, with one
+   period of the timeline `sushitrack.frame` per frame (`frame_recorder.hpp`). `st eval` reads the
+   median and the quartiles of the periods from it (`cli/sushitrack_cli/services/profile_record.py`).
+5. Prints `[ PERF <tracker> ] <sequence>: <us> us/frame` and `[ PROFILE <tracker> ] <sequence>: <path>`.
+   `st eval` takes the `PERF` figure only for a pair that has no record, and a pair with neither
+   prints `N/A` for its latency. A sequence with no detections prints neither line.
 
 SushiTrack loads `assets/sushitrack.json` through `SUSHITRACK_CONFIG`; ByteTrack and OC-SORT read
 `applications/tracker_bridge/bytetrack.json` and `applications/tracker_bridge/ocsort.json`. The

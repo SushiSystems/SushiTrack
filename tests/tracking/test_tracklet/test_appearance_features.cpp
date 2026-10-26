@@ -36,6 +36,9 @@
 #include <SushiTrack/filtering/kalman_filter.hpp>
 #include <SushiTrack/tracking/tracklet.hpp>
 
+#include <captured_log.hpp>
+#include <tracklet_builders.hpp>
+
 using namespace SushiTrack;
 
 // Helpers
@@ -229,4 +232,21 @@ TEST(Small_TrackletAppearanceTest, EmptyFeatureVectorIsNoOp)
     t->update_features(empty);
     // After empty update, smooth_feat_ is still empty
     EXPECT_FALSE(t->has_feature());
+}
+
+/**
+ * @brief Features of changing lengths log one WARN naming both lengths, however many times the
+ *        length changes.
+ */
+TEST(Small_TrackletAppearanceFeaturesTest, ChangingFeatureLengthWarnsOnce)
+{
+    CapturedLog log;
+    auto track = SushiTrack::make_feat_t(10.f, 10.f, 4, 0);
+
+    track->update_features(std::vector<float>(8, 1.0f));
+    track->update_features(std::vector<float>(4, 1.0f));
+    track->update_features(std::vector<float>(8, 1.0f));
+
+    EXPECT_EQ(log.count("Feature length 8 does not match the track's 4"), 1);
+    EXPECT_EQ(log.level_of("does not match"), SushiLog::LogLevel::Warn);
 }

@@ -31,7 +31,12 @@
 #include <array>
 #include <cmath>
 
+#include <SushiTrack/filtering/filtering_log_category.hpp>
 #include <SushiTrack/filtering/kalman_filter_registry.hpp>
+#include <SushiTrack/logging/log_throttle.hpp>
+#include <SushiTrack/logging/logger.hpp>
+
+#include <filtering/covariance_conditioning.hpp>
 
 namespace SushiTrack
 {
@@ -282,6 +287,7 @@ namespace SushiTrack
         Eigen::LLT<Mat11> llt(mode_cov);
         if (llt.info() != Eigen::Success)
         {
+            Detail::report_regularized_covariance(Detail::ConditionedFilter::Imm, "prediction");
             mode_cov.diagonal().array() += 1e-6f;
             llt.compute(mode_cov);
         }
@@ -494,6 +500,7 @@ namespace SushiTrack
             Eigen::LLT<Mat4> llt(innovation_cov);
             if (llt.info() != Eigen::Success)
             {
+                Detail::report_regularized_covariance(Detail::ConditionedFilter::Imm, "update");
                 innovation_cov.diagonal().array() += 1e-6f;
                 llt.compute(innovation_cov);
             }
@@ -526,6 +533,11 @@ namespace SushiTrack
         }
         else
         {
+            static LogThrottle collapsed_throttle;
+            SUSHITRACK_LOG_WARN_LIMITED(K_FILTERING_LOG_CATEGORY, collapsed_throttle,
+                                        "IMM filter: mode likelihood sum {} is below {}; mode "
+                                        "probabilities reset to the prior.",
+                                        sum, K_EPS);
             mu_ = cbar_;
         }
 

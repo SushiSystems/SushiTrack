@@ -164,9 +164,10 @@ class TrackEvalRunner:
 
             if perf_fps and tracker in perf_fps:
                 for seq, fps in perf_fps[tracker].items():
-                    if seq in tracker_results:
+                    if seq in tracker_results and fps > 0:
                         tracker_results[seq]["FPS"]        = fps
-                        tracker_results[seq]["Latency_us"] = (1_000_000.0 / fps) if fps > 0 else 0.0
+                        if fps > 0:
+                            tracker_results[seq]["Latency_us"] = 1_000_000.0 / fps
 
             from report_generator import _aggregate_seqs
             all_seq_names = list(tracker_results.keys())
@@ -430,9 +431,6 @@ class TrackEvalRunner:
                 flat["IDF1"] = float(i.get("IDF1", 0))
                 flat["IDP"]  = float(i.get("IDP",  0))
                 flat["IDR"]  = float(i.get("IDR",  0))
-
-            flat.setdefault("FPS",        0.0)
-            flat.setdefault("Latency_us", 0.0)
 
             if seq_name != "COMBINED_SEQ":
                 results[seq_name] = flat

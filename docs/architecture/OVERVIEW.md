@@ -35,6 +35,7 @@ the code. The compiled defaults are those set by `sushitrack_get_default_params`
 - [Configuration system](#configuration-system)
 - [C API and bindings](#c-api-and-bindings)
 - [Logging](#logging)
+- [Profiling](#profiling)
 - [Thread safety](#thread-safety)
 - [Testing and evaluation](#testing-and-evaluation)
 - [Future work](#future-work)
@@ -417,10 +418,16 @@ order; a missing or reordered field silently corrupts every field after it.
 
 `source/configuration/config_loader.cpp` overlays a JSON file onto a seeded `sushitrack_params_t`. The
 schema is layered `basic` / `advanced.<section>`; the outer `"sushitrack"`
-wrapper is optional. Any key absent from the file keeps the compiled default. A
-missing file is non-fatal; a malformed file leaves the parameters untouched and
-returns an error status. Resolution order: the `SUSHITRACK_CONFIG` environment
-variable, then an upward search for `sushitrack.json` from the working directory.
+wrapper is optional. Any key absent from the file keeps the compiled default. The
+reader refuses what the format does not hold: a key no section reads, a value of the
+wrong kind, a number with a fraction in an integer field, and a named file that does
+not exist, whether the path argument or `SUSHITRACK_CONFIG` names it. A refusal
+returns `SUSHITRACK_INVALID_ARGUMENT`, logs one ERROR with the dotted path of the key,
+and leaves the parameters untouched; `sushitrack_create_from_config` then returns no
+tracker. A file that is not valid JSON returns `SUSHITRACK_RUNTIME_ERROR`. With nothing
+named and nothing found, the call succeeds and logs INFO. Resolution order: the
+`SUSHITRACK_CONFIG` environment variable, then an upward search for `sushitrack.json`
+from the working directory.
 Because the library parses the file itself, a compiled build is retuned by
 editing `sushitrack.json` with no recompilation.
 
@@ -459,13 +466,44 @@ README.
 ## Logging
 
 SushiTrack logs through SushiLog, the one logger of every Sushi library, with the macros of
-`include/SushiTrack/logging/logger.hpp`. Every call names `K_SUSHITRACK_LOG_CATEGORY`, whose
-project and module are both `sushitrack`. `SUSHITRACK_LOG_LEVEL` sets its level, `warn` when
-unset: `debug` adds the track lifecycle events, and `trace` the per-frame association summaries,
-which only a debug build compiles. Records go to stderr. A C or Python host takes them with
+`include/SushiTrack/logging/logger.hpp`. Every call names the category of its area,
+`K_TRACKING_LOG_CATEGORY`, `K_ASSOCIATION_LOG_CATEGORY`, `K_FILTERING_LOG_CATEGORY`,
+`K_CONFIGURATION_LOG_CATEGORY` or `K_C_API_LOG_CATEGORY`, each declared in its area's folder under
+the project `sushitrack`. `SUSHITRACK_LOG_LEVEL` sets their levels, `warn` when unset, for all
+of them or by area: `warn,association=trace`. `debug` adds the track lifecycle events, each
+starting with its frame number, and `trace` the per-frame association summaries, which only a
+debug build compiles. The applications log under `tracker_bridge` and `mot_engine`.
+
+An event that can recur every frame, such as a covariance that fails to factor, a feature of the
+wrong length or an overflowing output buffer, writes its first record and then one in a thousand,
+each ending with the number it left out (`SUSHITRACK_LOG_WARN_LIMITED`,
+`include/SushiTrack/logging/log_throttle.hpp`). Records go to stderr. A C or Python host takes them with
 SushiLog's `sl_set_log_sink`; the Python binding's `Tracker.set_log_callback` does that for a
 callable. `SUSHITRACK_THROW` throws without logging, and the C entry point that catches the
 exception logs it once.
+
+---
+
+## Profiling
+
+SushiTrack records its frame through SushiProfiler, linked as the shared library so a process
+holds one collector. The host marks the period: `mot_engine` marks the timeline `sushitrack.frame`
+once per frame, before the tracker's update, and the library records zones, counters and instants
+inside it (`include/SushiTrack/profiling/profiling.hpp`). A host that starts no session pays
+one relaxed load per site.
+
+| Level | Records |
+| --- | --- |
+| 1 | The stage zones `update`, `split`, `predict`, `match_high`, `match_low`, `lost_recovery`, `tentative` or `unconfirmed`, `cleanup_lost`, `finalize` and `output`, and nine counters |
+| 2 | Adds the `solve` and `cost_matrix` zones, the other counters and the track instants |
+
+`SUSHITRACK_PROFILE_LEVEL` is the level compiled in, 1 in a release build and 2 in a debug
+build; the session's `level` filters at run time. With `SUSHITRACK_ENABLE_PROFILER` off the macros
+expand to nothing and the library builds without SushiProfiler. The names, groups and units are in
+[Profiler keys](../reference/PROFILER_KEYS.md). `register_profiler_parts`
+(`include/SushiTrack/profiling/sushitrack_profiler_parts.hpp`) adds the library's name, version,
+commit, profile level and run date to a record's environment. The design and its phases are in
+`docs/design/SUSHITRACK_PROFILING/README.md`.
 
 ---
 

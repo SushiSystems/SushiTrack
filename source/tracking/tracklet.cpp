@@ -37,7 +37,9 @@
 #include <utility>
 #include <vector>
 
+#include <SushiTrack/logging/log_throttle.hpp>
 #include <SushiTrack/logging/logger.hpp>
+#include <SushiTrack/tracking/tracking_log_category.hpp>
 
 namespace SushiTrack
 {
@@ -59,6 +61,14 @@ namespace SushiTrack
             {
                 f /= norm;
             }
+        }
+        else if (!v.empty())
+        {
+            static LogThrottle zero_norm_throttle;
+            SUSHITRACK_LOG_WARN_LIMITED(K_TRACKING_LOG_CATEGORY, zero_norm_throttle,
+                                        "A feature of length {} has a norm near zero; it is "
+                                        "stored unnormalised.",
+                                        v.size());
         }
     }
 
@@ -405,6 +415,14 @@ namespace SushiTrack
 
         if (smooth_feat_.empty() || smooth_feat_.size() != curr_feat_.size())
         {
+            if (!smooth_feat_.empty() && !curr_feat_.empty())
+            {
+                static LogThrottle length_throttle;
+                SUSHITRACK_LOG_WARN_LIMITED(K_TRACKING_LOG_CATEGORY, length_throttle,
+                                            "Feature length {} does not match the track's {}; "
+                                            "the smoothed feature restarts from the new one.",
+                                            curr_feat_.size(), smooth_feat_.size());
+            }
             smooth_feat_ = curr_feat_;
         }
         else
@@ -428,11 +446,15 @@ namespace SushiTrack
             return 1.0f;
 
         float max_similarity = 0.0f;
+        size_t mismatched_length = 0U;
 
         for (const auto& hist_feat : feature_history_)
         {
             if (hist_feat.size() != detection_feat.size())
+            {
+                mismatched_length = hist_feat.size();
                 continue;
+            }
 
             float dot = 0.0f;
             for (size_t i = 0; i < hist_feat.size(); ++i)
@@ -451,6 +473,15 @@ namespace SushiTrack
                 dot += smooth_feat_[i] * detection_feat[i];
             }
             max_similarity = std::max(max_similarity, dot);
+        }
+
+        if (mismatched_length != 0U && !detection_feat.empty())
+        {
+            static LogThrottle similarity_throttle;
+            SUSHITRACK_LOG_WARN_LIMITED(K_TRACKING_LOG_CATEGORY, similarity_throttle,
+                                        "Feature length {} does not match the track's {}; "
+                                        "appearance is ignored for those entries.",
+                                        detection_feat.size(), mismatched_length);
         }
 
         return max_similarity;

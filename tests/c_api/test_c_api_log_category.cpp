@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* test_sushitrack_log_category.cpp                                       */
+/* test_c_api_log_category.cpp                                            */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -20,25 +20,22 @@
 /**************************************************************************/
 
 /**
- * @file test_sushitrack_log_category.cpp
- * @brief Tests the project and the category SushiTrack logs under.
+ * @file test_c_api_log_category.cpp
+ * @brief Tests the category the c_api area logs under.
  * @author Mustafa Garip
  */
 
 #include <gtest/gtest.h>
 
-#include <SushiTrack/logging/sushitrack_log_category.hpp>
+#include <SushiTrack/c_api/c_api_log_category.hpp>
 
 using namespace SushiTrack;
 
 /**
- * @brief The project is `sushitrack`, its levels come from SUSHITRACK_LOG_LEVEL, and the
- *        category's module is `sushitrack`.
+ * @brief The category belongs to `sushitrack` and its module is `c_api`.
  */
-TEST(Small_SushiTrackLogCategoryTest, NamesTheProjectItsVariableAndTheModule)
+TEST(Small_CAPILogCategoryTest, NamesTheProjectAndTheModule)
 {
-    EXPECT_EQ(K_SUSHITRACK_LOG_PROJECT.name(), "sushitrack");
-    EXPECT_EQ(K_SUSHITRACK_LOG_PROJECT.level_variable(), "SUSHITRACK_LOG_LEVEL");
-    EXPECT_EQ(K_SUSHITRACK_LOG_CATEGORY.project().name(), "sushitrack");
-    EXPECT_EQ(K_SUSHITRACK_LOG_CATEGORY.module(), "sushitrack");
+    EXPECT_EQ(K_C_API_LOG_CATEGORY.project().name(), "sushitrack");
+    EXPECT_EQ(K_C_API_LOG_CATEGORY.module(), "c_api");
 }

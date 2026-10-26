@@ -34,9 +34,12 @@
 #include <cmath>
 #include <cstddef>
 
+#include <SushiTrack/filtering/filtering_log_category.hpp>
 #include <SushiTrack/filtering/kalman_filter_registry.hpp>
 #include <SushiTrack/filtering/nsa_kalman_filter.hpp>
 #include <SushiTrack/logging/logger.hpp>
+
+#include <filtering/covariance_conditioning.hpp>
 
 namespace SushiTrack
 {
@@ -177,8 +180,7 @@ namespace SushiTrack
         auto llt = projected_cov.llt();
         if (llt.info() != Eigen::Success)
         {
-            SUSHITRACK_LOG_WARN(K_SUSHITRACK_LOG_CATEGORY,
-                                "Matrix update conditioning failure. Regularizing covariance.");
+            Detail::report_regularized_covariance(Detail::ConditionedFilter::Kalman, "update");
             projected_cov.diagonal().array() += 1e-6f;
             llt = projected_cov.llt();
         }
@@ -219,8 +221,8 @@ namespace SushiTrack
 
         if (cached_llt_.info() != Eigen::Success)
         {
-            SUSHITRACK_LOG_WARN(K_SUSHITRACK_LOG_CATEGORY,
-                                "Matrix projection conditioning failure. Regularizing covariance.");
+            Detail::report_regularized_covariance(Detail::ConditionedFilter::Kalman,
+                                                  "projection");
             projected_cov.diagonal().array() += 1e-6f;
             cached_llt_ = projected_cov.llt();
         }
@@ -250,9 +252,8 @@ namespace SushiTrack
             auto llt = projected_cov.llt();
             if (llt.info() != Eigen::Success)
             {
-                SUSHITRACK_LOG_WARN(
-                    K_SUSHITRACK_LOG_CATEGORY,
-                    "Score-aware gate conditioning failure. Regularizing covariance.");
+                Detail::report_regularized_covariance(Detail::ConditionedFilter::Kalman,
+                                                      "score-aware gate");
                 projected_cov.diagonal().array() += 1e-6f;
                 llt = projected_cov.llt();
             }
@@ -311,6 +312,8 @@ namespace SushiTrack
                 auto llt = projected_cov.llt();
                 if (llt.info() != Eigen::Success)
                 {
+                    Detail::report_regularized_covariance(Detail::ConditionedFilter::Kalman,
+                                                          "gate flags");
                     projected_cov.diagonal().array() += 1e-6f;
                     llt = projected_cov.llt();
                 }
@@ -361,6 +364,8 @@ namespace SushiTrack
                 auto llt = projected_cov.llt();
                 if (llt.info() != Eigen::Success)
                 {
+                    Detail::report_regularized_covariance(Detail::ConditionedFilter::Kalman,
+                                                          "gate distances");
                     projected_cov.diagonal().array() += 1e-6f;
                     llt = projected_cov.llt();
                 }

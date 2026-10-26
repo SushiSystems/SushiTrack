@@ -274,6 +274,18 @@ namespace SushiTrack
                                             std::vector<TrackletPtr>& __restrict b_res) const;
 
             /**
+             * @brief Fills a cost matrix for one stage, recording its zone and cell count.
+             *
+             * @param metric Cost calculator of the stage.
+             * @param tracks Rows of the matrix.
+             * @param detections Columns of the matrix.
+             * @param out Matrix filled in place.
+             */
+            void calculate_costs(CostCalculator& metric, const std::vector<TrackletPtr>& tracks,
+                                 const std::vector<TrackletPtr>& detections,
+                                 CostMatrix& out) const;
+
+            /**
              * @brief Creates a state predictor instance.
              *
              * @return Unique pointer to the state predictor.

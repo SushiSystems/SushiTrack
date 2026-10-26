@@ -21,7 +21,8 @@
 
 /**
  * @file json_settings.hpp
- * @brief Declares read_json_settings and json_number, which read a reference tracker's settings.
+ * @brief Declares read_json_settings, json_section and json_number, which read a reference
+ *        tracker's settings and log what they cannot use.
  * @author Mustafa Garip
  */
 
@@ -29,42 +30,83 @@
 
 #include <exception>
 #include <fstream>
-#include <iostream>
 #include <string>
 
 #include <nlohmann/json.hpp>
 
+#include <SushiTrack/logging/logger.hpp>
+
+#include <tracker_bridge_log_category.hpp>
+
 namespace TrackerBridge
 {
     /**
-     * @brief Returns the JSON document in @p path, or an empty object when the file is missing or
-     *        malformed, naming the fault on stderr.
+     * @brief Returns the JSON document in @p path, or an empty object when the file cannot be
+     *        opened or parsed, logging why.
      */
     inline nlohmann::json read_json_settings(const std::string& path)
     {
         nlohmann::json result = nlohmann::json::object();
         std::ifstream file(path);
         if (!file.is_open())
+        {
+            SUSHITRACK_LOG_WARN(K_TRACKER_BRIDGE_LOG_CATEGORY,
+                                "Settings file {} cannot be opened; the tracker keeps its "
+                                "defaults.",
+                                path);
             return result;
+        }
         try
         {
             result = nlohmann::json::parse(file, nullptr, true, true);
         }
         catch (const std::exception& error)
         {
-            std::cerr << "[ JSON ERROR ] " << path << ": " << error.what()
-                      << "; the tracker keeps its defaults\n";
+            SUSHITRACK_LOG_ERROR(K_TRACKER_BRIDGE_LOG_CATEGORY,
+                                 "Settings file {} is not valid JSON ({}); the tracker keeps its "
+                                 "defaults.",
+                                 path, error.what());
         }
         return result;
     }
 
     /**
+     * @brief Returns the section @p key of @p document read from @p path, or an empty object
+     *        after logging that the file has none.
+     */
+    inline const nlohmann::json& json_section(const nlohmann::json& document,
+                                              const std::string& key, const std::string& path)
+    {
+        static const nlohmann::json empty = nlohmann::json::object();
+        const auto found = document.find(key);
+        if (found == document.end())
+        {
+            SUSHITRACK_LOG_WARN(K_TRACKER_BRIDGE_LOG_CATEGORY,
+                                "Settings file {} has no \"{}\" section; the tracker keeps its "
+                                "defaults.",
+                                path, key);
+            return empty;
+        }
+        return found.value();
+    }
+
+    /**
      * @brief Returns the number @p section holds under @p key, or @p fallback when it holds none.
+     *
+     * An absent key gives the fallback silently; a key that holds something else than a number
+     * gives it after a WARN.
      */
     inline float json_number(const nlohmann::json& section, const std::string& key, float fallback)
     {
-        if (section.is_object() && section.contains(key) && section[key].is_number())
-            return section[key].get<float>();
-        return fallback;
+        if (!section.is_object() || !section.contains(key))
+            return fallback;
+        const nlohmann::json& value = section[key];
+        if (!value.is_number())
+        {
+            SUSHITRACK_LOG_WARN(K_TRACKER_BRIDGE_LOG_CATEGORY,
+                                "Setting {} is not a number; keeping {}.", key, fallback);
+            return fallback;
+        }
+        return value.get<float>();
     }
 } // namespace TrackerBridge

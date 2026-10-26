@@ -27,8 +27,6 @@
 
 #pragma once
 
-#include <filesystem>
-#include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -37,7 +35,10 @@
 
 #include <OCSort.hpp>
 
+#include <SushiTrack/logging/logger.hpp>
+
 #include <json_settings.hpp>
+#include <tracker_bridge_log_category.hpp>
 #include <mot_detection.hpp>
 #include <track_result.hpp>
 #include <tracker_adapter.hpp>
@@ -67,25 +68,22 @@ namespace TrackerBridge
                   inertia_(0.2f),
                   use_byte_(false)
             {
-                if (!config_path.empty() && std::filesystem::exists(config_path))
+                if (!config_path.empty())
                 {
                     const nlohmann::json doc = read_json_settings(config_path);
-                    auto it = doc.find("ocsort");
-                    if (it != doc.end())
-                    {
-                        const nlohmann::json& s = it.value();
-                        det_thresh_ = json_number(s, "det_thresh", det_thresh_);
-                        max_age_ = static_cast<int>(
-                            json_number(s, "max_age", static_cast<float>(max_age_)));
-                        min_hits_ = static_cast<int>(
-                            json_number(s, "min_hits", static_cast<float>(min_hits_)));
-                        iou_threshold_ = json_number(s, "iou_threshold", iou_threshold_);
-                        delta_t_ = static_cast<int>(
-                            json_number(s, "delta_t", static_cast<float>(delta_t_)));
-                        inertia_ = json_number(s, "inertia", inertia_);
-                        use_byte_ = json_number(s, "use_byte", 0.0f) > 0.5f;
-                        std::cout << "[ OCSORTAdapter ] config loaded from " << config_path << "\n";
-                    }
+                    const nlohmann::json& s = json_section(doc, "ocsort", config_path);
+                    det_thresh_ = json_number(s, "det_thresh", det_thresh_);
+                    max_age_ =
+                        static_cast<int>(json_number(s, "max_age", static_cast<float>(max_age_)));
+                    min_hits_ = static_cast<int>(
+                        json_number(s, "min_hits", static_cast<float>(min_hits_)));
+                    iou_threshold_ = json_number(s, "iou_threshold", iou_threshold_);
+                    delta_t_ =
+                        static_cast<int>(json_number(s, "delta_t", static_cast<float>(delta_t_)));
+                    inertia_ = json_number(s, "inertia", inertia_);
+                    use_byte_ = json_number(s, "use_byte", 0.0f) > 0.5f;
+                    SUSHITRACK_LOG_INFO(K_TRACKER_BRIDGE_LOG_CATEGORY,
+                                        "OC-SORT settings read from {}.", config_path);
                 }
 
                 tracker_ = std::make_unique<ocsort::OCSort>(det_thresh_, max_age_, min_hits_,

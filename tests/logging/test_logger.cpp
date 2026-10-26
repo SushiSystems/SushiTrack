@@ -32,7 +32,7 @@
 #include <gtest/gtest.h>
 
 #include <SushiTrack/logging/logger.hpp>
-#include <SushiTrack/logging/sushitrack_log_category.hpp>
+#include <SushiTrack/tracking/tracking_log_category.hpp>
 
 #include <captured_log.hpp>
 
@@ -44,13 +44,13 @@ using namespace SushiTrack;
 TEST(Small_LoggerTest, WarnCarriesTheProjectModuleAndFormattedMessage)
 {
     CapturedLog log;
-    SUSHITRACK_LOG_WARN(K_SUSHITRACK_LOG_CATEGORY, "track {} lost after {} frames", 7, 30);
+    SUSHITRACK_LOG_WARN(K_TRACKING_LOG_CATEGORY, "track {} lost after {} frames", 7, 30);
 
     const auto records = log.records();
     ASSERT_EQ(records.size(), 1u);
     EXPECT_EQ(records[0].level, SushiLog::LogLevel::Warn);
     EXPECT_EQ(records[0].project, "sushitrack");
-    EXPECT_EQ(records[0].module, "sushitrack");
+    EXPECT_EQ(records[0].module, "tracking");
     EXPECT_EQ(records[0].message, "track 7 lost after 30 frames");
 }
 
@@ -60,8 +60,8 @@ TEST(Small_LoggerTest, WarnCarriesTheProjectModuleAndFormattedMessage)
 TEST(Small_LoggerTest, RecordBelowTheCategoryLevelIsDropped)
 {
     CapturedLog log(SushiLog::LogLevel::Error);
-    SUSHITRACK_LOG_WARN(K_SUSHITRACK_LOG_CATEGORY, "below the level");
-    SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY, "at the level");
+    SUSHITRACK_LOG_WARN(K_TRACKING_LOG_CATEGORY, "below the level");
+    SUSHITRACK_LOG_ERROR(K_TRACKING_LOG_CATEGORY, "at the level");
 
     EXPECT_EQ(log.count("below the level"), 0);
     EXPECT_EQ(log.count("at the level"), 1);
@@ -104,13 +104,13 @@ TEST(Medium_LoggerConcurrencyTest, CallsFromTwoThreadsReachTheSink)
         []
         {
             for (int i = 0; i < K_PER_THREAD; ++i)
-                SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY, "t1 msg {}", i);
+                SUSHITRACK_LOG_ERROR(K_TRACKING_LOG_CATEGORY, "t1 msg {}", i);
         });
     std::thread second(
         []
         {
             for (int i = 0; i < K_PER_THREAD; ++i)
-                SUSHITRACK_LOG_ERROR(K_SUSHITRACK_LOG_CATEGORY, "t2 msg {}", i);
+                SUSHITRACK_LOG_ERROR(K_TRACKING_LOG_CATEGORY, "t2 msg {}", i);
         });
     first.join();
     second.join();

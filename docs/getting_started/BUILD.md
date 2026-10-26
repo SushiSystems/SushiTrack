@@ -22,6 +22,9 @@ The CMake options `st build` sets:
 | `SUSHITRACK_BUILD_TESTS` | ON | Builds `sushitrack_tests` from the mirror under `tests/`; `--no-test` turns it off |
 | `SUSHITRACK_BUILD_APPLICATIONS` | ON | Builds `tracker_bridge` and the `mot_engine` benchmark under `applications/` |
 | `SUSHITRACK_ENABLE_LOGGING` | ON | Compiles log calls below ERROR; OFF keeps ERROR and FATAL only |
+| `SUSHITRACK_ENABLE_PROFILER` | ON | Records zones, counters and instants through SushiProfiler; OFF compiles the macros out and builds without SushiProfiler |
+| `SUSHITRACK_PROFILE_LEVEL` | 1 release, 2 debug | The most detailed profiling level compiled in |
+| `SUSHIPROFILER_DIR` | set by `st` | The SushiProfiler checkout `cli/sushistack.deps.toml` pins |
 | `SUSHILOG_DIR` | set by `st` | The SushiLog checkout `cli/sushistack.deps.toml` pins |
 
 cmake configure runs only when the requested configuration (build type, tests on/off,
