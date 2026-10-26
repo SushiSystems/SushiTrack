@@ -13,7 +13,7 @@ depends_on = ["sushilog"]
 
 # SushiLog, the one logger of the process. The library links it; the CLI resolves this pin and
 # hands it to CMake as SUSHILOG_DIR.
-[sushi.sushilog]
+[sushisystems.sushilog]
 version = "v0.2.3"
 commit  = "5f714a7bca6cad1a49e9a6133e75f0f791dba551"
 
