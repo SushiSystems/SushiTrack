@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- 2026-10-26 — deps: Upgraded sushicore to 0.9.3 and moved the Sushi library pins to `[sushisystems.<name>]` tables (`cli/sushistack.deps.toml`).
+- 2026-10-26 — deps: Upgraded sushicore to 0.9.5 and moved the Sushi library pins to `[sushisystems.<name>]` tables (`cli/sushistack.deps.toml`).
 - 2026-10-21 — docs: Reshaped the migration design document into the five sections with a phase table, and copied the design format checker (`docs/design/SUSHITRACK_MIGRATION/README.md`, `tools/documentation/check_design_format.py`).
 - 2026-10-21 — ci: Added the nightly workflow, which runs `ci.yml` with ThreadSanitizer against SushiLog's main, then the quarantined tests without gating (`.github/workflows/nightly.yml`, `ci.yml`, `.github/actions/sushilog/action.yml`).
 - 2026-10-21 — ci: Pinned the actions of `release.yml` to the commit hashes `ci.yml` uses (`.github/workflows/release.yml`).
