@@ -19,8 +19,8 @@ commit  = "5f714a7bca6cad1a49e9a6133e75f0f791dba551"
 
 # SushiProfiler, which the zones of Tracker::update record into.
 [sushisystems.sushiprofiler]
-version = "v0.3.0"
-commit  = "e6e9b8af059d26f4084bbef3de902907df2a04ae"
+version = "v0.3.1"
+commit  = "ff730eab8b3ba713d37228e2e9662d593e355d10"
 
 [googletest]
 description   = "GoogleTest, for the test programs st build builds unless --no-test is given; see docs/getting_started/INSTALL.md."
