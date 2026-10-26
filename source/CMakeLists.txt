@@ -19,6 +19,7 @@ target_include_directories(sushitrack PRIVATE
     ${PROJECT_SOURCE_DIR}/third_party)
 target_link_libraries(sushitrack PRIVATE SushiLog::SushiLog)
 sushitrack_apply_logging(sushitrack PRIVATE)
+sushitrack_apply_profiling(sushitrack PUBLIC)
 sushitrack_apply_sanitizers(sushitrack)
 
 add_library(sushitrack_static OBJECT EXCLUDE_FROM_ALL ${SUSHITRACK_SOURCES})
@@ -31,4 +32,5 @@ target_include_directories(sushitrack_static PRIVATE
     ${PROJECT_SOURCE_DIR}/third_party)
 target_link_libraries(sushitrack_static PUBLIC SushiLog::SushiLog)
 sushitrack_apply_logging(sushitrack_static PUBLIC)
+sushitrack_apply_profiling(sushitrack_static PUBLIC)
 sushitrack_apply_sanitizers(sushitrack_static)

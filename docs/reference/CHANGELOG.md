@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- 2026-10-26 — build: Took SushiLog with `find_package(SushiLog CONFIG REQUIRED)` and dropped the added subdirectory (`cmake/SushiTrackSushiLog.cmake`).
+- 2026-10-26 — build: Added `cmake/SushiTrackSushiProfiler.cmake`: the switch, the level set on every target, the SushiProfiler link and the version and commit of the record.
+- 2026-10-26 — build: Linked SushiLog into `tracker_adapters` (`applications/tracker_bridge/CMakeLists.txt`).
+- 2026-10-26 — build: Compiled `frame_recorder.cpp` into `mot_engine_runner` (`applications/benchmarks/mot_engine/CMakeLists.txt`).
+- 2026-10-26 — deps: Pinned sushiprofiler v0.3.0 and moved the sushicore floor to 0.9.6 (`cli/sushistack.deps.toml`, `cli/pyproject.toml`).
 - 2026-10-26 — cli: Made `st build` take SushiLog as a built package and pass its config folder to CMake (`library_packages.py`, `build.py`).
 - 2026-10-26 — cli: Made `st build` pass the compiler it resolves to every configure, so the packages and the tree share one (`build.py`).
 - 2026-10-26 — cli: Put the run-time folders of the packages first on the search path of every command that runs the tree (`env.py`).

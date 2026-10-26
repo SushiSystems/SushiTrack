@@ -12,6 +12,7 @@ include(SushiTrackBuildPolicy)
 include(SushiTrackSanitizers)
 include(SushiTrackEigen)
 include(SushiTrackSushiLog)
+include(SushiTrackSushiProfiler)
 include(SushiTrackTests)
 
 option(SUSHITRACK_BUILD_TESTS "Build sushitrack_tests from the mirror under tests/" ON)

@@ -7,7 +7,8 @@
 | C++ compiler | C++17 (MSVC 19.20+, GCC 9+, Clang 10+) |
 | CMake | ≥ 3.14 |
 | Eigen | vendored at `third_party/eigen` |
-| SushiLog | `v0.2.3`, pinned in `cli/sushistack.deps.toml`; `st setup` fetches it, a checkout beside this one at `../sushilog` is used first, and `SUSHILOG_DIR` overrides both |
+| SushiLog | `v0.2.3`, pinned in `cli/sushistack.deps.toml`; `st build` builds its package from a checkout beside this one at `../sushilog` or from the one `SUSHILOG_DIR` names, and reuses it afterwards |
+| SushiProfiler | `v0.3.0`, pinned in `cli/sushistack.deps.toml`; `st build` builds its package the same way, from `../sushiprofiler` or the checkout `SUSHIPROFILER_DIR` names |
 | GoogleTest | provided via conda or system package |
 | Ninja | provided via conda |
 | Python | 3.11 |

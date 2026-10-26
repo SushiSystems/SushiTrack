@@ -9,13 +9,19 @@
 #   check_cmd      Optional command; exit 0 means "already installed".
 
 [module]
-depends_on = ["sushilog"]
+depends_on = ["sushilog", "sushiprofiler"]
 
 # SushiLog, the one logger of the process. The library links it; the CLI builds or reuses its
 # package at this tag and hands its config folder to CMake.
 [sushisystems.sushilog]
 version = "v0.2.3"
 commit  = "5f714a7bca6cad1a49e9a6133e75f0f791dba551"
+
+# SushiProfiler, which the zones of Tracker::update record into. The tag v0.3.0 is cut after its
+# package build; until then the commit is the head of its main branch.
+[sushisystems.sushiprofiler]
+version = "v0.3.0"
+commit  = "f303075857f444a4edd89cfaae598d0847b8899b"
 
 [googletest]
 description   = "GoogleTest, for the test programs st build builds unless --no-test is given; see docs/getting_started/INSTALL.md."

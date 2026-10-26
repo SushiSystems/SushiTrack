@@ -17,7 +17,7 @@ target_include_directories(tracker_adapters INTERFACE
     ${PROJECT_SOURCE_DIR}/third_party
     ${PROJECT_SOURCE_DIR}/third_party/bytetrack/include
     ${PROJECT_SOURCE_DIR}/third_party/ocsort/include)
-target_link_libraries(tracker_adapters INTERFACE sushitrack bytetrack libocsort)
+target_link_libraries(tracker_adapters INTERFACE sushitrack SushiLog::SushiLog bytetrack libocsort)
 
 add_library(tracker_bridge SHARED tracker_bridge.cpp)
 target_link_libraries(tracker_bridge PRIVATE tracker_adapters)

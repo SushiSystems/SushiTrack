@@ -23,9 +23,12 @@ The CMake options `st build` sets:
 | `SUSHITRACK_BUILD_APPLICATIONS` | ON | Builds `tracker_bridge` and the `mot_engine` benchmark under `applications/` |
 | `SUSHITRACK_ENABLE_LOGGING` | ON | Compiles log calls below ERROR; OFF keeps ERROR and FATAL only |
 | `SUSHITRACK_ENABLE_PROFILER` | ON | Records zones, counters and instants through SushiProfiler; OFF compiles the macros out and builds without SushiProfiler |
-| `SUSHITRACK_PROFILE_LEVEL` | 1 release, 2 debug | The most detailed profiling level compiled in |
-| `SUSHIPROFILER_DIR` | set by `st` | The SushiProfiler checkout `cli/sushistack.deps.toml` pins |
-| `SUSHILOG_DIR` | set by `st` | The SushiLog checkout `cli/sushistack.deps.toml` pins |
+| `SUSHITRACK_PROFILE_LEVEL` | empty: 1, and 2 in a Debug configuration | The most detailed profiling level compiled in: 0, 1 or 2 |
+| `SushiProfiler_DIR` | set by `st` | The config folder of the SushiProfiler package `cli/sushistack.deps.toml` pins |
+| `SushiLog_DIR` | set by `st` | The config folder of the SushiLog package `cli/sushistack.deps.toml` pins |
+
+`st` builds each package once through its library's own CLI and reuses it afterwards. CMake
+finds both with `find_package(... CONFIG REQUIRED)` and compiles none of their sources.
 
 cmake configure runs only when the requested configuration (build type, tests on/off,
 generator, extra defines, the SushiLog path) differs from what the tree was configured with,
