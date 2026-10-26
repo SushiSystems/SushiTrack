@@ -15,7 +15,7 @@ from pathlib import Path
 from sushicore.build_env import merge_env, read_cache, snapshot_vcvars, write_cache
 from sushicore.provision.probe import find_vcvars
 
-from . import console
+from . import console, library_packages
 
 CACHE_NAME = ".sushitrack_env.json"
 #: The variable the library reads its configuration path from.
@@ -58,9 +58,11 @@ def load_build_env(tool, build_dir, tracker_config=None) -> dict[str, str]:
         tracker_config: The `sushitrack.json` a child loads when `SUSHITRACK_CONFIG` is unset.
 
     Returns:
-        `os.environ` off Windows or without a snapshot; else it merged with one.
+        `os.environ` off Windows or without a snapshot; else it merged with one. The run-time
+        folders of the library packages the tree linked come first on the search path.
     """
     env = _compiler_env(tool, build_dir)
+    library_packages.prepend_run_dirs(tool, env, library_packages.read_run_dirs(build_dir))
     if tracker_config is not None:
         env.setdefault(TRACKER_CONFIG_VARIABLE, str(tracker_config))
     return env

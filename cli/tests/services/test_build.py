@@ -30,16 +30,35 @@ class RecordingRunner:
         return 0
 
 
+class NoPackages:
+    """Stands in for a package set that holds no library."""
+
+    def names(self):
+        """Return no name."""
+        return []
+
+    def definitions(self):
+        """Return no definition."""
+        return []
+
+    def run_dirs(self, platform):
+        """Return no folder."""
+        return []
+
+
 def _cfg(generator="", windows=True, sushi=()):
-    """Build a Config slice with st's tool settings."""
+    """Build a Config slice with st's tool settings, a pin that is no package, and no compiler."""
     tool = SimpleNamespace(cmake_exe="", ctest_exe="", generator=generator,
                            is_windows=windows, platform="x", vs_vcvars="",
-                           expand=lambda v: v, sushi_definitions=lambda root: list(sushi))
+                           expand=lambda v: v,
+                           sushi_definitions=lambda root, packaged=None: list(sushi),
+                           sushi_packages=lambda *args, **kwargs: NoPackages(),
+                           resolved_compiler=lambda root: "")
     return SimpleNamespace(tool=tool, build_type="Release", jobs=lambda: 4)
 
 
 def test_a_pinned_sushi_library_reaches_the_configure(tmp_path, runner):
-    """Hands each pinned Sushi library to CMake as -D<NAME>_DIR and records it in the stamp."""
+    """Hands a pinned Sushi library that is no package to CMake as -D<NAME>_DIR."""
     paths = SimpleNamespace(root=tmp_path, build=tmp_path / "build")
     cfg = _cfg(sushi=["-DSUSHILOG_DIR=/stack/sushilog"])
     assert build_svc.build(cfg, paths, tests=False) == 0

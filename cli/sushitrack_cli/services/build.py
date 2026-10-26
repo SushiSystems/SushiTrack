@@ -11,8 +11,9 @@ from pathlib import Path
 
 from sushicore import cmake_cache
 from sushicore.cmake_driver import CMakeDriver
+from sushicore.provision.sushi_packages import PackageError
 
-from .. import console
+from .. import console, library_packages
 from ..env import load_build_env
 from ..errors import UnknownBuildTypeError
 from ..process import RUNNER
@@ -145,15 +146,26 @@ def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
                  + (f"  |  generator: {generator_name}" if generator_name else "")
                  + (f"  |  sanitizer: {sanitizer.value}" if sanitizer else ""))
 
-    env = load_build_env(cfg.tool, build_dir)
-    # Each pinned Sushi library reaches CMake as -D<NAME>_DIR; CMake never downloads.
-    defines = (*defines, *cfg.tool.sushi_definitions(paths.root))
+    # The libraries are built packages made with this tree's compiler; CMake compiles none.
+    compiler = cfg.tool.resolved_compiler(paths.root)
+    try:
+        packages = library_packages.resolve(
+            cfg.tool, paths.root, build_type, compiler, console.info, console.warn)
+    except PackageError as error:
+        console.error(str(error))
+        return 1
+    defines = (*defines, *library_packages.compiler_arguments(compiler),
+               *library_packages.configure_arguments(cfg.tool, paths.root, packages))
     stamp_key = _stamp_key(build_type, tests, generator_name, defines)
 
-    if _needs_configure(build_dir, generator_name, stamp_key, paths.root):
-        if build_dir.exists() and not _remove_tree(build_dir):
-            return 1
-        build_dir.mkdir(parents=True, exist_ok=True)
+    configure = _needs_configure(build_dir, generator_name, stamp_key, paths.root)
+    if configure and build_dir.exists() and not _remove_tree(build_dir):
+        return 1
+    # Recorded before the environment is read, and after a tree was removed, so it survives.
+    library_packages.record_run_dirs(build_dir, packages.run_dirs(cfg.tool.platform))
+    env = load_build_env(cfg.tool, build_dir)
+
+    if configure:
         console.info("Configuring...")
         args = _configure_args(cfg, paths, build_type, tests, generator_name, defines)
         code = DRIVER.configure(args, paths.root, env)

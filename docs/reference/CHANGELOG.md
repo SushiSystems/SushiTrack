@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- 2026-10-26 — cli: Made `st build` take SushiLog as a built package and pass its config folder to CMake (`library_packages.py`, `build.py`).
+- 2026-10-26 — cli: Made `st build` pass the compiler it resolves to every configure, so the packages and the tree share one (`build.py`).
+- 2026-10-26 — cli: Put the run-time folders of the packages first on the search path of every command that runs the tree (`env.py`).
+- 2026-10-26 — cli: Made `st` honour `SUSHISTACK_CXX` over its configured compiler (`config.py`).
 - 2026-10-26 — config: Made the reader refuse an unknown key, a wrong-typed value, a fractional integer and a named missing file with `SUSHITRACK_INVALID_ARGUMENT`; a missing named file no longer succeeds (`params_overlay.cpp`).
 - 2026-10-26 — config: Made `sushitrack_create_from_config` return no tracker for a refused file; it built one from the defaults, so callers that ignored a null now fail (`config_loader.cpp`).
 - 2026-10-26 — config: Removed `load_config_from_json`, which had no caller (`include/SushiTrack/configuration/config_loader.hpp`).

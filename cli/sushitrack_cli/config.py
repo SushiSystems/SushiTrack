@@ -23,6 +23,9 @@ from sushicore.profile import ModuleProfile
 from sushicore.stack_config import StackConfig
 from sushicore.workspace import read_toml
 
+#: The compiler a consumer's package build hands the CLI; it outranks the configured one.
+K_STACK_CXX_ENV = "SUSHISTACK_CXX"
+
 #: root_marker exists only at the SushiTrack root; see docs/architecture/CLI_PACKAGE.md.
 PROFILE = ModuleProfile(
     name="SushiTrack",
@@ -63,6 +66,15 @@ class ToolSettings(StackConfig):
     """Holds the ``[tool]`` section: host build tools and provisioned toolchain roots."""
 
     generator: str = ""
+
+    # The compiler SUSHISTACK_CXX names; empty outside a package build. It outranks `cxx`.
+    stack_cxx: str = ""
+
+    def resolved_compiler(self, root) -> str:
+        """Return the C++ compiler: SUSHISTACK_CXX, else the one the shared resolution finds."""
+        if self.stack_cxx:
+            return self.expand(self.stack_cxx)
+        return super().resolved_compiler(root)
 
 
 @dataclass
@@ -226,8 +238,11 @@ def load_tool(root=None):
         config_dir(root)
     except SystemExit:
         plat = platform.system().lower()
-        return load_tool_config(ToolSettings, [], plat, PROFILE.env_overrides())
-    return _MODULE.load(ToolSettings)
+        tool = load_tool_config(ToolSettings, [], plat, PROFILE.env_overrides())
+    else:
+        tool = _MODULE.load(ToolSettings)
+    tool.stack_cxx = os.environ.get(K_STACK_CXX_ENV, "")
+    return tool
 
 
 def load_config(root=None):

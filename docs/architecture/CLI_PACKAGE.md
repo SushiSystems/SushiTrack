@@ -12,6 +12,7 @@ The CLI lives in `cli/` as the package `sushitrack-cli`. Its commands are in the
 | `cli/sushitrack_cli/config.py` | Layered TOML config, `ST_*` overrides, project-root and path resolution via `sushicore.module_config` |
 | `cli/sushitrack_cli/console.py` | `sushicore`'s console, theme and icon set, wired in lazily |
 | `cli/sushitrack_cli/env.py` | vcvars discovery and build-environment snapshotting on Windows |
+| `cli/sushitrack_cli/library_packages.py` | The Sushi libraries `st` links as built packages: the request, the configure arguments and the run-time folders |
 | `cli/sushitrack_cli/process.py` | The `sushicore` process runner every service shares |
 | `cli/sushitrack_cli/__main__.py` | Entry for `python -m sushitrack_cli` |
 | `cli/sushitrack_cli/services/` | build, tests (ctest and the pytest suite), test_label (the `--label` selection), label (`st eval`, `st clean --predictions`), infer, evaluate (TrackEval), deploy, docker, diag, artifacts, checks, runner |
@@ -37,6 +38,24 @@ root.
 that overrides it. The table is sectioned, not flat.
 `sushicore.profile.ModuleProfile.env_overrides()` assumes one `ToolSettings` field per override, so
 the table stays local to `config.py` and is not derived from the shared profile.
+
+### The library packages
+
+`st build` links SushiLog, and any library its fragment adds, as a built package and never
+compiles it. Each build asks `cfg.tool.sushi_packages` for the packages of its closure, with the
+compiler `ToolSettings.resolved_compiler` finds and the build type of the command, builds a
+missing one through the library's own CLI, and prints one `reused` or `built` line per library.
+The configure passes `-D<Package>_DIR` for each package and no `-D<NAME>_DIR`. A MinSizeRel build
+links release packages, because a library CLI takes no `minsizerel`.
+
+The packages are built with the compiler of the tree, so `st` passes `-DCMAKE_CXX_COMPILER` and
+`-DCMAKE_C_COMPILER` to every configure, and both are in the configure stamp. `SUSHISTACK_CXX`
+outranks the configured `cxx`.
+
+`build` writes the run-time folders of the packages to `.sushitrack_package_dirs.json` in its
+tree. `env.load_build_env` reads the file and puts the folders first on `PATH` (Windows) or
+`LD_LIBRARY_PATH` (Linux), so every command that runs the tree starts a program with the folders
+the build linked.
 
 ### The lazy console
 
