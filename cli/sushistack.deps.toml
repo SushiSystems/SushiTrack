@@ -17,11 +17,12 @@ depends_on = ["sushilog", "sushiprofiler"]
 version = "v0.2.3"
 commit  = "5f714a7bca6cad1a49e9a6133e75f0f791dba551"
 
-# SushiProfiler, which the zones of Tracker::update record into. The tag v0.3.0 is cut after its
-# package build; until then the commit is the head of its main branch.
+# SushiProfiler, which the zones of Tracker::update record into. v0.3.0 lives on its branch
+# feature/live_session; the tag follows the merge of that branch, and until then the commit is the
+# branch head.
 [sushisystems.sushiprofiler]
 version = "v0.3.0"
-commit  = "f303075857f444a4edd89cfaae598d0847b8899b"
+commit  = "cd71c85a7b633261165d469a7c906206568de566"
 
 [googletest]
 description   = "GoogleTest, for the test programs st build builds unless --no-test is given; see docs/getting_started/INSTALL.md."

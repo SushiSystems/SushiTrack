@@ -28,51 +28,48 @@
 
 #pragma once
 
-#include <SushiTrack/profiling/profiling.hpp>
-
-#if SUSHITRACK_ENABLE_PROFILER
-
-#include <SushiProfiler/environment/environment_contributor.hpp>
-#include <SushiProfiler/registry/registry.hpp>
-#include <SushiProfiler/version/export.hpp>
+#include <memory>
 
 #include <SushiTrack/c_api/sushitrack_export.hpp>
 
-SUSHIPROFILER_DLL_WARNINGS_PUSH
+namespace SushiProfiler
+{
+    class Registry;
+} // namespace SushiProfiler
+
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4251)
+#endif
 namespace SushiTrack
 {
     /**
-     * @brief Adds the library's name, version, commit, profile level and the run's UTC date to
-     *        a record's environment.
-     */
-    class SUSHITRACK_API SushiTrackEnvironment final : public SushiProfiler::EnvironmentContributor
-    {
-        public:
-            /// @brief Sets the `sushitrack.*` facts of ProfilerKeys in @p facts.
-            void contribute(SushiProfiler::RecordFacts& facts) const override;
-    };
-
-    /**
      * @brief Owns what SushiTrack registers with a SushiProfiler registry.
      *
-     * Neither copyable nor movable, because the registry holds the contributor's address; the
-     * caller keeps it alive until every session started with the registry has stopped.
+     * Neither copyable nor movable, because the registry holds the address of what this owns; the
+     * caller keeps it alive until every session started with the registry has stopped. Built
+     * without SushiProfiler it registers nothing.
      */
     class SUSHITRACK_API SushiTrackProfilerParts final
     {
         public:
-            /// @brief Registers the environment contributor in @p registry.
+            /// @brief Registers the library's environment contributor in @p registry.
             explicit SushiTrackProfilerParts(SushiProfiler::Registry& registry);
 
             SushiTrackProfilerParts(const SushiTrackProfilerParts&) = delete;
             SushiTrackProfilerParts& operator=(const SushiTrackProfilerParts&) = delete;
             SushiTrackProfilerParts(SushiTrackProfilerParts&&) = delete;
             SushiTrackProfilerParts& operator=(SushiTrackProfilerParts&&) = delete;
-            ~SushiTrackProfilerParts() = default;
+
+            /// @brief Releases what the constructor registered.
+            ~SushiTrackProfilerParts();
 
         private:
-            /// @brief The contributor the registry refers to.
-            SushiTrackEnvironment environment_;
+            /// @brief Holds the contributor the registry refers to; defined in the library.
+            struct State;
+
+            /// @brief The contributor, kept behind a pointer so no SushiProfiler type is named here.
+            std::unique_ptr<State> state_;
     };
 
     /**
@@ -84,6 +81,6 @@ namespace SushiTrack
     [[nodiscard]] SUSHITRACK_API SushiTrackProfilerParts
     register_profiler_parts(SushiProfiler::Registry& registry);
 } // namespace SushiTrack
-SUSHIPROFILER_DLL_WARNINGS_POP
-
+#if defined(_MSC_VER)
+#pragma warning(pop)
 #endif

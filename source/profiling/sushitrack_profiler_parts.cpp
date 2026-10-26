@@ -25,15 +25,19 @@
  * @author Mustafa Garip
  */
 
-#include <SushiTrack/profiling/profiling.hpp>
+#include <SushiTrack/profiling/sushitrack_profiler_parts.hpp>
+
+#include <SushiTrack/profiling/profile_config.hpp>
 
 #if SUSHITRACK_ENABLE_PROFILER
 
-#include <SushiTrack/profiling/sushitrack_profiler_parts.hpp>
+#include <SushiProfiler/environment/environment_contributor.hpp>
+#include <SushiProfiler/registry/registry.hpp>
 
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <memory>
 #include <string>
 
 #include <SushiTrack/profiling/profiler_keys.hpp>
@@ -86,24 +90,62 @@ namespace SushiTrack
                           static_cast<long long>(second_of_day % 60));
             return text;
         }
+
+        /// @brief Adds the library's name, version, commit, profile level and the run's UTC date
+        ///        to a record's environment.
+        class SushiTrackEnvironment final : public SushiProfiler::EnvironmentContributor
+        {
+            public:
+                /// @brief Sets the `sushitrack.*` facts of ProfilerKeys in @p facts.
+                void contribute(SushiProfiler::RecordFacts& facts) const override;
+        };
+
+        void SushiTrackEnvironment::contribute(SushiProfiler::RecordFacts& facts) const
+        {
+            SushiProfiler::set_fact(facts.environment, ProfilerKeys::K_FACT_LIBRARY, "SushiTrack");
+            SushiProfiler::set_fact(facts.environment, ProfilerKeys::K_FACT_VERSION,
+                                    SUSHITRACK_VERSION_STRING);
+            SushiProfiler::set_fact(facts.environment, ProfilerKeys::K_FACT_COMMIT,
+                                    SUSHITRACK_COMMIT);
+            SushiProfiler::set_fact(facts.environment, ProfilerKeys::K_FACT_DATE,
+                                    utc_text(std::chrono::system_clock::now()));
+            SushiProfiler::set_fact(facts.environment, ProfilerKeys::K_FACT_PROFILE_LEVEL,
+                                    std::to_string(SUSHITRACK_PROFILE_LEVEL));
+        }
     } // namespace
 
-    void SushiTrackEnvironment::contribute(SushiProfiler::RecordFacts& facts) const
+    struct SushiTrackProfilerParts::State
     {
-        SushiProfiler::set_fact(facts.environment, ProfilerKeys::K_FACT_LIBRARY, "SushiTrack");
-        SushiProfiler::set_fact(facts.environment, ProfilerKeys::K_FACT_VERSION,
-                                SUSHITRACK_VERSION_STRING);
-        SushiProfiler::set_fact(facts.environment, ProfilerKeys::K_FACT_COMMIT, SUSHITRACK_COMMIT);
-        SushiProfiler::set_fact(facts.environment, ProfilerKeys::K_FACT_DATE,
-                                utc_text(std::chrono::system_clock::now()));
-        SushiProfiler::set_fact(facts.environment, ProfilerKeys::K_FACT_PROFILE_LEVEL,
-                                std::to_string(SUSHITRACK_PROFILE_LEVEL));
-    }
+        SushiTrackEnvironment environment; /**< The contributor the registry refers to. */
+    };
 
     SushiTrackProfilerParts::SushiTrackProfilerParts(SushiProfiler::Registry& registry)
+        : state_(std::make_unique<State>())
     {
-        registry.add_contributor(environment_);
+        registry.add_contributor(state_->environment);
     }
+
+    SushiTrackProfilerParts::~SushiTrackProfilerParts() = default;
+
+    SushiTrackProfilerParts register_profiler_parts(SushiProfiler::Registry& registry)
+    {
+        return SushiTrackProfilerParts(registry);
+    }
+} // namespace SushiTrack
+
+#else
+
+namespace SushiTrack
+{
+    struct SushiTrackProfilerParts::State
+    {
+    };
+
+    SushiTrackProfilerParts::SushiTrackProfilerParts(SushiProfiler::Registry&)
+    {
+    }
+
+    SushiTrackProfilerParts::~SushiTrackProfilerParts() = default;
 
     SushiTrackProfilerParts register_profiler_parts(SushiProfiler::Registry& registry)
     {

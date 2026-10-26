@@ -1,0 +1,35 @@
+/**************************************************************************/
+/* profile_config.hpp.in                                                  */
+/**************************************************************************/
+/*                          This file is part of:                         */
+/*                               SushiTrack                               */
+/*               https://github.com/SushiSystems/SushiTrack               */
+/*                         https://sushisystems.io                        */
+/**************************************************************************/
+/* Copyright (c) 2026-present Mustafa Garip & Sushi Systems               */
+/*                                                                        */
+/* Licensed under the PolyForm Noncommercial License 1.0.0 (the           */
+/* "License"); you may not use this file except in compliance with the    */
+/* License. You may obtain a copy of the License at                       */
+/*                                                                        */
+/*     https://polyformproject.org/licenses/noncommercial/1.0.0           */
+/*                                                                        */
+/* Noncommercial use is free. Commercial use requires a separate licence  */
+/* from Sushi Systems; see COMMERCIAL.md. The software is provided        */
+/* "as is", without warranty of any kind.                                 */
+/**************************************************************************/
+
+/**
+ * @file profile_config.hpp
+ * @brief Defines the profiler switch and level the build chose, for every profiling header.
+ * @author Mustafa Garip
+ * @see docs/design/SUSHITRACK_PROFILING/README.md
+ */
+
+#pragma once
+
+/// @brief 1 when the build records through SushiProfiler, 0 when every macro compiles to nothing.
+#define SUSHITRACK_ENABLE_PROFILER @SUSHITRACK_ENABLE_PROFILER_VALUE@
+
+/// @brief The most detailed level compiled in: 1 stages and counters, 2 adds fine zones.
+#define SUSHITRACK_PROFILE_LEVEL @SUSHITRACK_PROFILE_LEVEL@

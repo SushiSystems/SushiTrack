@@ -489,7 +489,7 @@ exception logs it once.
 SushiTrack records its frame through SushiProfiler, linked as the shared library so a process
 holds one collector. The host marks the period: `mot_engine` marks the timeline `sushitrack.frame`
 once per frame, before the tracker's update, and the library records zones, counters and instants
-inside it (`include/SushiTrack/profiling/profiling.hpp`). A host that starts no session pays
+inside it (`source/private_include/SushiTrack/profiling/profiling.hpp`, a private header). A host that starts no session pays
 one relaxed load per site.
 
 | Level | Records |
@@ -497,9 +497,11 @@ one relaxed load per site.
 | 1 | The stage zones `update`, `split`, `predict`, `match_high`, `match_low`, `lost_recovery`, `tentative` or `unconfirmed`, `cleanup_lost`, `finalize` and `output`, and nine counters |
 | 2 | Adds the `solve` and `cost_matrix` zones, the other counters and the track instants |
 
-`SUSHITRACK_PROFILE_LEVEL` is the level compiled in, 1 in a release build and 2 in a debug
-build; the session's `level` filters at run time. With `SUSHITRACK_ENABLE_PROFILER` off the macros
-expand to nothing and the library builds without SushiProfiler. The names, groups and units are in
+`SUSHITRACK_PROFILE_LEVEL` is the level compiled in, 1 by default; the build writes it and
+`SUSHITRACK_ENABLE_PROFILER` into a generated `profile_config.hpp`, and the session's `level`
+filters at run time. With `SUSHITRACK_ENABLE_PROFILER` off the macros
+expand to nothing and the library builds without SushiProfiler. No installed header includes a
+SushiProfiler header. The names, groups and units are in
 [Profiler keys](../reference/PROFILER_KEYS.md). `register_profiler_parts`
 (`include/SushiTrack/profiling/sushitrack_profiler_parts.hpp`) adds the library's name, version,
 commit, profile level and run date to a record's environment. The design and its phases are in

@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* test_sushitrack_profiler_parts.cpp                                     */
+/* test_environment.cpp                                                   */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -20,7 +20,7 @@
 /**************************************************************************/
 
 /**
- * @file test_sushitrack_profiler_parts.cpp
+ * @file test_environment.cpp
  * @brief Tests the facts SushiTrack adds to a record and that two such records compare.
  * @author Mustafa Garip
  */

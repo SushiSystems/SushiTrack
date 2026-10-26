@@ -28,19 +28,8 @@
 
 #pragma once
 
-/// @brief Whether this translation unit records through SushiProfiler; 0 compiles every macro out.
-#ifndef SUSHITRACK_ENABLE_PROFILER
-#define SUSHITRACK_ENABLE_PROFILER 1
-#endif
-
-/// @brief The most detailed level compiled in: 1 stages and counters, 2 adds fine zones.
-#ifndef SUSHITRACK_PROFILE_LEVEL
-#ifdef NDEBUG
-#define SUSHITRACK_PROFILE_LEVEL 1
-#else
-#define SUSHITRACK_PROFILE_LEVEL 2
-#endif
-#endif
+// The generated config defines the switch and the level. No installed header includes this one.
+#include <SushiTrack/profiling/profile_config.hpp>
 
 #if SUSHITRACK_ENABLE_PROFILER
 

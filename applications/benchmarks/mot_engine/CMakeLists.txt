@@ -9,9 +9,7 @@
 add_library(mot_engine_runner STATIC frame_recorder.cpp mot_runner.cpp)
 target_include_directories(mot_engine_runner PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(mot_engine_runner PUBLIC tracker_adapters)
-if(SUSHITRACK_ENABLE_PROFILER)
-    target_link_libraries(mot_engine_runner PUBLIC SushiProfiler::SushiProfiler)
-endif()
+sushitrack_link_profiling(mot_engine_runner)
 sushitrack_apply_sanitizers(mot_engine_runner)
 
 add_executable(mot_engine main.cpp)

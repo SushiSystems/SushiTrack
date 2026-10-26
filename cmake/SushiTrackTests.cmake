@@ -48,6 +48,7 @@ function(sushitrack_add_sized_test_program target)
     add_executable(${target} ${ARG_TEST_SOURCES})
     target_link_libraries(${target} PRIVATE ${ARG_LINK} GTest::gtest_main)
     sushitrack_apply_sanitizers(${target})
+    sushitrack_link_profiling(${target})
     target_include_directories(${target} PRIVATE
         ${PROJECT_SOURCE_DIR}/tests
         ${PROJECT_SOURCE_DIR}/third_party)

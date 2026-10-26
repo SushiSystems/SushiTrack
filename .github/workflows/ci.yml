@@ -5,8 +5,8 @@ name: CI
 #
 # Pre-merge: the checkers and the CLI's own tests, the build and the small and medium tests on
 # Linux and Windows, and the small tests again under ASan and UBSan on Linux. A push to main and
-# the nightly run add ThreadSanitizer. Every build lane takes SushiLog from .github/actions/sushilog. Large tests need
-# hardware and run on no runner.
+# the nightly run add ThreadSanitizer. The CLI builds SushiLog and SushiProfiler once as packages from the commits
+# cli/sushistack.deps.toml pins. Large tests need hardware and run on no runner.
 
 on:
   push:
@@ -64,7 +64,6 @@ jobs:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: cli/pyproject.toml
-      - uses: ./.github/actions/sushilog
       - name: Install the toolchain and the CLI
         run: |
           sudo apt-get update
@@ -96,7 +95,6 @@ jobs:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: cli/pyproject.toml
-      - uses: ./.github/actions/sushilog
       - name: Install GoogleTest
         shell: pwsh
         run: vcpkg install gtest:x64-windows
@@ -143,7 +141,6 @@ jobs:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: cli/pyproject.toml
-      - uses: ./.github/actions/sushilog
         if: env.RUN == 'true'
       - name: Install the toolchain and the CLI
         if: env.RUN == 'true'

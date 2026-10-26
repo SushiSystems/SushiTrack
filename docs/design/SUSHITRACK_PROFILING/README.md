@@ -31,13 +31,14 @@ record, until SushiProfiler writes tables.
 ## Design
 
 The macros `SUSHITRACK_ZONE`, `SUSHITRACK_COUNTER` and `SUSHITRACK_INSTANT` sit in
-`include/SushiTrack/profiling/profiling.hpp`, beside `logging/logger.hpp`. They take the level of
-`SUSHITRACK_PROFILE_LEVEL` and expand to nothing when `SUSHITRACK_ENABLE_PROFILER` is 0. The names
+`source/private_include/SushiTrack/profiling/profiling.hpp`, which no installed header includes. They
+take the level of `SUSHITRACK_PROFILE_LEVEL` and expand to nothing when `SUSHITRACK_ENABLE_PROFILER`
+is 0; both come from the generated `profile_config.hpp`, not from compile definitions. The names
 are in `include/SushiTrack/profiling/profiler_keys.hpp` and listed in
 [Profiler keys](../../reference/PROFILER_KEYS.md); the groups are `Associate`, `Filter`, `Detect` and
 `Track`. The environment contributor, with the library's name, version, commit and the run's date,
-lives in the library (`sushitrack_profiler_parts.hpp`), which therefore includes the session tier of
-SushiProfiler. The stage zones wrap each step of `Tracker::update`; the `solve` and `cost_matrix`
+lives in the library (`sushitrack_profiler_parts.cpp`); its public header forward-declares
+`SushiProfiler::Registry` and names no other SushiProfiler type, so SushiProfiler links PRIVATE. The stage zones wrap each step of `Tracker::update`; the `solve` and `cost_matrix`
 zones and the per-track instants are level 2 because mode 0 of the primary stage solves once per
 track age.
 

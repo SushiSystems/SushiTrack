@@ -27,7 +27,7 @@
 
 #include <frame_recorder.hpp>
 
-#include <SushiTrack/profiling/profiling.hpp>
+#include <SushiTrack/profiling/profile_config.hpp>
 
 #if SUSHITRACK_ENABLE_PROFILER
 

@@ -25,6 +25,9 @@
  * @author Mustafa Garip
  */
 
+// The generated config comes first, and this file then sees a build with the profiler off.
+#include <SushiTrack/profiling/profile_config.hpp>
+
 #undef SUSHITRACK_ENABLE_PROFILER
 #define SUSHITRACK_ENABLE_PROFILER 0
 
