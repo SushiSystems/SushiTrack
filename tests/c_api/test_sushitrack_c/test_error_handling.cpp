@@ -28,6 +28,8 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <memory>
+#include <new>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -38,6 +40,7 @@
 
 #include <SushiTrack/c_api/sushitrack_c.h>
 #include <SushiTrack/c_api/c_api_log_category.hpp>
+#include <SushiTrack/filtering/kalman_filter_registry.hpp>
 #include <SushiTrack/tracking/tracking_log_category.hpp>
 
 namespace
@@ -464,38 +467,96 @@ TEST(Small_SushiTrackCLifecycleSafetyTest, RepeatedCreateDestroyCycleSucceeds)
     }
 }
 
-// Small_SushiTrackCStatusCodeCoverageTest — Disabled placeholders for future status codes
+// Small_SushiTrackCStatusCodeCoverageTest
+
+namespace
+{
+    /// @brief Kalman type whose creator throws std::runtime_error.
+    constexpr int K_THROWING_KALMAN_TYPE = 9101;
+    /// @brief Kalman type whose creator throws std::bad_alloc.
+    constexpr int K_OUT_OF_MEMORY_KALMAN_TYPE = 9102;
+    /// @brief Kalman type whose creator builds type 0 until told to throw.
+    constexpr int K_FAILING_LATER_KALMAN_TYPE = 9103;
+
+    /// @brief Whether the creator of K_FAILING_LATER_KALMAN_TYPE throws.
+    bool g_fail_later_throws = false;
+
+    /// @brief Returns default parameters naming Kalman type @p type.
+    sushitrack_params_t params_with_kalman_type(int type)
+    {
+        sushitrack_params_t params{};
+        sushitrack_get_default_params(&params);
+        params.kalman_type = type;
+        return params;
+    }
+} // namespace
 
 /**
- * @brief DISABLED. Documents the desired propagation path for
- *        SUSHITRACK_INITIALIZATION_FAILURE. Enable when CreateEx can surface
- *        sub-component construction failures (e.g. assignment solver init).
+ * @brief A component that throws while the tracker is built returns
+ *        SUSHITRACK_INITIALIZATION_FAILURE and no handle.
  */
-TEST(Small_SushiTrackCStatusCodeCoverageTest, DISABLED_InitFailureReturnsInitializationFailureCode)
+TEST(Small_SushiTrackCStatusCodeCoverageTest, InitFailureReturnsInitializationFailureCode)
 {
-    // Note: Inject a controlled init failure (e.g. a registered factory that throws) and assert sushitrack_create_ex returns SUSHITRACK_INITIALIZATION_FAILURE.
-    FAIL() << "Pending fault-injection hook for sub-component initialisation.";
+    SushiTrack::KalmanFilterRegistry::get_instance().register_creator(
+        K_THROWING_KALMAN_TYPE,
+        [](bool) -> std::unique_ptr<SushiTrack::GatedStatePredictor>
+        {
+            throw std::runtime_error("injected initialisation failure");
+        });
+    const sushitrack_params_t params = params_with_kalman_type(K_THROWING_KALMAN_TYPE);
+    sushitrack_tracker_t tracker = reinterpret_cast<sushitrack_tracker_t>(0x1);
+
+    EXPECT_EQ(sushitrack_create_ex(&params, &tracker), SUSHITRACK_INITIALIZATION_FAILURE);
+    EXPECT_EQ(tracker, nullptr);
 }
 
 /**
- * @brief DISABLED. Documents the desired propagation path for
- *        SUSHITRACK_RUNTIME_ERROR from sushitrack_update.
+ * @brief An exception inside sushitrack_update returns SUSHITRACK_RUNTIME_ERROR with a count
+ *        of 0.
  */
-TEST(Small_SushiTrackCStatusCodeCoverageTest, DISABLED_RuntimeErrorReturnsRuntimeErrorCode)
+TEST(Small_SushiTrackCStatusCodeCoverageTest, RuntimeErrorReturnsRuntimeErrorCode)
 {
-    // Note: Inject an exception into Tracker::update and assert sushitrack_update returns SUSHITRACK_RUNTIME_ERROR with a count of 0.
-    FAIL() << "Pending a fault-injection hook inside the tracker.";
+    g_fail_later_throws = false;
+    SushiTrack::KalmanFilterRegistry::get_instance().register_creator(
+        K_FAILING_LATER_KALMAN_TYPE,
+        [](bool enable_xyah) -> std::unique_ptr<SushiTrack::GatedStatePredictor>
+        {
+            if (g_fail_later_throws)
+                throw std::runtime_error("injected update failure");
+            return SushiTrack::KalmanFilterRegistry::get_instance().create(0, enable_xyah);
+        });
+    const sushitrack_params_t params = params_with_kalman_type(K_FAILING_LATER_KALMAN_TYPE);
+    sushitrack_tracker_t tracker = nullptr;
+    ASSERT_EQ(sushitrack_create_ex(&params, &tracker), SUSHITRACK_SUCCESS);
+    g_fail_later_throws = true;
+    const sushitrack_object_t object = make_det(10.0f, 20.0f);
+    std::vector<sushitrack_track_t> out(4);
+    int count = -1;
+
+    EXPECT_EQ(sushitrack_update(tracker, &object, 1, out.data(), 4, 0.04f, &count),
+              SUSHITRACK_RUNTIME_ERROR);
+    EXPECT_EQ(count, 0);
+    g_fail_later_throws = false;
+    sushitrack_destroy(tracker);
 }
 
 /**
- * @brief DISABLED. Documents the desired propagation path for
- *        SUSHITRACK_OUT_OF_MEMORY. Enable when an allocator hook or stub
- *        allocator is in place to force bad_alloc inside the tracker core.
+ * @brief An allocation that fails while the tracker is built returns SUSHITRACK_OUT_OF_MEMORY
+ *        and no handle.
  */
-TEST(Small_SushiTrackCStatusCodeCoverageTest, DISABLED_OutOfMemoryReturnsOutOfMemoryCode)
+TEST(Small_SushiTrackCStatusCodeCoverageTest, OutOfMemoryReturnsOutOfMemoryCode)
 {
-    // Note: Inject a controlled bad_alloc and assert sushitrack_create_ex returns SUSHITRACK_OUT_OF_MEMORY.
-    FAIL() << "Pending allocator fault-injection hook.";
+    SushiTrack::KalmanFilterRegistry::get_instance().register_creator(
+        K_OUT_OF_MEMORY_KALMAN_TYPE,
+        [](bool) -> std::unique_ptr<SushiTrack::GatedStatePredictor>
+        {
+            throw std::bad_alloc();
+        });
+    const sushitrack_params_t params = params_with_kalman_type(K_OUT_OF_MEMORY_KALMAN_TYPE);
+    sushitrack_tracker_t tracker = reinterpret_cast<sushitrack_tracker_t>(0x1);
+
+    EXPECT_EQ(sushitrack_create_ex(&params, &tracker), SUSHITRACK_OUT_OF_MEMORY);
+    EXPECT_EQ(tracker, nullptr);
 }
 
 // Small_SushiTrackCBoundaryExceptionTest

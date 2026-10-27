@@ -76,9 +76,11 @@ TEST(Medium_FrameRecorderTest, WritesOnePeriodPerFrameWithTheRunFacts)
     ASSERT_TRUE(recording.error.empty()) << recording.error;
     EXPECT_EQ(recording.path.filename().string(), "sushitrack_seq.sprec.json");
     EXPECT_EQ(recording.dropped, 0U);
-    std::ifstream file(recording.path, std::ios::binary);
     std::stringstream text;
-    text << file.rdbuf();
+    {
+        std::ifstream file(recording.path, std::ios::binary);
+        text << file.rdbuf();
+    }
     const SushiProfiler::RecordReadResult read = SushiProfiler::read_record(text.str());
     ASSERT_TRUE(read.ok()) << read.error;
     EXPECT_EQ(read.record->periods.size(), 4U);

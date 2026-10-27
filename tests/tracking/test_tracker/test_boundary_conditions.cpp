@@ -166,13 +166,10 @@ TEST_F(Small_TrackerMalformedDetectionTest, NegativeScoreDoesNotProduceNaNGeomet
 }
 
 /**
- * @brief A detection with NaN coordinates must not crash, and must not
- *        corrupt other tracks present in the same frame.
- *
- * DISABLED: surfaces a real production behaviour — when a frame contains a
- * NaN-coordinate detection alongside a valid one, the tracker propagates the
+ * @brief A detection with NaN coordinates is ignored, so it neither crashes nor corrupts the
+ *        other tracks of the same frame.
  */
-TEST_F(Small_TrackerMalformedDetectionTest, DISABLED_NaNCoordinatesDoNotCorruptOtherTracks)
+TEST_F(Small_TrackerMalformedDetectionTest, NaNCoordinatesDoNotCorruptOtherTracks)
 {
     std::vector<sushitrack_track_t> out(8);
 
@@ -199,13 +196,10 @@ TEST_F(Small_TrackerMalformedDetectionTest, DISABLED_NaNCoordinatesDoNotCorruptO
 }
 
 /**
- * @brief A detection with Inf coordinates must not crash.
- *
- * DISABLED: surfaces a real production behaviour — Inf coordinates propagate
- * into the Tracked output's x/y fields rather than being clipped or rejected.
- * The call does not crash (so the no-crash half of the contract holds) but
+ * @brief A detection with Inf coordinates is ignored: the call does not crash and no track
+ *        reports non-finite geometry.
  */
-TEST_F(Small_TrackerMalformedDetectionTest, DISABLED_InfCoordinatesDoNotCrash)
+TEST_F(Small_TrackerMalformedDetectionTest, InfCoordinatesDoNotCrash)
 {
     std::vector<sushitrack_track_t> out(4);
     const float K_INF = std::numeric_limits<float>::infinity();

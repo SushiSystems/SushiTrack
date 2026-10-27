@@ -32,8 +32,6 @@
 #include <SushiTrack/association/lapjv_solver.hpp>
 
 #include <algorithm>
-#include <cstdint>
-#include <cstring>
 #include <limits>
 #include <stdexcept>
 #include <vector>
@@ -45,18 +43,15 @@
 #include <SushiTrack/profiling/profiler_keys.hpp>
 #include <SushiTrack/profiling/profiling.hpp>
 
+#include <detection/finite_value.hpp>
+
 namespace SushiTrack
 {
     namespace
     {
-        /// @brief Returns whether @p value is NaN or infinite, read from its bits so -ffast-math
-        ///        cannot fold the test away.
-        bool is_non_finite(float value) noexcept
-        {
-            std::uint32_t bits = 0U;
-            std::memcpy(&bits, &value, sizeof(bits));
-            return (bits & 0x7F800000U) == 0x7F800000U;
-        }
+        /// @brief Stands in for a pair that may not match: a non-finite cost, or a cell the
+        ///        sparse matrix leaves unset.
+        constexpr float K_UNMATCHABLE_COST = 1e4f;
     } // namespace
 
     /**
@@ -103,7 +98,11 @@ namespace SushiTrack
         {
             for (int j = 0; j < n_cols; ++j)
             {
-                if (cost(i, j) <= thresh)
+                if (is_non_finite(cost(i, j)))
+                {
+                    ++non_finite_costs;
+                }
+                else if (cost(i, j) <= thresh)
                 {
                     if (!ws_.row_active[i])
                     {
@@ -115,10 +114,6 @@ namespace SushiTrack
                         ws_.col_active[j] = 1;
                         num_active_cols++;
                     }
-                }
-                else if (is_non_finite(cost(i, j)))
-                {
-                    ++non_finite_costs;
                 }
             }
         }
@@ -170,14 +165,15 @@ namespace SushiTrack
             }
         }
 
-        ws_.sparse_cost.resize(num_active_rows, num_active_cols, 1e4f);
+        ws_.sparse_cost.resize(num_active_rows, num_active_cols, K_UNMATCHABLE_COST);
         for (int sr = 0; sr < num_active_rows; ++sr)
         {
             int rr = ws_.sparse_to_real_row[sr];
             for (int sc = 0; sc < num_active_cols; ++sc)
             {
                 int rc = ws_.sparse_to_real_col[sc];
-                ws_.sparse_cost(sr, sc) = cost(rr, rc);
+                const float value = cost(rr, rc);
+                ws_.sparse_cost(sr, sc) = is_non_finite(value) ? K_UNMATCHABLE_COST : value;
             }
         }
 

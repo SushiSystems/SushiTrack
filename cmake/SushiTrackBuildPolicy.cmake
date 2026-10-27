@@ -28,7 +28,8 @@ if(MSVC)
     add_compile_options(/W3 /O2 /Ot /fp:fast /arch:AVX2 /DNDEBUG /wd4251)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 else()
-    add_compile_options(-Wall -O3 -ffast-math -funroll-loops -DNDEBUG)
+    # NaN and Inf keep their meaning, as under /fp:fast; the tracker refuses non-finite input.
+    add_compile_options(-Wall -O3 -ffast-math -fno-finite-math-only -funroll-loops -DNDEBUG)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i686)$")
         # Eigen emits FMA whenever AVX2 is on under an MSVC-compatible compiler, as /arch:AVX2 allows.
         add_compile_options(-mavx2 -mfma)

@@ -187,19 +187,17 @@ namespace
 {
     /**
      * @brief A duplicate drop writes one DEBUG naming the dropped track, the kept one and the frame.
+     *
+     * Two coincident detections on the first frame confirm two tracks at once; the twin that
+     * misses the next frame turns Lost and is dropped as a duplicate of the Tracked one.
      */
     TEST_F(Small_TrackerDuplicateSuppressionTest, DuplicateDropLogsBothTrackIds)
     {
         SushiTrack::CapturedLog log(SushiLog::LogLevel::Debug);
         std::vector<sushitrack_track_t> out(8);
 
-        for (int i = 0; i < 6; ++i)
-        {
-            sushitrack_object_t d = make_det(100.0f, 200.0f);
-            CDetections::update_frame(hdl_, &d, 1, out.data(), 8, 0.04f);
-        }
-        sushitrack_object_t dets[2] = {make_det(100.0f, 200.0f), make_det(103.0f, 200.0f)};
-        CDetections::update_frame(hdl_, dets, 2, out.data(), 8, 0.04f);
+        sushitrack_object_t seed[2] = {make_det(100.0f, 200.0f), make_det(103.0f, 200.0f)};
+        CDetections::update_frame(hdl_, seed, 2, out.data(), 8, 0.04f);
         for (int i = 0; i < 4; ++i)
         {
             sushitrack_object_t d = make_det(100.0f, 200.0f);

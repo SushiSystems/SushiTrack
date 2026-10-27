@@ -28,9 +28,9 @@ sushitrack_destroy(hdl);
 
 Source: not compiled
 
-`sushitrack_create` returns `NULL` on failure. `sushitrack_create_ex` returns a `sushitrack_status_t` and writes the handle through `out_tracker`, which it sets to `NULL` on every failure.
+`sushitrack_create` returns `NULL` on failure. `sushitrack_create_ex` returns a `sushitrack_status_t` and writes the handle through `out_tracker`, which it sets to `NULL` on every failure. It returns `SUSHITRACK_INVALID_ARGUMENT` for a refused argument or an unregistered `kalman_type`, `SUSHITRACK_OUT_OF_MEMORY` when an allocation fails, and `SUSHITRACK_INITIALIZATION_FAILURE` when a component of the tracker fails to build.
 
-`sushitrack_update` and `sushitrack_get_tracklets` return a `sushitrack_status_t` and write the number of tracks through `out_count`. Output tracks are sorted by lifecycle priority (`Tracked` < `Tentative` < `Lost` < `Removed`). `out_tracks` may be `NULL` only when `max_tracks` is 0.
+`sushitrack_update` and `sushitrack_get_tracklets` return a `sushitrack_status_t` and write the number of tracks through `out_count`. Output tracks are sorted by lifecycle priority (`Tracked` < `Tentative` < `Lost` < `Removed`). `out_tracks` may be `NULL` only when `max_tracks` is 0. A detection whose box or score is NaN or infinite is ignored, and the tracker logs a WARN.
 
 | Status | Meaning for `sushitrack_update` | `out_count` |
 |---|---|---|

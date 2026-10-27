@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- 2026-10-27 — association: Counted a non-finite cost before the threshold test and gave the solver the unmatchable cost in its place, since under clang `-ffast-math` a NaN passed the threshold (`source/association/lapjv_solver.cpp`).
+- 2026-10-27 — tracking: Ignored a detection whose box or score is NaN or infinite, with one throttled WARN; it poisoned the other tracks of its frame (`source/tracking/tracker.cpp`).
+- 2026-10-27 — c_api: Made `sushitrack_create_ex` return `SUSHITRACK_INITIALIZATION_FAILURE` where a component throws; it returned `SUSHITRACK_RUNTIME_ERROR` (`source/c_api/sushitrack_c.cpp`).
+- 2026-10-27 — applications: Logged an unreadable `det.txt`, skipped rows and a defaulted frame rate in `mot_engine` (`applications/benchmarks/mot_engine/mot_sequence.hpp`).
 - 2026-10-26 — ci: Removed `.github/actions/sushilog` and its uses, since the CLI clones the pinned SushiLog and SushiProfiler and builds their packages (`.github/workflows/`).
 - 2026-10-26 — build: Took SushiLog with `find_package(SushiLog CONFIG REQUIRED)` and dropped the added subdirectory (`cmake/SushiTrackSushiLog.cmake`).
 - 2026-10-26 — build: Added `cmake/SushiTrackSushiProfiler.cmake`: the switch, the level (default 1), a generated `profile_config.hpp`, the PRIVATE SushiProfiler link and the version and commit of the record.

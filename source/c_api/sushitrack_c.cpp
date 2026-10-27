@@ -507,15 +507,18 @@ extern "C"
         }
         catch (const std::exception& e)
         {
-            SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY, "Tracker creation failed: {}",
+            SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
+                                 "Tracker creation failed: {}; returning "
+                                 "SUSHITRACK_INITIALIZATION_FAILURE",
                                  e.what());
-            return SUSHITRACK_RUNTIME_ERROR;
+            return SUSHITRACK_INITIALIZATION_FAILURE;
         }
         catch (...)
         {
             SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
-                                 "Tracker creation failed: unknown exception.");
-            return SUSHITRACK_RUNTIME_ERROR;
+                                 "Tracker creation failed: unknown exception; returning "
+                                 "SUSHITRACK_INITIALIZATION_FAILURE");
+            return SUSHITRACK_INITIALIZATION_FAILURE;
         }
     }
 

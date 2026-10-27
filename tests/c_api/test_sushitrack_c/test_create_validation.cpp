@@ -106,7 +106,9 @@ TEST(Small_SushiTrackCCreateValidationTest, RefusedArgumentsAreLoggedByName)
     int count = 0;
 
     EXPECT_EQ(sushitrack_create_ex(&params, nullptr), SUSHITRACK_INVALID_ARGUMENT);
-    EXPECT_EQ(sushitrack_create_ex(nullptr, &tracker), SUSHITRACK_INVALID_ARGUMENT);
+    sushitrack_tracker_t refused = nullptr;
+    EXPECT_EQ(sushitrack_create_ex(nullptr, &refused), SUSHITRACK_INVALID_ARGUMENT);
+    EXPECT_EQ(refused, nullptr);
     EXPECT_EQ(sushitrack_update(nullptr, &object, 1, out.data(), 4, 0.04f, &count),
               SUSHITRACK_INVALID_ARGUMENT);
     EXPECT_EQ(sushitrack_update(tracker, nullptr, 1, out.data(), 4, 0.04f, &count),

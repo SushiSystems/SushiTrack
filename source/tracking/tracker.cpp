@@ -39,6 +39,7 @@
 #include <SushiTrack/association/lapjv_solver.hpp>
 #include <SushiTrack/filtering/kalman_factory.hpp>
 #include <SushiTrack/filtering/kalman_filter.hpp>
+#include <SushiTrack/logging/log_throttle.hpp>
 #include <SushiTrack/logging/logger.hpp>
 #include <SushiTrack/profiling/profiler_keys.hpp>
 #include <SushiTrack/profiling/profiling.hpp>
@@ -46,6 +47,8 @@
 #include <SushiTrack/tracking/track_state.hpp>
 #include <SushiTrack/tracking/tracking_log_category.hpp>
 #include <SushiTrack/tracking/wall_clock_timing_policy.hpp>
+
+#include <detection/finite_value.hpp>
 
 namespace SushiTrack
 {
@@ -123,8 +126,16 @@ namespace SushiTrack
 
         {
             SUSHITRACK_ZONE(Keys::K_ZONE_SPLIT, Keys::K_GROUP_DETECT);
+            int non_finite_objects = 0;
             for (const auto& obj : objects)
             {
+                if (is_non_finite(obj.rect.x()) || is_non_finite(obj.rect.y()) ||
+                    is_non_finite(obj.rect.width()) || is_non_finite(obj.rect.height()) ||
+                    is_non_finite(obj.prob))
+                {
+                    ++non_finite_objects;
+                    continue;
+                }
                 TrackletPtr tracklet = std::make_shared<Tracklet>(
                     nullptr, obj.rect, obj.label, obj.prob, obj.feature, config_.feature_momentum,
                     config_.enable_xyah, config_.max_feature_history, config_.ocm_delta_t,
@@ -136,6 +147,14 @@ namespace SushiTrack
                     det_high.push_back(tracklet);
                 else
                     det_low.push_back(tracklet);
+            }
+            if (non_finite_objects > 0)
+            {
+                static LogThrottle non_finite_throttle;
+                SUSHITRACK_LOG_WARN_LIMITED(K_TRACKING_LOG_CATEGORY, non_finite_throttle,
+                                            "Frame {}: {} of {} detections hold a non-finite box "
+                                            "or score and were ignored.",
+                                            frame_id_, non_finite_objects, objects.size());
             }
         }
         SUSHITRACK_COUNTER(Keys::K_COUNTER_DETECTIONS_IN, Keys::K_UNIT_DETECTIONS, Set,
