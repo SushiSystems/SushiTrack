@@ -25,9 +25,10 @@ the same data as `sushitrack_object_t`; see [docs/reference/C_API.md](docs/refer
 
 ## Build
 
-The build needs a C++17 compiler, CMake, Ninja, GoogleTest, Python 3.11 and the SushiLog checkout
-`st setup` fetches; [docs/getting_started/INSTALL.md](docs/getting_started/INSTALL.md) lists the
-versions. Eigen, TrackEval and YOLOX are git submodules.
+The build needs a C++17 compiler, CMake, Ninja, GoogleTest, Python 3.11, and the SushiLog and
+SushiProfiler packages that `st setup` fetches;
+[docs/getting_started/INSTALL.md](docs/getting_started/INSTALL.md) lists the versions. Eigen,
+TrackEval and YOLOX are git submodules.
 
 ```bash
 git submodule update --init
@@ -36,6 +37,9 @@ st setup
 st build
 st test
 ```
+
+With SushiHub: `hub add sushitrack` and `hub install-cli sushitrack`, or `hub link sushitrack
+<path>` for a checkout you already have.
 
 ## Status
 

@@ -91,15 +91,6 @@ The Python binding sits in a root folder the layout does not name. `bindings/` b
 - Blocked by: RW-17, RW-23
 - Done when: the `chore(release): v0.1.0` commit carries the tag `v0.1.0`
 
-### RW-16 Take sushicore from one source in every install path
-- State: open
-- Done when: `.config/conda/environment.yml`, the Dockerfile and `cli/pyproject.toml` name the same sushicore
-  version and the same source
-- Where: `.config/docker/Dockerfile`
-
-The image build names no source for sushicore 0.7.0. The image build fails at the CLI install step.
-Cause: the image installs the CLI with `pip3 install` and no index or path for sushicore.
-
 ### RW-17 Generate every version number from CMakeLists.txt
 - State: open
 - Done when: the binding and the CLI read the version `project()` declares, and

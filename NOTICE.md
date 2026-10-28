@@ -28,7 +28,7 @@ Nothing in this table is stored in the repository.
 | SushiLog | `cli/sushistack.deps.toml` | `v0.2.3`, commit `5f714a7b`; `st setup` fetches it, or a sibling checkout `../sushilog` is used; `st deploy` ships `sushilog.dll` or `libsushilog.so` | A Sushi Systems library under PolyForm Noncommercial 1.0.0 |
 | GoogleTest | `cli/sushistack.deps.toml`, `.config/conda/environment.yml` | 1.17.0 in `.config/conda/environment.yml`; unpinned in the fragment | BSD-3-Clause |
 | typer, rich, tomli, pytest | `cli/pyproject.toml` | lower bounds only | MIT |
-| sushicore | `cli/pyproject.toml`, `.config/conda/environment.yml` | `>=0.7.0` and `==0.4.0` | A Sushi Systems package under its own licence |
+| sushicore | `cli/pyproject.toml` | `>=0.9.7` | A Sushi Systems package under its own licence |
 | PyTorch, torchvision, torchaudio | `.config/conda/environment.yml`, `.config/docker/Dockerfile` | 2.5.1, 0.20.1 and 2.5.1 in `.config/docker/Dockerfile`; unpinned in `.config/conda/environment.yml` | unverified |
 | `pytorch-cuda` 12.1 and the `nvidia/cuda:12.1.1-devel-ubuntu22.04` base image | `.config/conda/environment.yml`, `.config/docker/Dockerfile` | as named | NVIDIA's own terms; unverified |
 | The other conda and pip packages | `.config/conda/environment.yml` | pinned there | unverified, not read one by one |

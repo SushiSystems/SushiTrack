@@ -1,0 +1,9 @@
+# What this module is. `hub` reads this when the checkout is in a workspace; when it is
+# absent, `hub` falls back to its own catalog entry for a module it already knows.
+# The format: docs/reference/MODULE_MANIFEST.md in the SushiStack repository.
+
+[module]
+name = "sushitrack"
+alias = "st"
+distribution = "source"
+repo = "https://github.com/sushisystems/sushitrack.git"

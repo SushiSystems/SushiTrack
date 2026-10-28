@@ -43,12 +43,8 @@ package in `cli/`, installed with pipx:
 pipx install cli/
 ```
 
-`cli/pyproject.toml` requires `sushicore>=0.7.0`, and PyPI carries sushicore 0.1.0 to 0.4.0.
-Until 0.7.0 is published, `pipx install cli/` cannot resolve that requirement. Install sushicore
-from a checkout into one environment with `pip install -e /path/to/sushicore`, then the CLI beside
-it with `pip install -e cli`. The conda environment pins `sushicore==0.4.0`, so an environment
-built from `.config/conda/environment.yml` needs the same step; see
-[Installing](../getting_started/INSTALL.md#cli-pipx).
+`cli/pyproject.toml` names the `sushicore` version, and pip resolves it from PyPI. The conda
+environment and the Docker image name none; see [Installing](../getting_started/INSTALL.md#standalone).
 
 `st --help` lists every command and `st --version` prints the installed version of
 `sushitrack-cli`.

@@ -7,14 +7,6 @@ Defects that stand in the tree. The work that closes each one is in
 
 ## Installing and versions
 
-### KI-4 An environment built from environment.yml cannot run st
-- Origin: own
-- Where: `.config/conda/environment.yml`, `cli/pyproject.toml`
-- Cause: the environment pins `sushicore==0.4.0` and the CLI requires `sushicore>=0.7.0`
-- Recognise: pip reports a resolution conflict on sushicore when the CLI is installed
-- Workaround: install sushicore 0.7.0 into the environment by hand
-- Fix: RW-16
-
 ### KI-8 st doctor never looks for GoogleTest
 - Origin: own
 - Where: `cli/sushistack.deps.toml`
