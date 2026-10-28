@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-28 — ci: Ran `st setup` before each build, since `st build` finds SushiLog and SushiProfiler only beside the checkout or in the copy `setup` fetched (`ci.yml`, `nightly.yml`).
 - 2026-10-28 — docs: Wrote the standalone and SushiHub routes side by side in `INSTALL.md`, the README and the FAQ, and named `cli/pyproject.toml` as the one place that pins `sushicore` (`INSTALL.md`).
 - 2026-10-28 — build: Added `sushi-module.toml`, so SushiHub recognises a checkout it never cloned.
 - 2026-10-28 — build: Dropped the `sushicore==0.4.0` pin from the conda environment, which conflicted with the CLI's requirement, and closed KI-4 and RW-16 (`environment.yml`).

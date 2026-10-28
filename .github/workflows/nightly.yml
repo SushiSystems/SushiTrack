@@ -49,6 +49,8 @@ jobs:
           path: ~/.cache/ccache
           key: ccache-linux-gcc-release-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}-${{ github.sha }}
           restore-keys: ccache-linux-gcc-release-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}-
+      - name: Fetch SushiLog and SushiProfiler
+        run: st setup --yes --no-gpu
       - name: Build
         run: st build
       - name: Run the quarantined tests
