@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-29 — cli: Added the `backlog` and `design` groups and asked for sushicore 0.10.2 (`cli.py`).
 - 2026-10-28 — ci: Ran `st setup` before each build, since `st build` finds SushiLog and SushiProfiler only beside the checkout or in the copy `setup` fetched (`ci.yml`, `nightly.yml`).
 - 2026-10-28 — docs: Wrote the standalone and SushiHub routes side by side in `INSTALL.md`, the README and the FAQ, and named `cli/pyproject.toml` as the one place that pins `sushicore` (`INSTALL.md`).
 - 2026-10-28 — build: Added `sushi-module.toml`, so SushiHub recognises a checkout it never cloned.

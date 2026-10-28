@@ -20,7 +20,9 @@ from typing import List, Optional, Sequence
 import typer
 from sushicore import entry as core_entry
 from sushicore.diag_commands import register_diagnostic_commands
+from sushicore.backlog import register_backlog_commands
 from sushicore.docs_bundle import register_docs_commands
+from sushicore.design import register_design_commands
 from sushicore.provision.commands import ModuleProvision, register_provision_commands
 from sushicore.root_options import register_root_options
 from sushicore.typer_help import help_group
@@ -284,6 +286,20 @@ register_docs_commands(
     panel=K_PROJECT,
     project_root=find_project_root,
     report=lambda line: console.success(line),
+    group_cls=_help_group,
+)
+register_backlog_commands(
+    app,
+    program=PROFILE.program,
+    panel=K_PROJECT,
+    project_root=find_project_root,
+    group_cls=_help_group,
+)
+register_design_commands(
+    app,
+    program=PROFILE.program,
+    panel=K_PROJECT,
+    project_root=find_project_root,
     group_cls=_help_group,
 )
 
