@@ -291,7 +291,7 @@ a test per behaviour of its public surface, the suite name opens with `Small_`, 
 
 - **Waits on:** C8, C9, decision 10.
 - **Files:** `docs/reference/BENCHMARKS.md`, `BENCHMARKS_IMM.md`, `BENCHMARKS_LINEAR_KALMAN.md`,
-  `docs/design/REMAINING_WORK.md` (RW-19), `docs/reference/CHANGELOG.md`; manual and backlog are
+  `docs/backlog/README.md` (RW-19), `docs/reference/CHANGELOG.md`; manual and backlog are
   the orchestrator's.
 - **Acceptance:** each table names the date, the commit and the machine of its record, and RW-19
   closes.

@@ -50,7 +50,7 @@
 - 2026-10-19 — ci: Built and ran the small and medium tests on Windows and Linux, the small tests under ASan and UBSan, and TSan on main, behind one gate job (`.github/workflows/ci.yml`).
 - 2026-10-19 — cli: Added `--sanitize` to st build and st test, which builds the project's own targets under ASan and UBSan or under TSan (`cmake/SushiTrackSanitizers.cmake`).
 - 2026-10-19 — build: Built ByteTrack and OC-SORT with position-independent code so `tracker_bridge` links on Linux, and fixed the GCC errors and warnings of the tests (`applications/tracker_bridge/CMakeLists.txt`).
-- 2026-10-19 — docs: Folded the untagged v1.0.0 section into Unreleased, since v0.1.0 is the first release, and planned it with the SushiAI and OpenCV inference (`docs/design/REMAINING_WORK.md`).
+- 2026-10-19 — docs: Folded the untagged v1.0.0 section into Unreleased, since v0.1.0 is the first release, and planned it with the SushiAI and OpenCV inference (`docs/backlog/README.md`).
 - 2026-10-19 — applications: Took the MOT17, MOT20 and DanceTrack sequences out of git; each machine keeps them under the benchmark's `data/` folder (`.gitignore`, `docs/reference/DATA_LAYOUT.md`).
 - 2026-10-19 — c_api: Made `sushitrack_update` and `sushitrack_get_tracklets` return a status and the count through `out_count`, and `sushitrack_create_ex` null its handle on every failure (`include/SushiTrack/c_api/sushitrack_c.h`).
 - 2026-10-19 — docs: Rewrote the root README in the documentation skill's order, with a Status section, and closed the skill alignment work (`README.md`, the skill alignment report in the version history).
@@ -79,7 +79,7 @@
 - 2026-10-19 — cli: Renamed the ST_3RDPARTY_DIR variable to ST_THIRD_PARTY_DIR and set SUSHITRACK_CONFIG for the programs st runs (`cli/sushitrack_cli/config.py`, `cli/sushitrack_cli/env.py`).
 - 2026-10-19 — build: Added the clang-format and EditorConfig files the editors find at the root (`.clang-format`, `.editorconfig`).
 - 2026-10-19 — build: Moved the Dockerfile and the conda environment under .config and the default tracker configuration under assets (`.config/README.md`, `assets/sushitrack.json`).
-- 2026-10-19 — docs: Rewrote the backlog and the known issues as numbered entries with state, acceptance and fix fields (`docs/design/REMAINING_WORK.md`, `docs/reference/KNOWN_ISSUES.md`).
+- 2026-10-19 — docs: Rewrote the backlog and the known issues as numbered entries with state, acceptance and fix fields (`docs/backlog/README.md`, `docs/backlog/README.md`).
 - 2026-10-19 — tools: Copied the ten shared checkers and `check_all.py` from SushiSkills and ran them in CI (`tools/check_all.py`, `tools/checking/`, `tools/settings.py`, `.github/workflows/ci.yml`).
 - 2026-10-07 — ci: Passed the repository's secrets to the CI the release job calls (`.github/workflows/release.yml`).
 - 2026-10-07 — ci: Added the release job that builds the documentation bundle after CI and attaches it to the tag's release (`.github/workflows/release.yml`, `ci.yml`).

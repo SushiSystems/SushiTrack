@@ -13,8 +13,8 @@ and what a changelog entry looks like follow the `documentation` skill. Source c
 | A command, a flag or an exit code of `st` | `docs/reference/CLI.md` |
 | A tracker parameter or its default | `docs/reference/CONFIGURATION.md` |
 | How the pipeline, an estimator or the lifecycle works | `docs/architecture/OVERVIEW.md` |
-| Work that is planned or deferred | `docs/design/REMAINING_WORK.md` |
-| A defect that is known and open | `docs/reference/KNOWN_ISSUES.md` |
+| Work that is planned or deferred | `docs/backlog/README.md` |
+| A defect that is known and open | `docs/backlog/README.md` |
 
 A page links to the page that owns a fact and does not repeat it.
 

@@ -1,7 +1,7 @@
 # Design map
 
 Every live topic has exactly one document in this folder. The backlog is
-[Remaining work](REMAINING_WORK.md).
+[Remaining work](../backlog/README.md).
 
 ## Topics
 

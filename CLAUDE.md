@@ -7,7 +7,7 @@ When starting work on this project:
 1. Follow the Sushi Systems doctrine (`sushiskills`) and repository conventions.
 2. Read `docs/CONTRIBUTING.md` first and follow its rules.
 3. Read `docs/README.md`, the index of the manual, and `docs/architecture/OVERVIEW.md` before modifying subsystems.
-4. `docs/design/` holds design specifications and `docs/design/REMAINING_WORK.md`, the single backlog. Read the relevant design document before changing a subsystem.
+4. `docs/design/` holds design specifications and `docs/backlog/README.md`, the single backlog. Read the relevant design document before changing a subsystem.
 
 ## Active skills
 

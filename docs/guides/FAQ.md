@@ -184,7 +184,7 @@ The manual states these limits:
 - No built Docker image is published.
 
 Contributions from outside Sushi Systems are not accepted yet. Recorded defects are in
-[Known issues](../reference/KNOWN_ISSUES.md).
+[Known issues](../backlog/README.md).
 
 ## How is SushiTrack licensed?
 

@@ -48,7 +48,7 @@ video inference pipeline.
 | [Profiler keys](reference/PROFILER_KEYS.md) | The zones, counters, instants and facts SushiTrack records through SushiProfiler |
 | [Changelog](reference/CHANGELOG.md) | What changed, by release |
 | [Glossary](reference/GLOSSARY.md) | The words these documents use |
-| [Known issues](reference/KNOWN_ISSUES.md) | Defects that are recorded and not yet fixed |
+| [Known issues](backlog/README.md) | Defects that are recorded and not yet fixed |
 
 ## Project
 
@@ -57,7 +57,7 @@ video inference pipeline.
 | [Contributing](CONTRIBUTING.md) | Code style, what a change must carry and how it lands |
 | [Documentation style guide](DOCUMENTATION_STYLE_GUIDE.md) | How prose is written and where a document goes |
 | [Design map](design/README.md) | Which design document covers which topic |
-| [Remaining work](design/REMAINING_WORK.md) | The backlog |
+| [Remaining work](backlog/README.md) | The backlog |
 
 The Python binding is described in [`bindings/python/README.md`](../bindings/python/README.md)
 and the checkers in [`tools/README.md`](../tools/README.md).

@@ -85,7 +85,7 @@ The pipeline has no decode and no detect stage in C++; both live in `application
 
 `decode`, `detect`, `reid` and `draw` exist only in `pipeline.py:378-447`. They are Python
 stages; where they are recorded depends on decision 11. If inference moves to SushiAI and OpenCV
-(`docs/design/REMAINING_WORK.md`, RW-23), `detect` is SushiAI's zone group `Device` and
+(`docs/backlog/README.md`, RW-23), `detect` is SushiAI's zone group `Device` and
 `Evaluation` (SushiProfiler `CLIENTS.md`, "SushiAI"), not SushiTrack's.
 
 Level 3 (per track or per pair) is not proposed. The pair loops sit inside the calculators
@@ -143,7 +143,7 @@ thread serving several tracker instances becomes a lane.
 | Python `Processed N frames at X FPS` | `pipeline.py:458-459` | a record written by the pipeline, or nothing (decision 11) |
 | Hand-typed tables | `docs/reference/BENCHMARKS.md`, `BENCHMARKS_IMM.md`, `BENCHMARKS_LINEAR_KALMAN.md` | tables generated from records plus TrackEval output (decision 10); closes `REMAINING_WORK.md` RW-19 |
 
-RW-10, RW-11 and RW-12 (`docs/design/REMAINING_WORK.md`) are all "unmeasured" and each needs a
+RW-10, RW-11 and RW-12 (`docs/backlog/README.md`) are all "unmeasured" and each needs a
 per-frame cost to compare; a record with `sp record compare` gives them that.
 
 ### 1.7 The Python side and P9

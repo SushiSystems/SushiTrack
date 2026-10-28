@@ -21,7 +21,7 @@ timeout:
 A suite whose name has no size stops the configure. A test that fails now and then is fixed or
 quarantined: it keeps its size and also carries the label `quarantined`, which takes it out of
 every run that does not name it, and it has an entry in
-[Known issues](../reference/KNOWN_ISSUES.md).
+[Known issues](../backlog/README.md).
 
 Today the configuration loader and the logger's two-thread test are `medium`; every other suite
 is `small`.

@@ -55,7 +55,7 @@ All public library code lives in the `SushiTrack` namespace. The C ABI layer in 
 Comments follow the `source-comments` skill: a comment says what a thing does, in Doxygen
 form. The reason for a design goes in a document under `docs/design/`, which the comment may
 cite by path. `tools/documentation/check_source_comments.py` checks the shape; the findings it still reports
-are in [Remaining work](design/REMAINING_WORK.md).
+are in [Remaining work](backlog/README.md).
 
 ### Includes
 
@@ -84,7 +84,7 @@ repository uses. A change carries its documentation in the same commit:
   `- <date> — <scope>: <Past-tense verb> <what changed> (<where>).`, at most 240 characters and
   five cited places, never the reason;
 - the status line of its design document and the entry in
-  [Remaining work](design/REMAINING_WORK.md), when the change opens or finishes planned work.
+  [Remaining work](backlog/README.md), when the change opens or finishes planned work.
 
 Before a commit that touches `docs/`, both of these print nothing:
 

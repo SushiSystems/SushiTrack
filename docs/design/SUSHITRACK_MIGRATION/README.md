@@ -119,7 +119,7 @@ No open work.
 
 ## Open questions
 
-P1 leaves two items, each also in [the backlog](../REMAINING_WORK.md):
+P1 leaves two items, each also in [the backlog](../../backlog/README.md):
 
 - `.clang-format` and `.editorconfig` do not exist at the root.
 - The test discovery files are still written to the root: `gtest_discover_tests` runs with

@@ -526,4 +526,4 @@ pipeline in [Inference pipeline](../guides/INFERENCE.md).
 
 ## Future work
 
-Deferred changes to the tracker are listed in [Remaining work](../design/REMAINING_WORK.md).
+Deferred changes to the tracker are listed in [Remaining work](../backlog/README.md).
