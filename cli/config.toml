@@ -14,7 +14,6 @@ color = "auto"
 [paths]
 source = "source"
 include = "include/SushiTrack"
-build = "build"
 data = "data"
 third_party = "third_party"
 config = "assets/sushitrack.json"
@@ -26,7 +25,7 @@ inference = "applications/inference"
 package = "package"
 
 [build]
-type = "Release"
+type = "Debug"
 jobs = 0
 
 [docker]

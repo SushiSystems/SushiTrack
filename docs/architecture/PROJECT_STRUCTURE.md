@@ -54,7 +54,7 @@ sushitrack/
 └── docs/                              # this manual; see docs/README.md
 ```
 
-`cli/config.local.toml` holds per-machine overrides and is ignored. `build/` and `package/` are
+`cli/config.local.toml` holds per-machine overrides and is ignored. `build/` (one tree per build type) and `package/` are
 build output and are ignored.
 
 The files of the CLI package are listed in [The `st` package](CLI_PACKAGE.md). The test files

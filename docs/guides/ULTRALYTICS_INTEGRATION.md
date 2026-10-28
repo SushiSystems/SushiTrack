@@ -51,7 +51,7 @@ and no `SUSHITRACK_LIB` variable on the consumer side. See
 library and import the binding directly:
 
 ```bash
-st build           # produces build/bin/<cfg>/sushitrack.{dll,so}
+st build           # produces build/default-debug/bin/sushitrack.{dll,so}
 # bindings/python/sushitrack.py then finds the library under build/ automatically
 ```
 

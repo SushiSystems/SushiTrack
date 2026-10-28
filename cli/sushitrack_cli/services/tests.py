@@ -23,17 +23,18 @@ def _config_flag(cfg, build_dir):
     return build_svc.normalize_build_type(cfg.build_type)
 
 
-def test(cfg, paths, labels=None, filter=None, repeat=0, jobs=None):
+def test(cfg, paths, labels=None, filter=None, repeat=0, jobs=None, sanitizer=None):
     """Run the tests whose labels the selection names.
 
     Args:
         labels: The TestLabel values to run; none runs small and medium.
+        sanitizer: Runs the tree that sanitizer builds, instead of the plain one.
 
     Returns:
         ctest's exit code, or 1 when the tree is absent or stale.
     """
     console.header("Test")
-    build_dir = paths.build
+    build_dir = build_svc.tree_for(paths, build_svc.normalize_build_type(cfg.build_type), sanitizer)
     if not build_dir.is_dir():
         console.error(f"{build_dir} not found. Run `st build` first.")
         return 1

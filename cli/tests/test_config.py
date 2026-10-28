@@ -35,7 +35,7 @@ def test_defaults_are_used_when_no_file_or_env_overrides(tmp_path, monkeypatch):
 
     cfg = config_module.load_config(tmp_path)
 
-    assert cfg.build_type == "Release"
+    assert cfg.build_type == "Debug"
     assert cfg.sources["build_type"] == "default"
 
 

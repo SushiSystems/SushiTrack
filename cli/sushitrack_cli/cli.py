@@ -71,7 +71,8 @@ def _sanitize_option() -> typer.models.OptionInfo:
     "build",
     rich_help_panel=K_PROJECT,
     epilog="st build\n"
-           "st build --type debug\n"
+           "st build --type release  # Its own tree, build/default-release\n"
+           "st build --report  # Time and memory per kind of edge\n"
            "st build --no-test  # Library only\n"
            "st build --sanitize address  # ASan and UBSan; thread for TSan\n"
            "st build --deploy cpp  # Build, then assemble package/",
@@ -79,15 +80,15 @@ def _sanitize_option() -> typer.models.OptionInfo:
 def build(
     type: Optional[BuildType] = typer.Option(
         None, "--type", "-t", case_sensitive=False,
-        help="Build type: release | debug | relwithdebinfo | minsizerel "
-             "(default from config)."),
+        help="Build type: debug | release | relwithdebinfo | minsizerel "
+             "(default: debug, or the configured build type). Each type has its own tree."),
     no_test: bool = typer.Option(
         False, "--no-test",
         help="Skip the test targets (library only). Tests are built by default."),
     clean: bool = typer.Option(
         False, "--clean", help="Delete the build tree before configuring."),
     jobs: Optional[int] = typer.Option(
-        None, "--jobs", "-j", help="Parallel build jobs (default: CPU count)."),
+        None, "--jobs", "-j", help="Parallel build jobs (default: the hardware threads)."),
     deploy: Optional[DeployKind] = typer.Option(
         None, "--deploy", case_sensitive=False,
         help="After building, assemble package/ for the given consumer."),
@@ -95,19 +96,24 @@ def build(
         None, "-D", metavar="VAR=VALUE",
         help="Extra -D option passed straight to cmake (repeatable)."),
     sanitize: Optional[Sanitizer] = _sanitize_option(),
+    report: bool = typer.Option(
+        False, "--report",
+        help="After the build, print the time and peak memory per kind of edge and the lowest "
+             "free memory. Writes build_report.json into the tree."),
 ):
-    """Configure and build the project.
+    """Configure and build the project in the tree of its build type.
 
-    cmake configure runs only when the requested configuration differs from
-    what the build tree was configured with; otherwise the existing tree is
-    reused.
+    The tree is build/<name>-<type>: build/default-debug, build/default-release,
+    build/asan-debug. cmake configure runs only when the settings differ from what
+    the tree was configured with; a tree is never given another build type.
     """
     cfg, paths = context()
     build_type = build_svc.normalize_build_type(type.value) if type else None
     code = build_svc.build(
         cfg, paths, build_type=build_type, clean=clean, jobs=jobs,
         tests=not no_test,
-        defines=[f"-D{item}" for item in (define or [])], sanitizer=sanitize)
+        defines=[f"-D{item}" for item in (define or [])], sanitizer=sanitize,
+        report=report)
     if code != 0 or not deploy:
         raise typer.Exit(code)
     raise typer.Exit(deploy_svc.deploy(paths, deploy.value))
@@ -163,7 +169,7 @@ def test(
         if code != 0:
             raise typer.Exit(code)
     raise typer.Exit(test_svc.test(cfg, paths, labels=label, filter=filter,
-                                   repeat=repeat, jobs=jobs))
+                                   repeat=repeat, jobs=jobs, sanitizer=sanitize))
 
 
 @app.command(

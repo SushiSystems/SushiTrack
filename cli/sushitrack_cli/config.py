@@ -17,11 +17,16 @@ import platform
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
+from sushicore.build_admission import hardware_threads
+from sushicore.build_tree import K_DEFAULT_BUILD_TYPE, tree_dir
 from sushicore.config_base import load_tool_config
 from sushicore.module_config import ModuleConfig
 from sushicore.profile import ModuleProfile
 from sushicore.stack_config import StackConfig
 from sushicore.workspace import read_toml
+
+#: The name of the plain tree; a sanitizer tree is named by its sanitizer.
+K_DEFAULT_TREE = "default"
 
 #: The compiler a consumer's package build hands the CLI; it outranks the configured one.
 K_STACK_CXX_ENV = "SUSHISTACK_CXX"
@@ -89,7 +94,6 @@ class Config:
 
     paths_source: str = "source"
     paths_include: str = "include/SushiTrack"
-    paths_build: str = "build"
     paths_data: str = "data"
     paths_third_party: str = "third_party"
     paths_config: str = "assets/sushitrack.json"
@@ -100,8 +104,8 @@ class Config:
     paths_inference: str = "applications/inference"
     paths_package: str = "package"
 
-    build_type: str = "Release"
-    build_jobs: int = 0  # 0 -> os.cpu_count()
+    build_type: str = K_DEFAULT_BUILD_TYPE
+    build_jobs: int = 0  # 0 -> the hardware threads
 
     docker_image: str = "sushitrack"
     docker_workdir: str = "/workspace/sushitrack"
@@ -119,7 +123,7 @@ class Config:
         return os.path.expandvars(os.path.expanduser(value)) if value else value
 
     def jobs(self):
-        return self.build_jobs if self.build_jobs > 0 else (os.cpu_count() or 2)
+        return self.build_jobs if self.build_jobs > 0 else hardware_threads()
 
 
 # Maps each config field to its overriding variable; see docs/architecture/CLI_PACKAGE.md.
@@ -129,7 +133,6 @@ ENV_OVERRIDES = {
     "cli_color": "ST_COLOR",
     "paths_source": "ST_SOURCE_DIR",
     "paths_include": "ST_INCLUDE_DIR",
-    "paths_build": "ST_BUILD_DIR",
     "paths_data": "ST_DATA_DIR",
     "paths_third_party": "ST_THIRD_PARTY_DIR",
     "paths_config": "ST_CONFIG_FILE",
@@ -302,7 +305,8 @@ class Paths:
         self.cli = root / "cli"
         self.source = self._resolve(cfg, cfg.paths_source)
         self.include = self._resolve(cfg, cfg.paths_include)
-        self.build = self._resolve(cfg, cfg.paths_build)
+        self.build_root = root / "build"
+        self.build = tree_dir(root, K_DEFAULT_TREE, cfg.build_type)
         self.data = self._resolve(cfg, cfg.paths_data)
         self.third_party = self._resolve(cfg, cfg.paths_third_party)
         self.config = self._resolve(cfg, cfg.paths_config)
@@ -335,6 +339,7 @@ class Paths:
             "source": self.source,
             "include": self.include,
             "build": self.build,
+            "build_root": self.build_root,
             "data": self.data,
             "benchmarks": self.benchmarks,
             "third_party": self.third_party,

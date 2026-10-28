@@ -245,10 +245,12 @@ def find_library(explicit: str | None = None) -> str:
         candidates.append(str(here / name))
 
     root = Path(__file__).resolve().parents[2]
-    build = root / "build"
-    for sub in ("bin/Release", "bin/Debug", "bin", "lib", "Release", "Debug", ""):
-        for name in names:
-            candidates.append(str(build / sub / name))
+    # st builds each type in its own tree, build/default-<type>; the Debug tree is the default.
+    for build in (root / "build" / "default-debug", root / "build" / "default-release",
+                  root / "build"):
+        for sub in ("bin/Release", "bin/Debug", "bin", "lib", "Release", "Debug", ""):
+            for name in names:
+                candidates.append(str(build / sub / name))
 
     for path in candidates:
         if path and os.path.exists(path):

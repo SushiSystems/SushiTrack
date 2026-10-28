@@ -12,6 +12,25 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
+# Every build type takes the release C runtime, so Debug links the Release packages beneath it
+# (SushiLog, SushiProfiler) on one heap; ignored off the MSVC ABI. Memory errors are the
+# sanitizer tree's job.
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+
+# A Debug consumer of an imported target links its Release build, which shares that CRT.
+set(CMAKE_MAP_IMPORTED_CONFIG_DEBUG Release RelWithDebInfo MinSizeRel "")
+
+# The MSVC STL's container layout depends on this; libstdc++ and libc++ never read it.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+    add_compile_definitions("$<$<COMPILE_LANGUAGE:CXX>:_ITERATOR_DEBUG_LEVEL=0>")
+endif()
+
+# Debug host code keeps line tables only: stack traces get files and lines at a fraction of full
+# debug information's compile memory, object size and link time. The later flag overrides -g.
+if(NOT CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    add_compile_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CXX>>:-gline-tables-only>")
+endif()
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)

@@ -12,6 +12,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from sushicore import build_admission
 from sushicore.cmake_driver import CMakeDriver
 from sushicore.provision.sushi_packages import PackageError
 
@@ -64,7 +65,7 @@ def _tool(asked, windows=False, compiler="clang++"):
         return Packages()
 
     return SimpleNamespace(
-        cmake_exe="", ctest_exe="", generator="Ninja", is_windows=windows,
+        cmake_exe="", ctest_exe="", ccache_exe="", generator="Ninja", is_windows=windows,
         platform="windows" if windows else "linux", vs_vcvars="", expand=lambda v: v,
         sushi_definitions=lambda root, packaged=None: [], sushi_packages=sushi_packages,
         resolved_compiler=lambda root: compiler)
@@ -78,13 +79,15 @@ def runner(monkeypatch, recorder):
     monkeypatch.setattr(build_svc, "DRIVER", CMakeDriver(RecordingConsole(), rec))
     monkeypatch.setattr(build_svc, "load_build_env",
                         lambda tool, directory: {"LD_LIBRARY_PATH": "/old", "seen": directory})
+    monkeypatch.setattr(build_admission, "compiler_cache", lambda configured="": "")
     rec.console = spy
     return rec
 
 
 def _build(tmp_path, tool, **options):
     """Run the build service over a scratch checkout; return its code and its paths."""
-    paths = SimpleNamespace(root=tmp_path, build=tmp_path / "build")
+    paths = SimpleNamespace(root=tmp_path, build=tmp_path / "build" / "default-release",
+                            build_root=tmp_path / "build")
     cfg = SimpleNamespace(tool=tool, build_type="Release", jobs=lambda: 2)
     return build_svc.build(cfg, paths, tests=False, **options), paths
 
@@ -129,7 +132,7 @@ def test_the_run_dirs_are_recorded_in_the_tree_after_a_configure(tmp_path, runne
 
 def test_a_tree_that_is_not_reconfigured_still_records_the_run_dirs(tmp_path, runner):
     _build(tmp_path, _tool([]))
-    tree = tmp_path / "build"
+    tree = tmp_path / "build" / "default-release"
     (tree / "build.ninja").write_text("", encoding="utf-8")
     (tree / "CMakeCache.txt").write_text(
         f"CMAKE_HOME_DIRECTORY:INTERNAL={tmp_path}\n", encoding="utf-8")

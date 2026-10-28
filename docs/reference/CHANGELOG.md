@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- 2026-10-28 — cli: Made `st build` build Debug by default, one tree per type, behind the memory gate, with `--report` (`build.py`).
+- 2026-10-28 — cli: Removed `[paths] build` and `ST_BUILD_DIR`; a script that reads `build/bin` follows the tree of its type (`config.py`).
+- 2026-10-28 — build: Linked every build type against the release C runtime without iterator checks and gave Debug line tables only (`cmake/SushiTrackBuildPolicy.cmake`).
 - 2026-10-27 — association: Counted a non-finite cost before the threshold test and gave the solver the unmatchable cost in its place, since under clang `-ffast-math` a NaN passed the threshold (`source/association/lapjv_solver.cpp`).
 - 2026-10-27 — tracking: Ignored a detection whose box or score is NaN or infinite, with one throttled WARN; it poisoned the other tracks of its frame (`source/tracking/tracker.cpp`).
 - 2026-10-27 — c_api: Made `sushitrack_create_ex` return `SUSHITRACK_INITIALIZATION_FAILURE` where a component throws; it returned `SUSHITRACK_RUNTIME_ERROR` (`source/c_api/sushitrack_c.cpp`).

@@ -14,7 +14,7 @@ the commands are in [Building](../getting_started/BUILD.md).
 | `source/CMakeLists.txt` | The library `sushitrack` and its object twin `sushitrack_static` |
 | `tests/CMakeLists.txt` | The test programs |
 
-Every executable and the library land in `build/bin`, so a test program finds `sushitrack.dll`
+Every executable and the library land in `bin` of their tree (`build/default-debug/bin`), so a test program finds `sushitrack.dll`
 beside it on Windows without a path change.
 
 ## Symbol visibility
@@ -32,7 +32,7 @@ question, and the C API never exposes `Tracker` to an outside consumer.
 
 ## Compiler flags
 
-Release builds use `/O2 /Ot /fp:fast /arch:AVX2` on MSVC and `-O3 -ffast-math -funroll-loops
+Every build type uses `/O2 /Ot /fp:fast /arch:AVX2` on MSVC and `-O3 -ffast-math -funroll-loops
 -mavx2` on GCC and Clang. `-mavx2` is added only on an x86 host, where it matches the MSVC flag;
 on ARM it would fail to compile.
 

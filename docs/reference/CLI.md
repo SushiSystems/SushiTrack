@@ -10,7 +10,7 @@ Commands are flat: `st <command> [flags]`, with `st container <action>` and
 | `st eval` | MOT label benchmark + TrackEval metrics (not a CTest suite) |
 | `st infer` | YOLOX video inference pipeline through `tracker_bridge` |
 | `st run` | Run a built executable, by name or from a picker |
-| `st clean` | Remove `build/` and `package/` |
+| `st clean` | Remove every tree under `build/` and `package/` |
 | `st deploy {cpp,python}` | Assemble `package/` from the current build |
 | `st status` | What is built, what is missing, which data sets are present |
 | `st setup [--dry-run] [--yes] [--toolchain NAME] [--no-gpu]` | Provision the dependencies in `cli/sushistack.deps.toml`, then run the doctor |
@@ -25,7 +25,7 @@ Commands are flat: `st <command> [flags]`, with `st container <action>` and
 | `st --version` / `st --describe` | Installed version / command catalogue as JSON |
 
 Configuration is layered: built-in defaults → `cli/config.toml` → `cli/config.local.toml`
-→ `ST_*` environment variables (`ST_BUILD_DIR`, `ST_BUILD_TYPE`, `ST_GENERATOR`,
+→ `ST_*` environment variables (`ST_BUILD_TYPE`, `ST_GENERATOR`,
 `ST_CMAKE`, `ST_DOCKER_IMAGE`, `ST_TRACKER`, …). `st config`
 prints which layer each value came from.
 
@@ -33,10 +33,11 @@ prints which layer each value came from.
 
 | Flag | Effect |
 |---|---|
-| `--type, -t <type>` | `release` (default) / `debug` / `relwithdebinfo` / `minsizerel` |
+| `--type, -t <type>` | `debug` (default) / `release` / `relwithdebinfo` / `minsizerel`; each type builds in `build/default-<type>` |
 | `--no-test` | Build the library only; test targets are built by default |
-| `--clean` | Remove the build directory before configuring |
-| `--jobs, -j <n>` | Parallel build jobs (default: CPU count) |
+| `--clean` | Remove the tree of the build before configuring |
+| `--jobs, -j <n>` | Parallel build jobs (default: the hardware threads) |
+| `--report` | Print the time and peak memory per kind of edge and write `build_report.json` into the tree |
 | `-D VAR=VALUE` | Extra `-D` option forwarded to cmake (repeatable) |
 | `--sanitize {address,thread}` | Build SushiTrack's own targets with ASan and UBSan, or with TSan; GCC or Clang only. The next build without it reconfigures the tree |
 | `--deploy {cpp,python}` | After a successful build, assemble a redistributable `package/` for the chosen consumer ([details](../guides/DEPLOY_PACKAGES.md)) |
@@ -77,7 +78,7 @@ st run sushitrack_tests -- --gtest_shuffle --gtest_break_on_failure
 
 The MOT label benchmark. Not a CTest suite: it runs `mot_engine` over
 det.txt-backed scenarios, reads the per-frame latency of each pair from its profile record in
-`build/profiles/` (the `[ PERF ]` line when a pair has none), then runs TrackEval and prints a metrics table (HOTA / DetA / AssA /
+`profiles/` under the build tree (the `[ PERF ]` line when a pair has none), then runs TrackEval and prints a metrics table (HOTA / DetA / AssA /
 MOTA / IDF1 / IDSW / FP / FN / Lat).
 
 | Flag | Effect |
@@ -150,8 +151,8 @@ resolution.
 
 ## `st clean`
 
-Removes the build directory and the assembled package directory (`build/` and
-`package/` by default; both overridable in the `paths` section of `cli/config.toml`).
+Removes every tree under `build/` and the assembled package directory (`package/` by
+default, overridable in the `paths` section of `cli/config.toml`).
 `--predictions` removes the `pred/` folder of every benchmark sequence instead, and leaves
 the build tree.
 

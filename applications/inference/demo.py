@@ -19,7 +19,10 @@ from pathlib import Path
 _THIS_DIR = Path(__file__).parent
 _PROJECT_ROOT = _THIS_DIR.parent.parent
 _YOLOX_DIR = _PROJECT_ROOT / "third_party" / "yolox"
-_BUILD_DIR = _PROJECT_ROOT / "build"
+# st builds each type in its own tree; the Debug tree is the default, the Release tree the other.
+_BUILD_DIR = next((tree for tree in (_PROJECT_ROOT / "build" / "default-debug",
+                                     _PROJECT_ROOT / "build" / "default-release")
+                   if tree.is_dir()), _PROJECT_ROOT / "build" / "default-debug")
 
 sys.path.append(str(_THIS_DIR))
 sys.path.append(str(_YOLOX_DIR))

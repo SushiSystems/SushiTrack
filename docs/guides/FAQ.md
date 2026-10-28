@@ -61,9 +61,9 @@ st test
 ```
 
 `st build` configures and compiles the library and every test target; `st build --no-test`
-compiles the library only. The build type is `release` unless `--type` names `debug`,
-`relwithdebinfo` or `minsizerel`. The library lands at
-`build/bin/{Release,Debug}/sushitrack.{dll,so}`.
+compiles the library only. The build type is `debug` unless `--type` names `release`,
+`relwithdebinfo` or `minsizerel`, and each type builds in its own tree. The library lands at
+`build/default-<type>/bin/sushitrack.{dll,so}`.
 
 `st test` runs the small and medium tests together. `st test --label small` runs one size. [Building](../getting_started/BUILD.md) holds
 the CMake options and the [command line reference](../reference/CLI.md) holds every flag.

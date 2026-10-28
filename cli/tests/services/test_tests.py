@@ -35,8 +35,8 @@ class DrainRecorder:
 
 def _tree(tmp_path, cache):
     """Create a configured tree whose cache holds *cache*."""
-    build = tmp_path / "build"
-    build.mkdir()
+    build = tmp_path / "build" / "default-release"
+    build.mkdir(parents=True)
     (build / "CMakeCache.txt").write_text(
         f"CMAKE_HOME_DIRECTORY:INTERNAL={tmp_path}\n{cache}", encoding="utf-8")
     return SimpleNamespace(root=tmp_path, build=build, config=tmp_path / "sushitrack.json")
@@ -64,6 +64,30 @@ def test_the_default_runs_small_and_medium_without_the_quarantine(tmp_path, rec)
                           "--parallel", "2"]]
 
 
+def test_a_sanitized_run_reads_the_tree_of_its_sanitizer(tmp_path, rec):
+    paths = _tree(tmp_path, "CMAKE_BUILD_TYPE:STRING=Debug\n")
+    sanitized = tmp_path / "build" / "asan-debug"
+    sanitized.mkdir(parents=True)
+    (sanitized / "CMakeCache.txt").write_text(
+        f"CMAKE_HOME_DIRECTORY:INTERNAL={tmp_path}\nCMAKE_BUILD_TYPE:STRING=Debug\n",
+        encoding="utf-8")
+    cfg = SimpleNamespace(build_type="Debug", tool=_CFG.tool)
+    assert test_svc.test(cfg, paths, sanitizer=build_svc.Sanitizer.address) == 0
+    assert rec.calls[0][2] == str(sanitized)
+
+
+def test_the_default_run_reads_the_debug_tree(tmp_path, rec):
+    paths = _tree(tmp_path, "CMAKE_BUILD_TYPE:STRING=Release\n")
+    debug = tmp_path / "build" / "default-debug"
+    debug.mkdir(parents=True)
+    (debug / "CMakeCache.txt").write_text(
+        f"CMAKE_HOME_DIRECTORY:INTERNAL={tmp_path}\nCMAKE_BUILD_TYPE:STRING=Debug\n",
+        encoding="utf-8")
+    cfg = SimpleNamespace(build_type="Debug", tool=_CFG.tool)
+    assert test_svc.test(cfg, paths) == 0
+    assert rec.calls[0][2] == str(debug)
+
+
 def test_naming_the_quarantine_runs_it_too(tmp_path, rec):
     paths = _tree(tmp_path, "CMAKE_BUILD_TYPE:STRING=Release\n")
     test_svc.test(_CFG, paths, labels=[TestLabel.LARGE, TestLabel.QUARANTINED])
@@ -79,8 +103,8 @@ def test_multi_config_tree_gets_a_config(tmp_path, rec):
 
 
 def test_a_stale_tree_is_refused(tmp_path, rec):
-    build = tmp_path / "build"
-    build.mkdir()
+    build = tmp_path / "build" / "default-release"
+    build.mkdir(parents=True)
     (build / "CMakeCache.txt").write_text(
         "CMAKE_HOME_DIRECTORY:INTERNAL=/workspace\n", encoding="utf-8")
     paths = SimpleNamespace(root=tmp_path, build=build, config=tmp_path)

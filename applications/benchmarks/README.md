@@ -17,7 +17,7 @@ dataset is a new folder and nothing else. Git does not track the `data/` folders
 
 `mot_engine` takes `--data DIR --settings DIR [--tracker NAME]... [--sequence NAME]... [--profiles DIR | --no-profile]`,
 writes each tracker's predictions to `<sequence>/pred/<tracker>/<sequence>.txt`, writes one
-profile record per pair under `--profiles` (`build/profiles` by default) and prints one
+profile record per pair under `--profiles` (`profiles` under the build tree by default) and prints one
 `[ PERF <tracker> ] <sequence>: <us> us/frame` line and one `[ PROFILE ]` line per pair. It exits 0 when every run ran, 1
 when an input is missing and 2 for a bad command line. The
 [Evaluation pipeline](../../docs/guides/EVALUATION.md) describes the engine and the evaluator.

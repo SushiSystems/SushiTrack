@@ -74,8 +74,9 @@ the overrides and creates the tracker from the result, so an override wins over 
 1. the `lib_path` argument;
 2. the `SUSHITRACK_LIB` environment variable;
 3. the directory that holds `sushitrack.py`, which is where a deploy package puts the library;
-4. the `build/` folder two levels above the module, which is this repository's when the module
-   is used in place: `bin/Release`, `bin/Debug`, `bin`, `lib`, `Release`,
-   `Debug`, then `build/` itself.
+4. the trees under the `build/` folder two levels above the module, which is this repository's
+   when the module is used in place: `build/default-debug`, `build/default-release`, then
+   `build/` itself, each searched at `bin/Release`, `bin/Debug`, `bin`, `lib`, `Release`,
+   `Debug`, then the tree itself.
 
 It raises `FileNotFoundError` when none exists.

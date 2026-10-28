@@ -7,9 +7,10 @@ time.
 ```bash
 st build                      # library + test programs (default)
 st build --no-test            # library only
-st build --type debug         # release (default) | debug | relwithdebinfo | minsizerel
-st build --clean              # wipe build/ first; combinable with the above
-st build -j 4                 # parallel jobs (default: CPU count)
+st build --type release       # debug (default) | release | relwithdebinfo | minsizerel
+st build --clean              # wipe the tree first; combinable with the above
+st build -j 4                 # parallel jobs (default: the hardware threads)
+st build --report             # time and peak memory per kind of edge
 st build -D CMAKE_UNITY_BUILD=ON   # extra -D passed straight to cmake
 st build --deploy cpp         # build, then assemble package/ for C/C++ consumers
 st build --deploy python      # build, then assemble package/ for Python consumers
@@ -30,13 +31,24 @@ The CMake options `st build` sets:
 `st` builds each package once through its library's own CLI and reuses it afterwards. CMake
 finds both with `find_package(... CONFIG REQUIRED)` and compiles none of their sources.
 
-cmake configure runs only when the requested configuration (build type, tests on/off,
-generator, extra defines, the SushiLog path) differs from what the tree was configured with,
-which `build/.sushitrack_config` records. A configuration change reconfigures from scratch,
-because a single-config generator bakes the build type into its cache and would otherwise
-silently hand back the previous one.
+Each build type has its own tree, `build/<name>-<type>`: `build/default-debug`,
+`build/default-release`, and `build/asan-debug` or `build/tsan-debug` for a sanitizer build.
+The type is fixed when a tree is created, so switching type never recompiles a tree, and a
+configure of another type into an existing tree is refused. Debug is the default; Release is
+for releases and for measurements, so build it with `--type release`. `st test`, `st run`
+and the other commands that read a tree use the tree of the configured build type, which is
+Debug unless `[build] type` or `ST_BUILD_TYPE` says otherwise. `st clean` removes every tree.
 
-Artefacts land in `build/bin`: `sushitrack.{dll,so}`, `sushilog.{dll,so}`,
+cmake configure runs only when the settings (tests on/off, generator, extra defines, the
+SushiLog path, the launcher) differ from what the tree was configured with, which
+`.sushitrack_config` in the tree records.
+
+Every compile and link runs through the memory gate of sushicore, which admits an edge only when
+its expected peak fits in the free memory less a reserve. `st build --report` prints what the
+build cost. Create a file named `stop` in `build/build_gate/` to make the gate refuse every
+edge; delete it to build again.
+
+Artefacts land in `bin` of the tree, for example `build/default-debug/bin`: `sushitrack.{dll,so}`, `sushilog.{dll,so}`,
 `sushitrack_tests{,.exe}`, `sushitrack_application_tests{,.exe}`, `mot_engine{,.exe}` and
 `tracker_bridge.{dll,so}`. How the tests
 run is in [Test suites](../guides/TESTING.md); how the tree is laid out is in
