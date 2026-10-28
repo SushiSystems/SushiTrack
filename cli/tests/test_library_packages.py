@@ -98,7 +98,7 @@ def test_the_build_asks_for_the_closure_with_the_compiler_and_the_type(tmp_path,
     code, _ = _build(tmp_path, _tool(asked), build_type="Debug")
 
     assert code == 0
-    assert asked == [{"build_type": "debug", "options": {}, "compiler": "clang++"}]
+    assert asked == [{"build_type": "release", "options": {}, "compiler": "clang++"}]
 
 
 def test_a_minimum_size_build_links_release_packages(tmp_path, runner):

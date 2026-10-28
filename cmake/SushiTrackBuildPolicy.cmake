@@ -43,12 +43,16 @@ set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS OFF)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 
+# Optimisation and the assert switch belong to every build type but Debug: Debug is the build to
+# step through, with the asserts on. The floating-point model is the same in all of them.
 if(MSVC)
-    add_compile_options(/W3 /O2 /Ot /fp:fast /arch:AVX2 /DNDEBUG /wd4251)
+    add_compile_options(/W3 /fp:fast /arch:AVX2 /wd4251)
+    add_compile_options("$<$<NOT:$<CONFIG:Debug>>:/O2;/Ot;/DNDEBUG>")
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 else()
     # NaN and Inf keep their meaning, as under /fp:fast; the tracker refuses non-finite input.
-    add_compile_options(-Wall -O3 -ffast-math -fno-finite-math-only -funroll-loops -DNDEBUG)
+    add_compile_options(-Wall -ffast-math -fno-finite-math-only)
+    add_compile_options("$<$<NOT:$<CONFIG:Debug>>:-O3;-funroll-loops;-DNDEBUG>")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i686)$")
         # Eigen emits FMA whenever AVX2 is on under an MSVC-compatible compiler, as /arch:AVX2 allows.
         add_compile_options(-mavx2 -mfma)

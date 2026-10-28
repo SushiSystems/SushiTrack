@@ -75,7 +75,7 @@ jobs:
           key: ccache-linux-gcc-release-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}-${{ github.sha }}
           restore-keys: ccache-linux-gcc-release-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}-
       - name: Build
-        run: st build -D CMAKE_CXX_COMPILER_LAUNCHER=ccache
+        run: st build
       - name: Run the small and medium tests
         run: st test
 
@@ -156,7 +156,7 @@ jobs:
           restore-keys: ccache-linux-gcc-${{ matrix.sanitizer }}-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}-
       - name: Build
         if: env.RUN == 'true'
-        run: st build --sanitize ${{ matrix.sanitizer }} -D CMAKE_CXX_COMPILER_LAUNCHER=ccache
+        run: st build --sanitize ${{ matrix.sanitizer }}
       - name: Run the tests
         if: env.RUN == 'true'
         run: st test ${{ matrix.labels }}

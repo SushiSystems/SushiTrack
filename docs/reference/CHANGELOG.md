@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- 2026-10-28 — build: Added `-O3`, `-funroll-loops` and `NDEBUG` (`/O2 /Ot /DNDEBUG` on MSVC) to the non-Debug build types only, so Debug keeps its asserts and is not optimised (`cmake/SushiTrackBuildPolicy.cmake`).
+- 2026-10-28 — cli: Took the build type of the library packages from sushicore's `package_build_type`, so a Debug build links Release packages (`library_packages.py`).
+- 2026-10-28 — ci: Dropped `-D CMAKE_CXX_COMPILER_LAUNCHER=ccache` from the CLI builds; the memory gate finds ccache on `PATH` (`.github/workflows/`).
 - 2026-10-28 — cli: Made `st build` build Debug by default, one tree per type, behind the memory gate, with `--report` (`build.py`).
 - 2026-10-28 — cli: Removed `[paths] build` and `ST_BUILD_DIR`; a script that reads `build/bin` follows the tree of its type (`config.py`).
 - 2026-10-28 — build: Linked every build type against the release C runtime without iterator checks and gave Debug line tables only (`cmake/SushiTrackBuildPolicy.cmake`).

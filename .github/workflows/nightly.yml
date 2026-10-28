@@ -50,6 +50,6 @@ jobs:
           key: ccache-linux-gcc-release-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}-${{ github.sha }}
           restore-keys: ccache-linux-gcc-release-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}-
       - name: Build
-        run: st build -D CMAKE_CXX_COMPILER_LAUNCHER=ccache
+        run: st build
       - name: Run the quarantined tests
         run: st test --label quarantined

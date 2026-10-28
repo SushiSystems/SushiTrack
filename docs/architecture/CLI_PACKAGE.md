@@ -45,8 +45,9 @@ the table stays local to `config.py` and is not derived from the shared profile.
 compiles it. Each build asks `cfg.tool.sushi_packages` for the packages of its closure, with the
 compiler `ToolSettings.resolved_compiler` finds and the build type of the command, builds a
 missing one through the library's own CLI, and prints one `reused` or `built` line per library.
-The configure passes `-D<Package>_DIR` for each package and no `-D<NAME>_DIR`. A MinSizeRel build
-links release packages, because a library CLI takes no `minsizerel`.
+The configure passes `-D<Package>_DIR` for each package and no `-D<NAME>_DIR`. The packages take the
+build type sushicore's `package_build_type` names: release for Debug, Release and MinSizeRel;
+RelWithDebInfo links its own kind.
 
 The packages are built with the compiler of the tree, so `st` passes `-DCMAKE_CXX_COMPILER` and
 `-DCMAKE_C_COMPILER` to every configure, and both are in the configure stamp. `SUSHISTACK_CXX`

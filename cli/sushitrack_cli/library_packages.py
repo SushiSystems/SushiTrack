@@ -10,25 +10,13 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
+from sushicore.build_tree import package_build_type
 from sushicore.provision.sushi_packages import PackageSet, RunDirs
 from sushicore.provision.sushi_packages import configure_arguments  # noqa: F401  (callers take it from here)
 from sushicore.toolchain_args import c_compiler_for
 
 #: The file of a build tree that names the run-time folders of the packages it linked.
 K_RUN_DIRS_FILE = ".sushitrack_package_dirs.json"
-
-#: The build types a library CLI does not take, and the one it is built as instead.
-K_PACKAGE_BUILD_TYPE = {"minsizerel": "release"}
-
-
-def package_build_type(build_type: str) -> str:
-    """Return the build type the library packages are built in for a consumer's *build_type*.
-
-    A library CLI's ``--type`` takes release, debug and relwithdebinfo, so a MinSizeRel build
-    links release packages.
-    """
-    lowered = build_type.lower()
-    return K_PACKAGE_BUILD_TYPE.get(lowered, lowered)
 
 
 def compiler_arguments(compiler: str) -> list[str]:
