@@ -144,7 +144,7 @@ jobs:
       ST_BUILD_TYPE: relwithdebinfo
     steps:
       - name: Command
-        run: echo "st build --sanitize ${{ matrix.sanitizer }} && st test ${{ matrix.labels }}"
+        run: echo "st build --sanitize ${{ matrix.sanitizer }} && st test ${{ matrix.labels }} --sanitize ${{ matrix.sanitizer }}"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         if: env.RUN == 'true'
       - name: Fetch Eigen
@@ -180,7 +180,7 @@ jobs:
         run: st build --sanitize ${{ matrix.sanitizer }}
       - name: Run the tests
         if: env.RUN == 'true'
-        run: st test ${{ matrix.labels }}
+        run: st test ${{ matrix.labels }} --sanitize ${{ matrix.sanitizer }}
 
   gate:
     name: Gate
