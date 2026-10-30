@@ -50,3 +50,15 @@ Never invoke CMake or CTest directly. All builds, tests, and tool invocations mu
 ### Task tracking
 
 Track work with actionable task lists. Record progress in the work folder of the task, `docs/agent/<YYYY_MM_DD>_<WORK_NAME>/`, which holds only `SPEC.md`, `PLAN.md` and `REPORT.md`.
+
+## Backlog and design
+
+1. Session start: `st backlog next`. Take what it gives.
+2. A defect or limitation turns up: `st backlog add issue ...` or `st backlog add work ...`
+   at once.
+3. Before changing a module: `st design owner <path>`.
+4. Finishing: `st backlog close <ID>` in the same commit, and the changelog line it prints.
+   The commit message ends with `Backlog: <ID>`, or `Backlog: none (<reason>)`.
+5. Once per clone: `python tools/hooks/install_hooks.py`.
+
+State is read with these commands. It is never read from a markdown file or the git log.
