@@ -49,6 +49,16 @@ function(sushitrack_add_sized_test_program target)
     target_link_libraries(${target} PRIVATE ${ARG_LINK} GTest::gtest_main)
     sushitrack_apply_sanitizers(${target})
     sushitrack_link_profiling(${target})
+    # A Debug tree links GTest's Release build, and vcpkg puts the Debug DLLs beside the program,
+    # which crash it on load; the DLLs of the configuration it links are copied over them.
+    if(WIN32 AND TARGET GTest::gtest AND TARGET GTest::gtest_main)
+        add_custom_command(TARGET ${target} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "$<TARGET_FILE:GTest::gtest>"
+                "$<TARGET_FILE:GTest::gtest_main>"
+                $<TARGET_FILE_DIR:${target}>
+            COMMENT "Copying gtest.dll and gtest_main.dll to the test directory")
+    endif()
     target_include_directories(${target} PRIVATE
         ${PROJECT_SOURCE_DIR}/tests
         ${PROJECT_SOURCE_DIR}/third_party)
