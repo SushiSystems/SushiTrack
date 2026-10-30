@@ -76,6 +76,9 @@ jobs:
           restore-keys: ccache-linux-gcc-release-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}-
       - name: Fetch SushiLog and SushiProfiler
         run: st setup --yes --no-gpu
+      - name: Install the library CLIs setup fetched
+        shell: bash
+        run: python -m pip install ~/.sushisystems/sources/*/*/cli
       - name: Build
         run: st build
       - name: Run the small and medium tests
@@ -106,6 +109,9 @@ jobs:
       - name: Fetch SushiLog and SushiProfiler
         shell: pwsh
         run: st setup --yes --no-gpu
+      - name: Install the library CLIs setup fetched
+        shell: bash
+        run: python -m pip install ~/.sushisystems/sources/*/*/cli
       - name: Build
         shell: pwsh
         run: st build -D "CMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
@@ -161,6 +167,10 @@ jobs:
       - name: Fetch SushiLog and SushiProfiler
         if: env.RUN == 'true'
         run: st setup --yes --no-gpu
+      - name: Install the library CLIs setup fetched
+        if: env.RUN == 'true'
+        shell: bash
+        run: python -m pip install ~/.sushisystems/sources/*/*/cli
       - name: Build
         if: env.RUN == 'true'
         run: st build --sanitize ${{ matrix.sanitizer }}
