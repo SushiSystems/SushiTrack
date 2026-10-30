@@ -36,6 +36,7 @@ K_VISIBLE = {
     "docs bundle", "eval", "infer", "status", "config", "paths", "env",
     "setup", "doctor", "link", "unlink",
 }
+K_SUSHICORE_GROUPS = ("backlog", "design")
 
 
 def _invoke(*args: str):
@@ -49,10 +50,11 @@ def _plain(text: str) -> str:
 
 
 def _described() -> set[str]:
-    """Returns the command names `st --describe` lists."""
+    """Returns the command names `st --describe` lists, less the groups sushicore owns."""
     result = _invoke("--describe")
     assert result.exit_code == 0, result.output
-    return {command["name"] for command in json.loads(result.output)["commands"]}
+    names = {command["name"] for command in json.loads(result.output)["commands"]}
+    return {name for name in names if name.split()[0] not in K_SUSHICORE_GROUPS}
 
 
 def test_version_names_the_distribution_and_its_version():
