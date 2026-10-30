@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 2026-10-30 — tests: Fixed every Windows Debug test program crashing on load; each copies the gtest DLLs it links over the Debug ones vcpkg put beside it (`cmake/SushiTrackTests.cmake`).
+- 2026-10-30 — ci: Dropped a repeated `if` key that made GitHub refuse the workflow, installed the library CLIs `st setup` fetches, built the Linux lanes in a type the system GTest imports and tested the sanitizer tree (`ci.yml`).
 - 2026-10-29 — cli: Added the `backlog` and `design` groups and asked for sushicore 0.10.2 (`cli.py`).
 - 2026-10-28 — ci: Ran `st setup` before each build, since `st build` finds SushiLog and SushiProfiler only beside the checkout or in the copy `setup` fetched (`ci.yml`, `nightly.yml`).
 - 2026-10-28 — docs: Wrote the standalone and SushiHub routes side by side in `INSTALL.md`, the README and the FAQ, and named `cli/pyproject.toml` as the one place that pins `sushicore` (`INSTALL.md`).
