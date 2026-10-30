@@ -10,3 +10,5 @@
 
 | ID | Origin | Symptom | Workaround | Fix | Source | Opened |
 | --- | --- | --- | --- | --- | --- | --- |
+| KI-18 | own | A Debug tree fails to configure on Linux: the distribution GTest names no Debug import | Build with ST_BUILD_TYPE=release or relwithdebinfo, as ci.yml does | none, the Linux lanes build Release and no Debug tree is needed there | `cmake/SushiTrackTests.cmake` | 2026-10-30 |
+| KI-19 | dependency | st setup installs no SushiLog or SushiProfiler CLI, so st build says 'cannot run sl' | Run python -m pip install ~/.sushisystems/sources/*/*/cli after st setup, as ci.yml does |  | `.github/workflows/ci.yml` | 2026-10-30 |
