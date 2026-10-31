@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-31 — cli: Ran `st test` through the shared test command of sushicore, which writes a JUnit file and prints the budget line (RW-29, `77b3f6f`).
 - 2026-10-30 — tests: Fixed every Windows Debug test program crashing on load; each copies the gtest DLLs it links over the Debug ones vcpkg put beside it (`cmake/SushiTrackTests.cmake`).
 - 2026-10-30 — ci: Dropped a repeated `if` key that made GitHub refuse the workflow, installed the library CLIs `st setup` fetches, built the Linux lanes in a type the system GTest imports and tested the sanitizer tree (`ci.yml`).
 - 2026-10-29 — cli: Added the `backlog` and `design` groups and asked for sushicore 0.10.2 (`cli.py`).
