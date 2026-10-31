@@ -3,17 +3,19 @@
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
 # Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
 # Commercial use requires a licence from Sushi Systems.
-"""Runs the tests of the build tree through CTest, selected by size label."""
+"""What `st test` hands the shared test command: the tree, the CTest call and the pytest suite."""
 
 import sys
 
 from sushicore import cmake_cache
+from sushicore.testing import ModuleTests, SanitizedTests
+from sushicore.testing.labels import LabelSelection
 
 from .. import console
+from ..config import PROFILE
 from ..env import load_build_env
 from ..process import RUNNER
 from . import build as build_svc
-from .test_label import select_labels
 
 
 def _config_flag(cfg, build_dir):
@@ -23,49 +25,50 @@ def _config_flag(cfg, build_dir):
     return build_svc.normalize_build_type(cfg.build_type)
 
 
-def test(cfg, paths, labels=None, filter=None, repeat=0, jobs=None, sanitizer=None):
-    """Run the tests whose labels the selection names.
+def module_tests(context, panel=None):
+    """Return what `st test` hands the shared command, reading the workspace from *context* on use.
 
     Args:
-        labels: The TestLabel values to run; none runs small and medium.
-        sanitizer: Runs the tree that sanitizer builds, instead of the plain one.
-
-    Returns:
-        ctest's exit code, or 1 when the tree is absent or stale.
+        context: Returns the configuration and the paths of the project.
+        panel: The help panel `test` is listed under.
     """
-    console.header("Test")
-    build_dir = build_svc.tree_for(paths, build_svc.normalize_build_type(cfg.build_type), sanitizer)
-    if not build_dir.is_dir():
-        console.error(f"{build_dir} not found. Run `st build` first.")
-        return 1
-    if cmake_cache.is_stale(build_dir, paths.root):
-        console.error(
-            f"{build_dir} was configured for a different source path "
-            f"(e.g. a Docker volume build reused on this host).\n"
-            f"  - run `st build --clean` to reconfigure it cleanly first.")
-        return 1
+    def tree():
+        cfg, paths = context()
+        return build_svc.tree_for(paths, build_svc.normalize_build_type(cfg.build_type))
 
-    selection = select_labels(labels)
-    console.info("Labels: " + ", ".join(
-        [size.value for size in selection.sizes] + (["quarantined"] if selection.quarantined else [])))
-    code = build_svc.DRIVER.ctest_run(
-        cfg.tool, build_dir, load_build_env(cfg.tool, build_dir, paths.config),
-        label_regex=selection.ctest_include(),
-        exclude_label_regex=selection.ctest_exclude(),
-        filter=filter, repeat=repeat, jobs=jobs,
-        config=_config_flag(cfg, build_dir))
-    if code != 0:
-        console.error(f"Tests failed (exit {code}).")
-    return code
+    def sanitized_tree(name):
+        cfg, paths = context()
+        return build_svc.tree_for(paths, build_svc.normalize_build_type(cfg.build_type),
+                                  build_svc.Sanitizer(name))
 
+    def build_sanitized(name):
+        cfg, paths = context()
+        return build_svc.build(cfg, paths, sanitizer=build_svc.Sanitizer(name))
 
-def test_cli(paths, labels=None):
-    """Run the pytest suite of the st package that *labels* select.
+    def check_tree(build_dir):
+        _, paths = context()
+        if cmake_cache.is_stale(build_dir, paths.root):
+            return (f"{build_dir} was configured for a different source path "
+                    f"(e.g. a Docker volume build reused on this host).\n"
+                    f"  - run `st build --clean` to reconfigure it cleanly first.")
+        return None
 
-    Returns:
-        pytest's exit code.
-    """
-    console.header("Test (st package)")
-    expression = select_labels(labels).pytest_expression()
-    console.info(f"Markers: {expression}")
-    return RUNNER.run([sys.executable, "-m", "pytest", "-q", "-m", expression], paths.cli)
+    def run_ctest(build_dir, **options):
+        cfg, paths = context()
+        return build_svc.DRIVER.ctest_run(
+            cfg.tool, build_dir, load_build_env(cfg.tool, build_dir, paths.config),
+            config=_config_flag(cfg, build_dir), **options)
+
+    def run_cli_tests(selection: LabelSelection):
+        _, paths = context()
+        console.header("Test (st package)")
+        expression = selection.pytest_expression()
+        console.info(f"Markers: {expression}")
+        return RUNNER.run([sys.executable, "-m", "pytest", "-q", "-m", expression], paths.cli)
+
+    return ModuleTests(
+        profile=PROFILE, project_root=lambda: context()[1].root, console=console.current,
+        build_tree=tree, run_ctest=run_ctest, run=RUNNER.run, check_tree=check_tree, panel=panel,
+        sanitized=SanitizedTests(names=tuple(item.value for item in build_svc.Sanitizer),
+                                 build=build_sanitized, tree=sanitized_tree),
+        cli_tests=run_cli_tests)

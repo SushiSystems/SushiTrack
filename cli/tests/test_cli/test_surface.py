@@ -69,17 +69,12 @@ def test_describe_lists_every_visible_command_and_no_hidden_one():
     assert _described() == K_VISIBLE
 
 
-def test_test_with_a_sanitizer_builds_with_it_before_running(monkeypatch):
-    """Builds the tree with the named sanitizer, then runs the tests."""
-    seen: list[object] = []
-    monkeypatch.setattr(cli, "context", lambda: (object(), object()))
-    monkeypatch.setattr(cli.build_svc, "build",
-                        lambda cfg, paths, **options: seen.append(options["sanitizer"]) or 0)
-    monkeypatch.setattr(cli.test_svc, "test",
-                        lambda cfg, paths, **options: seen.append("test") or 0)
-    result = _invoke("test", "--label", "small", "--sanitize", "address")
-    assert result.exit_code == 0, result.output
-    assert seen == [cli.build_svc.Sanitizer.address, "test"]
+def test_test_is_the_shared_command_and_offers_the_sanitizer_and_the_own_suite():
+    """Takes `test` from sushicore's one declaration, with `--sanitize` and `--cli` shown."""
+    command = typer.main.get_command(cli.app).commands["test"]
+    assert command.callback.__module__ == "sushicore.testing.commands"
+    shown = {name for parameter in command.params if not parameter.hidden for name in parameter.opts}
+    assert {"--sanitize", "--cli", "--all"} <= shown
 
 
 def test_config_and_env_are_the_shared_declarations():

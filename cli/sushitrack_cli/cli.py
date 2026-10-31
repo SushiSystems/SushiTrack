@@ -25,6 +25,7 @@ from sushicore.docs_bundle import register_docs_commands
 from sushicore.design import register_design_commands
 from sushicore.provision.commands import ModuleProvision, register_provision_commands
 from sushicore.root_options import register_root_options
+from sushicore.testing import register_test_command
 from sushicore.typer_help import help_group
 
 from . import console
@@ -41,7 +42,6 @@ from .services import tests as test_svc
 from .services.checks import st_checks
 from .services.build import BuildType, Sanitizer
 from .services.deploy import DeployKind
-from .services.test_label import TestLabel
 
 K_PROJECT = "Project"
 K_BENCHMARK = "Benchmark"
@@ -121,57 +121,7 @@ def build(
     raise typer.Exit(deploy_svc.deploy(paths, deploy.value))
 
 
-@app.command(
-    "test",
-    rich_help_panel=K_PROJECT,
-    epilog="st test  # small and medium\n"
-           "st test --label small\n"
-           "st test --label small -f 'RectTest'\n"
-           "st test --label medium --repeat 3\n"
-           "st test --label large  # Needs real hardware\n"
-           "st test --label quarantined\n"
-           "st test --label small --sanitize address  # Small tests under ASan and UBSan\n"
-           "st test --cli  # The st package's own tests",
-)
-def test(
-    label: Optional[List[TestLabel]] = typer.Option(
-        None, "--label", "-l", case_sensitive=False,
-        help="Size label to run, repeatable: small, medium, large or quarantined. "
-             "Default: small and medium; quarantined tests run only when named."),
-    filter: Optional[str] = typer.Option(
-        None, "--filter", "-f", metavar="REGEX",
-        help="ctest -R regex over 'Suite.Case' test names."),
-    repeat: int = typer.Option(
-        0, "--repeat", "-r", min=0, metavar="N",
-        help="Re-run each test up to N times, stopping on the first failure "
-             "(ctest --repeat until-fail). Useful for hunting flaky tests."),
-    jobs: Optional[int] = typer.Option(
-        None, "--jobs", "-j", metavar="N",
-        help="Run up to N tests concurrently (ctest --parallel)."),
-    cli_tests: bool = typer.Option(
-        False, "--cli", help="Run the pytest suite of the st package instead of CTest."),
-    sanitize: Optional[Sanitizer] = _sanitize_option(),
-):
-    """Run the tests through CTest, selected by size label.
-
-    For GTest-level knobs (shuffle, break-on-failure) run the binary directly:
-    st run sushitrack_tests -- --gtest_shuffle --gtest_break_on_failure
-
-    --cli runs the pytest suite of the st package instead, with the same labels.
-    --sanitize builds the tree with that sanitizer first.
-
-    Metric evaluation and video inference are not CTest suites — see `st eval`
-    and `st infer`.
-    """
-    cfg, paths = context()
-    if cli_tests:
-        raise typer.Exit(test_svc.test_cli(paths, labels=label))
-    if sanitize is not None:
-        code = build_svc.build(cfg, paths, sanitizer=sanitize)
-        if code != 0:
-            raise typer.Exit(code)
-    raise typer.Exit(test_svc.test(cfg, paths, labels=label, filter=filter,
-                                   repeat=repeat, jobs=jobs, sanitizer=sanitize))
+register_test_command(app, test_svc.module_tests(context, panel=K_PROJECT))
 
 
 @app.command(

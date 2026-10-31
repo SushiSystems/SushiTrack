@@ -8,6 +8,7 @@
 | RW-5 | P2 | decision | Decide which of AGENTS.md and CLAUDE.md is the source of the agent instructions | one file holds the directives and the other points at it |  |  | 2026-10-19 |
 | RW-6 | P2 | decision | Decide whether contributions from outside are accepted | the owner has named the contributor agreement, or ruled contributions out |  |  | 2026-10-19 |
 | RW-7 | P2 | decision | Decide whether the SushiTrack migration is closed | `docs/design/SUSHITRACK_MIGRATION/README.md` carries a `Shipped` status, or a phase with work left |  | `docs/design/SUSHITRACK_MIGRATION/README.md` | 2026-10-19 |
+| RW-29 | P2 | open | Run st test through the shared test command of sushicore | st test is register_test_command, keeps --sanitize and --cli, and prints a budget line from a real JUnit file |  |  | 2026-10-31 |
 
 ## Known issues
 
