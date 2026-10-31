@@ -11,6 +11,7 @@ The line is `Backlog: <ID>[, <ID>]` or `Backlog: none (<reason>)`; an ID is open
 
 from __future__ import annotations
 
+import functools
 import re
 import sys
 from collections.abc import Iterable, Iterator
@@ -35,19 +36,43 @@ def _ids_in(text: str) -> set[str]:
     return set(row.findall(text))
 
 
-def open_ids(root: Path, revision: str | None) -> frozenset[str]:
-    """Returns the IDs of the entries in the backlog at a revision, or on disk when revision is None."""
+@functools.lru_cache(maxsize=None)
+def _ids_of_blob(root: Path, blob: str) -> frozenset[str]:
+    """Returns the IDs in one backlog file, named by its object hash, which never changes its content."""
+    return frozenset(_ids_in(git(root, "cat-file", "blob", blob) or ""))
+
+
+@functools.lru_cache(maxsize=None)
+def _ids_of_tree(root: Path, tree: str) -> frozenset[str]:
+    """Returns the IDs in the backlog folder named by its tree hash; most commits leave the folder alone."""
     ids: set[str] = set()
+    for line in (git(root, "ls-tree", "-r", tree) or "").splitlines():
+        info, _, name = line.partition("\t")
+        if name.endswith(".md"):
+            ids |= _ids_of_blob(root, info.split()[2])
+    return frozenset(ids)
+
+
+@functools.lru_cache(maxsize=None)
+def _backlog_tree(root: Path, revision: str) -> str:
+    """Returns the tree hash of the backlog folder at a revision, or an empty string when it has none."""
+    return (git(root, "rev-parse", f"{revision}:{K_BACKLOG_FOLDER}") or "").strip()
+
+
+def open_ids(root: Path, revision: str | None) -> frozenset[str]:
+    """Returns the IDs of the entries in the backlog at a revision, or on disk when revision is None.
+
+    A revision is read through the hashes of the backlog folder and its files, so a run over many
+    commits reads each version of a file once.
+    """
     if revision is None:
+        ids: set[str] = set()
         folder = root / K_BACKLOG_FOLDER
         for path in sorted(folder.glob("*.md")) if folder.is_dir() else []:
             ids |= _ids_in(path.read_text(encoding="utf-8", errors="replace"))
         return frozenset(ids)
-    listing = git(root, "ls-tree", "-r", "--name-only", revision, "--", K_BACKLOG_FOLDER)
-    for name in (listing or "").splitlines():
-        if name.endswith(".md"):
-            ids |= _ids_in(git(root, "show", f"{revision}:{name}") or "")
-    return frozenset(ids)
+    tree = _backlog_tree(root, revision)
+    return _ids_of_tree(root, tree) if tree else frozenset()
 
 
 def trailer_value(message: str) -> str | None:

@@ -14,9 +14,10 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from testing.added_tests import added_cases, added_programs, main  # noqa: E402
-from tests.repo_builder import Repo  # noqa: E402
+from repo_builder import Repo  # noqa: E402
 
 K_ONE = "TEST(Small_A, One) {\n  EXPECT_TRUE(f());\n}\n"
 K_TWO = "TEST(Small_A, Two) {\n  EXPECT_TRUE(f());\n}\n"

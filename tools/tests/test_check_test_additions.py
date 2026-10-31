@@ -13,6 +13,7 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from testing import check_test_additions  # noqa: E402
 from testing.check_test_additions import (  # noqa: E402
@@ -20,7 +21,7 @@ from testing.check_test_additions import (  # noqa: E402
     rule_second_program_unapproved,
     rule_too_many_cases,
 )
-from tests.repo_builder import Repo  # noqa: E402
+from repo_builder import Repo  # noqa: E402
 
 
 def cases(count: int, first: int = 0) -> str:

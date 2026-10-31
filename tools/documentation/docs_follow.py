@@ -20,7 +20,7 @@ from pathlib import Path, PurePosixPath
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import settings  # noqa: E402
-from commits.history import git  # noqa: E402
+from commits.history import blob_texts, git  # noqa: E402
 from documentation import facts  # noqa: E402
 
 K_SINCE: str = getattr(settings, "K_DOCS_FOLLOW_SINCE", "")
@@ -91,15 +91,36 @@ def _text(root: Path, revision: str | None, path: str) -> str:
     return git(root, "show", f"{revision or ''}:{path}") or ""
 
 
+K_PAGE_CACHE: dict[tuple[Path, str], tuple[tuple[str, ...], tuple[str, ...]]] = {}
+
+
+def _listing(root: Path, revision: str | None) -> list[tuple[str, str]]:
+    """Returns the object hash and the path of every file of a revision, or of the index when revision is None."""
+    listing = git(root, "ls-tree", "-r", revision) if revision else git(root, "ls-files", "-s")
+    entries = []
+    for line in (listing or "").splitlines():
+        info, _, name = line.partition("\t")
+        fields = info.split()
+        if name and len(fields) >= 3:
+            entries.append((fields[2] if revision else fields[1], name))
+    return entries
+
+
 def _pages(root: Path, revision: str | None) -> dict[str, tuple[tuple[str, ...], tuple[str, ...]]]:
-    """Returns every followed markdown page of a revision (or the index) with what it describes and follows."""
-    listing = git(root, "ls-tree", "-r", "--name-only", revision) if revision else git(root, "ls-files")
-    pages: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {}
-    for name in (listing or "").splitlines():
-        if name.endswith(".md") and not _is_ignored(name):
-            text = _text(root, revision, name)
-            pages[name] = (describes_of(text), tuple(dict.fromkeys(fact_id for fact_id, _ in facts.parse(name, text).follows)))
-    return pages
+    """Returns every followed markdown page of a revision (or the index) with what it describes and follows.
+
+    A page is read once for each version of it: the pages are cached by object hash and the ones not yet
+    seen are read in a single git call.
+    """
+    entries = [(blob, name) for blob, name in _listing(root, revision)
+               if name.endswith(".md") and not _is_ignored(name)]
+    missing = sorted({blob for blob, _ in entries if (root, blob) not in K_PAGE_CACHE})
+    texts = blob_texts(root, missing)
+    for blob in missing:
+        text = texts.get(blob, "")
+        K_PAGE_CACHE[(root, blob)] = (describes_of(text),
+                                      tuple(dict.fromkeys(fact_id for fact_id, _ in facts.parse("", text).follows)))
+    return {name: K_PAGE_CACHE[(root, blob)] for blob, name in entries}
 
 
 def _changed_facts(root: Path, changes: list[Change], before: str | None, after: str | None) -> set[str]:
