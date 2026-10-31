@@ -12,42 +12,21 @@ The line is `Backlog: <ID>[, <ID>]` or `Backlog: none (<reason>)`; an ID is open
 from __future__ import annotations
 
 import re
-import subprocess
 import sys
 from collections.abc import Iterable, Iterator
-from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import settings  # noqa: E402
 from checking.checker import Checker, Issue, run  # noqa: E402
+from commits.history import Commit, commits_since, git  # noqa: E402
 
 K_SINCE: str = getattr(settings, "K_TRAILER_SINCE", "")
 K_ID_PATTERN: str = getattr(settings, "K_BACKLOG_ID_PATTERN", r"[A-Z]{2}-[0-9]+")
 K_BACKLOG_FOLDER = "docs/backlog"
 K_TRAILER = re.compile(r"^Backlog:[ \t]*(.*?)[ \t]*$", re.MULTILINE)
 K_NONE = re.compile(r"^none \(\s*(\S.*?)\s*\)$")
-
-
-@dataclass(frozen=True, slots=True)
-class Commit:
-    """Holds one commit to check: where it is, its hash, its parent and its message."""
-
-    root: Path
-    sha: str
-    parent: str
-    message: str
-
-
-def _git(root: Path, *arguments: str) -> str | None:
-    """Returns the output of a git command, or None when it fails."""
-    try:
-        completed = subprocess.run(
-            ["git", "-C", str(root), *arguments], capture_output=True, text=True, encoding="utf-8")
-    except OSError:
-        return None
-    return completed.stdout if completed.returncode == 0 else None
 
 
 def _ids_in(text: str) -> set[str]:
@@ -64,10 +43,10 @@ def open_ids(root: Path, revision: str | None) -> frozenset[str]:
         for path in sorted(folder.glob("*.md")) if folder.is_dir() else []:
             ids |= _ids_in(path.read_text(encoding="utf-8", errors="replace"))
         return frozenset(ids)
-    listing = _git(root, "ls-tree", "-r", "--name-only", revision, "--", K_BACKLOG_FOLDER)
+    listing = git(root, "ls-tree", "-r", "--name-only", revision, "--", K_BACKLOG_FOLDER)
     for name in (listing or "").splitlines():
         if name.endswith(".md"):
-            ids |= _ids_in(_git(root, "show", f"{revision}:{name}") or "")
+            ids |= _ids_in(git(root, "show", f"{revision}:{name}") or "")
     return frozenset(ids)
 
 
@@ -94,17 +73,7 @@ def trailer_problems(message: str, known: frozenset[str]) -> list[str]:
 
 def collect(paths: list[Path]) -> Iterable[Commit]:
     """Returns each commit after K_TRAILER_SINCE below each given repository root, oldest first."""
-    commits: list[Commit] = []
-    for root in (path for path in paths if path.is_dir() and K_SINCE):
-        listing = _git(root, "rev-list", "--no-merges", "--reverse", f"{K_SINCE}..HEAD")
-        if listing is None:
-            raise SystemExit(f"cannot read the history after {K_SINCE}; fetch the full history")
-        for sha in listing.split():
-            parent = _git(root, "rev-parse", f"{sha}^")
-            message = _git(root, "log", "-1", "--format=%B", sha)
-            if parent is not None and message is not None:
-                commits.append(Commit(root, sha, parent.strip(), message))
-    return commits
+    return [commit for root in paths if root.is_dir() and K_SINCE for commit in commits_since(root, K_SINCE)]
 
 
 def _issue(commit: Commit, text: str) -> Issue:
