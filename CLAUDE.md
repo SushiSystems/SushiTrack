@@ -62,3 +62,8 @@ Track work with actionable task lists. Record progress in the work folder of the
 5. Once per clone: `python tools/hooks/install_hooks.py`.
 
 State is read with these commands. It is never read from a markdown file or the git log.
+
+## Skills
+
+Load `sushiskills` and `sushisystems-specific` before any work. With each doctrine skill a task
+loads, load the Sushi skill that `sushisystems-specific` names beside it.

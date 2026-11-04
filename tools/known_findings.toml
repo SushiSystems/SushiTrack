@@ -1,0 +1,27 @@
+[[finding]]
+checker = "testing/check_test_sizes.py"
+rule = "rule_unsized_python_test"
+path = "third_party/TrackEval/tests/test_metrics.py"
+count = 1
+backlog = "RW-30"
+
+[[finding]]
+checker = "testing/check_test_sizes.py"
+rule = "rule_unsized_python_test"
+path = "third_party/yolox/tests/utils/test_model_utils.py"
+count = 1
+backlog = "RW-30"
+
+[[finding]]
+checker = "testing/check_test_sizes.py"
+rule = "rule_unsized_python_test"
+path = "tools/tests/test_check_test_additions.py"
+count = 1
+backlog = "RW-30"
+
+[[finding]]
+checker = "testing/check_test_sizes.py"
+rule = "rule_unsized_python_test"
+path = "tools/tests/test_test_budget_settings.py"
+count = 1
+backlog = "RW-30"
