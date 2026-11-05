@@ -44,12 +44,14 @@ checkers' tests.
 - `tools/tests/test_test_budget_settings.py` skips here, since the repository has no `skills/` folder, so
   its promise is checked nowhere; it also defines `read_budget` and `differences` in the test file.
 
-## The owner's decisions waiting
+## Decisions
 
-1. The negative frame rate: the documentation or the code.
-2. The seams that change public signatures: a stream to parse in place of a file, an owned
-   `TrackerRegistry` and `KalmanFilterRegistry`, explicit adapter parameters in place of
-   `SUSHITRACK_CONFIG`.
+The owner delegated these decisions on 2026-11-05. Each ruling below is final for the plan; its reason follows it.
+
+1. A negative frame rate is rejected, as the documentation says, and the code changes. A silent clamp to 1 hides the caller's error.
+2. The seams are approved: a stream to parse in place of a file, owned `TrackerRegistry` and `KalmanFilterRegistry` passed in, and explicit adapter parameters, with `SUSHITRACK_CONFIG` read only at the CLI edge. Every seam is added as a parameter or overload whose default keeps today's behaviour, so existing callers compile unchanged and the change is a minor version. A value passed in is preferred to a reset of process-wide state.
+3. SushiLog's seam is a scoped in-memory sink: a guard that swaps the process-wide logger's sink for one test and restores it on exit. Routing a logger through every call site in every repository would cost more than it returns, and small tests run one at a time in their process.
+4. A named constant holding a hand-typed epsilon is not a typed tolerance. A tolerance names its kind (absolute, relative or ulps) and its derivation, so every such constant is redefined through `tolerance.hpp`, keeping its name. The rewrites stay rewrites, and they are mechanical.
 
 ## Dispatches
 
