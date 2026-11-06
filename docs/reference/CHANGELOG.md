@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-11-06 — cli: Dropped the `Capturer` seam and `ScriptedCapturer`; the runner captures and the tests script `RecordingRunner`; sushicore 0.10.13 is required (RW-31, `workspace.py`).
 - 2026-11-06 — cli: Gave the services a `Workspace` and moved the CLI tests onto sushicore's in-memory runner and console; the CLI asks for sushicore 0.10.12 (`cli/sushitrack_cli/workspace.py`).
 - 2026-11-06 — tools: Deleted the leftover `check_test_additions.py` and its test, which the shared tools no longer carry, and recopied the shared tools (RW-30).
 - 2026-11-06 — licence: Relicensed SushiTrack under the Apache License 2.0 and removed `COMMERCIAL.md`; every source file's licence block follows (`LICENSE`, `tools/settings.py`).

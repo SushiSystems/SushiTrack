@@ -135,7 +135,7 @@ def _run_benchmark(space: Workspace, tool, paths, args):
         return 1, {}
 
     console.command(" ".join([str(binary), *args]))
-    code, out, err = space.capturer.capture(
+    code, out, err = space.runner.capture(
         [str(binary), *args], cwd=paths.root,
         env=space.build_env(tool, paths.build, paths.config))
     if code != 0:

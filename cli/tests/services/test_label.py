@@ -26,7 +26,8 @@ def test_run_benchmark_hands_the_tool_settings_to_the_build_env(tmp_path, sessio
 
     label._run_benchmark(workspace, SimpleNamespace(is_windows=False), paths, [])
 
-    (environment,) = session.capturer.environments
+    (command,) = session.runner.commands
+    environment = command.env
     assert environment["SUSHITRACK_CONFIG"] == str(paths.config)
 
 
@@ -34,7 +35,7 @@ def test_benchmark_capture_keeps_streams_apart(tmp_path, session):
     engine = tmp_path / "bin" / artifacts.executable_name(label.BENCHMARK)
     engine.parent.mkdir()
     engine.write_text("", encoding="utf-8")
-    session.capturer.script(0, "[ PERF bytetrack ] S: 5 us/frame", "")
+    session.runner.script(0, ("[ PERF bytetrack ] S: 5 us/frame",))
     paths = SimpleNamespace(root=tmp_path, build=tmp_path, config=tmp_path)
 
     result = label._run_benchmark(session.workspace, SimpleNamespace(), paths, [])

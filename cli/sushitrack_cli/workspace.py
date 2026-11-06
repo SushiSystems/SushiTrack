@@ -36,29 +36,20 @@ class ServiceConsole(ConsoleLike, Protocol):
         """Prints a table."""
 
 
-class Capturer(Protocol):
-    """Runs a command quietly and hands back what it printed."""
-
-    def capture(self, cmd: list[str], cwd: Path | None = None,
-                env: dict[str, str] | None = None) -> tuple[int, str, str]:
-        """Runs *cmd* and returns its exit code, stdout and stderr."""
-
-
 @dataclass(frozen=True)
 class Workspace:
     """Holds what the services act through; the checkout they act on is passed to each call.
 
     Attributes:
         console: Where the services print.
-        runner: What starts cmake, ctest, docker and the programs.
-        capturer: What runs a command and returns its output.
+        runner: What starts cmake, ctest, docker and the programs, and captures the output of
+            the commands a service reads.
         environment: The environment the started commands run under; ``None`` assembles it per
             tree through ``sushitrack_cli.env.load_build_env``.
     """
 
     console: ServiceConsole
     runner: CommandRunner
-    capturer: Capturer
     environment: Mapping[str, str] | None = None
 
     @cached_property
@@ -75,4 +66,4 @@ class Workspace:
 
 def current_workspace() -> Workspace:
     """Returns the workspace `st` runs in, with the real console and the real runner."""
-    return Workspace(console, RUNNER, RUNNER)
+    return Workspace(console, RUNNER)

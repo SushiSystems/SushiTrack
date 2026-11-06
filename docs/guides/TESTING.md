@@ -60,8 +60,7 @@ repository root as often as from `cli/`. `conftest.py` puts `cli/` on `sys.path`
 command works from either.
 
 The `session` fixture of `conftest.py` is a `Workspace` over sushicore's `RecordingRunner` and
-`RecordingConsole`, and over a `ScriptedCapturer` for the commands whose output a service reads. A
-service takes it as `workspace=`, and a command test hands it in as the context object, so no test
+`RecordingConsole`. A service takes it as `workspace=`, and a command test hands it in as the context object, so no test
 patches a function of the CLI.
 
 Nothing in the fixtures reaches the machine. A test that runs a real tool, prints through the

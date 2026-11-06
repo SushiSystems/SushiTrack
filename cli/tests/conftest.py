@@ -55,37 +55,12 @@ def said(console: RecordingConsole, fragment: str) -> bool:
     return any(fragment in str(argument) for call in console.calls for argument in call.args)
 
 
-class ScriptedCapturer:
-    """Answers each captured command from a script and records it; starts nothing.
-
-    sushicore's RecordingRunner has no ``capture``, so the commands whose output a service reads
-    go through this one.
-    """
-
-    def __init__(self) -> None:
-        self.commands: list[list[str]] = []
-        self.environments: list[dict[str, str] | None] = []
-        self._answers: list[tuple[int, str, str]] = []
-
-    def script(self, exit_code: int = 0, stdout: str = "", stderr: str = "") -> "ScriptedCapturer":
-        """Queues the answer to the next unanswered command and returns this capturer."""
-        self._answers.append((exit_code, stdout, stderr))
-        return self
-
-    def capture(self, cmd, cwd=None, env=None) -> tuple[int, str, str]:
-        """Records *cmd* and returns the next scripted answer, else success with no output."""
-        self.commands.append([str(part) for part in cmd])
-        self.environments.append(env)
-        return self._answers.pop(0) if self._answers else (0, "", "")
-
-
 @dataclass
 class Session:
     """Holds a workspace over sushicore's in-memory runner and console, and what they recorded."""
 
     console: RecordingConsole
     runner: RecordingRunner
-    capturer: ScriptedCapturer
     workspace: Workspace
 
     @property
@@ -103,5 +78,4 @@ def session() -> Session:
     """Returns a workspace whose console and runner record, with an empty environment."""
     console = RecordingConsole()
     runner = RecordingRunner(console)
-    capturer = ScriptedCapturer()
-    return Session(console, runner, capturer, Workspace(console, runner, capturer, {}))
+    return Session(console, runner, Workspace(console, runner, {}))

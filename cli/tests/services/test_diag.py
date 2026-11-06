@@ -19,13 +19,13 @@ pytestmark = pytest.mark.medium
 
 
 def test_git_missing_answers_none(tmp_path, session):
-    session.capturer.script(127)
+    session.runner.script(127)
 
     assert diag._git_describe(session.workspace, SimpleNamespace(root=tmp_path)) is None
 
 
 def test_git_describe_joins_branch_commit_and_dirt(tmp_path, session):
-    session.capturer.script(0, "main\n").script(0, "abc123\n").script(0, " M x\n")
+    session.runner.script(0, ("main",)).script(0, ("abc123",)).script(0, (" M x",))
 
     described = diag._git_describe(session.workspace, SimpleNamespace(root=tmp_path))
 

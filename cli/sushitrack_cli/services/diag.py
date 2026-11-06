@@ -38,14 +38,14 @@ def _mtime(path):
 
 def _git_describe(space: Workspace, paths):
     """Return "branch @ commit" with a dirty marker, or None without git."""
-    code, out, _ = space.capturer.capture(["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                                  cwd=paths.root)
+    code, out, _ = space.runner.capture(["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                                        cwd=paths.root)
     if code == MISSING_EXIT_CODE:
         return None
     branch = out.strip() if code == 0 else "?"
-    code, out, _ = space.capturer.capture(["git", "rev-parse", "--short", "HEAD"], cwd=paths.root)
+    code, out, _ = space.runner.capture(["git", "rev-parse", "--short", "HEAD"], cwd=paths.root)
     commit = out.strip() if code == 0 else "?"
-    code, out, _ = space.capturer.capture(["git", "status", "--porcelain"], cwd=paths.root)
+    code, out, _ = space.runner.capture(["git", "status", "--porcelain"], cwd=paths.root)
     dirty = " (dirty)" if code == 0 and out.strip() else ""
     return f"{branch} @ {commit}{dirty}"
 
