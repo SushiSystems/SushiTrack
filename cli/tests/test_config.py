@@ -18,6 +18,13 @@ from sushitrack_cli.config import IS_WINDOWS, Config, ToolSettings, load_config
 pytestmark = pytest.mark.medium
 
 
+def _cli_folder(root, name):
+    """Return the path of *name* in the cli/ folder of the checkout at *root*, made if needed."""
+    folder = root / "cli"
+    folder.mkdir(exist_ok=True)
+    return folder / name
+
+
 @pytest.fixture
 def st_checkout(monkeypatch, tmp_path):
     """Return this checkout's root with tool env cleared and an empty workspace."""
@@ -28,7 +35,6 @@ def st_checkout(monkeypatch, tmp_path):
 
 
 def test_defaults_are_used_when_no_file_or_env_overrides(tmp_path, monkeypatch):
-    monkeypatch.setattr(config_module, "config_dir", lambda root=None: tmp_path)
     for var in config_module.ENV_OVERRIDES.values():
         monkeypatch.delenv(var, raising=False)
 
@@ -38,9 +44,8 @@ def test_defaults_are_used_when_no_file_or_env_overrides(tmp_path, monkeypatch):
     assert cfg.sources["build_type"] == "default"
 
 
-def test_config_toml_overrides_a_default(tmp_path, monkeypatch):
-    monkeypatch.setattr(config_module, "config_dir", lambda root=None: tmp_path)
-    (tmp_path / "config.toml").write_text(
+def test_config_toml_overrides_a_default(tmp_path):
+    _cli_folder(tmp_path, "config.toml").write_text(
         "[build]\ntype = \"Debug\"\n", encoding="utf-8")
 
     cfg = config_module.load_config(tmp_path)
@@ -49,11 +54,10 @@ def test_config_toml_overrides_a_default(tmp_path, monkeypatch):
     assert cfg.sources["build_type"] == "config.toml"
 
 
-def test_config_local_toml_wins_over_config_toml(tmp_path, monkeypatch):
-    monkeypatch.setattr(config_module, "config_dir", lambda root=None: tmp_path)
-    (tmp_path / "config.toml").write_text(
+def test_config_local_toml_wins_over_config_toml(tmp_path):
+    _cli_folder(tmp_path, "config.toml").write_text(
         "[build]\ntype = \"Debug\"\n", encoding="utf-8")
-    (tmp_path / "config.local.toml").write_text(
+    _cli_folder(tmp_path, "config.local.toml").write_text(
         "[build]\ntype = \"RelWithDebInfo\"\n", encoding="utf-8")
 
     cfg = config_module.load_config(tmp_path)
@@ -63,8 +67,7 @@ def test_config_local_toml_wins_over_config_toml(tmp_path, monkeypatch):
 
 
 def test_an_env_override_wins_over_every_file(tmp_path, monkeypatch):
-    monkeypatch.setattr(config_module, "config_dir", lambda root=None: tmp_path)
-    (tmp_path / "config.toml").write_text(
+    _cli_folder(tmp_path, "config.toml").write_text(
         "[build]\ntype = \"Debug\"\n", encoding="utf-8")
     monkeypatch.setenv("ST_BUILD_TYPE", "MinSizeRel")
 
@@ -74,10 +77,9 @@ def test_an_env_override_wins_over_every_file(tmp_path, monkeypatch):
     assert cfg.sources["build_type"] == "env:ST_BUILD_TYPE"
 
 
-def test_a_platform_table_overlays_the_current_platform_only(tmp_path, monkeypatch):
-    monkeypatch.setattr(config_module, "config_dir", lambda root=None: tmp_path)
+def test_a_platform_table_overlays_the_current_platform_only(tmp_path):
     other = "linux" if platform.system().lower() == "windows" else "windows"
-    (tmp_path / "config.toml").write_text(
+    _cli_folder(tmp_path, "config.toml").write_text(
         f"[build]\ntype = \"Debug\"\n"
         f"[platform.{platform.system().lower()}]\nbuild.type = \"MinSizeRel\"\n"
         f"[platform.{other}]\nbuild.type = \"RelWithDebInfo\"\n",
@@ -89,7 +91,6 @@ def test_a_platform_table_overlays_the_current_platform_only(tmp_path, monkeypat
 
 
 def test_a_bool_field_coerces_common_truthy_env_spellings(tmp_path, monkeypatch):
-    monkeypatch.setattr(config_module, "config_dir", lambda root=None: tmp_path)
     monkeypatch.setenv("ST_DOCKER_GPUS", "no")
 
     cfg = config_module.load_config(tmp_path)
@@ -138,37 +139,32 @@ def test_legacy_tool_keys_name_each_old_key_and_its_replacement():
     ]
 
 
-def test_load_config_warns_once_per_legacy_key(tmp_path, monkeypatch):
-    monkeypatch.setattr(config_module, "config_dir", lambda root=None: tmp_path)
-    (tmp_path / "config.local.toml").write_text(
+def test_load_config_warns_once_per_legacy_key(tmp_path):
+    _cli_folder(tmp_path, "config.local.toml").write_text(
         '[build]\ncmake = "x"\ngenerator = "y"\n', encoding="utf-8")
     said = []
-    monkeypatch.setattr(config_module, "_warn", said.append)
 
-    config_module.load_config(tmp_path)
+    config_module.load_config(tmp_path, warn=said.append)
 
     assert len(said) == 2
     assert all("config.local.toml" in line for line in said)
     assert "[tool] cmake_exe" in said[0]
 
 
-def test_a_key_no_setting_reads_is_warned_and_ignored(tmp_path, monkeypatch):
-    monkeypatch.setattr(config_module, "config_dir", lambda root=None: tmp_path)
-    (tmp_path / "config.local.toml").write_text('[build]\nno_such_key = 1\n', encoding="utf-8")
+def test_a_key_no_setting_reads_is_warned_and_ignored(tmp_path):
+    _cli_folder(tmp_path, "config.local.toml").write_text('[build]\nno_such_key = 1\n', encoding="utf-8")
     said = []
-    monkeypatch.setattr(config_module, "_warn", said.append)
 
-    config_module.load_config(tmp_path)
+    config_module.load_config(tmp_path, warn=said.append)
 
     assert len(said) == 1
     assert "build.no_such_key" in said[0]
     assert "config.local.toml" in said[0]
 
 
-def test_an_integer_field_that_cannot_read_its_value_keeps_it_and_warns(monkeypatch):
+def test_an_integer_field_that_cannot_read_its_value_keeps_it_and_warns():
     said = []
-    monkeypatch.setattr(config_module, "_warn", said.append)
 
-    assert config_module._coerce(4, "many", "env:ST_JOBS") == 4
+    assert config_module._coerce(4, "many", "env:ST_JOBS", said.append) == 4
 
     assert said == ["env:ST_JOBS: 'many' is not an integer; keeping 4"]

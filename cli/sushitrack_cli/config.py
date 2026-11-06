@@ -182,10 +182,11 @@ def _warn(message):
     console.warn(message)
 
 
-def _coerce(current, raw, name=""):
+def _coerce(current, raw, name="", warn=None):
     """Coerce a config/env value to the type of the existing field value.
 
-    A value an integer field cannot read keeps the current one and says so under *name*.
+    A value an integer field cannot read keeps the current one and says so under *name*, through
+    *warn*, which is st's console when None.
     """
     if isinstance(current, bool):
         return str(raw).strip().lower() in ("1", "true", "yes", "on")
@@ -193,7 +194,7 @@ def _coerce(current, raw, name=""):
         try:
             return int(raw)
         except (TypeError, ValueError):
-            _warn(f"{name}: {raw!r} is not an integer; keeping {current}")
+            (warn or _warn)(f"{name}: {raw!r} is not an integer; keeping {current}")
             return current
     return raw
 
@@ -207,7 +208,7 @@ def _legacy_pairs(document):
     return pairs
 
 
-def _apply_document(cfg, document, origin):
+def _apply_document(cfg, document, origin, warn):
     known = {f.name for f in fields(cfg)}
     legacy = _legacy_pairs(document)
     for section, values in _merge_platform(document).items():
@@ -216,17 +217,18 @@ def _apply_document(cfg, document, origin):
         for key, value in values.items():
             name = f"{section}_{key}"
             if name in known:
-                setattr(cfg, name, _coerce(getattr(cfg, name), value, f"{origin}: {section}.{key}"))
+                setattr(cfg, name, _coerce(getattr(cfg, name), value, f"{origin}: {section}.{key}",
+                                           warn))
                 cfg.sources[name] = origin
             elif (section, key) not in legacy:
-                _warn(f"{origin}: {section}.{key} is not a setting and is ignored")
+                warn(f"{origin}: {section}.{key} is not a setting and is ignored")
 
 
-def _apply_env(cfg):
+def _apply_env(cfg, warn):
     for name, var in ENV_OVERRIDES.items():
         raw = os.environ.get(var)
         if raw is not None and raw != "":
-            setattr(cfg, name, _coerce(getattr(cfg, name), raw, f"env:{var}"))
+            setattr(cfg, name, _coerce(getattr(cfg, name), raw, f"env:{var}", warn))
             cfg.sources[name] = f"env:{var}"
 
 
@@ -247,8 +249,14 @@ def load_tool(root=None):
     return tool
 
 
-def load_config(root=None):
-    """Load and resolve the layered configuration for the current platform."""
+def load_config(root=None, warn=None):
+    """Load and resolve the layered configuration for the current platform.
+
+    Args:
+        root: The checkout; none finds the one the process runs in.
+        warn: Receives each warning; none prints it through st's console.
+    """
+    warn = warn or _warn
     cfg = Config()
     cfg.sources = {f.name: "default" for f in fields(cfg)
                    if f.name not in ("sources", "tool")}
@@ -256,14 +264,14 @@ def load_config(root=None):
     try:
         cfg_dir = config_dir(root)
     except SystemExit:
-        _apply_env(cfg)  # still usable outside a checkout (e.g. `st doctor`)
+        _apply_env(cfg, warn)  # still usable outside a checkout (e.g. `st doctor`)
         return cfg
     for name in CONFIG_NAMES:
         document = read_toml(cfg_dir / name)
         for old, new in legacy_tool_keys(document):
-            _warn(f"{name}: {old} is ignored; use {new}")
-        _apply_document(cfg, document, name)
-    _apply_env(cfg)
+            warn(f"{name}: {old} is ignored; use {new}")
+        _apply_document(cfg, document, name, warn)
+    _apply_env(cfg, warn)
     return cfg
 
 

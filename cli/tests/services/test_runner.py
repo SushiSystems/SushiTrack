@@ -6,24 +6,26 @@
 
 from __future__ import annotations
 
-import pytest
-
+import dataclasses
 from types import SimpleNamespace
 
-from sushitrack_cli.services import runner
+import pytest
+
+from sushitrack_cli.services import artifacts, runner
 
 pytestmark = pytest.mark.medium
 
 
-def test_run_matches_through_the_shared_index(tmp_path, monkeypatch, recorder):
-    recorder(runner)
-    seen = {}
-    monkeypatch.setattr(runner, "EXECUTABLES",
-                        SimpleNamespace(match=lambda build, q: tmp_path / "t.exe"))
-    monkeypatch.setattr(runner, "load_build_env", lambda tool, d, config: {"X": "1"})
-    monkeypatch.setattr(runner, "RUNNER", SimpleNamespace(
-        run=lambda cmd, cwd, env=None: seen.update(cmd=cmd, env=env) or 0))
-    cfg = SimpleNamespace(tool=SimpleNamespace())
-    paths = SimpleNamespace(root=tmp_path, build=tmp_path, config=tmp_path)
-    assert runner.run(cfg, paths, target="t", forwarded=("--a",)) == 0
-    assert seen == {"cmd": [str(tmp_path / "t.exe"), "--a"], "env": {"X": "1"}}
+def test_run_matches_through_the_shared_index(tmp_path, session):
+    program = tmp_path / "bin" / artifacts.executable_name("t")
+    program.parent.mkdir()
+    program.write_text("", encoding="utf-8")
+    workspace = dataclasses.replace(session.workspace, environment=None)
+    cfg = SimpleNamespace(tool=SimpleNamespace(is_windows=False))
+    paths = SimpleNamespace(root=tmp_path, build=tmp_path, config=tmp_path / "sushitrack.json")
+
+    assert runner.run(cfg, paths, target="t", forwarded=("--a",), workspace=workspace) == 0
+
+    (command,) = session.runner.commands
+    assert list(command.argv) == [str(program), "--a"]
+    assert command.env["SUSHITRACK_CONFIG"] == str(paths.config)

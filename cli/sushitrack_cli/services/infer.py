@@ -11,9 +11,7 @@ Python dependencies (torch, opencv) — those belong to the demo, not to this CL
 
 import sys
 
-from .. import console
-from ..env import load_build_env
-from ..process import RUNNER
+from ..workspace import current_workspace
 from .label import TRACKERS, resolve_tracker
 
 # Flag name on the parsed namespace -> the switch demo.py expects.
@@ -27,7 +25,9 @@ _SWITCHES = (
 )
 
 
-def run(cfg, paths, args):
+def run(cfg, paths, args, workspace=None):
+    space = workspace or current_workspace()
+    console = space.console
     demo = paths.inference / "demo.py"
     if not demo.exists():
         console.error(f"demo.py not found at {demo}")
@@ -62,5 +62,5 @@ def run(cfg, paths, args):
 
     console.header("Infer")
     console.info(f"Tracker: {TRACKERS[key]}  |  source: {args.source}")
-    return RUNNER.run(command, paths.root,
-                      env=load_build_env(cfg.tool, paths.build, paths.config))
+    return space.runner.run(command, paths.root,
+                            env=space.build_env(cfg.tool, paths.build, paths.config))

@@ -6,16 +6,15 @@
 
 from __future__ import annotations
 
+import dataclasses
 import os
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from sushicore import build_admission
-from sushicore.cmake_driver import CMakeDriver
 from sushicore.provision.sushi_packages import PackageError
 
-from conftest import RecordingConsole
 from sushitrack_cli import config, env, library_packages
 from sushitrack_cli.services import build as build_svc
 
@@ -42,20 +41,6 @@ class Packages:
         return list(K_RUN_DIRS)
 
 
-class RecordingRunner:
-    """Record argv and the environment instead of running them."""
-
-    def __init__(self):
-        self.calls = []
-        self.environments = []
-
-    def run(self, cmd, cwd, env=None):
-        """Record *cmd* and its environment, and succeed."""
-        self.calls.append(list(cmd))
-        self.environments.append(env)
-        return 0
-
-
 def _tool(asked, windows=False, compiler="clang++"):
     """Build the tool settings of st with a resolver that records what it is asked."""
     def sushi_packages(root, build_type, options=None, report=print, warn=print, compiler=""):
@@ -71,30 +56,27 @@ def _tool(asked, windows=False, compiler="clang++"):
 
 
 @pytest.fixture
-def runner(monkeypatch, recorder):
-    """Swap in a recording runner and a console that records."""
-    spy = recorder(build_svc)
-    rec = RecordingRunner()
-    monkeypatch.setattr(build_svc, "DRIVER", CMakeDriver(RecordingConsole(), rec))
-    monkeypatch.setattr(build_svc, "load_build_env",
-                        lambda tool, directory: {"LD_LIBRARY_PATH": "/old", "seen": directory})
+def runner(monkeypatch, session):
+    """Return the session over an environment that names a search path and no compiler cache."""
     monkeypatch.setattr(build_admission, "compiler_cache", lambda configured="": "")
-    rec.console = spy
-    return rec
+    session.workspace = dataclasses.replace(
+        session.workspace, environment={"LD_LIBRARY_PATH": "/old"})
+    return session
 
 
-def _build(tmp_path, tool, **options):
+def _build(session, tmp_path, tool, **options):
     """Run the build service over a scratch checkout; return its code and its paths."""
     paths = SimpleNamespace(root=tmp_path, build=tmp_path / "build" / "default-release",
                             build_root=tmp_path / "build")
     cfg = SimpleNamespace(tool=tool, build_type="Release", jobs=lambda: 2)
-    return build_svc.build(cfg, paths, tests=False, **options), paths
+    code = build_svc.build(cfg, paths, tests=False, workspace=session.workspace, **options)
+    return code, paths
 
 
 def test_the_build_asks_for_the_closure_with_the_compiler_and_the_type(tmp_path, runner):
     asked = []
 
-    code, _ = _build(tmp_path, _tool(asked), build_type="Debug")
+    code, _ = _build(runner, tmp_path, _tool(asked), build_type="Debug")
 
     assert code == 0
     assert asked == [{"build_type": "release", "options": {}, "compiler": "clang++"}]
@@ -103,17 +85,17 @@ def test_the_build_asks_for_the_closure_with_the_compiler_and_the_type(tmp_path,
 def test_a_minimum_size_build_links_release_packages(tmp_path, runner):
     asked = []
 
-    _build(tmp_path, _tool(asked), build_type="MinSizeRel")
+    _build(runner, tmp_path, _tool(asked), build_type="MinSizeRel")
 
     assert asked[0]["build_type"] == "release"
 
 
 def test_the_configure_passes_each_package_the_compiler_and_no_checkout_directory(tmp_path,
                                                                                 runner):
-    code, paths = _build(tmp_path, _tool([]))
+    code, paths = _build(runner, tmp_path, _tool([]))
 
     assert code == 0
-    configure = runner.calls[0]
+    configure = runner.commands[0]
     assert f"-DSushiLog_DIR={K_LOG_CONFIG}" in configure
     assert f"-DSushiProfiler_DIR={K_PROFILER_CONFIG}" in configure
     assert "-DCMAKE_CXX_COMPILER=clang++" in configure
@@ -123,24 +105,24 @@ def test_the_configure_passes_each_package_the_compiler_and_no_checkout_director
 
 
 def test_the_run_dirs_are_recorded_in_the_tree_after_a_configure(tmp_path, runner):
-    code, paths = _build(tmp_path, _tool([]))
+    code, paths = _build(runner, tmp_path, _tool([]))
 
     assert code == 0
     assert library_packages.read_run_dirs(paths.build) == K_RUN_DIRS
 
 
 def test_a_tree_that_is_not_reconfigured_still_records_the_run_dirs(tmp_path, runner):
-    _build(tmp_path, _tool([]))
+    _build(runner, tmp_path, _tool([]))
     tree = tmp_path / "build" / "default-release"
     (tree / "build.ninja").write_text("", encoding="utf-8")
     (tree / "CMakeCache.txt").write_text(
         f"CMAKE_HOME_DIRECTORY:INTERNAL={tmp_path}\n", encoding="utf-8")
     (tree / library_packages.K_RUN_DIRS_FILE).unlink()
-    runner.calls.clear()
+    first_run = len(runner.commands)
 
-    code, paths = _build(tmp_path, _tool([]))
+    code, paths = _build(runner, tmp_path, _tool([]))
 
-    assert code == 0 and "-S" not in runner.calls[0]
+    assert code == 0 and "-S" not in runner.commands[first_run]
     assert library_packages.read_run_dirs(paths.build) == K_RUN_DIRS
 
 
@@ -151,11 +133,11 @@ def test_a_package_that_cannot_be_chosen_ends_the_build_in_one_error_line(tmp_pa
     tool = _tool([])
     tool.sushi_packages = refuse
 
-    code, _ = _build(tmp_path, tool)
+    code, _ = _build(runner, tmp_path, tool)
 
     assert code == 1
-    assert runner.console.said("SushiLog has no cli and no stored package.")
-    assert runner.calls == []
+    assert runner.said("SushiLog has no cli and no stored package.")
+    assert runner.commands == []
 
 
 def test_the_run_dirs_lead_the_search_path_of_every_command_that_runs_the_tree(tmp_path):
@@ -184,9 +166,8 @@ def test_the_compiler_the_environment_names_outranks_the_configured_one(monkeypa
     assert tool.resolved_compiler(Path(".")) == "/stack/clang++"
 
 
-def test_load_tool_reads_the_stack_compiler_from_the_environment(monkeypatch):
-    monkeypatch.setattr(config, "config_dir", lambda root=None: (_ for _ in ()).throw(SystemExit()))
-    monkeypatch.setattr(config, "load_tool_config", lambda cls, *args: cls())
+def test_load_tool_reads_the_stack_compiler_from_the_environment(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setenv(config.K_STACK_CXX_ENV, "/env/clang++")
 
     assert config.load_tool().stack_cxx == "/env/clang++"

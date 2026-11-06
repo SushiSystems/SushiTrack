@@ -7,10 +7,8 @@
 import shutil
 from pathlib import Path
 
-from .. import console
-from ..env import load_build_env
 from ..errors import UnknownTrackerError
-from ..process import RUNNER
+from ..workspace import Workspace, current_workspace
 from . import evaluate
 from .artifacts import find_binary
 from .profile_record import read_latency
@@ -87,7 +85,7 @@ def _benchmark_args(paths, data_root, names, trackers, profiles=None):
     return args
 
 
-def _parse_perf(stdout):
+def _parse_perf(stdout, console):
     """Extract ``[ PERF <tracker> ] <sequence>: <n> us/frame`` lines.
 
     Parsed per line and skipped on any malformed one: the timing column is
@@ -110,7 +108,7 @@ def _parse_perf(stdout):
     return perf
 
 
-def _use_records(profiles, trackers, names, perf):
+def _use_records(profiles, trackers, names, perf, console):
     """Replace each PERF figure with the median of its profile record, where one exists.
 
     Prints the median with its quartiles per record. A pair with no record keeps its PERF
@@ -128,31 +126,38 @@ def _use_records(profiles, trackers, names, perf):
     return perf
 
 
-def _run_benchmark(tool, paths, args):
+def _run_benchmark(space: Workspace, tool, paths, args):
     """Run mot_engine with *args* and parse its PERF lines from stdout."""
+    console = space.console
     binary = find_binary(paths.build, BENCHMARK)
     if not binary:
         console.error(f"{BENCHMARK} not found. Run `st build` first.")
         return 1, {}
 
     console.command(" ".join([str(binary), *args]))
-    code, out, err = RUNNER.capture([str(binary), *args], cwd=paths.root,
-                                    env=load_build_env(tool, paths.build, paths.config))
+    code, out, err = space.capturer.capture(
+        [str(binary), *args], cwd=paths.root,
+        env=space.build_env(tool, paths.build, paths.config))
     if code != 0:
         console.error(f"{BENCHMARK} failed (exit {code}): {(err or out).strip()}")
         return code, {}
-    return 0, _parse_perf(out)
+    return 0, _parse_perf(out, console)
 
 
 def evaluate_sequences(cfg, paths, benchmark=None, scenario=None, tracker="sushitrack",
                        compare=False, eval_only=False, trackeval=False,
-                       export=None, private=False, public=False):
+                       export=None, private=False, public=False, workspace=None):
     """Run the engine over each selected benchmark and score it.
+
+    Args:
+        workspace: What the run prints and starts the engine through; none uses the real ones.
 
     Returns:
         2 for a flag conflict or an unknown benchmark, 1 when no sequence matched, else the
         first non-zero exit code of a benchmark's run, or 0.
     """
+    space = workspace or current_workspace()
+    console = space.console
     if private and public:
         console.error("--private and --public are mutually exclusive.")
         return 2
@@ -169,8 +174,8 @@ def evaluate_sequences(cfg, paths, benchmark=None, scenario=None, tracker="sushi
         if not names:
             continue
         matched += len(names)
-        code = _evaluate_benchmark(cfg, paths, name, names, trackers, compare, eval_only,
-                                   trackeval, export)
+        code = _evaluate_benchmark(space, cfg, paths, name, names, trackers, compare,
+                                   eval_only, trackeval, export)
         if code != 0:
             return code
     if not matched:
@@ -179,33 +184,38 @@ def evaluate_sequences(cfg, paths, benchmark=None, scenario=None, tracker="sushi
     return 0
 
 
-def _evaluate_benchmark(cfg, paths, benchmark, names, trackers, compare, eval_only,
+def _evaluate_benchmark(space, cfg, paths, benchmark, names, trackers, compare, eval_only,
                         trackeval, export):
     """Run the engine over one benchmark's sequences *names*, then score them."""
+    console = space.console
     data_root = paths.data_root(benchmark)
     console.info(f"{benchmark}: {len(names)} sequence(s) x {len(trackers)} tracker(s): "
                  f"{', '.join(TRACKERS[t] for t in trackers)}")
     perf = {}
     if not eval_only:
         profiles = paths.build / "profiles"
-        code, perf = _run_benchmark(cfg.tool, paths,
+        code, perf = _run_benchmark(space, cfg.tool, paths,
                                     _benchmark_args(paths, data_root, names, trackers, profiles))
         if code != 0:
             return code
-        perf = _use_records(profiles, trackers, names, perf)
+        perf = _use_records(profiles, trackers, names, perf, console)
     if trackeval:
-        return evaluate.run_official(paths, data_root, names, trackers)
+        return evaluate.run_official(paths, data_root, names, trackers, workspace=space)
     export_dir = None if export is None else str(Path(export) / benchmark)
     return evaluate.run_internal(paths, data_root, names, trackers, perf, export_dir,
-                                 compare=compare)
+                                 compare=compare, workspace=space)
 
 
-def clean_predictions(paths):
+def clean_predictions(paths, workspace=None):
     """Remove the pred/ folder of every sequence of every benchmark.
+
+    Args:
+        workspace: What the clean prints through; none uses the real console.
 
     Returns:
         0 when every pred/ folder is gone, 1 when one could not be removed.
     """
+    console = (workspace or current_workspace()).console
     console.header("Clean predictions")
     removed = 0
     for benchmark in paths.benchmark_names():

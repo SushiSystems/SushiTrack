@@ -4,18 +4,17 @@
 # Licensed under the Apache License 2.0. See LICENSE.
 """Run a built executable, by name or by picking one interactively."""
 
-from .. import console
-from ..env import load_build_env
-from ..process import RUNNER
+from ..workspace import Workspace, current_workspace
 from .artifacts import EXECUTABLES
 
 
-def _select(paths):
+def _select(space: Workspace, paths):
     """List the build tree's executables and prompt for one.
 
     Falls back to an error rather than a prompt when stdin is not a terminal, so
     a scripted `st run --select` fails loudly instead of hanging.
     """
+    console = space.console
     executables = EXECUTABLES.find(paths.build)
     if not executables:
         console.error("No executables found. Run `st build` first.")
@@ -36,10 +35,16 @@ def _select(paths):
     return executables[int(raw) - 1]
 
 
-def run(cfg, paths, target=None, select=False, forwarded=()):
-    """Run *target* (exact name, then substring match). Returns its exit code."""
+def run(cfg, paths, target=None, select=False, forwarded=(), workspace=None):
+    """Run *target* (exact name, then substring match). Returns its exit code.
+
+    Args:
+        workspace: What the run prints and starts the program through; none uses the real ones.
+    """
+    space = workspace or current_workspace()
+    console = space.console
     if select or not target:
-        binary = _select(paths)
+        binary = _select(space, paths)
         if binary is None:
             return 1
     else:
@@ -50,5 +55,5 @@ def run(cfg, paths, target=None, select=False, forwarded=()):
             return 1
 
     console.header(f"Run {binary.name}")
-    return RUNNER.run([str(binary), *forwarded], paths.root,
-                      env=load_build_env(cfg.tool, paths.build, paths.config))
+    return space.runner.run([str(binary), *forwarded], paths.root,
+                            env=space.build_env(cfg.tool, paths.build, paths.config))

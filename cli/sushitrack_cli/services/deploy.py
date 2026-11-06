@@ -14,8 +14,8 @@ import platform
 import shutil
 from importlib import resources
 
-from .. import console
 from ..config import IS_WINDOWS
+from ..workspace import Workspace, current_workspace
 from .artifacts import find_file, import_lib_name, shared_lib_name, sushilog_lib_name
 
 KINDS = ("cpp", "python")
@@ -41,7 +41,7 @@ def _template(name):
     return resources.files("sushitrack_cli").joinpath("templates", name).read_text(encoding="utf-8")
 
 
-def _copy_notices(paths, pkg_dir):
+def _copy_notices(space: Workspace, paths, pkg_dir):
     """Copy LICENSE, NOTICE.md and the third-party licence texts; False after naming a missing one."""
     sources = [(paths.root / "LICENSE", pkg_dir / "LICENSE"),
                (paths.root / "NOTICE.md", pkg_dir / "NOTICE.md")]
@@ -50,7 +50,7 @@ def _copy_notices(paths, pkg_dir):
     (pkg_dir / "licenses").mkdir(parents=True, exist_ok=True)
     for source, target in sources:
         if not source.is_file():
-            console.error(f"{source} not found; a package without its notices may not ship.")
+            space.console.error(f"{source} not found; a package without its notices may not ship.")
             return False
         shutil.copy2(source, target)
     return True
@@ -62,26 +62,26 @@ def _copy_config(paths, pkg_dir):
         shutil.copy2(config, pkg_dir / "sushitrack.json")
 
 
-def _find_runtimes(paths):
+def _find_runtimes(space: Workspace, paths):
     """Return SushiTrack's and SushiLog's runtime libraries, or None after naming the missing one."""
     found = []
     for name in (shared_lib_name(), sushilog_lib_name()):
         library = find_file(paths.build, name)
         if not library:
-            console.error(f"{name} not found. Run `st build` first.")
+            space.console.error(f"{name} not found. Run `st build` first.")
             return None
         found.append(library)
     return found
 
 
-def _deploy_cpp(paths, pkg_dir):
-    runtimes = _find_runtimes(paths)
+def _deploy_cpp(space, paths, pkg_dir):
+    runtimes = _find_runtimes(space, paths)
     if runtimes is None:
         return False
     runtime, sushilog = runtimes
     import_lib = find_file(paths.build, import_lib_name())
     if not import_lib:
-        console.error(f"{import_lib_name()} not found. Run `st build` first.")
+        space.console.error(f"{import_lib_name()} not found. Run `st build` first.")
         return False
 
     include_dst = pkg_dir / "include" / "SushiTrack"
@@ -113,18 +113,18 @@ def _deploy_cpp(paths, pkg_dir):
                                              runtime_lib=shared_lib_name(),
                                              sushilog_lib=sushilog_lib_name(),
                                              platform=platform.system()), encoding="utf-8")
-    return _copy_notices(paths, pkg_dir)
+    return _copy_notices(space, paths, pkg_dir)
 
 
-def _deploy_python(paths, pkg_dir):
-    runtimes = _find_runtimes(paths)
+def _deploy_python(space, paths, pkg_dir):
+    runtimes = _find_runtimes(space, paths)
     if runtimes is None:
         return False
     runtime, sushilog = runtimes
 
     binding = paths.root / "bindings" / "python" / "sushitrack.py"
     if not binding.exists():
-        console.error(f"Python binding not found under {paths.root / 'bindings' / 'python'}")
+        space.console.error(f"Python binding not found under {paths.root / 'bindings' / 'python'}")
         return False
 
     module_dir = pkg_dir / "sushitrack"
@@ -141,11 +141,17 @@ def _deploy_python(paths, pkg_dir):
         _template("python_readme.md.in").format(runtime_lib=shared_lib_name(),
                                                 sushilog_lib=sushilog_lib_name(),
                                                 platform=platform.system()), encoding="utf-8")
-    return _copy_notices(paths, pkg_dir)
+    return _copy_notices(space, paths, pkg_dir)
 
 
-def deploy(paths, kind):
-    """Assemble ``package/`` for *kind* ("cpp" or "python"). Returns an exit code."""
+def deploy(paths, kind, workspace=None):
+    """Assemble ``package/`` for *kind* ("cpp" or "python"). Returns an exit code.
+
+    Args:
+        workspace: What the deploy prints through; none uses the real console.
+    """
+    space = workspace or current_workspace()
+    console = space.console
     if kind not in KINDS:
         console.error(f"Unknown deploy kind '{kind}'. Choose: {', '.join(KINDS)}.")
         return 2
@@ -158,8 +164,8 @@ def deploy(paths, kind):
     pkg_dir.mkdir(parents=True, exist_ok=True)
 
     console.info(f"Assembling for {platform.system()} -> {pkg_dir}")
-    ok = _deploy_cpp(paths, pkg_dir) if kind == "cpp" \
-        else _deploy_python(paths, pkg_dir)
+    ok = _deploy_cpp(space, paths, pkg_dir) if kind == "cpp" \
+        else _deploy_python(space, paths, pkg_dir)
     if not ok:
         console.error("Deploy failed.")
         return 1

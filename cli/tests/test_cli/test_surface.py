@@ -7,19 +7,18 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
+import sys
 from importlib.metadata import version
 from pathlib import Path
 
 import pytest
 import typer.main
-from sushicore.cli_console import LazyConsole
 from typer.testing import CliRunner
 
-from sushitrack_cli import cli, console
-from sushitrack_cli.config import config_dir
-from sushitrack_cli.services import docker as docker_svc
+from sushitrack_cli import cli
 
 pytestmark = pytest.mark.medium
 
@@ -38,9 +37,9 @@ K_VISIBLE = {
 K_SUSHICORE_GROUPS = ("backlog", "design")
 
 
-def _invoke(*args: str):
-    """Runs st with *args* through Typer's test runner."""
-    return CliRunner().invoke(cli.app, list(args))
+def _invoke(*args: str, workspace=None):
+    """Runs st with *args* through Typer's test runner, on *workspace* when one is given."""
+    return CliRunner().invoke(cli.app, list(args), obj=workspace)
 
 
 def _plain(text: str) -> str:
@@ -83,16 +82,21 @@ def test_config_and_env_are_the_shared_declarations():
         assert group.commands[name].callback.__module__ == "sushicore.diag_commands"
 
 
+def _marked_checkout(root: Path) -> None:
+    """Writes the SushiTrack root marker, so st finds a checkout at *root*."""
+    marker = root / "include" / "SushiTrack" / "c_api" / "sushitrack_c.h"
+    marker.parent.mkdir(parents=True)
+    marker.write_text("", encoding="utf-8")
+
+
 @pytest.mark.parametrize("action", ["build", "run"])
-def test_the_docker_word_still_runs_the_container_command(action, monkeypatch):
+def test_the_docker_word_still_runs_the_container_command(action, tmp_path, monkeypatch, session):
     """Runs the container service when the old `docker` word is typed."""
-    seen: list[str] = []
-    monkeypatch.setattr(cli, "context", lambda: (object(), object()))
-    monkeypatch.setattr(docker_svc, action,
-                        lambda cfg, paths, **options: seen.append(action) or 0)
-    result = _invoke("docker", action)
+    _marked_checkout(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    result = _invoke("docker", action, workspace=session.workspace)
     assert result.exit_code == 0, result.output
-    assert seen == [action]
+    assert [command[:2] for command in session.commands] == [["docker", action]]
 
 
 def test_the_docker_word_is_absent_from_help_and_describe():
@@ -134,18 +138,17 @@ def test_bare_docs_prints_the_group_help_and_exits_two():
 
 
 def test_docs_bundle_writes_the_archive_of_the_checkout_it_runs_in(
-        tmp_path, monkeypatch, recorder):
+        tmp_path, monkeypatch):
     """Writes `docs-bundle-1.2.3.tar.gz` and its digest file, and reports both lines."""
     _published_checkout(tmp_path)
     monkeypatch.chdir(tmp_path)
-    spy = recorder(cli)
     result = _invoke("docs", "bundle", "--release", "1.2.3")
     assert result.exit_code == 0, result.output
     bundle = tmp_path / "build" / "docs" / "bundle"
     assert (bundle / "docs-bundle-1.2.3.tar.gz").is_file()
     assert (bundle / "docs-bundle-1.2.3.tar.gz.sha256").is_file()
-    assert spy.said("docs-bundle-1.2.3.tar.gz (1 pages)")
-    assert spy.said("sha256 ")
+    assert "docs-bundle-1.2.3.tar.gz (1 pages)" in result.output
+    assert "sha256 " in result.output
 
 
 def _broken_checkout(root) -> None:
@@ -158,20 +161,16 @@ def _broken_checkout(root) -> None:
 
 
 @pytest.mark.parametrize("function", ["main", "entry"])
-def test_a_malformed_config_gives_one_line_and_exit_one(
-        function, tmp_path, monkeypatch, capsys):
+def test_a_malformed_config_gives_one_line_and_exit_one(function, tmp_path):
     """Prints one `st:` line and exits 1 for a config.toml that is not TOML."""
     _broken_checkout(tmp_path)
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr("sys.argv", ["st", "paths"])
-    fresh = LazyConsole(config_dir)
-    monkeypatch.setattr(console, "_lazy", fresh)
-    monkeypatch.setattr(console, "__getattr__", fresh.attribute)
-    with pytest.raises(SystemExit) as raised:
-        getattr(cli, function)()
-    assert raised.value.code == 1
-    captured = capsys.readouterr()
-    lines = [line for line in (captured.out + captured.err).splitlines() if line.strip()]
+    script = ("import sys; sys.argv = ['st', 'paths']; from sushitrack_cli import cli; "
+              f"cli.{function}()")
+    environment = {**os.environ, "PYTHONPATH": str(Path(cli.__file__).resolve().parents[1])}
+    finished = subprocess.run([sys.executable, "-c", script], cwd=tmp_path, env=environment,
+                              capture_output=True, text=True, check=False)
+    assert finished.returncode == 1
+    lines = [line for line in (finished.stdout + finished.stderr).splitlines() if line.strip()]
     assert len(lines) == 1
     assert lines[0].startswith("st:") and "config.toml" in lines[0]
     assert "Traceback" not in lines[0]

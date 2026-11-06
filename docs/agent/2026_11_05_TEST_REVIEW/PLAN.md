@@ -15,7 +15,7 @@ writes each add. Nothing in a module job changes production code except a seam a
 | T2 | The seams of decision 2 |  | todo |
 | T3 | `CapturedLog` moved onto SushiLog's in-memory sink | sushilog T1 | todo |
 | T4 | A public profiler macro header for the three tests that include the private one |  | todo |
-| T5 | The CLI runner fixtures replaced by sushicore's in-memory runner and console | sushicore T1 | todo |
+| T5 | The CLI runner fixtures replaced by sushicore's in-memory runner and console | sushicore T1 | done |
 | T6 | The defects of this report, each with a test that fails first; `docs/guides/TESTING.md` aligned with the skill |  | todo |
 | T7 | `tools/testing/check_test_additions.py`, `tools/tests/test_check_test_additions.py` deleted |  | done |
 | M1 | the tests of `applications` (14 files): 21 rewrite, 2 resize, 7 split, 1 merge, 5 delete | T1, T2, T3, T4, T5, T6, T7 | todo |

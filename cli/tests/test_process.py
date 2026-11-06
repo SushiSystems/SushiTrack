@@ -12,7 +12,9 @@ import os
 import subprocess
 import sys
 
-from conftest import RecordingConsole
+from sushicore.console_memory import RecordingConsole
+
+from conftest import said
 from sushitrack_cli import process
 
 pytestmark = pytest.mark.medium
@@ -34,13 +36,13 @@ def test_run_returns_the_child_exit_code(tmp_path):
 def test_run_echoes_the_command(tmp_path):
     runner, spy = _runner()
     runner.run([sys.executable, "-c", "pass"], tmp_path)
-    assert spy.said('-c pass')
+    assert said(spy, '-c pass')
 
 
 def test_a_missing_executable_keeps_st_exit_code(tmp_path):
     runner, spy = _runner()
     assert runner.run([MISSING], tmp_path) == 127
-    assert spy.said("Executable not found")
+    assert said(spy, "Executable not found")
 
 
 def test_an_interrupted_child_returns_130(tmp_path, monkeypatch):
@@ -50,7 +52,7 @@ def test_an_interrupted_child_returns_130(tmp_path, monkeypatch):
     monkeypatch.setattr(subprocess, "run", interrupt)
     runner, spy = _runner()
     assert runner.run([sys.executable, "-c", "pass"], tmp_path) == 130
-    assert ("warn", "Interrupted.") in spy.lines
+    assert spy.texts("warn") == ["Interrupted."]
 
 
 def test_run_drained_returns_the_child_exit_code(tmp_path):
@@ -61,14 +63,14 @@ def test_run_drained_returns_the_child_exit_code(tmp_path):
 def test_run_drained_reports_a_missing_executable(tmp_path):
     runner, spy = _runner()
     assert runner.run_drained([MISSING], tmp_path) == 127
-    assert spy.said("Executable not found")
+    assert said(spy, "Executable not found")
 
 
 def test_capture_returns_the_triple_and_stays_quiet():
     runner, spy = _runner()
     code, out, err = runner.capture([sys.executable, "-c", "print('hello')"])
     assert (code, out.strip(), err) == (0, "hello", "")
-    assert spy.lines == []
+    assert spy.calls == []
 
 
 def test_capture_reports_a_missing_executable_in_its_stderr():

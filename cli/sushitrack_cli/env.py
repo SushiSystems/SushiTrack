@@ -36,38 +36,39 @@ def vcvars_path(tool) -> Path | None:
     return find_vcvars()
 
 
-def _snapshot(tool) -> dict[str, str] | None:
+def _snapshot(tool, output) -> dict[str, str] | None:
     """Return a fresh vcvars snapshot, or None when there is nothing to take."""
     if os.environ.get("VSINSTALLDIR"):
         return None
     vcvars = vcvars_path(tool)
     if vcvars is None:
-        console.warn("No Visual Studio installation detected; "
-                     "assuming the compiler is already on PATH.")
+        output.warn("No Visual Studio installation detected; "
+                    "assuming the compiler is already on PATH.")
         return None
-    return snapshot_vcvars(vcvars, console)
+    return snapshot_vcvars(vcvars, output)
 
 
-def load_build_env(tool, build_dir, tracker_config=None) -> dict[str, str]:
+def load_build_env(tool, build_dir, tracker_config=None, output=None) -> dict[str, str]:
     """Return the environment for build, test and run children.
 
     Args:
         tool: The resolved `cfg.tool` settings.
         build_dir: Where the snapshot cache lives.
         tracker_config: The `sushitrack.json` a child loads when `SUSHITRACK_CONFIG` is unset.
+        output: Where the warnings and the snapshot's progress print; the st console when None.
 
     Returns:
         `os.environ` off Windows or without a snapshot; else it merged with one. The run-time
         folders of the library packages the tree linked come first on the search path.
     """
-    env = _compiler_env(tool, build_dir)
+    env = _compiler_env(tool, build_dir, output or console)
     library_packages.prepend_run_dirs(tool, env, library_packages.read_run_dirs(build_dir))
     if tracker_config is not None:
         env.setdefault(TRACKER_CONFIG_VARIABLE, str(tracker_config))
     return env
 
 
-def _compiler_env(tool, build_dir) -> dict[str, str]:
+def _compiler_env(tool, build_dir, output) -> dict[str, str]:
     """Return `os.environ`, merged with the vcvars snapshot on Windows."""
     if not tool.is_windows:
         return dict(os.environ)
@@ -75,14 +76,14 @@ def _compiler_env(tool, build_dir) -> dict[str, str]:
     key = cache_key(tool)
     snapshot = read_cache(cache_file, key)
     if snapshot is None:
-        snapshot = _snapshot(tool)
+        snapshot = _snapshot(tool, output)
         if not snapshot:
             return dict(os.environ)
         try:
             Path(build_dir).mkdir(parents=True, exist_ok=True)
         except OSError as error:
-            console.warn(f"Cannot make {build_dir} ({error}); "
-                         f"the environment snapshot is not cached.")
+            output.warn(f"Cannot make {build_dir} ({error}); "
+                        f"the environment snapshot is not cached.")
             return merge_env(os.environ, snapshot)
         write_cache(cache_file, key, snapshot)
     return merge_env(os.environ, snapshot)

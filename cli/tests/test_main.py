@@ -10,13 +10,14 @@ import runpy
 
 import pytest
 
-from sushitrack_cli import cli
-
-pytestmark = pytest.mark.small
+pytestmark = pytest.mark.medium
 
 
-def test_running_the_package_calls_the_cli_entry(monkeypatch):
-    calls = []
-    monkeypatch.setattr(cli, "main", lambda: calls.append("main"))
-    runpy.run_module("sushitrack_cli", run_name="__main__")
-    assert calls == ["main"]
+def test_running_the_package_runs_the_cli_entry(monkeypatch, capsys):
+    monkeypatch.setattr("sys.argv", ["st", "--version"])
+
+    with pytest.raises(SystemExit) as raised:
+        runpy.run_module("sushitrack_cli", run_name="__main__")
+
+    assert raised.value.code == 0
+    assert capsys.readouterr().out.startswith("sushitrack-cli ")

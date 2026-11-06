@@ -6,49 +6,52 @@
 
 from __future__ import annotations
 
-import pytest
-
+import dataclasses
 from types import SimpleNamespace
 
+import pytest
+
+from sushitrack_cli import library_packages
+from sushitrack_cli.config import Paths, load_config
 from sushitrack_cli.services import diag
 
 pytestmark = pytest.mark.medium
 
 
-def test_git_missing_answers_none(tmp_path, monkeypatch):
-    fake = SimpleNamespace(capture=lambda cmd, cwd=None, env=None: (127, "", ""))
-    monkeypatch.setattr(diag, "RUNNER", fake)
-    assert diag._git_describe(SimpleNamespace(root=tmp_path)) is None
+def test_git_missing_answers_none(tmp_path, session):
+    session.capturer.script(127)
+
+    assert diag._git_describe(session.workspace, SimpleNamespace(root=tmp_path)) is None
 
 
-def test_git_describe_joins_branch_commit_and_dirt(tmp_path, monkeypatch):
-    answers = iter([(0, "main\n", ""), (0, "abc123\n", ""), (0, " M x\n", "")])
-    fake = SimpleNamespace(capture=lambda cmd, cwd=None, env=None: next(answers))
-    monkeypatch.setattr(diag, "RUNNER", fake)
-    assert diag._git_describe(SimpleNamespace(root=tmp_path)) == "main @ abc123 (dirty)"
+def test_git_describe_joins_branch_commit_and_dirt(tmp_path, session):
+    session.capturer.script(0, "main\n").script(0, "abc123\n").script(0, " M x\n")
+
+    described = diag._git_describe(session.workspace, SimpleNamespace(root=tmp_path))
+
+    assert described == "main @ abc123 (dirty)"
 
 
-def test_env_dump_reads_the_tool_settings(tmp_path, monkeypatch, recorder):
-    recorder(diag)
-    seen = {}
+def test_env_dump_shows_the_run_dirs_of_the_tree_first_on_the_search_path(tmp_path, session):
+    library_packages.record_run_dirs(tmp_path, ["/store/pkg/lib"])
+    workspace = dataclasses.replace(session.workspace, environment=None)
+    tool = SimpleNamespace(is_windows=False)
 
-    def fake_load(tool, build_dir):
-        seen["tool"] = tool
-        return {"PATH": "x"}
+    assert diag.env_dump(SimpleNamespace(tool=tool), SimpleNamespace(build=tmp_path),
+                         show_all=True, workspace=workspace) == 0
 
-    monkeypatch.setattr(diag, "load_build_env", fake_load)
-    tool = SimpleNamespace(name="tool")
-    assert diag.env_dump(SimpleNamespace(tool=tool), SimpleNamespace(build=tmp_path)) == 0
-    assert seen["tool"] is tool
+    (call,) = [call for call in session.console.calls if call.kind == "table"]
+    shown = dict(map(tuple, call.args[1]))
+    assert shown["LD_LIBRARY_PATH"].startswith("/store/pkg/lib")
 
 
-def test_diagnostics_reads_the_context_once_per_report(monkeypatch):
-    """Passes the context pair to each report and returns the report's code."""
-    calls = []
-    monkeypatch.setattr(diag, "config_show", lambda cfg, paths: calls.append((cfg, paths)) or 0)
-    monkeypatch.setattr(diag, "env_dump",
-                        lambda cfg, paths, show_all=False: calls.append(show_all) or 3)
-    diagnostics = diag.Diagnostics(lambda: ("cfg", "paths"))
+def test_diagnostics_reads_the_context_once_per_report(tmp_path, session):
+    cfg = load_config(tmp_path)
+    paths = Paths(cfg, tmp_path)
+    reads = []
+    diagnostics = diag.Diagnostics(lambda: reads.append(1) or (cfg, paths), session.workspace)
+
     assert diagnostics.config_show() == 0
-    assert diagnostics.env_dump(show_all=True) == 3
-    assert calls == [("cfg", "paths"), True]
+    assert diagnostics.env_dump(show_all=True) == 0
+
+    assert len(reads) == 2

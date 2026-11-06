@@ -12,11 +12,10 @@ from typing import Callable
 
 from sushicore import cmake_cache
 
-from .. import console
 from ..config import (CONFIG_NAMES, ENV_OVERRIDES, IS_WINDOWS, PROFILE, Config,
                       config_dir)
-from ..env import load_build_env
-from ..process import MISSING_EXIT_CODE, RUNNER
+from ..process import MISSING_EXIT_CODE
+from ..workspace import Workspace, current_workspace
 from .artifacts import find_binary, find_file, shared_lib_name
 
 # Prefixes of the variables `st env` shows without --all.
@@ -37,16 +36,16 @@ def _mtime(path):
         return "?"
 
 
-def _git_describe(paths):
+def _git_describe(space: Workspace, paths):
     """Return "branch @ commit" with a dirty marker, or None without git."""
-    code, out, _ = RUNNER.capture(["git", "rev-parse", "--abbrev-ref", "HEAD"],
+    code, out, _ = space.capturer.capture(["git", "rev-parse", "--abbrev-ref", "HEAD"],
                                   cwd=paths.root)
     if code == MISSING_EXIT_CODE:
         return None
     branch = out.strip() if code == 0 else "?"
-    code, out, _ = RUNNER.capture(["git", "rev-parse", "--short", "HEAD"], cwd=paths.root)
+    code, out, _ = space.capturer.capture(["git", "rev-parse", "--short", "HEAD"], cwd=paths.root)
     commit = out.strip() if code == 0 else "?"
-    code, out, _ = RUNNER.capture(["git", "status", "--porcelain"], cwd=paths.root)
+    code, out, _ = space.capturer.capture(["git", "status", "--porcelain"], cwd=paths.root)
     dirty = " (dirty)" if code == 0 and out.strip() else ""
     return f"{branch} @ {commit}{dirty}"
 
@@ -65,12 +64,14 @@ def _muted(text):
     return f"[dim]{text}[/dim]"
 
 
-def status(cfg, paths):
+def status(cfg, paths, workspace=None):
     """Print the project status table and return 0."""
+    space = workspace or current_workspace()
+    console = space.console
     console.header("Project status")
 
     rows = []
-    revision = _git_describe(paths)
+    revision = _git_describe(space, paths)
     rows.append(["repository", paths.root.name, _muted(revision or str(paths.root))])
 
     if paths.build.is_dir():
@@ -115,8 +116,9 @@ def status(cfg, paths):
     return 0
 
 
-def config_show(cfg, paths):
+def config_show(cfg, paths, workspace=None):
     """Print every resolved setting with the layer it came from and return 0."""
+    console = (workspace or current_workspace()).console
     console.header("Resolved configuration")
 
     rows = [[field.name, str(getattr(cfg, field.name)),
@@ -139,8 +141,9 @@ def config_show(cfg, paths):
     return 0
 
 
-def paths_show(cfg, paths):
+def paths_show(cfg, paths, workspace=None):
     """Print the resolved project directories and whether each exists, and return 0."""
+    console = (workspace or current_workspace()).console
     console.header("Resolved paths")
     rows = [[name, str(path), "exists" if path.exists() else "missing"]
             for name, path in paths.as_dict().items()]
@@ -148,10 +151,12 @@ def paths_show(cfg, paths):
     return 0
 
 
-def env_dump(cfg, paths, show_all=False):
+def env_dump(cfg, paths, show_all=False, workspace=None):
     """Print the environment a build runs under, filtered unless *show_all*, and return 0."""
+    space = workspace or current_workspace()
+    console = space.console
     console.header("Build environment")
-    env = load_build_env(cfg.tool, paths.build)
+    env = space.build_env(cfg.tool, paths.build)
 
     def keep(key):
         """Returns whether the variable named *key* is shown."""
@@ -173,17 +178,19 @@ class Diagnostics:
 
     Args:
         context: Returns the (config, paths) pair of the checkout the process runs in.
+        workspace: What the reports print and run through; none uses the real ones.
     """
 
-    __slots__ = ("_context",)
+    __slots__ = ("_context", "_workspace")
 
-    def __init__(self, context: Callable[[], tuple]) -> None:
+    def __init__(self, context: Callable[[], tuple], workspace=None) -> None:
         self._context = context
+        self._workspace = workspace
 
     def config_show(self) -> int:
         """Prints the resolved configuration and returns the exit code."""
-        return config_show(*self._context())
+        return config_show(*self._context(), workspace=self._workspace)
 
     def env_dump(self, show_all: bool = False) -> int:
         """Prints the build environment, every variable when *show_all*, and returns the code."""
-        return env_dump(*self._context(), show_all=show_all)
+        return env_dump(*self._context(), show_all=show_all, workspace=self._workspace)

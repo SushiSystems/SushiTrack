@@ -4,9 +4,9 @@
 # Licensed under the Apache License 2.0. See LICENSE.
 """The SushiTrack developer CLI (`st` / `sushitrack`).
 
-Thin Typer layer: each command parses arguments and delegates to
-:mod:`sushitrack_cli.services`. Nothing here does real work, so the surface
-stays readable as one file and the behaviour stays testable without Typer.
+Thin Typer layer: each command parses arguments and delegates to :mod:`sushitrack_cli.services`,
+handing them the context object as their workspace; `st` leaves it unset, so the services use the
+real console and runner.
 """
 
 from __future__ import annotations
@@ -79,6 +79,7 @@ def _sanitize_option() -> typer.models.OptionInfo:
            "st build --deploy cpp  # Build, then assemble package/",
 )
 def build(
+    ctx: typer.Context,
     type: Optional[BuildType] = typer.Option(
         None, "--type", "-t", case_sensitive=False,
         help="Build type: debug | release | relwithdebinfo | minsizerel "
@@ -114,10 +115,10 @@ def build(
         cfg, paths, build_type=build_type, clean=clean, jobs=jobs,
         tests=not no_test,
         defines=[f"-D{item}" for item in (define or [])], sanitizer=sanitize,
-        report=report)
+        report=report, workspace=ctx.obj)
     if code != 0 or not deploy:
         raise typer.Exit(code)
-    raise typer.Exit(deploy_svc.deploy(paths, deploy.value))
+    raise typer.Exit(deploy_svc.deploy(paths, deploy.value, workspace=ctx.obj))
 
 
 register_test_command(app, test_svc.module_tests(context, panel=K_PROJECT))
@@ -143,12 +144,13 @@ def run(
     """Run a built executable."""
     cfg, paths = context()
     raise typer.Exit(run_svc.run(cfg, paths, target=target, select=select,
-                                 forwarded=list(ctx.args)))
+                                 forwarded=list(ctx.args), workspace=ctx.obj))
 
 
 @app.command("clean", rich_help_panel=K_PROJECT,
              epilog="st clean\nst clean --predictions  # Only the benchmarks' pred/ folders")
 def clean(
+    ctx: typer.Context,
     predictions: bool = typer.Option(
         False, "--predictions",
         help="Remove the pred/ folder of every benchmark sequence instead of the build tree."),
@@ -156,8 +158,8 @@ def clean(
     """Remove the build tree and the assembled package directory, or the predictions."""
     _, paths = context()
     if predictions:
-        raise typer.Exit(label_svc.clean_predictions(paths))
-    raise typer.Exit(build_svc.clean(paths))
+        raise typer.Exit(label_svc.clean_predictions(paths, workspace=ctx.obj))
+    raise typer.Exit(build_svc.clean(paths, workspace=ctx.obj))
 
 
 @app.command(
@@ -165,11 +167,12 @@ def clean(
     epilog="st deploy cpp\nst deploy python",
 )
 def deploy_cmd(
+    ctx: typer.Context,
     kind: DeployKind = typer.Argument(..., help="Consumer flavour to assemble."),
 ):
     """Assemble package/ from the current build for C/C++ or Python consumers."""
     _, paths = context()
-    raise typer.Exit(deploy_svc.deploy(paths, kind.value))
+    raise typer.Exit(deploy_svc.deploy(paths, kind.value, workspace=ctx.obj))
 
 
 container_app = typer.Typer(
@@ -200,7 +203,7 @@ def container_build(
     """Build the SushiTrack Docker image."""
     cfg, paths = context()
     raise typer.Exit(docker_svc.build(cfg, paths, no_cache=no_cache,
-                                      forwarded=list(ctx.args)))
+                                      forwarded=list(ctx.args), workspace=ctx.obj))
 
 
 @container_app.command(
@@ -221,7 +224,8 @@ def container_run(
     """
     cfg, paths = context()
     raise typer.Exit(docker_svc.run(cfg, paths, no_gpu=no_gpu,
-                                    command=list(ctx.args) or None))
+                                    command=list(ctx.args) or None,
+                                    workspace=ctx.obj))
 
 
 ALIASES.command(docker_alias_app, "build", container_build, "st docker build",
@@ -263,6 +267,7 @@ register_design_commands(
            "st eval --trackeval --private",
 )
 def evaluate(
+    ctx: typer.Context,
     benchmark: Optional[str] = typer.Option(
         None, "--benchmark", "-b", metavar="NAME",
         help="Benchmark under applications/benchmarks/ to run: mot17, mot20 or dancetrack "
@@ -302,7 +307,7 @@ def evaluate(
     raise typer.Exit(label_svc.evaluate_sequences(
         cfg, paths, benchmark=benchmark, scenario=scenario, tracker=key, compare=compare,
         eval_only=eval_only, trackeval=trackeval, export=export,
-        private=private, public=public))
+        private=private, public=public, workspace=ctx.obj))
 
 
 @app.command(
@@ -352,19 +357,19 @@ def infer(
         stress=stress, no_save=no_save, save_name=save_name, mot_label=mot_label,
         no_screen=no_screen, reid=reid, reid_model=reid_model,
         forwarded=list(ctx.args))
-    raise typer.Exit(infer_svc.run(cfg, paths, args))
+    raise typer.Exit(infer_svc.run(cfg, paths, args, workspace=ctx.obj))
 
 
 @app.command("status", rich_help_panel=K_DIAGNOSTICS, epilog="st status")
-def status():
+def status(ctx: typer.Context):
     """Show what is built, what is missing and which data sets are present."""
-    raise typer.Exit(diag_svc.status(*context()))
+    raise typer.Exit(diag_svc.status(*context(), workspace=ctx.obj))
 
 
 @app.command("paths", rich_help_panel=K_DIAGNOSTICS, epilog="st paths")
-def paths():
+def paths(ctx: typer.Context):
     """Print the resolved project directories."""
-    raise typer.Exit(diag_svc.paths_show(*context()))
+    raise typer.Exit(diag_svc.paths_show(*context(), workspace=ctx.obj))
 
 
 register_diagnostic_commands(

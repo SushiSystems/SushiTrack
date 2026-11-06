@@ -14,6 +14,7 @@ The CLI lives in `cli/` as the package `sushitrack-cli`. Its commands are in the
 | `cli/sushitrack_cli/env.py` | vcvars discovery and build-environment snapshotting on Windows |
 | `cli/sushitrack_cli/library_packages.py` | The Sushi libraries `st` links as built packages: the request, the configure arguments and the run-time folders |
 | `cli/sushitrack_cli/process.py` | The `sushicore` process runner every service shares |
+| `cli/sushitrack_cli/workspace.py` | The `Workspace` each service acts through: the console, the runner, the capturer and the environment; `st` passes none, so the real ones apply |
 | `cli/sushitrack_cli/__main__.py` | Entry for `python -m sushitrack_cli` |
 | `cli/sushitrack_cli/services/` | build, tests (ctest and the pytest suite), test_label (the `--label` selection), label (`st eval`, `st clean --predictions`), infer, evaluate (TrackEval), deploy, docker, diag, artifacts, checks, runner |
 | `cli/sushitrack_cli/templates/` | The example sources and READMEs `st deploy` writes into a package |

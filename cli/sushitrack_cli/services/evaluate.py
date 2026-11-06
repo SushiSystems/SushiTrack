@@ -7,14 +7,13 @@
 import shutil
 import sys
 
-from .. import console
-from ..process import RUNNER
+from ..workspace import current_workspace
 
 # A MOT20 sequence is scored as MOT20; every other sequence is scored as MOT17.
 _BENCHMARKS = ("MOT17", "MOT20")
 
 
-def _load_evaluator(paths):
+def _load_evaluator(console, paths):
     """Import the repo's evaluator lazily. Returns the module trio or None."""
     evaluator_dir = str(paths.evaluator)
     if evaluator_dir not in sys.path:
@@ -37,9 +36,14 @@ def _load_evaluator(paths):
 
 
 def run_internal(paths, data_root, sequences, trackers, perf, export_dir=None,
-                 compare=False):
-    """Evaluate the sequences under *data_root* with the repo's own TrackEval wrapper."""
-    loaded = _load_evaluator(paths)
+                 compare=False, workspace=None):
+    """Evaluate the sequences under *data_root* with the repo's own TrackEval wrapper.
+
+    Args:
+        workspace: What the evaluation prints through; none uses the real console.
+    """
+    console = (workspace or current_workspace()).console
+    loaded = _load_evaluator(console, paths)
     if loaded is None:
         return 1
     runner_cls, print_table, export_results = loaded
@@ -108,8 +112,14 @@ def _stage_official_data(data_root, sequences, trackers, trackeval_dir):
     return staged
 
 
-def run_official(paths, data_root, sequences, trackers):
-    """Run third_party/TrackEval's run_mot_challenge.py over the staged results."""
+def run_official(paths, data_root, sequences, trackers, workspace=None):
+    """Run third_party/TrackEval's run_mot_challenge.py over the staged results.
+
+    Args:
+        workspace: What the run prints and starts the script through; none uses the real ones.
+    """
+    space = workspace or current_workspace()
+    console = space.console
     trackeval_dir = paths.third_party / "TrackEval"
     script = trackeval_dir / "scripts" / "run_mot_challenge.py"
     if not script.exists():
@@ -150,6 +160,6 @@ def run_official(paths, data_root, sequences, trackers):
                    "--SPLIT_TO_EVAL", "train"]
         if len(sequences) == 1:
             command += ["--SEQ_INFO", sequences[0]]
-        if RUNNER.run(command, trackeval_dir) != 0:
+        if space.runner.run(command, trackeval_dir) != 0:
             failures += 1
     return 1 if failures else 0

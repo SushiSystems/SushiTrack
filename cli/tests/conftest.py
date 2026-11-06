@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -23,6 +24,11 @@ if importlib.util.find_spec("sushicore") is None:  # pragma: no cover - import g
         "sushicore is not importable, so the sushitrack CLI cannot be imported. "
         "Install this CLI's dependencies: `pip install -e cli` or "
         "`pip install sushicore`.")
+
+from sushicore.console_memory import RecordingConsole  # noqa: E402  (after the guard)
+from sushicore.proc_memory import RecordingRunner  # noqa: E402
+
+from sushitrack_cli.workspace import Workspace  # noqa: E402  (needs cli/ on the path)
 
 
 #: The timeout of each size, in seconds; see docs/guides/TESTING.md.
@@ -44,42 +50,58 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
         item.add_marker(pytest.mark.timeout(K_SIZE_TIMEOUTS[_sizes_of(item)[0]]))
 
 
-class RecordingConsole:
-    """Collect what a module printed instead of printing it.
+def said(console: RecordingConsole, fragment: str) -> bool:
+    """Returns whether any call recorded by *console* carries *fragment* in an argument."""
+    return any(fragment in str(argument) for call in console.calls for argument in call.args)
 
-    The shared console is a Rich console bound to a stream, and under pytest's
-    capture that stream can already be closed by the time a test writes to it.
-    A test asserting on output wants the text anyway, so it records.
+
+class ScriptedCapturer:
+    """Answers each captured command from a script and records it; starts nothing.
+
+    sushicore's RecordingRunner has no ``capture``, so the commands whose output a service reads
+    go through this one.
     """
 
     def __init__(self) -> None:
-        self.lines: list[tuple[str, str]] = []
-        self.console = self
+        self.commands: list[list[str]] = []
+        self.environments: list[dict[str, str] | None] = []
+        self._answers: list[tuple[int, str, str]] = []
 
-    def _record(self, level: str):
-        def say(text: object = "", *args: object, **kwargs: object) -> None:
-            self.lines.append((level, str(text)))
-        return say
+    def script(self, exit_code: int = 0, stdout: str = "", stderr: str = "") -> "ScriptedCapturer":
+        """Queues the answer to the next unanswered command and returns this capturer."""
+        self._answers.append((exit_code, stdout, stderr))
+        return self
 
-    def __getattr__(self, name: str):
-        """Answer any console call by recording it under its own name."""
-        return self._record(name)
+    def capture(self, cmd, cwd=None, env=None) -> tuple[int, str, str]:
+        """Records *cmd* and returns the next scripted answer, else success with no output."""
+        self.commands.append([str(part) for part in cmd])
+        self.environments.append(env)
+        return self._answers.pop(0) if self._answers else (0, "", "")
+
+
+@dataclass
+class Session:
+    """Holds a workspace over sushicore's in-memory runner and console, and what they recorded."""
+
+    console: RecordingConsole
+    runner: RecordingRunner
+    capturer: ScriptedCapturer
+    workspace: Workspace
+
+    @property
+    def commands(self) -> list[list[str]]:
+        """Returns the argv of every command the runner was handed, in order."""
+        return [list(command.argv) for command in self.runner.commands]
 
     def said(self, fragment: str) -> bool:
-        """Whether any recorded line contains *fragment*."""
-        return any(fragment in text for _level, text in self.lines)
+        """Returns whether any recorded console call carries *fragment* in an argument."""
+        return said(self.console, fragment)
 
 
 @pytest.fixture
-def recorder(monkeypatch):
-    """Patch a module's ``console`` with a recorder and hand it back.
-
-    Used as ``recorder(proc)``: the module is named by the test, because a
-    module that holds its own ``console`` reference does not see a patch applied
-    to a neighbour's.
-    """
-    def patch(module) -> RecordingConsole:
-        spy = RecordingConsole()
-        monkeypatch.setattr(module, "console", spy)
-        return spy
-    return patch
+def session() -> Session:
+    """Returns a workspace whose console and runner record, with an empty environment."""
+    console = RecordingConsole()
+    runner = RecordingRunner(console)
+    capturer = ScriptedCapturer()
+    return Session(console, runner, capturer, Workspace(console, runner, capturer, {}))

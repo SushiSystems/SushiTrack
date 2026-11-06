@@ -2,18 +2,24 @@
 # SushiTrack - https://github.com/SushiSystems/SushiTrack
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
 # Licensed under the Apache License 2.0. See LICENSE.
-"""The evaluator front spawns its children through the shared runner."""
+"""The evaluator front reports a missing official script and starts nothing."""
 
 from __future__ import annotations
 
-import pytest
+from types import SimpleNamespace
 
-import importlib
+import pytest
 
 from sushitrack_cli.services import evaluate
 
-pytestmark = pytest.mark.small
+pytestmark = pytest.mark.medium
 
 
-def test_the_service_uses_the_shared_runner():
-    assert evaluate.RUNNER is importlib.import_module("sushitrack_cli.process").RUNNER
+def test_a_missing_official_script_fails_and_names_the_submodule(tmp_path, session):
+    paths = SimpleNamespace(third_party=tmp_path)
+
+    code = evaluate.run_official(paths, tmp_path, ["S1"], ["sushitrack"],
+                                 workspace=session.workspace)
+
+    assert code == 1 and session.commands == []
+    assert session.said("git submodule update --init")

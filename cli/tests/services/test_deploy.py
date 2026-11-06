@@ -37,24 +37,24 @@ def test_the_readmes_name_every_runtime_library():
         assert "r" in text and "s" in text and "NOTICE.md" in text
 
 
-def test_notices_reach_the_package(tmp_path):
+def test_notices_reach_the_package(tmp_path, session):
     """Copies LICENSE, NOTICE.md and every licence text into the package."""
     root = tmp_path / "repo"
     for path in ["LICENSE", "NOTICE.md", *(source for source, _ in deploy.K_LICENCE_TEXTS)]:
         (root / path).parent.mkdir(parents=True, exist_ok=True)
         (root / path).write_text("text", encoding="utf-8")
     package = tmp_path / "package"
-    assert deploy._copy_notices(SimpleNamespace(root=root), package)
+    assert deploy._copy_notices(session.workspace, SimpleNamespace(root=root), package)
     assert (package / "LICENSE").is_file() and (package / "NOTICE.md").is_file()
     for _, target in deploy.K_LICENCE_TEXTS:
         assert (package / "licenses" / target).is_file()
 
 
-def test_a_missing_notice_stops_the_package(tmp_path, recorder):
+def test_a_missing_notice_stops_the_package(tmp_path, session):
     """Refuses to finish a package that would ship without LICENSE."""
-    spy = recorder(deploy)
-    assert not deploy._copy_notices(SimpleNamespace(root=tmp_path), tmp_path / "package")
-    assert spy.said("LICENSE")
+    assert not deploy._copy_notices(session.workspace, SimpleNamespace(root=tmp_path),
+                                    tmp_path / "package")
+    assert session.said("LICENSE")
 
 
 def test_deploy_kind_values_match_kinds():

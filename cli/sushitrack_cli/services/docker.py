@@ -4,14 +4,15 @@
 # Licensed under the Apache License 2.0. See LICENSE.
 """Builds the Docker image and runs the developer container."""
 
-from .. import console
-from ..process import RUNNER
+from ..workspace import current_workspace
 
 #: The Dockerfile, from the repository root; its ignore file sits beside it.
 DOCKERFILE = ".config/docker/Dockerfile"
 
 
-def build(cfg, paths, no_cache=False, forwarded=()):
+def build(cfg, paths, no_cache=False, forwarded=(), workspace=None):
+    space = workspace or current_workspace()
+    console = space.console
     console.header("Docker build")
     command = ["docker", "build", "-f", str(paths.root / DOCKERFILE), "-t", cfg.docker_image]
     if no_cache:
@@ -20,7 +21,7 @@ def build(cfg, paths, no_cache=False, forwarded=()):
     command.extend(forwarded)
     command.append(".")
 
-    code = RUNNER.run(command, paths.root)
+    code = space.runner.run(command, paths.root)
     if code != 0:
         console.error("Docker build failed.")
         return code
@@ -28,8 +29,10 @@ def build(cfg, paths, no_cache=False, forwarded=()):
     return 0
 
 
-def run(cfg, paths, no_gpu=False, command=None, forwarded=()):
+def run(cfg, paths, no_gpu=False, command=None, forwarded=(), workspace=None):
     """Start the developer container with the repo mounted at docker_workdir."""
+    space = workspace or current_workspace()
+    console = space.console
     console.header("Docker run")
     argv = ["docker", "run", "-it", "--rm"]
     if no_gpu or not cfg.docker_gpus:
@@ -41,4 +44,4 @@ def run(cfg, paths, no_gpu=False, command=None, forwarded=()):
     argv.extend(forwarded)
     argv.append(cfg.docker_image)
     argv.extend(command or ["bash"])
-    return RUNNER.run(argv, paths.root)
+    return space.runner.run(argv, paths.root)

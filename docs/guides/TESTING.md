@@ -59,6 +59,11 @@ The package under test sits in `cli/`, one level above `conftest.py`, and the su
 repository root as often as from `cli/`. `conftest.py` puts `cli/` on `sys.path` so the same
 command works from either.
 
+The `session` fixture of `conftest.py` is a `Workspace` over sushicore's `RecordingRunner` and
+`RecordingConsole`, and over a `ScriptedCapturer` for the commands whose output a service reads. A
+service takes it as `workspace=`, and a command test hands it in as the context object, so no test
+patches a function of the CLI.
+
 Nothing in the fixtures reaches the machine. A test that runs a real tool, prints through the
 shared console, or reads the developer's own project says something different on someone else's
 machine.

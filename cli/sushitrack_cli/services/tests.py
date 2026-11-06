@@ -10,10 +10,8 @@ from sushicore import cmake_cache
 from sushicore.testing import ModuleTests, SanitizedTests
 from sushicore.testing.labels import LabelSelection
 
-from .. import console
 from ..config import PROFILE
-from ..env import load_build_env
-from ..process import RUNNER
+from ..workspace import current_workspace
 from . import build as build_svc
 
 
@@ -24,13 +22,17 @@ def _config_flag(cfg, build_dir):
     return build_svc.normalize_build_type(cfg.build_type)
 
 
-def module_tests(context, panel=None):
+def module_tests(context, panel=None, workspace=None):
     """Return what `st test` hands the shared command, reading the workspace from *context* on use.
 
     Args:
         context: Returns the configuration and the paths of the project.
         panel: The help panel `test` is listed under.
+        workspace: What the tests build, run and print through; none uses the real ones.
     """
+    space = workspace or current_workspace()
+    console = space.console
+
     def tree():
         cfg, paths = context()
         return build_svc.tree_for(paths, build_svc.normalize_build_type(cfg.build_type))
@@ -42,7 +44,7 @@ def module_tests(context, panel=None):
 
     def build_sanitized(name):
         cfg, paths = context()
-        return build_svc.build(cfg, paths, sanitizer=build_svc.Sanitizer(name))
+        return build_svc.build(cfg, paths, sanitizer=build_svc.Sanitizer(name), workspace=space)
 
     def check_tree(build_dir):
         _, paths = context()
@@ -54,8 +56,8 @@ def module_tests(context, panel=None):
 
     def run_ctest(build_dir, **options):
         cfg, paths = context()
-        return build_svc.DRIVER.ctest_run(
-            cfg.tool, build_dir, load_build_env(cfg.tool, build_dir, paths.config),
+        return space.driver.ctest_run(
+            cfg.tool, build_dir, space.build_env(cfg.tool, build_dir, paths.config),
             config=_config_flag(cfg, build_dir), **options)
 
     def run_cli_tests(selection: LabelSelection):
@@ -63,11 +65,11 @@ def module_tests(context, panel=None):
         console.header("Test (st package)")
         expression = selection.pytest_expression()
         console.info(f"Markers: {expression}")
-        return RUNNER.run([sys.executable, "-m", "pytest", "-q", "-m", expression], paths.cli)
+        return space.runner.run([sys.executable, "-m", "pytest", "-q", "-m", expression], paths.cli)
 
     return ModuleTests(
-        profile=PROFILE, project_root=lambda: context()[1].root, console=console.current,
-        build_tree=tree, run_ctest=run_ctest, run=RUNNER.run, check_tree=check_tree, panel=panel,
+        profile=PROFILE, project_root=lambda: context()[1].root, console=lambda: console,
+        build_tree=tree, run_ctest=run_ctest, run=space.runner.run, check_tree=check_tree, panel=panel,
         sanitized=SanitizedTests(names=tuple(item.value for item in build_svc.Sanitizer),
                                  build=build_sanitized, tree=sanitized_tree),
         cli_tests=run_cli_tests)

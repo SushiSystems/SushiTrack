@@ -10,14 +10,12 @@ from pathlib import Path
 
 from sushicore import build_admission, build_report, cmake_cache
 from sushicore.build_tree import refuse_another_build_type, tree_dir
-from sushicore.cmake_driver import CMakeDriver
 from sushicore.provision.sushi_packages import PackageError
 
-from .. import console, library_packages
-from ..env import load_build_env
+from .. import library_packages
 from ..config import K_DEFAULT_TREE
 from ..errors import UnknownBuildTypeError
-from ..process import RUNNER
+from ..workspace import Workspace, current_workspace
 
 BUILD_TYPES = ("Release", "Debug", "RelWithDebInfo", "MinSizeRel")
 
@@ -80,9 +78,6 @@ def normalize_build_type(value):
 #: Generators whose configured tree leaves a build file behind.
 _SENTINEL_GENERATORS = ("Ninja", "Unix Makefiles")
 
-DRIVER = CMakeDriver(console, RUNNER)
-
-
 def generator(cfg) -> str:
     """Return the configured generator, else Ninja on Windows and CMake's default elsewhere."""
     configured = cfg.tool.expand(cfg.tool.generator)
@@ -91,12 +86,12 @@ def generator(cfg) -> str:
     return "Ninja" if cfg.tool.is_windows else ""
 
 
-def _remove_tree(target: Path) -> bool:
+def _remove_tree(space: Workspace, target: Path) -> bool:
     """Deletes *target* and returns whether it is gone, reporting a tree that survived."""
     shutil.rmtree(target, ignore_errors=True)
     if not target.exists():
         return True
-    console.error(f"Could not remove {target}; close whatever holds a file in it and retry.")
+    space.console.error(f"Could not remove {target}; close whatever holds a file in it and retry.")
     return False
 
 
@@ -108,16 +103,16 @@ def _stamp_key(tests, generator_name, defines):
     return "|".join(["ON" if tests else "OFF", generator_name, *sorted(defines)])
 
 
-def _needs_configure(build_dir: Path, generator_name: str, stamp_key: str,
+def _needs_configure(space: Workspace, build_dir: Path, generator_name: str, stamp_key: str,
                      root: Path) -> bool:
     """Return whether the tree must be configured from scratch."""
     if generator_name in _SENTINEL_GENERATORS:
-        if DRIVER.needs_configure(build_dir, generator_name, root=root):
+        if space.driver.needs_configure(build_dir, generator_name, root=root):
             return True
     elif not build_dir.is_dir():
         return True
     elif cmake_cache.is_stale(build_dir, root):
-        console.warn("Build tree was configured for a different source path "
+        space.console.warn("Build tree was configured for a different source path "
                      "(e.g. a Docker volume build); reconfiguring from scratch.")
         return True
     if not (build_dir / "CMakeCache.txt").is_file():
@@ -128,9 +123,9 @@ def _needs_configure(build_dir: Path, generator_name: str, stamp_key: str,
     return stamp.read_text(encoding="utf-8").strip() != stamp_key
 
 
-def _configure_args(cfg, paths, build_dir, build_type, tests, generator_name, defines):
+def _configure_args(space, cfg, paths, build_dir, build_type, tests, generator_name, defines):
     """Return the configure argv st's build policy asks for."""
-    args = [DRIVER.cmake(cfg.tool), "-S", str(paths.root), "-B", str(build_dir)]
+    args = [space.driver.cmake(cfg.tool), "-S", str(paths.root), "-B", str(build_dir)]
     if generator_name:
         args += ["-G", generator_name]
     args += [f"-DCMAKE_BUILD_TYPE={build_type}"]
@@ -139,16 +134,20 @@ def _configure_args(cfg, paths, build_dir, build_type, tests, generator_name, de
 
 
 def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
-          defines=(), sanitizer=None, report=False):
+          defines=(), sanitizer=None, report=False, workspace=None):
     """Configure when needed, then build st's targets in the tree of the build type.
 
     Args:
         sanitizer: Builds with this sanitizer, in the tree of its own.
         report: Measures the build and writes `build_report.json` into the tree.
+        workspace: What the build prints and runs through; none uses the real ones.
 
     Returns:
         The exit code of the failing step, else 0.
     """
+    space = workspace or current_workspace()
+    console = space.console
+    driver = space.driver
     console.header("Build")
     build_type = build_type or normalize_build_type(cfg.build_type)
     build_dir = tree_for(paths, build_type, sanitizer)
@@ -159,7 +158,7 @@ def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
 
     if clean and build_dir.exists():
         console.info(f"Removing build directory: {build_dir}")
-        if not _remove_tree(build_dir):
+        if not _remove_tree(space, build_dir):
             return 1
 
     console.info(f"Tree: {build_dir}")
@@ -181,18 +180,18 @@ def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
                    build_dir, build_admission.compiler_cache(cfg.tool.ccache_exe))))
     stamp_key = _stamp_key(tests, generator_name, defines)
 
-    configure = _needs_configure(build_dir, generator_name, stamp_key, paths.root)
-    if configure and build_dir.exists() and not _remove_tree(build_dir):
+    configure = _needs_configure(space, build_dir, generator_name, stamp_key, paths.root)
+    if configure and build_dir.exists() and not _remove_tree(space, build_dir):
         return 1
     # Recorded before the environment is read, and after a tree was removed, so it survives.
     library_packages.record_run_dirs(build_dir, packages.run_dirs(cfg.tool.platform))
-    env = load_build_env(cfg.tool, build_dir)
+    env = space.build_env(cfg.tool, build_dir)
 
     if configure:
         console.info("Configuring...")
-        args = _configure_args(cfg, paths, build_dir, build_type, tests, generator_name,
+        args = _configure_args(space, cfg, paths, build_dir, build_type, tests, generator_name,
                                defines)
-        code = DRIVER.configure(args, paths.root, env)
+        code = driver.configure(args, paths.root, env)
         if code != 0:
             console.error("CMake configuration failed.")
             return code
@@ -204,7 +203,7 @@ def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
     targets = [LIBRARY_TARGET, *APPLICATION_TARGETS] + (list(TEST_TARGETS) if tests else [])
     console.info("Building...")
     offset = build_report.ninja_log_offset(build_dir)
-    code = DRIVER.compile(cfg.tool, build_dir, paths.root, env, config=build_type,
+    code = driver.compile(cfg.tool, build_dir, paths.root, env, config=build_type,
                           targets=targets, jobs=jobs or cfg.jobs())
     if report:
         measured = build_report.of_build(build_dir, offset, build_admission.state_dir(build_dir))
@@ -218,18 +217,23 @@ def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
     return 0
 
 
-def clean(paths):
+def clean(paths, workspace=None):
     """Remove every build tree and the assembled package directory.
+
+    Args:
+        workspace: What the clean prints through; none uses the real console.
 
     Returns:
         0 when both are gone, 1 when one of them could not be removed.
     """
+    space = workspace or current_workspace()
+    console = space.console
     console.header("Clean")
     removed = []
     for target in (paths.build_root, paths.package):
         if target.exists():
             console.info(f"Removing {target}")
-            if not _remove_tree(Path(target)):
+            if not _remove_tree(space, Path(target)):
                 return 1
             removed.append(Path(target).name)
     if not removed:

@@ -96,14 +96,13 @@ def test_a_developer_shell_is_not_snapshotted_again(tmp_path, monkeypatch):
     assert env.load_build_env(_tool(), tmp_path) == dict(os.environ)
 
 
-def test_no_visual_studio_warns_and_uses_the_current_env(tmp_path, monkeypatch, recorder):
+def test_no_visual_studio_warns_and_uses_the_current_env(tmp_path, monkeypatch, session):
     """Warns once and carries on when no vcvars exists."""
-    spy = recorder(env)
     monkeypatch.delenv("VSINSTALLDIR", raising=False)
     monkeypatch.setattr(env, "find_vcvars", lambda: None)
     _no_vcvars_run(monkeypatch)
-    assert env.load_build_env(_tool(vcvars=""), tmp_path) == dict(os.environ)
-    assert spy.said("No Visual Studio installation detected")
+    assert env.load_build_env(_tool(vcvars=""), tmp_path, output=session.console) == dict(os.environ)
+    assert session.said("No Visual Studio installation detected")
 
 
 def test_a_configured_vcvars_wins_over_detection(monkeypatch, tmp_path):
@@ -115,13 +114,13 @@ def test_a_configured_vcvars_wins_over_detection(monkeypatch, tmp_path):
 
 
 def test_a_cache_folder_that_cannot_be_made_warns_and_still_returns_the_snapshot(
-        tmp_path, monkeypatch, recorder):
+        tmp_path, monkeypatch, session):
     """Carries on with the snapshot, uncached, and says why."""
-    spy = recorder(env)
     blocker = tmp_path / "file"
     blocker.write_text("x", encoding="utf-8")
-    monkeypatch.setattr(env, "read_cache", lambda cache_file, key: None)
-    monkeypatch.setattr(env, "_snapshot", lambda tool: {"SNAPSHOT_VARIABLE": "1"})
-    merged = env.load_build_env(_tool(), blocker / "build")
+    monkeypatch.delenv("VSINSTALLDIR", raising=False)
+    _detected_vcvars(monkeypatch)
+    monkeypatch.setattr(env, "snapshot_vcvars", lambda path, out: {"SNAPSHOT_VARIABLE": "1"})
+    merged = env.load_build_env(_tool(), blocker / "build", output=session.console)
     assert merged["SNAPSHOT_VARIABLE"] == "1"
-    assert spy.said("environment snapshot is not cached")
+    assert session.said("environment snapshot is not cached")
