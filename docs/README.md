@@ -66,7 +66,6 @@ Agent work folders are under `agent/`. Finished material is under `archive/` and
 
 ## Licence
 
-SushiTrack is free for non-commercial use under the PolyForm Noncommercial License 1.0.0;
-[LICENSE](../LICENSE) is the binding text and [COMMERCIAL.md](../COMMERCIAL.md) says how a
-company obtains a commercial licence. [NOTICE.md](../NOTICE.md) lists the third-party code, the
+SushiTrack is open source under the Apache License 2.0; [LICENSE](../LICENSE) is the binding
+text. [NOTICE.md](../NOTICE.md) lists the third-party code, the
 ported files and the benchmark data with their own licences.

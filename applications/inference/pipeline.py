@@ -1,8 +1,7 @@
 # pipeline.py
 # SushiTrack - https://github.com/SushiSystems/SushiTrack
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
-# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
-# Commercial use requires a licence from Sushi Systems.
+# Licensed under the Apache License 2.0. See LICENSE.
 # Holds code ported from YOLOX (Apache-2.0), see NOTICE.md
 # Copyright (c) 2021-2022 Megvii Inc. All rights reserved.
 """

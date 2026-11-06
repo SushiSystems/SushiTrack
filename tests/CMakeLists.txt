@@ -1,8 +1,7 @@
 # CMakeLists.txt
 # SushiTrack - https://github.com/SushiSystems/SushiTrack
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
-# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
-# Commercial use requires a licence from Sushi Systems.
+# Licensed under the Apache License 2.0. See LICENSE.
 
 # Builds sushitrack_tests from the mirror of the library and sushitrack_application_tests from
 # the mirror of applications/; the size of each suite is its label.

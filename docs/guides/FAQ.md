@@ -188,14 +188,9 @@ Contributions from outside Sushi Systems are not accepted yet. Recorded defects 
 
 ## How is SushiTrack licensed?
 
-SushiTrack is source-available under the PolyForm Noncommercial License 1.0.0, free for
-non-commercial use. [`LICENSE`](../../LICENSE) is the binding text and lists the permitted
-purposes: personal, non-commercial use, and use by the non-commercial organisations it names.
-
-Any commercial purpose needs a separate, paid licence from Sushi Systems. That includes use inside
-a company, use in paid client work, and use in a product or service that is sold. To ask for one,
-write to hello@sushisystems.io with what you want to build and who will use it; see
-[`COMMERCIAL.md`](../../COMMERCIAL.md).
+SushiTrack is open source under the Apache License 2.0, and [`LICENSE`](../../LICENSE) is the
+binding text. Any use is allowed, commercial use included, as long as the licence and the notices
+travel with the code.
 
 Third-party code keeps its own licence, listed in [`NOTICE.md`](../../NOTICE.md). The MOT17,
 MOT20 and DanceTrack sequences are not in the repository; each machine downloads them, under their

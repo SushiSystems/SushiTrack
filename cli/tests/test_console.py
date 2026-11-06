@@ -1,8 +1,7 @@
 # test_console.py
 # SushiTrack - https://github.com/SushiSystems/SushiTrack
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
-# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
-# Commercial use requires a licence from Sushi Systems.
+# Licensed under the Apache License 2.0. See LICENSE.
 """Tests that importing the console builds nothing, so st --help runs outside a checkout.
 
 The failure these tests guard against is in docs/architecture/CLI_PACKAGE.md.

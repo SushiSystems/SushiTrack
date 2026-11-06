@@ -1,8 +1,7 @@
 # SushiTrackTests.cmake
 # SushiTrack - https://github.com/SushiSystems/SushiTrack
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
-# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
-# Commercial use requires a licence from Sushi Systems.
+# Licensed under the Apache License 2.0. See LICENSE.
 
 # Builds the test program from the mirror under tests/ and registers its tests by size: the
 # Small_, Medium_ or Large_ prefix of each GoogleTest suite gives its label and its timeout.

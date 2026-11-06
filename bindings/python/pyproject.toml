@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "Python bindings for SushiTrack real-time multi-object tracking engine"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "PolyForm-Noncommercial-1.0.0" }
+license = { text = "Apache-2.0" }
 authors = [
     { name = "Mustafa Garip", email = "mustafagarip@sushisystems.io" },
     { name = "Sushi Systems" },

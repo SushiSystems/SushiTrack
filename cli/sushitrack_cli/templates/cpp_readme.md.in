@@ -9,7 +9,7 @@ lib/             Link library ({import_lib})
 bin/             Runtime libraries ({runtime_lib}, {sushilog_lib})   [Windows only]
 sushitrack.json  Default runtime configuration; edit it to retune without recompiling
 example/         A usage example and its CMakeLists.txt
-LICENSE          The PolyForm Noncommercial licence of SushiTrack
+LICENSE          The Apache License 2.0 of SushiTrack
 NOTICE.md        The third-party code inside the libraries
 licenses/        The licence texts NOTICE.md cites
 ```

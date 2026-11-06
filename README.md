@@ -59,7 +59,5 @@ Contributors start at [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
 ## Licence
 
-SushiTrack is source-available, free for non-commercial use under the PolyForm Noncommercial
-License 1.0.0; commercial use needs a licence from Sushi Systems, see
-[COMMERCIAL.md](COMMERCIAL.md). [LICENSE](LICENSE) is the binding text. Third-party code keeps
+SushiTrack is open source under the Apache License 2.0; [LICENSE](LICENSE) is the binding text. Third-party code keeps
 its own licence, listed in [NOTICE.md](NOTICE.md).

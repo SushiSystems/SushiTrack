@@ -5,7 +5,7 @@ The repository holds one module: public headers under `include/SushiTrack/`, sou
 
 ```
 sushitrack/
-├── README.md  LICENSE  NOTICE.md  COMMERCIAL.md
+├── README.md  LICENSE  NOTICE.md
 ├── AGENTS.md  CLAUDE.md               # agent instructions
 ├── CMakeLists.txt                     # project(), options, add_subdirectory
 ├── .clang-format  .editorconfig       # formatting the editors and clang-format find

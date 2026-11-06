@@ -1,8 +1,7 @@
 # CMakeLists.txt
 # SushiTrack - https://github.com/SushiSystems/SushiTrack
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
-# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
-# Commercial use requires a licence from Sushi Systems.
+# Licensed under the Apache License 2.0. See LICENSE.
 
 # Builds the shared library sushitrack and its object twin sushitrack_static, which the tests and
 # the applications link; docs/architecture/BUILD_SYSTEM.md gives the reasons for the twin.

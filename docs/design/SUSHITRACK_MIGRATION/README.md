@@ -7,15 +7,13 @@
 ## Problem
 
 The repository came from a project that carried another name, another licence and a layout of its
-own. It has to read as a Sushi Systems repository: one identity, the PolyForm Noncommercial
-License 1.0.0, and the standards of `sushiskills`.
+own. It has to read as a Sushi Systems repository: one identity, the Apache License 2.0,
+and the standards of `sushiskills`.
 
 ## Decision
 
 The project is SushiTrack, a core tracking library within Sushi Systems. All intellectual
-property rights have been transferred. The code is source-available, free for non-commercial use
-under the PolyForm Noncommercial License 1.0.0; commercial use needs a licence from Sushi
-Systems, see `COMMERCIAL.md`. The owner chose a clean break: no legacy shims keep an old name
+property rights have been transferred. The code is open source under the Apache License 2.0. The owner chose a clean break: no legacy shims keep an old name
 alive.
 
 | Item | Value |
@@ -24,7 +22,7 @@ alive.
 | C++ namespace | `SushiTrack` |
 | C API prefix | `sushitrack_` |
 | Header tree | `<SushiTrack/*.hpp>`, `<SushiTrack/c_api/sushitrack_c.h>` |
-| Licence | PolyForm Noncommercial License 1.0.0 (`LICENSE`), commercial terms in `COMMERCIAL.md` |
+| Licence | Apache License 2.0 (`LICENSE`) |
 | Copyright holder | `Copyright (c) 2026 Sushi Systems` |
 | Organisation website | `https://sushisystems.io` |
 | Repository URL | `https://github.com/SushiSystems/SushiTrack` |
@@ -57,8 +55,7 @@ which also adds the upstream lines of the ported files.
 /* tracker.hpp                                                  */
 /* SushiTrack - https://github.com/SushiSystems/SushiTrack      */
 /* Copyright (c) 2026 Sushi Systems                             */
-/* Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.    */
-/* Commercial use requires a licence from Sushi Systems.        */
+/* Licensed under the Apache License 2.0. See LICENSE.          */
 /****************************************************************/
 
 /**

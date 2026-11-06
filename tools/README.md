@@ -36,4 +36,4 @@ reporting, 2 on a bad path. Python 3.11, standard library only.
 | --- | --- |
 | `K_TIER_ORDER` | Empty. SushiTrack is one module, so `check_layering.py` has nothing to compare |
 | `K_CONSOLE_PATHS` | The CLI console module and the programs under `applications/`, which write to the terminal by design |
-| `K_CLOSED` | False; the licence lines are the PolyForm Noncommercial ones |
+| `K_CLOSED` | False; the licence lines are the Apache License 2.0 ones |

@@ -1,8 +1,7 @@
 # sushitrack.py
 # SushiTrack - https://github.com/SushiSystems/SushiTrack
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
-# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
-# Commercial use requires a licence from Sushi Systems.
+# Licensed under the Apache License 2.0. See LICENSE.
 """Python ctypes bindings for the SushiTrack C ABI.
 
 Wraps the native library interface declared in include/SushiTrack/c_api/sushitrack_c.h.

@@ -10,7 +10,7 @@ sushitrack/
     {sushilog_lib}   Native SushiLog library, which SushiTrack logs through
 sushitrack.json      Default runtime configuration
 example.py           A usage example
-LICENSE              The PolyForm Noncommercial licence of SushiTrack
+LICENSE              The Apache License 2.0 of SushiTrack
 NOTICE.md            The third-party code inside the libraries
 licenses/            The licence texts NOTICE.md cites
 ```
