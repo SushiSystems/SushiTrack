@@ -3,6 +3,9 @@
 SushiTrack is Copyright (c) 2026-present Mustafa Garip & Sushi Systems and licensed under the Apache
 License 2.0; see `LICENSE`. The material below keeps its own licence.
 
+Every version of SushiTrack published under the PolyForm Noncommercial License 1.0.0 is also
+licensed, from 2026-11-06 on, under the Apache License 2.0.
+
 ## Third-party components
 
 | Component | Where | Source | Version | Licence |
@@ -25,7 +28,7 @@ Nothing in this table is stored in the repository.
 
 | Component | Declared in | Version | Licence |
 | --- | --- | --- | --- |
-| SushiLog | `cli/sushistack.deps.toml` | `v0.2.3`, commit `5f714a7b`; `st setup` fetches it, or a sibling checkout `../sushilog` is used; `st deploy` ships `sushilog.dll` or `libsushilog.so` | A Sushi Systems library under PolyForm Noncommercial 1.0.0 |
+| SushiLog | `cli/sushistack.deps.toml` | `v0.2.3`, commit `5f714a7b`; `st setup` fetches it, or a sibling checkout `../sushilog` is used; `st deploy` ships `sushilog.dll` or `libsushilog.so` | A Sushi Systems library under the Apache License 2.0, which covers every SushiLog version |
 | GoogleTest | `cli/sushistack.deps.toml`, `.config/conda/environment.yml` | 1.17.0 in `.config/conda/environment.yml`; unpinned in the fragment | BSD-3-Clause |
 | typer, rich, tomli, pytest | `cli/pyproject.toml` | lower bounds only | MIT |
 | sushicore | `cli/pyproject.toml` | `>=0.9.7` | A Sushi Systems package under its own licence |
