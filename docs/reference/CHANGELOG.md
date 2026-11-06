@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-11-06 — tools: Deleted the leftover `check_test_additions.py` and its test, which the shared tools no longer carry, and recopied the shared tools (RW-30).
 - 2026-11-06 — licence: Relicensed SushiTrack under the Apache License 2.0 and removed `COMMERCIAL.md`; every source file's licence block follows (`LICENSE`, `tools/settings.py`).
 - 2026-11-05 — tools: Took the shared checkers of 2026-11-05 with a baseline of the findings they meet, which RW-30 clears.
 - 2026-10-31 — cli: Ran `st test` through the shared test command of sushicore, which writes a JUnit file and prints the budget line (RW-29, `77b3f6f`).
