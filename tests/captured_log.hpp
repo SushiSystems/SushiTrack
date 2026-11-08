@@ -23,21 +23,22 @@
 
 /**
  * @file captured_log.hpp
- * @brief Declares CapturedLog, which collects SushiTrack's log records for one test.
+ * @brief Declares CapturedLog, which collects SushiTrack's log records for one test through
+ *        SushiLog's scoped in-memory sink.
  * @author Mustafa Garip
  */
 
 #pragma once
 
 #include <array>
-#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include <SushiLog/log/log_calls.hpp>
+#include <SushiLog/log/log_capture.hpp>
+#include <SushiLog/log/log_category.hpp>
 #include <SushiLog/log/log_level.hpp>
-#include <SushiLog/log/log_record.hpp>
 
 #include <SushiTrack/association/association_log_category.hpp>
 #include <SushiTrack/c_api/c_api_log_category.hpp>
@@ -49,45 +50,25 @@
 namespace SushiTrack
 {
     /**
-     * @brief Holds one record a test received: its level, project, module and message.
-     */
-    struct CapturedRecord
-    {
-            SushiLog::LogLevel level; /**< The record's level. */
-            std::string project;      /**< The project of its category. */
-            std::string module;       /**< The module of its category. */
-            std::string message;      /**< The formatted message alone. */
-    };
-
-    /**
-     * @brief Collects every record from construction to destruction, delivered synchronously.
+     * @brief Collects every record from construction to destruction, delivered synchronously,
+     *        through a SushiLog::LogCapture.
      *
-     * Sets every SushiTrack category to @p level for its lifetime, makes every LogThrottle admit
-     * its next event, and restores the stderr sink, the WARN level and queued delivery when
-     * destroyed.
+     * Sets every SushiTrack category, and each one in @p extra, to @p level for its lifetime and
+     * makes every LogThrottle admit its next event. On exit it puts back the levels it found, and
+     * the capture puts back the sink and the delivery mode.
      */
     class CapturedLog final
     {
         public:
             /// @brief Starts collecting records at @p level and above, also under @p extra.
             explicit CapturedLog(SushiLog::LogLevel level = SushiLog::LogLevel::Trace,
-                                 std::vector<SushiLog::LogCategory> extra = {})
-                : extra_(std::move(extra))
+                                 const std::vector<SushiLog::LogCategory>& extra = {})
             {
                 reset_log_throttles();
-                SushiLog::set_log_synchronous(true);
                 for (const SushiLog::LogCategory& category : K_CATEGORIES)
-                    SushiLog::set_log_level(category, level);
-                for (const SushiLog::LogCategory& category : extra_)
-                    SushiLog::set_log_level(category, level);
-                SushiLog::set_log_sink(
-                    [this](const SushiLog::LogRecord& record)
-                    {
-                        const std::lock_guard<std::mutex> lock(mutex_);
-                        records_.push_back({record.level, std::string(record.project),
-                                            std::string(record.module),
-                                            std::string(record.message)});
-                    });
+                    set_level(category, level);
+                for (const SushiLog::LogCategory& category : extra)
+                    set_level(category, level);
             }
 
             CapturedLog(const CapturedLog&) = delete;
@@ -95,29 +76,24 @@ namespace SushiTrack
             CapturedLog(CapturedLog&&) = delete;
             CapturedLog& operator=(CapturedLog&&) = delete;
 
-            /// @brief Restores the stderr sink, the WARN level and queued delivery.
+            /// @brief Puts back the level each category had on entry, the last one set first.
             ~CapturedLog()
             {
-                SushiLog::set_log_sink(nullptr);
-                for (const SushiLog::LogCategory& category : K_CATEGORIES)
-                    SushiLog::set_log_level(category, SushiLog::LogLevel::Warn);
-                for (const SushiLog::LogCategory& category : extra_)
-                    SushiLog::set_log_level(category, SushiLog::LogLevel::Warn);
-                SushiLog::set_log_synchronous(false);
+                for (auto found = found_levels_.rbegin(); found != found_levels_.rend(); ++found)
+                    SushiLog::set_log_level(found->first, found->second);
             }
 
             /// @brief Returns a copy of the records collected so far.
-            [[nodiscard]] std::vector<CapturedRecord> records() const
+            [[nodiscard]] std::vector<SushiLog::CapturedRecord> records() const
             {
-                const std::lock_guard<std::mutex> lock(mutex_);
-                return records_;
+                return capture_.records();
             }
 
             /// @brief Returns how many records hold @p text in their message.
             [[nodiscard]] int count(const std::string& text) const
             {
                 int found = 0;
-                for (const CapturedRecord& record : records())
+                for (const SushiLog::CapturedRecord& record : records())
                 {
                     if (record.message.find(text) != std::string::npos)
                         ++found;
@@ -129,7 +105,7 @@ namespace SushiTrack
             [[nodiscard]] int count_from(const std::string& module, const std::string& text) const
             {
                 int found = 0;
-                for (const CapturedRecord& record : records())
+                for (const SushiLog::CapturedRecord& record : records())
                 {
                     if (record.module == module && record.message.find(text) != std::string::npos)
                         ++found;
@@ -140,7 +116,7 @@ namespace SushiTrack
             /// @brief Returns the level of the first record holding @p text, or Off with none.
             [[nodiscard]] SushiLog::LogLevel level_of(const std::string& text) const
             {
-                for (const CapturedRecord& record : records())
+                for (const SushiLog::CapturedRecord& record : records())
                 {
                     if (record.message.find(text) != std::string::npos)
                         return record.level;
@@ -152,7 +128,7 @@ namespace SushiTrack
             [[nodiscard]] std::string last(const std::string& text) const
             {
                 std::string found;
-                for (const CapturedRecord& record : records())
+                for (const SushiLog::CapturedRecord& record : records())
                 {
                     if (record.message.find(text) != std::string::npos)
                         found = record.message;
@@ -161,16 +137,21 @@ namespace SushiTrack
             }
 
         private:
+            /// @brief Keeps the level @p category has, then sets it to @p level.
+            void set_level(const SushiLog::LogCategory& category, SushiLog::LogLevel level)
+            {
+                found_levels_.emplace_back(category, SushiLog::log_level(category));
+                SushiLog::set_log_level(category, level);
+            }
+
             /// @brief Every category SushiTrack logs under.
             static constexpr std::array<SushiLog::LogCategory, 5> K_CATEGORIES = {
                 K_TRACKING_LOG_CATEGORY, K_ASSOCIATION_LOG_CATEGORY, K_FILTERING_LOG_CATEGORY,
                 K_CONFIGURATION_LOG_CATEGORY, K_C_API_LOG_CATEGORY};
 
-            /// @brief The categories of the applications under test, set beside K_CATEGORIES.
-            std::vector<SushiLog::LogCategory> extra_;
-            /// @brief Guards records_ against the logger thread.
-            mutable std::mutex mutex_;
-            /// @brief The records collected so far.
-            std::vector<CapturedRecord> records_;
+            /// @brief Each category this object set, with the level it had on entry, in order.
+            std::vector<std::pair<SushiLog::LogCategory, SushiLog::LogLevel>> found_levels_;
+            /// @brief The scoped in-memory sink, installed for this object's lifetime.
+            SushiLog::LogCapture capture_;
     };
 } // namespace SushiTrack

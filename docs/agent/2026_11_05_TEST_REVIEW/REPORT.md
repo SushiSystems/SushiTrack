@@ -56,6 +56,7 @@ The owner delegated these decisions on 2026-11-05. Each ruling below is final fo
 6. `sushitrack_load_params_from_json(NULL, ...)` still reads `SUSHITRACK_CONFIG`. Decision 2 asks for both a default that keeps today's behaviour and the variable read only at the CLI edge; the C API's documented resolution order is today's behaviour, so the default keeps it, and no small test reaches it: the one that did, `CreateWithNullParamsAutoLoadsConfig`, is relabelled medium until M3 rewrites it.
 7. A small test that builds a tracker through `sushitrack_create` reads the process-wide `KalmanFilterRegistry` and is not counted against T2's acceptance. After T2 no test writes that registry, so it holds the same three creators in every test, and the review flagged none of those tests. Every test whose promise depends on the registry's contents uses a registry it owns.
 8. The test builders the seams need, `default_params` and `library_kalman_registry`, are fixtures and live in `tests/support/`. They are not in-memory adapters: each builds a real library object.
+9. T3 pins SushiLog v0.3.1, the release that ships `LogCapture`. `CapturedLog` keeps its name and its counting helpers and holds a `LogCapture`; it returns `SushiLog::CapturedRecord`, so the copy SushiTrack declared is gone. It puts back the level each category had, where it set WARN before. The throwing sink of `test_error_handling.cpp` is not a capture and stays for M3, which resizes those tests to medium.
 
 ## Dispatches
 

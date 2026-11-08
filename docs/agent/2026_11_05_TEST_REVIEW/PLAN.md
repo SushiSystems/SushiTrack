@@ -13,7 +13,7 @@ writes each add. Nothing in a module job changes production code except a seam a
 | --- | --- | --- | --- |
 | T1 | `tests/support/tolerance.hpp` copied from SushiSkills |  | done |
 | T2 | The seams of decision 2 |  | done |
-| T3 | `CapturedLog` moved onto SushiLog's in-memory sink | sushilog T1 | todo |
+| T3 | `CapturedLog` moved onto SushiLog's in-memory sink | sushilog T1 | done |
 | T4 | A public profiler macro header for the three tests that include the private one |  | todo |
 | T5 | The CLI runner fixtures replaced by sushicore's in-memory runner and console | sushicore T1 | done |
 | T6 | The defects of this report, each with a test that fails first; `docs/guides/TESTING.md` aligned with the skill |  | todo |

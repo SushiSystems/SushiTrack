@@ -508,7 +508,7 @@ TEST(Small_TrackerTentativeRecordsTest, EveryLifecycleRecordCarriesItsFrame)
     sushitrack_destroy(hdl);
 
     int lifecycle = 0;
-    for (const SushiTrack::CapturedRecord& record : log.records())
+    for (const SushiLog::CapturedRecord& record : log.records())
     {
         if (record.module != "tracking" || record.level != SushiLog::LogLevel::Debug)
             continue;
