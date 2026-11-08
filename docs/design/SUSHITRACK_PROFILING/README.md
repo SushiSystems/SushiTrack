@@ -31,7 +31,9 @@ record, until SushiProfiler writes tables.
 ## Design
 
 The macros `SUSHITRACK_ZONE`, `SUSHITRACK_COUNTER` and `SUSHITRACK_INSTANT` sit in
-`source/private_include/SushiTrack/profiling/profiling.hpp`, which no installed header includes. They
+`include/SushiTrack/profiling/profiling.hpp`, public so their tests read no private header, and no
+other public header includes it; a target reads it after `sushitrack_link_profiling` gives it the
+generated config and, when the switch is on, SushiProfiler. They
 take the level of `SUSHITRACK_PROFILE_LEVEL` and expand to nothing when `SUSHITRACK_ENABLE_PROFILER`
 is 0; both come from the generated `profile_config.hpp`, not from compile definitions. The names
 are in `include/SushiTrack/profiling/profiler_keys.hpp` and listed in

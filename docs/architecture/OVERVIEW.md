@@ -491,7 +491,7 @@ exception logs it once.
 SushiTrack records its frame through SushiProfiler, linked as the shared library so a process
 holds one collector. The host marks the period: `mot_engine` marks the timeline `sushitrack.frame`
 once per frame, before the tracker's update, and the library records zones, counters and instants
-inside it (`source/private_include/SushiTrack/profiling/profiling.hpp`, a private header). A host that starts no session pays
+inside it (`include/SushiTrack/profiling/profiling.hpp`, which no other public header includes and which a target reads only after `sushitrack_link_profiling` gives it the generated config). A host that starts no session pays
 one relaxed load per site.
 
 | Level | Records |

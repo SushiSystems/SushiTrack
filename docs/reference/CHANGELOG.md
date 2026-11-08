@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-11-09 — profiling: Moved the zone, counter and instant macros to the public `include/SushiTrack/profiling/profiling.hpp`, so no test includes a private header, and removed `source/private_include` (RW-35, `profiling.hpp`).
 - 2026-11-09 — tests: Moved `CapturedLog` onto SushiLog's `LogCapture`, which puts back the sink and delivery mode it found; it now puts back each level it found too (RW-34, `tests/captured_log.hpp`).
 - 2026-11-09 — deps: Pinned SushiLog v0.3.1, which ships the scoped in-memory sink `LogCapture` (`cli/sushistack.deps.toml`).
 - 2026-11-09 — filtering: Gave `KalmanFilterRegistry` a public constructor and `GenericKalmanFactory` an overload that takes the registry to create from (RW-33, `generic_kalman_factory.hpp`).

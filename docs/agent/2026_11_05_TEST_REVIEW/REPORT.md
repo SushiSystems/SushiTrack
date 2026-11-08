@@ -57,6 +57,7 @@ The owner delegated these decisions on 2026-11-05. Each ruling below is final fo
 7. A small test that builds a tracker through `sushitrack_create` reads the process-wide `KalmanFilterRegistry` and is not counted against T2's acceptance. After T2 no test writes that registry, so it holds the same three creators in every test, and the review flagged none of those tests. Every test whose promise depends on the registry's contents uses a registry it owns.
 8. The test builders the seams need, `default_params` and `library_kalman_registry`, are fixtures and live in `tests/support/`. They are not in-memory adapters: each builds a real library object.
 9. T3 pins SushiLog v0.3.1, the release that ships `LogCapture`. `CapturedLog` keeps its name and its counting helpers and holds a `LogCapture`; it returns `SushiLog::CapturedRecord`, so the copy SushiTrack declared is gone. It puts back the level each category had, where it set WARN before. The throwing sink of `test_error_handling.cpp` is not a capture and stays for M3, which resizes those tests to medium.
+10. T4 moves `profiling.hpp` from `source/private_include/` to `include/SushiTrack/profiling/`, keeping its include path, rather than writing a second public header beside a private one. Six test files included it, not three. No other public header includes it, so a consumer of the library still compiles without SushiProfiler; a target that includes it calls `sushitrack_link_profiling`, which now adds only the generated config folder.
 
 ## Dispatches
 

@@ -30,7 +30,7 @@
 
 #pragma once
 
-// The generated config defines the switch and the level. No installed header includes this one.
+// The generated config, which sushitrack_link_profiling puts on the path, defines the switch.
 #include <SushiTrack/profiling/profile_config.hpp>
 
 #if SUSHITRACK_ENABLE_PROFILER

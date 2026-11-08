@@ -3,11 +3,11 @@
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
 # Licensed under the Apache License 2.0. See LICENSE.
 
-# SushiProfiler, which the zones, counters and instants of the library's private profiling.hpp
-# record into. The CLI builds or reuses its package and passes SushiProfiler_DIR; nothing is built
-# in this tree and nothing is downloaded. No installed header includes a SushiProfiler header, and
-# the switch and the level reach the code through a generated profile_config.hpp, not through
-# compile definitions.
+# SushiProfiler, which the zones, counters and instants of profiling.hpp record into. The CLI
+# builds or reuses its package and passes SushiProfiler_DIR; nothing is built in this tree and
+# nothing is downloaded. Only profiling.hpp includes a SushiProfiler header, no other public header
+# includes it, and the switch and the level reach the code through a generated profile_config.hpp,
+# not through compile definitions.
 
 option(SUSHITRACK_ENABLE_PROFILER
     "Record zones, counters and instants of Tracker::update through SushiProfiler" ON)
@@ -46,18 +46,17 @@ if(GIT_FOUND)
     endif()
 endif()
 
-# Gives <target> the private profiling headers, the generated config and, when the option is on,
-# SushiProfiler, all PRIVATE. The library, its test programs and the mot_engine runner call it.
+# Gives <target> the generated config that profiling.hpp reads and, when the option is on,
+# SushiProfiler, both PRIVATE. The library, its test programs and the mot_engine runner call it.
 function(sushitrack_link_profiling target)
     target_include_directories(${target} PRIVATE
-        "${PROJECT_SOURCE_DIR}/source/private_include"
         "${SUSHITRACK_GENERATED_DIR}")
     if(SUSHITRACK_ENABLE_PROFILER)
         target_link_libraries(${target} PRIVATE SushiProfiler::SushiProfiler)
     endif()
 endfunction()
 
-# Applies the profiling build to a library target: the private headers, the link and the version
+# Applies the profiling build to a library target: the generated config, the link and the version
 # and commit of the record. The version and the commit reach only sushitrack_profiler_parts.cpp,
 # so a new commit recompiles that file and no other.
 function(sushitrack_apply_profiling target)
