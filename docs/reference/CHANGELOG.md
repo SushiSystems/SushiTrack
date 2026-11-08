@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-11-09 — deps: Pinned SushiLog v0.3.1, which ships the scoped in-memory sink `LogCapture` (`cli/sushistack.deps.toml`).
 - 2026-11-09 — filtering: Gave `KalmanFilterRegistry` a public constructor and `GenericKalmanFactory` an overload that takes the registry to create from (RW-33, `generic_kalman_factory.hpp`).
 - 2026-11-09 — c_api: Added `SushiTrack::create_tracker`, which builds what `sushitrack_create_ex` builds from a Kalman filter registry the caller owns (RW-33, `create_tracker.hpp`).
 - 2026-11-09 — config: Added `SushiTrack::load_params`, which overlays a JSON document read from a stream; the file loader calls it (RW-33, `config_loader.hpp`).
