@@ -11,7 +11,7 @@ writes each add. Nothing in a module job changes production code except a seam a
 
 | Job | Files | Waits on | Status |
 | --- | --- | --- | --- |
-| T1 | `tests/support/tolerance.hpp` copied from SushiSkills |  | todo |
+| T1 | `tests/support/tolerance.hpp` copied from SushiSkills |  | done |
 | T2 | The seams of decision 2 |  | todo |
 | T3 | `CapturedLog` moved onto SushiLog's in-memory sink | sushilog T1 | todo |
 | T4 | A public profiler macro header for the three tests that include the private one |  | todo |

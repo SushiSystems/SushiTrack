@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-11-09 — tests: Copied SushiSkills' tolerance helper to `tests/support/tolerance.hpp`, which derives each floating-point tolerance from a rounding bound (RW-32).
 - 2026-11-06 — cli: Dropped the `Capturer` seam and `ScriptedCapturer`; the runner captures and the tests script `RecordingRunner`; sushicore 0.10.13 is required (RW-31, `workspace.py`).
 - 2026-11-06 — cli: Gave the services a `Workspace` and moved the CLI tests onto sushicore's in-memory runner and console; the CLI asks for sushicore 0.10.12 (`cli/sushitrack_cli/workspace.py`).
 - 2026-11-06 — tools: Deleted the leftover `check_test_additions.py` and its test, which the shared tools no longer carry, and recopied the shared tools (RW-30).

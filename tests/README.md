@@ -15,4 +15,5 @@ every file into `sushitrack_tests`. How to run them is in
 | `c_detection_builders.hpp` | `CDetections`: C API detections, the frame calls and the lookups of the tracker scenarios |
 | `gating_log_fixture.hpp` | `GatingLogFixture`, which counts the gating log lines of one cost matrix call |
 | `measurement_builders.hpp` | `make_box`, the measurement the Kalman filter tests feed |
+| `support/tolerance.hpp` | `TestSupport::measure_*_error` and `is_within`, which derive a floating-point tolerance from a rounding bound; a copy of SushiSkills' `tools/testing/support/tolerance.hpp` |
 | `tracklet_builders.hpp` | `make_t` and `make_feat_t`, the tracklets the cost calculator tests build |
