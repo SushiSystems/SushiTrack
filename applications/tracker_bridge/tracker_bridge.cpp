@@ -30,19 +30,16 @@
 #include <tracker_bridge.h>
 
 #include <exception>
-#include <memory>
-#include <string>
 #include <vector>
 
 #include <SushiTrack/logging/logger.hpp>
 
-#include <byte_track_adapter.hpp>
+#include <default_trackers.hpp>
 #include <mot_detection.hpp>
-#include <oc_sort_adapter.hpp>
-#include <sushitrack_adapter.hpp>
 #include <track_result.hpp>
 #include <tracker_adapter.hpp>
 #include <tracker_bridge_log_category.hpp>
+#include <tracker_builder.hpp>
 #include <tracker_registry.hpp>
 
 namespace
@@ -51,36 +48,10 @@ namespace
     using TrackerBridge::TrackerAdapter;
     using TrackerBridge::TrackerRegistry;
 
-    /**
-     * @brief Returns the registered names joined by commas, for a refusal that lists them.
-     */
-    std::string registered_list()
-    {
-        std::string list;
-        for (const std::string& name : TrackerRegistry::get_instance().registered_names())
-            list += (list.empty() ? "" : ", ") + name;
-        return list;
-    }
-
     /// @brief Registers the adapters before the first create_tracker call.
     const bool K_REGISTERED = []
     {
-        TrackerRegistry& registry = TrackerRegistry::get_instance();
-        registry.register_tracker("sushitrack",
-                                  []
-                                  {
-                                      return std::make_unique<TrackerBridge::SushiTrackAdapter>();
-                                  });
-        registry.register_tracker("bytetrack",
-                                  []
-                                  {
-                                      return std::make_unique<TrackerBridge::ByteTrackAdapter>();
-                                  });
-        registry.register_tracker("ocsort",
-                                  []
-                                  {
-                                      return std::make_unique<TrackerBridge::OCSORTAdapter>();
-                                  });
+        TrackerBridge::register_default_trackers(TrackerRegistry::get_instance());
         return true;
     }();
 } // namespace
@@ -89,40 +60,9 @@ extern "C"
 {
     void* create_tracker(const char* name)
     {
-        if (name == nullptr || !K_REGISTERED)
-        {
-            SUSHITRACK_LOG_ERROR(K_TRACKER_BRIDGE_LOG_CATEGORY,
-                                 "create_tracker refused: the name is null; no tracker was "
-                                 "built.");
+        if (!K_REGISTERED)
             return nullptr;
-        }
-        try
-        {
-            std::unique_ptr<TrackerAdapter> tracker = TrackerRegistry::get_instance().create(name);
-            if (tracker == nullptr)
-            {
-                SUSHITRACK_LOG_ERROR(K_TRACKER_BRIDGE_LOG_CATEGORY,
-                                     "create_tracker refused: {} is not registered (known: {}); "
-                                     "no tracker was built.",
-                                     name, registered_list());
-            }
-            return tracker.release();
-        }
-        catch (const std::exception& error)
-        {
-            SUSHITRACK_LOG_ERROR(K_TRACKER_BRIDGE_LOG_CATEGORY,
-                                 "create_tracker failed for {}: {}; no tracker was built.", name,
-                                 error.what());
-            return nullptr;
-        }
-        catch (...)
-        {
-            SUSHITRACK_LOG_ERROR(K_TRACKER_BRIDGE_LOG_CATEGORY,
-                                 "create_tracker failed for {}: unknown exception; no tracker "
-                                 "was built.",
-                                 name);
-            return nullptr;
-        }
+        return TrackerBridge::build_tracker(TrackerRegistry::get_instance(), name).release();
     }
 
     void delete_tracker(void* tracker)

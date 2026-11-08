@@ -34,6 +34,7 @@ The schema is layered `basic` / `advanced`. The outer `"sushitrack"` wrapper is 
 C API entry points (`include/SushiTrack/c_api/sushitrack_c.h`):
 
 - `sushitrack_load_params_from_json(path, &params)`: overlay a file onto a seeded `sushitrack_params_t` (`path = NULL` uses the resolution order above). It returns `SUSHITRACK_INVALID_ARGUMENT`, with `params` untouched and one ERROR in the log, for a null `params`, a named file that does not exist (the path argument or `$SUSHITRACK_CONFIG`), a key no section reads, a value of the wrong kind, and a number with a fraction in an integer field. A file that is not valid JSON gives `SUSHITRACK_RUNTIME_ERROR`. With nothing named and nothing found it succeeds.
+- `SushiTrack::load_params(stream, origin, params)` (C++, `config_loader.hpp`): overlay a JSON document read from a `std::istream` onto `params`, with the same statuses and log lines as the file loader, which calls it; `origin` names the document in the log.
 - `sushitrack_create_from_config(path)`: seed defaults, overlay the file, and create in one call. It returns no tracker when the file is refused.
 - `sushitrack_create(NULL)`: shorthand for `sushitrack_create_from_config(NULL)`. Passing an explicit `sushitrack_params_t*` bypasses file loading entirely (programmatic control).
 

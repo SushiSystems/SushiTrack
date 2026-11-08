@@ -32,16 +32,18 @@
 #include <gtest/gtest.h>
 
 #include <mot_detection.hpp>
+#include <support/default_params.hpp>
 #include <sushitrack_adapter.hpp>
 
 using namespace TrackerBridge;
+using TestSupport::default_params;
 
 /**
  * @brief The adapter is named after the predictions folder `st eval` reads.
  */
 TEST(Small_SushiTrackAdapterTest, IsNamedSushitrack)
 {
-    EXPECT_EQ(SushiTrackAdapter().name(), "sushitrack");
+    EXPECT_EQ(SushiTrackAdapter(default_params()).name(), "sushitrack");
 }
 
 /**
@@ -49,7 +51,7 @@ TEST(Small_SushiTrackAdapterTest, IsNamedSushitrack)
  */
 TEST(Small_SushiTrackAdapterTest, EmptyFrameGivesNoTrack)
 {
-    SushiTrackAdapter adapter;
+    SushiTrackAdapter adapter(default_params());
     EXPECT_TRUE(adapter.update({}, 1.f / 30.f).empty());
 }
 
@@ -58,7 +60,7 @@ TEST(Small_SushiTrackAdapterTest, EmptyFrameGivesNoTrack)
  */
 TEST(Small_SushiTrackAdapterTest, ReportedTrackFollowsItsDetection)
 {
-    SushiTrackAdapter adapter;
+    SushiTrackAdapter adapter(default_params());
     std::vector<TrackResult> tracks;
     for (int frame = 0; frame < 10; ++frame)
     {

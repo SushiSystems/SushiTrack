@@ -33,7 +33,10 @@
 
 #include <SushiTrack/filtering/generic_kalman_factory.hpp>
 #include <SushiTrack/filtering/kalman_factory.hpp>
+#include <SushiTrack/filtering/kalman_filter_registry.hpp>
 #include <SushiTrack/filtering/state_predictor.hpp>
+
+#include <support/kalman_registry_builders.hpp>
 
 using namespace SushiTrack;
 
@@ -42,7 +45,8 @@ using namespace SushiTrack;
  */
 TEST(Small_KalmanFactoryTest, EveryCreateGivesANewPredictor)
 {
-    const GenericKalmanFactory generic(0);
+    const std::unique_ptr<KalmanFilterRegistry> registry = TestSupport::library_kalman_registry();
+    const GenericKalmanFactory generic(0, false, *registry);
     const KalmanFactory& factory = generic;
 
     const std::unique_ptr<StatePredictor> first = factory.create();

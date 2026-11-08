@@ -53,6 +53,9 @@ namespace TrackerBridge
             /// @brief Builds one adapter.
             using Creator = std::function<std::unique_ptr<TrackerAdapter>()>;
 
+            /// @brief Builds a registry that holds no name.
+            TrackerRegistry() = default;
+
             /// @brief Returns the registry the adapters register into at static initialisation.
             [[nodiscard]] static TrackerRegistry& get_instance()
             {
@@ -93,8 +96,6 @@ namespace TrackerBridge
             }
 
         private:
-            TrackerRegistry() = default;
-
             /// @brief Returns @p name in lower case.
             [[nodiscard]] static std::string folded(std::string name)
             {

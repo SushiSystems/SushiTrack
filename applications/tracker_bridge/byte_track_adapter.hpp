@@ -62,27 +62,19 @@ namespace TrackerBridge
              * @param config_path Optional path to a JSON configuration file.
              */
             explicit ByteTrackAdapter(const std::string& config_path = "")
-                : frame_rate_(30),
-                  track_buffer_(30),
-                  track_thresh_(0.5f),
-                  high_thresh_(0.6f),
-                  match_thresh_(0.8f)
             {
                 if (!config_path.empty())
-                {
-                    const nlohmann::json doc = read_json_settings(config_path);
-                    const nlohmann::json& s = json_section(doc, "bytetrack", config_path);
-                    frame_rate_ = static_cast<int>(
-                        json_number(s, "frame_rate", static_cast<float>(frame_rate_)));
-                    track_buffer_ = static_cast<int>(
-                        json_number(s, "track_buffer", static_cast<float>(track_buffer_)));
-                    track_thresh_ = json_number(s, "track_thresh", track_thresh_);
-                    high_thresh_ = json_number(s, "high_thresh", high_thresh_);
-                    match_thresh_ = json_number(s, "match_thresh", match_thresh_);
-                    SUSHITRACK_LOG_INFO(K_TRACKER_BRIDGE_LOG_CATEGORY,
-                                        "ByteTrack settings read from {}.", config_path);
-                }
+                    apply_settings(read_json_settings(config_path), config_path);
+                rebuild_tracker();
+            }
 
+            /**
+             * @brief Initializes the adapter from the "bytetrack" section of @p document, read
+             *        from @p origin, which the log lines name.
+             */
+            ByteTrackAdapter(const nlohmann::json& document, const std::string& origin)
+            {
+                apply_settings(document, origin);
                 rebuild_tracker();
             }
 
@@ -140,12 +132,36 @@ namespace TrackerBridge
             }
 
         private:
-            int frame_rate_;
-            int track_buffer_;
-            float track_thresh_;
-            float high_thresh_;
-            float match_thresh_;
+            /**
+             * @brief Takes every setting the "bytetrack" section of @p document holds, logging
+             *        under @p origin what it cannot use.
+             */
+            void apply_settings(const nlohmann::json& document, const std::string& origin)
+            {
+                const nlohmann::json& s = json_section(document, "bytetrack", origin);
+                frame_rate_ = static_cast<int>(
+                    json_number(s, "frame_rate", static_cast<float>(frame_rate_)));
+                track_buffer_ = static_cast<int>(
+                    json_number(s, "track_buffer", static_cast<float>(track_buffer_)));
+                track_thresh_ = json_number(s, "track_thresh", track_thresh_);
+                high_thresh_ = json_number(s, "high_thresh", high_thresh_);
+                match_thresh_ = json_number(s, "match_thresh", match_thresh_);
+                SUSHITRACK_LOG_INFO(K_TRACKER_BRIDGE_LOG_CATEGORY,
+                                    "ByteTrack settings read from {}.", origin);
+            }
 
+            /// @brief Frames per second the tracker assumes.
+            int frame_rate_ = 30;
+            /// @brief Frames a lost track is kept.
+            int track_buffer_ = 30;
+            /// @brief Score that splits high from low detections.
+            float track_thresh_ = 0.5f;
+            /// @brief Score a detection needs to start a track.
+            float high_thresh_ = 0.6f;
+            /// @brief Matching threshold of the first association.
+            float match_thresh_ = 0.8f;
+
+            /// @brief The tracker built from the settings.
             std::unique_ptr<byte_track::BYTETracker> tracker_;
 
             /**

@@ -36,6 +36,7 @@
 #include <SushiTrack/filtering/kalman_types.hpp>
 
 #include <measurement_builders.hpp>
+#include <support/kalman_registry_builders.hpp>
 
 using namespace SushiTrack;
 
@@ -52,8 +53,8 @@ namespace
  */
 TEST_P(Small_GatedStatePredictorTest, GatesItsStartInAndAFarBoxOut)
 {
-    std::unique_ptr<GatedStatePredictor> filter =
-        KalmanFilterRegistry::get_instance().create(GetParam(), false);
+    const std::unique_ptr<KalmanFilterRegistry> registry = TestSupport::library_kalman_registry();
+    std::unique_ptr<GatedStatePredictor> filter = registry->create(GetParam(), false);
     ASSERT_NE(filter, nullptr);
 
     KalmanTypes::StateMean mean;
@@ -72,8 +73,8 @@ TEST_P(Small_GatedStatePredictorTest, GatesItsStartInAndAFarBoxOut)
  */
 TEST_P(Small_GatedStatePredictorTest, CovarianceStaysSymmetric)
 {
-    std::unique_ptr<GatedStatePredictor> filter =
-        KalmanFilterRegistry::get_instance().create(GetParam(), false);
+    const std::unique_ptr<KalmanFilterRegistry> registry = TestSupport::library_kalman_registry();
+    std::unique_ptr<GatedStatePredictor> filter = registry->create(GetParam(), false);
     ASSERT_NE(filter, nullptr);
 
     KalmanTypes::StateMean mean;

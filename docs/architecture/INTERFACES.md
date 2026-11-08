@@ -12,6 +12,6 @@ The runtime is organised around interfaces that the tracker depends on. Concrete
 | `AssignmentSolver` | Bipartite assignment | `LAPJVSolver` (Jonker–Volgenant with active-row/column reduction) |
 | `TimingPolicy` | dt normalisation, expiry | `FrameTimingPolicy`, `WallClockTimingPolicy` |
 
-`KalmanFilterRegistry` is a singleton plug-in registry. New Kalman variants register themselves through `KalmanFilterRegistrar<T>` and become selectable by `kalman_type`.
+`KalmanFilterRegistry` is a plug-in registry. The library's Kalman variants register themselves in the process-wide instance through `KalmanFilterRegistrar<T>` and become selectable by `kalman_type`; a caller may own another instance and pass it to `GenericKalmanFactory` or `SushiTrack::create_tracker`.
 
 Track lifecycle is governed by `TrackState` (`New`, `Tracked`, `Lost`, `Removed`, `Tentative`). When the IMM estimator is selected (`kalman_type=2`), each track also reports a motion regime (`Stationary`, `Cruising`, `Maneuvering`, or `Coasting`) derived from the IMM mode probabilities, plus a continuous `maneuver_probability` on the output track.

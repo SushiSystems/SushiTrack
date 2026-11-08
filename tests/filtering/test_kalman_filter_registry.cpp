@@ -58,7 +58,8 @@ TEST(Small_KalmanFilterRegistryTest, UnregisteredTypeLogsTheTypeAndReturnsNull)
     std::string logged;
     {
         CapturedLog log(SushiLog::LogLevel::Error);
-        filter = KalmanFilterRegistry::get_instance().create(987654, false);
+        const KalmanFilterRegistry registry;
+        filter = registry.create(987654, false);
         logged = log.last("Unregistered Kalman type requested");
     }
 
@@ -73,7 +74,7 @@ TEST(Small_KalmanFilterRegistryTest, UnregisteredTypeLogsTheTypeAndReturnsNull)
 TEST(Small_KalmanFilterRegistryTest, RegisteringATypeTwiceWarnsAndTheLaterCreatorWins)
 {
     CapturedLog log;
-    KalmanFilterRegistry& registry = KalmanFilterRegistry::get_instance();
+    KalmanFilterRegistry registry;
     const auto none = [](bool)
     {
         return std::unique_ptr<GatedStatePredictor>();

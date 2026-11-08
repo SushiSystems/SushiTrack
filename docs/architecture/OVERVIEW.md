@@ -130,7 +130,9 @@ constructed by the C-API entry point (`sushitrack_create_ex` in
 static: `KalmanFilter` at 0, `NSAKalmanFilter` at 1, `IMMFilter` at 2. The
 factory and the gating path both resolve predictors through the registry, so a
 new estimator becomes selectable by registering a new type id without editing
-the factory.
+the factory. A caller may own a registry and pass it to `GenericKalmanFactory`
+or to `SushiTrack::create_tracker` (`include/SushiTrack/c_api/create_tracker.hpp`)
+in place of the process-wide one.
 
 ---
 

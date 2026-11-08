@@ -23,14 +23,16 @@
 
 /**
  * @file config_loader.hpp
- * @brief Declares the helper that finds the tracker configuration file.
+ * @brief Declares the helpers that find the tracker configuration file and read a document.
  * @author Mustafa Garip
  */
 
 #pragma once
 
+#include <istream>
 #include <string>
 
+#include <SushiTrack/c_api/sushitrack_c.h>
 #include <SushiTrack/c_api/sushitrack_export.hpp>
 
 namespace SushiTrack
@@ -41,4 +43,16 @@ namespace SushiTrack
      * @return Resolved path string, or empty string when no file found.
      */
     SUSHITRACK_API std::string resolve_config_path(const char* path);
+
+    /**
+     * @brief Overlays the JSON configuration read from @p document onto @p params, as
+     *        sushitrack_load_params_from_json does with the file it opens.
+     * @param origin The name the log lines give the document, such as its path.
+     * @param params Updated in place; untouched on any failure.
+     * @return SUCCESS when it applied, INVALID_ARGUMENT for a document the reader refuses,
+     *         RUNTIME_ERROR for one that cannot be read or parsed.
+     */
+    [[nodiscard]] SUSHITRACK_API sushitrack_status_t load_params(std::istream& document,
+                                                                 const std::string& origin,
+                                                                 sushitrack_params_t& params);
 } // namespace SushiTrack

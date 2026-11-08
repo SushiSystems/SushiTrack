@@ -32,31 +32,32 @@
 #include <gtest/gtest.h>
 
 #include <captured_log.hpp>
+#include <support/default_params.hpp>
+#include <sushitrack_adapter.hpp>
+#include <tracker_adapter.hpp>
 #include <tracker_bridge.h>
 #include <tracker_bridge_log_category.hpp>
 
-/**
- * @brief Each registered name, in the case the pipeline passes, builds a tracker.
- */
-TEST(Small_TrackerBridgeTest, BuildsEveryRegisteredTracker)
+using TestSupport::default_params;
+
+namespace
 {
-    for (const char* name : {"SushiTrack", "ByteTrack", "OCSORT"})
+    /**
+     * @brief Returns @p adapter as the opaque handle tracker_process_c takes.
+     */
+    void* handle_of(TrackerBridge::TrackerAdapter& adapter)
     {
-        void* tracker = create_tracker(name);
-        EXPECT_NE(tracker, nullptr) << name;
-        delete_tracker(tracker);
+        return &adapter;
     }
-    EXPECT_EQ(create_tracker("no-such-tracker"), nullptr);
-    EXPECT_EQ(create_tracker(nullptr), nullptr);
-}
+} // namespace
 
 /**
  * @brief One steady detection over ten frames comes back as one track, within the capacity.
  */
 TEST(Small_TrackerBridgeTest, ProcessWritesTheTracksWithinTheCapacity)
 {
-    void* tracker = create_tracker("sushitrack");
-    ASSERT_NE(tracker, nullptr);
+    TrackerBridge::SushiTrackAdapter adapter(default_params());
+    void* tracker = handle_of(adapter);
 
     std::vector<CTrackResult> results(4);
     int count = -1;
@@ -66,7 +67,6 @@ TEST(Small_TrackerBridgeTest, ProcessWritesTheTracksWithinTheCapacity)
         tracker_process_c(tracker, &det, 1, results.data(), &count,
                           static_cast<int>(results.size()));
     }
-    delete_tracker(tracker);
 
     EXPECT_EQ(count, 1);
 }
@@ -78,29 +78,12 @@ TEST(Small_TrackerBridgeTest, NullResultsAreRefused)
 {
     SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace,
                                 {TrackerBridge::K_TRACKER_BRIDGE_LOG_CATEGORY});
-    void* tracker = create_tracker("sushitrack");
+    TrackerBridge::SushiTrackAdapter adapter(default_params());
     int count = -1;
-    EXPECT_EQ(tracker_process_c(tracker, nullptr, 0, nullptr, &count, 0),
+    EXPECT_EQ(tracker_process_c(handle_of(adapter), nullptr, 0, nullptr, &count, 0),
               TRACKER_BRIDGE_INVALID_ARGUMENT);
-    delete_tracker(tracker);
     EXPECT_EQ(count, -1);
     EXPECT_EQ(log.count("tracker_process_c refused: tracker, results or num_results is null"), 1);
-}
-
-/**
- * @brief An unknown or null tracker name logs one ERROR that lists the registered names.
- */
-TEST(Small_TrackerBridgeTest, RefusedNamesAreLogged)
-{
-    SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace,
-                                {TrackerBridge::K_TRACKER_BRIDGE_LOG_CATEGORY});
-
-    EXPECT_EQ(create_tracker("no-such-tracker"), nullptr);
-    EXPECT_EQ(create_tracker(nullptr), nullptr);
-
-    EXPECT_EQ(log.count("no-such-tracker is not registered (known: "), 1);
-    EXPECT_EQ(log.count("create_tracker refused: the name is null"), 1);
-    EXPECT_EQ(log.level_of("is not registered"), SushiLog::LogLevel::Error);
 }
 
 /**
@@ -110,8 +93,8 @@ TEST(Small_TrackerBridgeTest, TruncationIsReportedByStatusAndLog)
 {
     SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace,
                                 {TrackerBridge::K_TRACKER_BRIDGE_LOG_CATEGORY});
-    void* tracker = create_tracker("sushitrack");
-    ASSERT_NE(tracker, nullptr);
+    TrackerBridge::SushiTrackAdapter adapter(default_params());
+    void* tracker = handle_of(adapter);
     const CDetection dets[2] = {{100.f, 100.f, 50.f, 80.f, 0.9f, 1, nullptr, 0},
                                 {400.f, 100.f, 50.f, 80.f, 0.9f, 1, nullptr, 0}};
     std::vector<CTrackResult> results(1);
@@ -120,7 +103,6 @@ TEST(Small_TrackerBridgeTest, TruncationIsReportedByStatusAndLog)
 
     for (int frame = 0; frame < 3; ++frame)
         status = tracker_process_c(tracker, dets, 2, results.data(), &count, 1);
-    delete_tracker(tracker);
 
     EXPECT_EQ(status, TRACKER_BRIDGE_TRUNCATED);
     EXPECT_EQ(count, 1);
@@ -132,14 +114,12 @@ TEST(Small_TrackerBridgeTest, TruncationIsReportedByStatusAndLog)
  */
 TEST(Small_TrackerBridgeTest, EmptyFrameRunsAndReturnsOk)
 {
-    void* tracker = create_tracker("sushitrack");
-    ASSERT_NE(tracker, nullptr);
+    TrackerBridge::SushiTrackAdapter adapter(default_params());
     std::vector<CTrackResult> results(4);
     int count = -1;
 
-    EXPECT_EQ(tracker_process_c(tracker, nullptr, 0, results.data(), &count, 4),
+    EXPECT_EQ(tracker_process_c(handle_of(adapter), nullptr, 0, results.data(), &count, 4),
               TRACKER_BRIDGE_OK);
-    delete_tracker(tracker);
 
     EXPECT_EQ(count, 0);
 }
@@ -151,14 +131,12 @@ TEST(Small_TrackerBridgeTest, NegativeCountsAreRefused)
 {
     SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace,
                                 {TrackerBridge::K_TRACKER_BRIDGE_LOG_CATEGORY});
-    void* tracker = create_tracker("sushitrack");
-    ASSERT_NE(tracker, nullptr);
+    TrackerBridge::SushiTrackAdapter adapter(default_params());
     std::vector<CTrackResult> results(4);
     int count = -1;
 
-    EXPECT_EQ(tracker_process_c(tracker, nullptr, -1, results.data(), &count, 4),
+    EXPECT_EQ(tracker_process_c(handle_of(adapter), nullptr, -1, results.data(), &count, 4),
               TRACKER_BRIDGE_INVALID_ARGUMENT);
-    delete_tracker(tracker);
 
     EXPECT_EQ(count, 0);
     EXPECT_EQ(log.count("tracker_process_c refused: num_detections is -1"), 1);

@@ -62,35 +62,20 @@ namespace TrackerBridge
              * @param config_path Optional path to a JSON configuration file.
              */
             explicit OCSORTAdapter(const std::string& config_path = "")
-                : det_thresh_(0.4f),
-                  max_age_(30),
-                  min_hits_(3),
-                  iou_threshold_(0.3f),
-                  delta_t_(3),
-                  inertia_(0.2f),
-                  use_byte_(false)
             {
                 if (!config_path.empty())
-                {
-                    const nlohmann::json doc = read_json_settings(config_path);
-                    const nlohmann::json& s = json_section(doc, "ocsort", config_path);
-                    det_thresh_ = json_number(s, "det_thresh", det_thresh_);
-                    max_age_ =
-                        static_cast<int>(json_number(s, "max_age", static_cast<float>(max_age_)));
-                    min_hits_ = static_cast<int>(
-                        json_number(s, "min_hits", static_cast<float>(min_hits_)));
-                    iou_threshold_ = json_number(s, "iou_threshold", iou_threshold_);
-                    delta_t_ =
-                        static_cast<int>(json_number(s, "delta_t", static_cast<float>(delta_t_)));
-                    inertia_ = json_number(s, "inertia", inertia_);
-                    use_byte_ = json_number(s, "use_byte", 0.0f) > 0.5f;
-                    SUSHITRACK_LOG_INFO(K_TRACKER_BRIDGE_LOG_CATEGORY,
-                                        "OC-SORT settings read from {}.", config_path);
-                }
+                    apply_settings(read_json_settings(config_path), config_path);
+                rebuild_tracker();
+            }
 
-                tracker_ = std::make_unique<ocsort::OCSort>(det_thresh_, max_age_, min_hits_,
-                                                            iou_threshold_, delta_t_, "iou",
-                                                            inertia_, use_byte_);
+            /**
+             * @brief Initializes the adapter from the "ocsort" section of @p document, read from
+             *        @p origin, which the log lines name.
+             */
+            OCSORTAdapter(const nlohmann::json& document, const std::string& origin)
+            {
+                apply_settings(document, origin);
+                rebuild_tracker();
             }
 
             /**
@@ -151,14 +136,51 @@ namespace TrackerBridge
             }
 
         private:
-            float det_thresh_;
-            int max_age_;
-            int min_hits_;
-            float iou_threshold_;
-            int delta_t_;
-            float inertia_;
-            bool use_byte_;
+            /**
+             * @brief Takes every setting the "ocsort" section of @p document holds, logging under
+             *        @p origin what it cannot use.
+             */
+            void apply_settings(const nlohmann::json& document, const std::string& origin)
+            {
+                const nlohmann::json& s = json_section(document, "ocsort", origin);
+                det_thresh_ = json_number(s, "det_thresh", det_thresh_);
+                max_age_ =
+                    static_cast<int>(json_number(s, "max_age", static_cast<float>(max_age_)));
+                min_hits_ =
+                    static_cast<int>(json_number(s, "min_hits", static_cast<float>(min_hits_)));
+                iou_threshold_ = json_number(s, "iou_threshold", iou_threshold_);
+                delta_t_ =
+                    static_cast<int>(json_number(s, "delta_t", static_cast<float>(delta_t_)));
+                inertia_ = json_number(s, "inertia", inertia_);
+                use_byte_ = json_number(s, "use_byte", 0.0f) > 0.5f;
+                SUSHITRACK_LOG_INFO(K_TRACKER_BRIDGE_LOG_CATEGORY, "OC-SORT settings read from {}.",
+                                    origin);
+            }
 
+            /// @brief Replaces the tracker with one built from the settings.
+            void rebuild_tracker()
+            {
+                tracker_ = std::make_unique<ocsort::OCSort>(det_thresh_, max_age_, min_hits_,
+                                                            iou_threshold_, delta_t_, "iou",
+                                                            inertia_, use_byte_);
+            }
+
+            /// @brief Score a detection needs to be associated.
+            float det_thresh_ = 0.4f;
+            /// @brief Frames a lost track is kept.
+            int max_age_ = 30;
+            /// @brief Hits a track needs before it is reported.
+            int min_hits_ = 3;
+            /// @brief IoU a match needs.
+            float iou_threshold_ = 0.3f;
+            /// @brief Frames the velocity direction spans.
+            int delta_t_ = 3;
+            /// @brief Weight of the velocity direction in the cost.
+            float inertia_ = 0.2f;
+            /// @brief Whether the low-score detections get a second association.
+            bool use_byte_ = false;
+
+            /// @brief The tracker built from the settings.
             std::unique_ptr<ocsort::OCSort> tracker_;
     };
 

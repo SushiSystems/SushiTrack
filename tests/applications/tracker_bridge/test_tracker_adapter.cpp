@@ -38,6 +38,7 @@
 #include <byte_track_adapter.hpp>
 #include <mot_detection.hpp>
 #include <oc_sort_adapter.hpp>
+#include <support/default_params.hpp>
 #include <sushitrack_adapter.hpp>
 #include <tracker_adapter.hpp>
 
@@ -82,7 +83,8 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::Values(AdapterFactory(
                           []
                           {
-                              return std::make_unique<TrackerBridge::SushiTrackAdapter>();
+                              return std::make_unique<TrackerBridge::SushiTrackAdapter>(
+                                  TestSupport::default_params());
                           }),
                       AdapterFactory(
                           []

@@ -47,14 +47,20 @@ namespace SushiTrack
     using KalmanCreator = std::function<std::unique_ptr<GatedStatePredictor>(bool)>;
 
     /**
-     * @brief Singleton registry for managing and instantiating Kalman filters.
+     * @brief Maps a Kalman filter type to the creator that instantiates it.
+     *
+     * The filters of the library register into get_instance() at static initialisation; a
+     * caller that wants its own set owns an instance and passes it in.
      */
     class KalmanFilterRegistry final
     {
         public:
+            /// @brief Builds a registry that holds no creator.
+            KalmanFilterRegistry() = default;
+
             /**
              * @brief Retrieves the global registry instance.
-             * @return Reference to the singleton registry.
+             * @return Reference to the registry the library's filters register into.
              */
             [[nodiscard]] static KalmanFilterRegistry& get_instance()
             {
@@ -98,7 +104,7 @@ namespace SushiTrack
             }
 
         private:
-            KalmanFilterRegistry() = default;
+            /// @brief The creator of each registered type.
             std::unordered_map<int, KalmanCreator> creators_;
     };
 

@@ -23,15 +23,18 @@
 
 /**
  * @file config_loader.cpp
- * @brief Implements configuration path resolution and the C entry points that load a file.
+ * @brief Implements configuration path resolution, the document reader and the C entry points
+ *        that load a file.
  * @author Mustafa Garip
  */
 
 #include <SushiTrack/configuration/config_loader.hpp>
 
 #include <cstdlib>
+#include <exception>
 #include <filesystem>
 #include <fstream>
+#include <istream>
 #include <string>
 
 #include <nlohmann/json.hpp>
@@ -134,6 +137,44 @@ namespace SushiTrack
 
         return std::string();
     }
+
+    /**
+     * @brief Overlays the JSON configuration read from @p document onto @p params.
+     * @return SUCCESS, INVALID_ARGUMENT for a refused document, RUNTIME_ERROR for an unreadable
+     *         one.
+     */
+    sushitrack_status_t load_params(std::istream& document, const std::string& origin,
+                                    sushitrack_params_t& params)
+    {
+        try
+        {
+            const nlohmann::json parsed = nlohmann::json::parse(document, nullptr, true, true);
+            const std::string refusal = Detail::overlay_params(parsed, params);
+            if (!refusal.empty())
+            {
+                SUSHITRACK_LOG_ERROR(K_CONFIGURATION_LOG_CATEGORY,
+                                     "Configuration {} refused: {}; params is unchanged.", origin,
+                                     refusal);
+                return SUSHITRACK_INVALID_ARGUMENT;
+            }
+
+            SUSHITRACK_LOG_INFO(K_CONFIGURATION_LOG_CATEGORY, "Configuration loaded from {}",
+                                origin);
+            return SUSHITRACK_SUCCESS;
+        }
+        catch (const std::exception& e)
+        {
+            SUSHITRACK_LOG_ERROR(K_CONFIGURATION_LOG_CATEGORY,
+                                 "Failed to parse configuration {}: {}", origin, e.what());
+            return SUSHITRACK_RUNTIME_ERROR;
+        }
+        catch (...)
+        {
+            SUSHITRACK_LOG_ERROR(K_CONFIGURATION_LOG_CATEGORY,
+                                 "Failed to load configuration {}: unknown exception.", origin);
+            return SUSHITRACK_RUNTIME_ERROR;
+        }
+    }
 } // namespace SushiTrack
 
 extern "C"
@@ -189,19 +230,7 @@ extern "C"
                 return SUSHITRACK_RUNTIME_ERROR;
             }
 
-            const nlohmann::json document = nlohmann::json::parse(file, nullptr, true, true);
-            const std::string refusal = SushiTrack::Detail::overlay_params(document, *params);
-            if (!refusal.empty())
-            {
-                SUSHITRACK_LOG_ERROR(K_CONFIGURATION_LOG_CATEGORY,
-                                     "Configuration {} refused: {}; params is unchanged.",
-                                     resolved, refusal);
-                return SUSHITRACK_INVALID_ARGUMENT;
-            }
-
-            SUSHITRACK_LOG_INFO(K_CONFIGURATION_LOG_CATEGORY, "Configuration loaded from {}",
-                                resolved);
-            return SUSHITRACK_SUCCESS;
+            return SushiTrack::load_params(file, resolved, *params);
         }
         catch (const std::exception& e)
         {

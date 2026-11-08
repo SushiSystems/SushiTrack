@@ -36,6 +36,8 @@
 
 namespace SushiTrack
 {
+    class KalmanFilterRegistry;
+
     /**
      * @brief Generic factory for instantiating state predictors via a dynamic registry.
      */
@@ -43,11 +45,20 @@ namespace SushiTrack
     {
         public:
             /**
-             * @brief Initializes factory with Kalman type and coordinate parameters.
+             * @brief Initializes factory with Kalman type and coordinate parameters, creating
+             *        from KalmanFilterRegistry::get_instance().
              * @param kalman_type Identifier for the Kalman filter type.
              * @param enable_xyah Flag for coordinate system selection.
              */
             explicit GenericKalmanFactory(int kalman_type, bool enable_xyah = false);
+
+            /**
+             * @brief Initializes factory with Kalman type and coordinate parameters, creating
+             *        from @p registry.
+             * @param registry The registry create() asks; it must outlive the factory.
+             */
+            GenericKalmanFactory(int kalman_type, bool enable_xyah,
+                                 const KalmanFilterRegistry& registry);
 
             /**
              * @brief Generates a new state predictor instance from registry.
@@ -56,7 +67,11 @@ namespace SushiTrack
             [[nodiscard]] std::unique_ptr<StatePredictor> create() const override;
 
         private:
+            /// @brief The Kalman filter type create() asks for.
             int kalman_type_;
+            /// @brief Whether the filter works in xyah coordinates.
             bool enable_xyah_;
+            /// @brief The registry create() asks.
+            const KalmanFilterRegistry* registry_;
     };
 } // namespace SushiTrack

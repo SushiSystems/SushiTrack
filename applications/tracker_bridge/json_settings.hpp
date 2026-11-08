@@ -23,8 +23,8 @@
 
 /**
  * @file json_settings.hpp
- * @brief Declares read_json_settings, json_section and json_number, which read a reference
- *        tracker's settings and log what they cannot use.
+ * @brief Declares parse_json_settings, read_json_settings, json_section and json_number, which
+ *        read a reference tracker's settings and log what they cannot use.
  * @author Mustafa Garip
  */
 
@@ -32,6 +32,7 @@
 
 #include <exception>
 #include <fstream>
+#include <istream>
 #include <string>
 
 #include <nlohmann/json.hpp>
@@ -43,12 +44,32 @@
 namespace TrackerBridge
 {
     /**
+     * @brief Returns the JSON document, comments allowed, read from @p settings, or an empty
+     *        object after an ERROR naming @p origin when it does not parse.
+     */
+    inline nlohmann::json parse_json_settings(std::istream& settings, const std::string& origin)
+    {
+        nlohmann::json result = nlohmann::json::object();
+        try
+        {
+            result = nlohmann::json::parse(settings, nullptr, true, true);
+        }
+        catch (const std::exception& error)
+        {
+            SUSHITRACK_LOG_ERROR(K_TRACKER_BRIDGE_LOG_CATEGORY,
+                                 "Settings file {} is not valid JSON ({}); the tracker keeps its "
+                                 "defaults.",
+                                 origin, error.what());
+        }
+        return result;
+    }
+
+    /**
      * @brief Returns the JSON document in @p path, or an empty object when the file cannot be
      *        opened or parsed, logging why.
      */
     inline nlohmann::json read_json_settings(const std::string& path)
     {
-        nlohmann::json result = nlohmann::json::object();
         std::ifstream file(path);
         if (!file.is_open())
         {
@@ -56,20 +77,9 @@ namespace TrackerBridge
                                 "Settings file {} cannot be opened; the tracker keeps its "
                                 "defaults.",
                                 path);
-            return result;
+            return nlohmann::json::object();
         }
-        try
-        {
-            result = nlohmann::json::parse(file, nullptr, true, true);
-        }
-        catch (const std::exception& error)
-        {
-            SUSHITRACK_LOG_ERROR(K_TRACKER_BRIDGE_LOG_CATEGORY,
-                                 "Settings file {} is not valid JSON ({}); the tracker keeps its "
-                                 "defaults.",
-                                 path, error.what());
-        }
-        return result;
+        return parse_json_settings(file, path);
     }
 
     /**

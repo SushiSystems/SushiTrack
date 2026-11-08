@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- 2026-11-09 — filtering: Gave `KalmanFilterRegistry` a public constructor and `GenericKalmanFactory` an overload that takes the registry to create from (RW-33, `generic_kalman_factory.hpp`).
+- 2026-11-09 — c_api: Added `SushiTrack::create_tracker`, which builds what `sushitrack_create_ex` builds from a Kalman filter registry the caller owns (RW-33, `create_tracker.hpp`).
+- 2026-11-09 — config: Added `SushiTrack::load_params`, which overlays a JSON document read from a stream; the file loader calls it (RW-33, `config_loader.hpp`).
+- 2026-11-09 — applications: Gave `TrackerRegistry` a public constructor, added `build_tracker` and `register_default_trackers`, and let the adapters and the benchmark readers take parameters or a stream (RW-33, `tracker_builder.hpp`).
 - 2026-11-09 — tests: Copied SushiSkills' tolerance helper to `tests/support/tolerance.hpp`, which derives each floating-point tolerance from a rounding bound (RW-32).
 - 2026-11-06 — cli: Dropped the `Capturer` seam and `ScriptedCapturer`; the runner captures and the tests script `RecordingRunner`; sushicore 0.10.13 is required (RW-31, `workspace.py`).
 - 2026-11-06 — cli: Gave the services a `Workspace` and moved the CLI tests onto sushicore's in-memory runner and console; the CLI asks for sushicore 0.10.12 (`cli/sushitrack_cli/workspace.py`).

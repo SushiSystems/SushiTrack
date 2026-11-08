@@ -28,6 +28,7 @@
  */
 
 #include <SushiTrack/c_api/sushitrack_c.h>
+#include <SushiTrack/c_api/create_tracker.hpp>
 
 #include <algorithm>
 #include <cstddef>
@@ -204,103 +205,17 @@ namespace
     }
 } // namespace
 
-extern "C"
+namespace SushiTrack
 {
     /**
-     * @brief Populates a parameters structure with default algorithm values.
-     * @param params Pointer to the structure to be initialized.
-     */
-    void sushitrack_get_default_params(sushitrack_params_t* params)
-    {
-        if (!params)
-            return;
-
-        params->enable_reid = 0;
-        params->time_aware = 0;
-
-        params->frame_rate = 25;
-        params->track_buffer = 30;
-
-        params->track_thresh = 0.2f;
-        params->high_thresh = 0.5f;
-        params->match_thresh = 0.7f;
-
-        params->enable_tentative = 0;
-
-        params->enable_mahalanobis = 0;
-        params->gating_thresh = 9.4877f;
-        params->max_area_ratio = 50.0f;
-        params->motion_cost_weight = 0.15f;
-
-        params->enable_xyah = 0;
-        params->kalman_type = 0;
-        params->iou_plus_one = 1;
-        params->iou_type = 1;
-        params->feature_momentum = 0.9f;
-        params->reid_direct_assignment_weight = 0.2f;
-
-        params->iou_match_thresh = 0.5f;
-        params->unconfirmed_iou_thresh = 0.7f;
-        params->duplicate_iou_thresh = 0.15f;
-
-        params->tentative_match_thresh = 0.3f;
-        params->tentative_confirm_hits = 3;
-        params->tentative_max_age_seconds = 0.08f;
-        params->tentative_max_miss_frames = 2;
-        params->tentative_init_suppress_iou = 0.7f;
-
-        params->tentative_fast_thresh = 0.85f;
-        params->tentative_fast_hits = 1;
-        params->tentative_slow_thresh = 0.40f;
-        params->tentative_slow_hits_offset = 1;
-        params->tentative_vslow_hits_offset = 2;
-
-        params->reid_high_thresh = 0.3f;
-        params->reid_high_iou_weight = 0.3f;
-        params->reid_low_thresh = 0.5f;
-        params->reid_low_iou_weight = 0.2f;
-        params->reid_recovery_thresh = 0.4f;
-        params->max_feature_history = 100;
-
-        params->primary_assoc_mode = 1;
-        params->fuse_score = 1;
-
-        params->enable_ocm = 0;
-        params->enable_oru = 0;
-        params->ocm_vdc_weight = 0.1f;
-        params->ocm_delta_t = 3;
-        params->ocm_min_velocity = 1.0f;
-        params->ocm_max_age = 1;
-        params->ocm_maneuver_weight_scale = 0.15f;
-    }
-
-    /**
-     * @brief Instantiates a tracker based on provided configuration.
-     * @param params Pointer to configuration structure, or NULL for defaults.
-     * @return Handle to initialized tracker instance, or NULL on failure.
-     */
-    sushitrack_tracker_t sushitrack_create(const sushitrack_params_t* params)
-    {
-        if (!params)
-            return sushitrack_create_from_config(nullptr);
-
-        sushitrack_tracker_t hdl = nullptr;
-        sushitrack_status_t status = sushitrack_create_ex(params, &hdl);
-
-        if (status != SUSHITRACK_SUCCESS)
-            return nullptr;
-
-        return hdl;
-    }
-
-    /**
-     * @brief Extended instantiation providing status code feedback.
-     * @param params Pointer to configuration structure.
-     * @param out_tracker Pointer to receive initialized tracker handle.
+     * @brief Builds a tracker whose Kalman filters come from @p registry.
+     * @param registry The registry the tracker creates its filters from; it must outlive the
+     *        tracker.
      * @return Status code indicating success or failure reason.
      */
-    sushitrack_status_t sushitrack_create_ex(const sushitrack_params_t* params,
-                                             sushitrack_tracker_t* out_tracker)
+    sushitrack_status_t create_tracker(const sushitrack_params_t* params,
+                                       const KalmanFilterRegistry& registry,
+                                       sushitrack_tracker_t* out_tracker)
     {
         if (!out_tracker)
         {
@@ -379,13 +294,12 @@ extern "C"
             warn_about_adjusted_params(config);
 
             // The registry logs the ERROR that names the unregistered type.
-            auto gate_kf = SushiTrack::KalmanFilterRegistry::get_instance().create(
-                config.kalman_type, config.enable_xyah);
+            auto gate_kf = registry.create(config.kalman_type, config.enable_xyah);
             if (!gate_kf)
                 return SUSHITRACK_INVALID_ARGUMENT;
 
             auto kf_factory = std::make_shared<SushiTrack::GenericKalmanFactory>(
-                config.kalman_type, config.enable_xyah);
+                config.kalman_type, config.enable_xyah, registry);
 
             std::shared_ptr<SushiTrack::GateValidator> active_gate_validator;
 
@@ -522,6 +436,109 @@ extern "C"
                                  "SUSHITRACK_INITIALIZATION_FAILURE");
             return SUSHITRACK_INITIALIZATION_FAILURE;
         }
+    }
+} // namespace SushiTrack
+
+extern "C"
+{
+    /**
+     * @brief Populates a parameters structure with default algorithm values.
+     * @param params Pointer to the structure to be initialized.
+     */
+    void sushitrack_get_default_params(sushitrack_params_t* params)
+    {
+        if (!params)
+            return;
+
+        params->enable_reid = 0;
+        params->time_aware = 0;
+
+        params->frame_rate = 25;
+        params->track_buffer = 30;
+
+        params->track_thresh = 0.2f;
+        params->high_thresh = 0.5f;
+        params->match_thresh = 0.7f;
+
+        params->enable_tentative = 0;
+
+        params->enable_mahalanobis = 0;
+        params->gating_thresh = 9.4877f;
+        params->max_area_ratio = 50.0f;
+        params->motion_cost_weight = 0.15f;
+
+        params->enable_xyah = 0;
+        params->kalman_type = 0;
+        params->iou_plus_one = 1;
+        params->iou_type = 1;
+        params->feature_momentum = 0.9f;
+        params->reid_direct_assignment_weight = 0.2f;
+
+        params->iou_match_thresh = 0.5f;
+        params->unconfirmed_iou_thresh = 0.7f;
+        params->duplicate_iou_thresh = 0.15f;
+
+        params->tentative_match_thresh = 0.3f;
+        params->tentative_confirm_hits = 3;
+        params->tentative_max_age_seconds = 0.08f;
+        params->tentative_max_miss_frames = 2;
+        params->tentative_init_suppress_iou = 0.7f;
+
+        params->tentative_fast_thresh = 0.85f;
+        params->tentative_fast_hits = 1;
+        params->tentative_slow_thresh = 0.40f;
+        params->tentative_slow_hits_offset = 1;
+        params->tentative_vslow_hits_offset = 2;
+
+        params->reid_high_thresh = 0.3f;
+        params->reid_high_iou_weight = 0.3f;
+        params->reid_low_thresh = 0.5f;
+        params->reid_low_iou_weight = 0.2f;
+        params->reid_recovery_thresh = 0.4f;
+        params->max_feature_history = 100;
+
+        params->primary_assoc_mode = 1;
+        params->fuse_score = 1;
+
+        params->enable_ocm = 0;
+        params->enable_oru = 0;
+        params->ocm_vdc_weight = 0.1f;
+        params->ocm_delta_t = 3;
+        params->ocm_min_velocity = 1.0f;
+        params->ocm_max_age = 1;
+        params->ocm_maneuver_weight_scale = 0.15f;
+    }
+
+    /**
+     * @brief Instantiates a tracker based on provided configuration.
+     * @param params Pointer to configuration structure, or NULL for defaults.
+     * @return Handle to initialized tracker instance, or NULL on failure.
+     */
+    sushitrack_tracker_t sushitrack_create(const sushitrack_params_t* params)
+    {
+        if (!params)
+            return sushitrack_create_from_config(nullptr);
+
+        sushitrack_tracker_t hdl = nullptr;
+        sushitrack_status_t status = sushitrack_create_ex(params, &hdl);
+
+        if (status != SUSHITRACK_SUCCESS)
+            return nullptr;
+
+        return hdl;
+    }
+
+    /**
+     * @brief Extended instantiation providing status code feedback.
+     * @param params Pointer to configuration structure.
+     * @param out_tracker Pointer to receive initialized tracker handle.
+     * @return Status code indicating success or failure reason.
+     */
+    sushitrack_status_t sushitrack_create_ex(const sushitrack_params_t* params,
+                                             sushitrack_tracker_t* out_tracker)
+    {
+        return SushiTrack::create_tracker(params, SushiTrack::KalmanFilterRegistry::get_instance(),
+                                          out_tracker);
     }
 
     /**

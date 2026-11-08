@@ -34,51 +34,29 @@
 
 #include <gtest/gtest.h>
 
-#include <mot_detection.hpp>
-#include <track_result.hpp>
 #include <captured_log.hpp>
+#include <oc_sort_adapter.hpp>
 #include <tracker_adapter.hpp>
 #include <tracker_bridge_log_category.hpp>
 #include <tracker_registry.hpp>
 
 using namespace TrackerBridge;
 
-namespace
-{
-    /** @brief Reports no track; names itself "probe". */
-    class SilentAdapter final : public TrackerAdapter
-    {
-        public:
-            /// @brief Returns "probe".
-            [[nodiscard]] std::string name() const override { return "probe"; }
-
-            /// @brief Returns no track.
-            [[nodiscard]] std::vector<TrackResult> update(const std::vector<MOTDetection>&,
-                                                          float) override
-            {
-                return {};
-            }
-
-            /// @brief Ignores the frame rate.
-            void set_frame_rate(int) override {}
-    };
-} // namespace
-
 /**
  * @brief A name registered in one case is found in any other.
  */
 TEST(Small_TrackerRegistryTest, FindsANameInAnyCase)
 {
-    TrackerRegistry& registry = TrackerRegistry::get_instance();
+    TrackerRegistry registry;
     registry.register_tracker("RegistryProbe",
                               []
                               {
-                                  return std::make_unique<SilentAdapter>();
+                                  return std::make_unique<OCSORTAdapter>();
                               });
 
     const std::unique_ptr<TrackerAdapter> adapter = registry.create("REGISTRYPROBE");
     ASSERT_NE(adapter, nullptr);
-    EXPECT_EQ(adapter->name(), "probe");
+    EXPECT_EQ(adapter->name(), "ocsort");
 }
 
 /**
@@ -86,7 +64,8 @@ TEST(Small_TrackerRegistryTest, FindsANameInAnyCase)
  */
 TEST(Small_TrackerRegistryTest, UnknownNameBuildsNothing)
 {
-    EXPECT_EQ(TrackerRegistry::get_instance().create("no-such-tracker"), nullptr);
+    const TrackerRegistry registry;
+    EXPECT_EQ(registry.create("no-such-tracker"), nullptr);
 }
 
 /**
@@ -95,17 +74,17 @@ TEST(Small_TrackerRegistryTest, UnknownNameBuildsNothing)
 TEST(Small_TrackerRegistryTest, RegisteringANameTwiceWarnsAndNamesAreSorted)
 {
     SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_TRACKER_BRIDGE_LOG_CATEGORY});
-    TrackerRegistry& registry = TrackerRegistry::get_instance();
+    TrackerRegistry registry;
     const auto make = []
     {
-        return std::make_unique<SilentAdapter>();
+        return std::make_unique<OCSORTAdapter>();
     };
 
+    registry.register_tracker("ZuluProbe", make);
     registry.register_tracker("DuplicateProbe", make);
     registry.register_tracker("duplicateprobe", make);
 
     EXPECT_EQ(log.count("Tracker duplicateprobe registered twice"), 1);
-    const std::vector<std::string> names = registry.registered_names();
-    EXPECT_TRUE(std::is_sorted(names.begin(), names.end()));
-    EXPECT_NE(std::find(names.begin(), names.end(), "duplicateprobe"), names.end());
+    EXPECT_EQ(registry.registered_names(),
+              (std::vector<std::string>{"duplicateprobe", "zuluprobe"}));
 }

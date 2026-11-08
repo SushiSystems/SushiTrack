@@ -41,7 +41,19 @@ namespace SushiTrack
      * @param enable_xyah Flag selecting the xyah coordinate parameterization.
      */
     GenericKalmanFactory::GenericKalmanFactory(int kalman_type, bool enable_xyah)
-        : kalman_type_(kalman_type), enable_xyah_(enable_xyah)
+        : GenericKalmanFactory(kalman_type, enable_xyah, KalmanFilterRegistry::get_instance())
+    {
+    }
+
+    /**
+     * @brief Initializes the generic Kalman factory over a registry the caller owns.
+     * @param kalman_type Identifier for the Kalman filter implementation.
+     * @param enable_xyah Flag selecting the xyah coordinate parameterization.
+     * @param registry The registry create() asks; it must outlive the factory.
+     */
+    GenericKalmanFactory::GenericKalmanFactory(int kalman_type, bool enable_xyah,
+                                               const KalmanFilterRegistry& registry)
+        : kalman_type_(kalman_type), enable_xyah_(enable_xyah), registry_(&registry)
     {
     }
 
@@ -51,6 +63,6 @@ namespace SushiTrack
      */
     std::unique_ptr<StatePredictor> GenericKalmanFactory::create() const
     {
-        return KalmanFilterRegistry::get_instance().create(kalman_type_, enable_xyah_);
+        return registry_->create(kalman_type_, enable_xyah_);
     }
 } // namespace SushiTrack

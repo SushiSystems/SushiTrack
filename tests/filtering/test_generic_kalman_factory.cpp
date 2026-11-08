@@ -34,17 +34,32 @@
 #include <SushiTrack/filtering/generic_kalman_factory.hpp>
 #include <SushiTrack/filtering/imm_filter.hpp>
 #include <SushiTrack/filtering/kalman_filter.hpp>
+#include <SushiTrack/filtering/kalman_filter_registry.hpp>
 #include <SushiTrack/filtering/nsa_kalman_filter.hpp>
 #include <SushiTrack/filtering/state_predictor.hpp>
 
 #include <captured_log.hpp>
+#include <support/kalman_registry_builders.hpp>
 
 using namespace SushiTrack;
 
 /**
- * @brief Types 0, 1 and 2 build a KalmanFilter, an NSAKalmanFilter and an IMMFilter.
+ * @brief The factory builds what its registry holds for its type.
  */
-TEST(Small_GenericKalmanFactoryTest, BuildsTheRegisteredTypes)
+TEST(Small_GenericKalmanFactoryTest, BuildsWhatItsRegistryHoldsForTheType)
+{
+    const std::unique_ptr<KalmanFilterRegistry> registry = TestSupport::library_kalman_registry();
+
+    const std::unique_ptr<StatePredictor> nsa = GenericKalmanFactory(1, false, *registry).create();
+
+    EXPECT_NE(dynamic_cast<NSAKalmanFilter*>(nsa.get()), nullptr);
+}
+
+/**
+ * @brief Through the library's registry, types 0, 1 and 2 build a KalmanFilter, an
+ *        NSAKalmanFilter and an IMMFilter.
+ */
+TEST(Medium_GenericKalmanFactoryTest, BuildsTheRegisteredTypes)
 {
     const std::unique_ptr<StatePredictor> linear = GenericKalmanFactory(0).create();
     const std::unique_ptr<StatePredictor> nsa = GenericKalmanFactory(1).create();
@@ -56,10 +71,13 @@ TEST(Small_GenericKalmanFactoryTest, BuildsTheRegisteredTypes)
 }
 
 /**
- * @brief An unregistered type builds nothing.
+ * @brief A type its registry does not hold builds nothing, and the registry logs one ERROR.
  */
 TEST(Small_GenericKalmanFactoryTest, UnregisteredTypeBuildsNothing)
 {
-    const CapturedLog log(SushiLog::LogLevel::Off);
-    EXPECT_EQ(GenericKalmanFactory(987654).create(), nullptr);
+    const CapturedLog log(SushiLog::LogLevel::Error);
+    const KalmanFilterRegistry registry;
+
+    EXPECT_EQ(GenericKalmanFactory(987654, false, registry).create(), nullptr);
+    EXPECT_EQ(log.count("Unregistered Kalman type requested: 987654"), 1);
 }

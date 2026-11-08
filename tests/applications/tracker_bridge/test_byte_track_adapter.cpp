@@ -42,10 +42,10 @@ TEST(Small_ByteTrackAdapterTest, IsNamedBytetrack)
 }
 
 /**
- * @brief A settings file that does not exist leaves the defaults, and the adapter still runs.
+ * @brief Settings without a "bytetrack" section leave the defaults, and the adapter still runs.
  */
 TEST(Small_ByteTrackAdapterTest, MissingSettingsKeepTheDefaults)
 {
-    ByteTrackAdapter adapter("this/path/does/not/exist.json");
+    ByteTrackAdapter adapter(nlohmann::json::object(), "settings.json");
     EXPECT_TRUE(adapter.update({}, 1.f).empty());
 }

@@ -23,12 +23,13 @@
 
 /**
  * @file test_json_settings.cpp
- * @brief Tests read_json_settings and json_number.
+ * @brief Tests parse_json_settings, read_json_settings, json_section and json_number.
  * @author Mustafa Garip
  */
 
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 
 #include <gtest/gtest.h>
 
@@ -57,13 +58,17 @@ TEST(Medium_JsonSettingsTest, ReadsANumberFromAFileWithComments)
 }
 
 /**
- * @brief A missing file reads as an empty object.
+ * @brief A missing file reads as an empty object, after one WARN naming it.
  */
-TEST(Small_JsonSettingsTest, MissingFileReadsAsAnEmptyObject)
+TEST(Medium_JsonSettingsTest, MissingFileReadsAsAnEmptyObject)
 {
+    SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_TRACKER_BRIDGE_LOG_CATEGORY});
+
     const nlohmann::json doc = read_json_settings("this/path/does/not/exist.json");
+
     EXPECT_TRUE(doc.is_object());
     EXPECT_TRUE(doc.empty());
+    EXPECT_EQ(log.count("this/path/does/not/exist.json cannot be opened"), 1);
 }
 
 /**
@@ -77,22 +82,21 @@ TEST(Small_JsonSettingsTest, AbsentOrNonNumericKeyGivesTheFallback)
 }
 
 /**
- * @brief A missing file, a missing section and a key that is not a number each log one WARN, on
- *        the one stream every adapter uses.
+ * @brief A missing section and a key that is not a number each log one WARN, on the one stream
+ *        every adapter uses.
  */
 TEST(Small_JsonSettingsTest, UnusableSettingsAreLogged)
 {
     SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_TRACKER_BRIDGE_LOG_CATEGORY});
+    std::istringstream text("{ // no section\n}\n");
 
-    const nlohmann::json missing = read_json_settings("this/path/does/not/exist.json");
-    const nlohmann::json& section =
-        json_section(missing, "bytetrack", "this/path/does/not/exist.json");
+    const nlohmann::json document = parse_json_settings(text, "settings.json");
+    const nlohmann::json& section = json_section(document, "bytetrack", "settings.json");
     const nlohmann::json typed = {{"track_buffer", "many"}};
     const float value = json_number(typed, "track_buffer", 30.f);
 
     EXPECT_TRUE(section.empty());
     EXPECT_FLOAT_EQ(value, 30.f);
-    EXPECT_EQ(log.count("this/path/does/not/exist.json cannot be opened"), 1);
-    EXPECT_EQ(log.count("has no \"bytetrack\" section"), 1);
+    EXPECT_EQ(log.count("Settings file settings.json has no \"bytetrack\" section"), 1);
     EXPECT_EQ(log.count("Setting track_buffer is not a number; keeping 30"), 1);
 }

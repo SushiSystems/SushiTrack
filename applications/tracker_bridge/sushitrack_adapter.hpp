@@ -70,6 +70,13 @@ namespace TrackerBridge
                 rebuild_tracker();
             }
 
+            /// @brief Builds a tracker from @p params as given, reading no file.
+            explicit SushiTrackAdapter(const sushitrack_params_t& params)
+                : params_(params)
+            {
+                rebuild_tracker();
+            }
+
             SushiTrackAdapter(const SushiTrackAdapter&) = delete;
             SushiTrackAdapter& operator=(const SushiTrackAdapter&) = delete;
             SushiTrackAdapter(SushiTrackAdapter&&) = delete;
