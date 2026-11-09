@@ -280,22 +280,15 @@ TEST_F(Small_SushiTrackCParameterRangeTest, ZeroFrameRateIsRejectedOrInert)
 }
 
 /**
- * @brief Negative frame_rate is nonsensical and must be rejected.
+ * @brief A negative frame_rate is refused with INVALID_ARGUMENT and no handle, not clamped to 1.
  */
-TEST_F(Small_SushiTrackCParameterRangeTest, NegativeFrameRateIsRejectedOrInert)
+TEST_F(Small_SushiTrackCParameterRangeTest, NegativeFrameRateIsRefused)
 {
     params_.frame_rate = -25;
-    sushitrack_tracker_t hdl = nullptr;
-    sushitrack_status_t s = sushitrack_create_ex(&params_, &hdl);
+    sushitrack_tracker_t hdl = reinterpret_cast<sushitrack_tracker_t>(0x1);
 
-    if (s != SUSHITRACK_SUCCESS)
-    {
-        EXPECT_EQ(hdl, nullptr);
-        return;
-    }
-
-    ASSERT_NE(hdl, nullptr);
-    sushitrack_destroy(hdl);
+    EXPECT_EQ(sushitrack_create_ex(&params_, &hdl), SUSHITRACK_INVALID_ARGUMENT);
+    EXPECT_EQ(hdl, nullptr);
 }
 
 /**

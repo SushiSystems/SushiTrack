@@ -64,7 +64,7 @@ All knobs are exposed both on `sushitrack_params_t` (C API, `include/SushiTrack/
 
 | Key | Default | Description |
 |---|---|---|
-| `frame_rate` | 25 | Target frequency; drives noise scaling and wall-clock conversion |
+| `frame_rate` | 25 | Target frequency; drives noise scaling and wall-clock conversion. A negative value is refused; 0 is clamped to 1 with a WARN |
 | `track_buffer` | 30 | Frames a lost track is kept before deletion |
 | `enable_tentative` | 0 | Enables tentative state |
 | `tentative_match_thresh` | 0.3 | Cost cutoff for tentative association |

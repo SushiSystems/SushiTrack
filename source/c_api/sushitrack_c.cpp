@@ -185,7 +185,7 @@ namespace
      */
     void warn_about_adjusted_params(const SushiTrack::TrackerConfig& config)
     {
-        if (config.frame_rate < 1)
+        if (config.frame_rate == 0)
         {
             SUSHITRACK_LOG_WARN(K_C_API_LOG_CATEGORY,
                                 "frame_rate {} is below 1; the tracker clamps it to 1.",
@@ -230,6 +230,14 @@ namespace SushiTrack
             SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
                                  "sushitrack_create_ex refused: params is null; no tracker was "
                                  "created.");
+            return SUSHITRACK_INVALID_ARGUMENT;
+        }
+        if (params->frame_rate < 0)
+        {
+            SUSHITRACK_LOG_ERROR(K_C_API_LOG_CATEGORY,
+                                 "sushitrack_create_ex refused: frame_rate {} is negative; no "
+                                 "tracker was created.",
+                                 params->frame_rate);
             return SUSHITRACK_INVALID_ARGUMENT;
         }
 

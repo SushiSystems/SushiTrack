@@ -28,7 +28,7 @@ sushitrack_destroy(hdl);
 
 Source: not compiled
 
-`sushitrack_create` returns `NULL` on failure. `sushitrack_create_ex` returns a `sushitrack_status_t` and writes the handle through `out_tracker`, which it sets to `NULL` on every failure. It returns `SUSHITRACK_INVALID_ARGUMENT` for a refused argument or an unregistered `kalman_type`, `SUSHITRACK_OUT_OF_MEMORY` when an allocation fails, and `SUSHITRACK_INITIALIZATION_FAILURE` when a component of the tracker fails to build.
+`sushitrack_create` returns `NULL` on failure. `sushitrack_create_ex` returns a `sushitrack_status_t` and writes the handle through `out_tracker`, which it sets to `NULL` on every failure. It returns `SUSHITRACK_INVALID_ARGUMENT` for a refused argument, a negative `frame_rate` or an unregistered `kalman_type`, `SUSHITRACK_OUT_OF_MEMORY` when an allocation fails, and `SUSHITRACK_INITIALIZATION_FAILURE` when a component of the tracker fails to build.
 
 C++ callers may build the tracker with `SushiTrack::create_tracker(params, registry, &hdl)` (`include/SushiTrack/c_api/create_tracker.hpp`), which returns what `sushitrack_create_ex` returns but takes its Kalman filters from a `KalmanFilterRegistry` the caller owns; the registry must outlive the tracker.
 
