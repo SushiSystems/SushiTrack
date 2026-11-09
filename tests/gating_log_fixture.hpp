@@ -37,6 +37,7 @@
 
 #include <SushiTrack/association/cost_matrix.hpp>
 #include <SushiTrack/filtering/kalman_filter.hpp>
+#include <SushiTrack/logging/logger.hpp>
 #include <SushiTrack/tracking/tracklet.hpp>
 
 #include <captured_log.hpp>
@@ -47,7 +48,7 @@ namespace SushiTrack
      * @brief Counts the gating log lines a calculator writes for one track and three far
      *        detections.
      *
-     * The line is TRACE, which a release build compiles out, so a call logs at most one line.
+     * The line is TRACE, which a release build compiles out; there the line check is skipped.
      */
     class GatingLogFixture : public ::testing::Test
     {
@@ -63,19 +64,20 @@ namespace SushiTrack
                 return track;
             }
 
-            /** @brief Expects three sentinel cells and at most one line, counting all three pairs. */
+            /**
+             * @brief Expects three sentinel cells, then one line counting all three pairs; skips
+             *        the line check where TRACE is compiled out.
+             */
             void expect_one_line_for_three_gated_pairs(const CostMatrix& m) const
             {
                 for (std::size_t j = 0; j < 3; ++j)
                     EXPECT_GE(m(0, j), 1e3f);
 
-                const int lines = log_->count("gated out");
-                EXPECT_LE(lines, 1);
-                if (lines == 1)
-                {
-                    const std::string line = log_->last("gated out");
-                    EXPECT_NE(line.find("3 of 3"), std::string::npos) << "logged: " << line;
-                }
+                if (K_LOG_LEVEL_CEILING != SushiLog::LogLevel::Trace)
+                    GTEST_SKIP() << "TRACE is compiled out of this build; the line is not written.";
+                EXPECT_EQ(log_->count("gated out"), 1);
+                EXPECT_NE(log_->last("gated out").find("3 of 3"), std::string::npos)
+                    << "logged: " << log_->last("gated out");
             }
     };
 } // namespace SushiTrack

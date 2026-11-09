@@ -389,10 +389,9 @@ TEST(Small_LAPJVSolverTest, EmptyMatrixWithCountsLogsAnError)
 }
 
 /**
- * @brief A matrix holding a NaN logs one WARN however many times it is solved, and the NaN pair
- *        stays unmatched.
+ * @brief A matrix holding a NaN logs one WARN however many times it is solved.
  */
-TEST(Small_LAPJVSolverTest, NonFiniteCostLogsOneWarnAndStaysUnmatched)
+TEST(Small_LAPJVSolverTest, NonFiniteCostLogsOneWarn)
 {
     CapturedLog log;
     LAPJVSolver solver;
@@ -406,9 +405,29 @@ TEST(Small_LAPJVSolverTest, NonFiniteCostLogsOneWarnAndStaysUnmatched)
         std::vector<std::vector<int>> matches;
         std::vector<int> a_unm, b_unm;
         solver.solve(cost, 2, 2, 0.5f, matches, a_unm, b_unm);
-        EXPECT_LE(matches.size(), 2U);
     }
 
     EXPECT_EQ(log.count("holds 1 non-finite costs"), 1);
     EXPECT_EQ(log.level_of("non-finite"), SushiLog::LogLevel::Warn);
+}
+
+/**
+ * @brief The pair whose cost is NaN stays unmatched: only the zero-cost pair (1, 1) under the 0.5
+ *        threshold matches, and row 0 and column 0 are left over.
+ */
+TEST(Small_LAPJVSolverTest, NonFiniteCostPairStaysUnmatched)
+{
+    LAPJVSolver solver;
+    CostMatrix cost;
+    cost.resize(2, 2, 1.0f);
+    cost(0, 0) = std::numeric_limits<float>::quiet_NaN();
+    cost(1, 1) = 0.0f;
+    std::vector<std::vector<int>> matches;
+    std::vector<int> a_unm, b_unm;
+
+    solver.solve(cost, 2, 2, 0.5f, matches, a_unm, b_unm);
+
+    EXPECT_EQ(matches, (std::vector<std::vector<int>>{{1, 1}}));
+    EXPECT_EQ(a_unm, std::vector<int>{0});
+    EXPECT_EQ(b_unm, std::vector<int>{0});
 }
