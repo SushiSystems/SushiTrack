@@ -9,22 +9,26 @@ C API in `tests/c_api/test_sushitrack_c/`. The helpers the tests share are liste
 
 ## Sizes
 
-A suite's name opens with its size, and the size is the CTest label the build gives it, with its
-timeout:
+A suite's name opens with its size, and the size is the CTest label the build gives it. What a size
+may touch is the `testing` skill's rule:
 
-| Size | The test may use | Timeout |
-| --- | --- | --- |
-| `small` | One process and one thread, no file outside the build tree | 60 s |
-| `medium` | Threads, files such as `assets/sushitrack.json` | 300 s |
-| `large` | Real hardware, or a run longer than `medium` allows | 900 s |
+| Size | The test may touch | Never | Runs |
+| --- | --- | --- | --- |
+| `small` | The memory of its own process, one thread, an injected clock and seed, and a scoped in-memory log sink (`CapturedLog`) | A file, the environment, a thread, a sleep, the real clock, a process-wide instance it changes | Every build |
+| `medium` | One machine: a temporary folder of its own that it removes, threads, files such as `assets/sushitrack.json`, the environment | A sleep, state left behind | Every build |
+| `large` | Anything, including whole benchmark sequences | | Nightly or weekly, never before a merge |
+
+The skill's timeouts per test case are 1 s small, 10 s medium and 120 s large. The build still
+sets 60 s, 300 s and 900 s; RW-36 moves it to the skill's values.
 
 A suite whose name has no size stops the configure. A test that fails now and then is fixed or
 quarantined: it keeps its size and also carries the label `quarantined`, which takes it out of
 every run that does not name it, and it has an entry in
 [Known issues](../backlog/README.md).
 
-Today the configuration loader and the logger's two-thread test are `medium`; every other suite
-is `small`.
+A test that reads a file, the environment named by `SUSHITRACK_CONFIG` or a registry it does not
+own is `medium`. A small test reaches the same logic through a seam: a stream in place of a file,
+a `KalmanFilterRegistry` or `TrackerRegistry` it owns, or parameters passed to an adapter.
 
 ## Running
 

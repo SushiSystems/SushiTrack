@@ -59,6 +59,8 @@ The owner delegated these decisions on 2026-11-05. Each ruling below is final fo
 9. T3 pins SushiLog v0.3.1, the release that ships `LogCapture`. `CapturedLog` keeps its name and its counting helpers and holds a `LogCapture`; it returns `SushiLog::CapturedRecord`, so the copy SushiTrack declared is gone. It puts back the level each category had, where it set WARN before. The throwing sink of `test_error_handling.cpp` is not a capture and stays for M3, which resizes those tests to medium.
 10. T4 moves `profiling.hpp` from `source/private_include/` to `include/SushiTrack/profiling/`, keeping its include path, rather than writing a second public header beside a private one. Six test files included it, not three. No other public header includes it, so a consumer of the library still compiles without SushiProfiler; a target that includes it calls `sushitrack_link_profiling`, which now adds only the generated config folder.
 
+11. T6 fixes each defect that sits in one test or one page, and backlogs the two that need a seam or a build change. The NaN pair, the gating-log lines, the four weak checks and the temp-folder leaks are fixed; the negative frame rate is refused as decision 1 says; `docs/guides/TESTING.md` now carries the skill's sizes. RW-36 holds the CTest timeouts (the build still sets 60, 300 and 900 s) and RW-37 the configuration search seam that `NothingNamedAndNothingFoundSucceedsAtInfo` needs. `tools/tests/test_test_budget_settings.py` and `K_TEST_BUDGET` are deleted instead of rewritten: the test always skips here, `K_TEST_BUDGET` served nothing else, and M12's records for that file are void.
+
 ## Dispatches
 
 dispatch: J15 review, 6 chunks — haiku high, 1 round each, passed, rung 1
