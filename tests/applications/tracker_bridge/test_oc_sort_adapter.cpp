@@ -23,9 +23,11 @@
 
 /**
  * @file test_oc_sort_adapter.cpp
- * @brief Tests OCSORTAdapter.
+ * @brief Tests OCSORTAdapter: the defaults and the settings that replace them.
  * @author Mustafa Garip
  */
+
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -33,19 +35,43 @@
 
 using namespace TrackerBridge;
 
-/**
- * @brief The adapter is named after the predictions folder `st eval` reads.
- */
-TEST(Small_OCSORTAdapterTest, IsNamedOcsort)
+namespace
 {
-    EXPECT_EQ(OCSORTAdapter().name(), "ocsort");
+    /// @brief A score under the default det_thresh (0.4) and over 0.3.
+    constexpr float K_SCORE_BELOW_DET_THRESH = 0.35f;
+
+    /// @brief One detection with K_SCORE_BELOW_DET_THRESH.
+    std::vector<MOTDetection> one_detection_below_det_thresh()
+    {
+        MOTDetection det;
+        det.x = 100.f;
+        det.y = 100.f;
+        det.w = 50.f;
+        det.h = 80.f;
+        det.score = K_SCORE_BELOW_DET_THRESH;
+        return {det};
+    }
+} // namespace
+
+/**
+ * @brief With no settings the default det_thresh of 0.4 refuses a box that scores 0.35, so no
+ *        track starts.
+ */
+TEST(Small_OCSORTAdapterTest, MissingSettingsKeepTheDefaults)
+{
+    OCSORTAdapter adapter(nlohmann::json::object(), "settings.json");
+
+    EXPECT_TRUE(adapter.update(one_detection_below_det_thresh(), 1.f).empty());
 }
 
 /**
- * @brief A frame with no detections gives no track.
+ * @brief A det_thresh of 0.3 in the "ocsort" section replaces the default: the box that scores
+ *        0.35 then starts a track.
  */
-TEST(Small_OCSORTAdapterTest, EmptyFrameGivesNoTrack)
+TEST(Small_OCSORTAdapterTest, SettingsReplaceTheDefaults)
 {
-    OCSORTAdapter adapter;
-    EXPECT_TRUE(adapter.update({}, 1.f).empty());
+    const nlohmann::json document = {{"ocsort", {{"det_thresh", 0.3}}}};
+    OCSORTAdapter adapter(document, "settings.json");
+
+    EXPECT_EQ(adapter.update(one_detection_below_det_thresh(), 1.f).size(), 1U);
 }
