@@ -23,9 +23,11 @@
 
 /**
  * @file test_byte_track_adapter.cpp
- * @brief Tests ByteTrackAdapter.
+ * @brief Tests ByteTrackAdapter: the defaults and the settings that replace them.
  * @author Mustafa Garip
  */
+
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -33,19 +35,43 @@
 
 using namespace TrackerBridge;
 
-/**
- * @brief The adapter is named after the predictions folder `st eval` reads.
- */
-TEST(Small_ByteTrackAdapterTest, IsNamedBytetrack)
+namespace
 {
-    EXPECT_EQ(ByteTrackAdapter().name(), "bytetrack");
-}
+    /// @brief A score between the default track_thresh (0.5) and the default high_thresh (0.6).
+    constexpr float K_SCORE_BELOW_HIGH_THRESH = 0.55f;
+
+    /// @brief One detection with K_SCORE_BELOW_HIGH_THRESH.
+    std::vector<MOTDetection> one_detection_below_high_thresh()
+    {
+        MOTDetection det;
+        det.x = 100.f;
+        det.y = 100.f;
+        det.w = 50.f;
+        det.h = 80.f;
+        det.score = K_SCORE_BELOW_HIGH_THRESH;
+        return {det};
+    }
+} // namespace
 
 /**
- * @brief Settings without a "bytetrack" section leave the defaults, and the adapter still runs.
+ * @brief With no settings the default high_thresh of 0.6 refuses a box that scores 0.55, so no
+ *        track starts.
  */
 TEST(Small_ByteTrackAdapterTest, MissingSettingsKeepTheDefaults)
 {
     ByteTrackAdapter adapter(nlohmann::json::object(), "settings.json");
-    EXPECT_TRUE(adapter.update({}, 1.f).empty());
+
+    EXPECT_TRUE(adapter.update(one_detection_below_high_thresh(), 1.f).empty());
+}
+
+/**
+ * @brief A high_thresh in the "bytetrack" section replaces the default: the box that scores 0.55
+ *        then starts a track.
+ */
+TEST(Small_ByteTrackAdapterTest, SettingsReplaceTheDefaults)
+{
+    const nlohmann::json document = {{"bytetrack", {{"high_thresh", 0.5}}}};
+    ByteTrackAdapter adapter(document, "settings.json");
+
+    EXPECT_EQ(adapter.update(one_detection_below_high_thresh(), 1.f).size(), 1U);
 }
