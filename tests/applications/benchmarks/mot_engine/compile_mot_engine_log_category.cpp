@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* test_mot_engine_log_category.cpp                                       */
+/* compile_mot_engine_log_category.cpp                                    */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -22,22 +22,14 @@
 /**************************************************************************/
 
 /**
- * @file test_mot_engine_log_category.cpp
- * @brief Tests the category the mot_engine application logs under.
+ * @file compile_mot_engine_log_category.cpp
+ * @brief Checks at compile time that the mot_engine category belongs to `sushitrack`, module `mot_engine`.
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-
 #include <mot_engine_log_category.hpp>
 
-using namespace MOTEngine;
-
-/**
- * @brief The category belongs to `sushitrack` and its module is `mot_engine`.
- */
-TEST(Small_MotEngineLogCategoryTest, NamesTheProjectAndTheModule)
-{
-    EXPECT_EQ(K_MOT_ENGINE_LOG_CATEGORY.project().name(), "sushitrack");
-    EXPECT_EQ(K_MOT_ENGINE_LOG_CATEGORY.module(), "mot_engine");
-}
+static_assert(MOTEngine::K_MOT_ENGINE_LOG_CATEGORY.project().name() == "sushitrack",
+              "the mot_engine category belongs to the sushitrack project");
+static_assert(MOTEngine::K_MOT_ENGINE_LOG_CATEGORY.module() == "mot_engine",
+              "the mot_engine category names the mot_engine module");

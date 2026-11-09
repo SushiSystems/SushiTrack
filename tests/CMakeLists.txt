@@ -23,5 +23,17 @@ if(SUSHITRACK_BUILD_TESTS)
             TEST_SOURCES ${SUSHITRACK_APPLICATION_TEST_SOURCES}
             LINK mot_engine_runner tracker_bridge
             ENVIRONMENT "SUSHITRACK_CONFIG=${PROJECT_SOURCE_DIR}/assets/sushitrack.json")
+
+        # A header with no runtime promise keeps compile_<name>.cpp, whose static_asserts are
+        # its test: the build of this object library is the check.
+        file(GLOB_RECURSE SUSHITRACK_APPLICATION_COMPILE_CHECKS CONFIGURE_DEPENDS
+            "${CMAKE_CURRENT_SOURCE_DIR}/applications/*/compile_*.cpp")
+        if(SUSHITRACK_APPLICATION_COMPILE_CHECKS)
+            add_library(sushitrack_application_compile_checks OBJECT
+                ${SUSHITRACK_APPLICATION_COMPILE_CHECKS})
+            target_compile_features(sushitrack_application_compile_checks PRIVATE cxx_std_17)
+            target_link_libraries(sushitrack_application_compile_checks PRIVATE
+                mot_engine_runner tracker_bridge)
+        endif()
     endif()
 endif()
