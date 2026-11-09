@@ -40,9 +40,11 @@
 
 #include <SushiTrack/profiling/profiling.hpp>
 
+#include <byte_track_adapter.hpp>
 #include <captured_log.hpp>
 #include <mot_engine_log_category.hpp>
 #include <mot_runner.hpp>
+#include <oc_sort_adapter.hpp>
 #include <support/default_params.hpp>
 #include <sushitrack_adapter.hpp>
 
@@ -67,6 +69,16 @@ namespace
                 std::ofstream(root_ / "seq" / "det" / "det.txt")
                     << "1,-1,100,100,50,80,0.9\n2,-1,102,100,50,80,0.9\n3,-1,104,100,50,80,0.9\n";
                 std::ofstream(root_ / "seq" / "seqinfo.ini") << "frameRate=25\n";
+            }
+
+            /// @brief Runs @p adapter over the three-frame sequence and returns whether it wrote
+            ///        `pred/<folder>/seq.txt`.
+            [[nodiscard]] bool wrote_under(TrackerBridge::TrackerAdapter& adapter,
+                                           const std::string& folder) const
+            {
+                write_sequence();
+                static_cast<void>(run_mot_sequence(root_, "seq", adapter));
+                return std::filesystem::exists(root_ / "seq" / "pred" / folder / "seq.txt");
             }
 
             /// @brief Returns the text of the file at @p path.
@@ -110,6 +122,26 @@ TEST_F(Medium_MOTRunnerTest, WritesPredictionsToTheAdapterFolder)
     static_cast<void>(run_mot_sequence(root_, "seq", adapter));
 
     EXPECT_TRUE(std::filesystem::exists(root_ / "seq" / "pred" / "sushitrack" / "seq.txt"));
+}
+
+/**
+ * @brief ByteTrack's predictions land in the `bytetrack` folder `st eval` reads.
+ */
+TEST_F(Medium_MOTRunnerTest, ByteTrackWritesToTheBytetrackFolder)
+{
+    TrackerBridge::ByteTrackAdapter adapter;
+
+    EXPECT_TRUE(wrote_under(adapter, "bytetrack"));
+}
+
+/**
+ * @brief OC-SORT's predictions land in the `ocsort` folder `st eval` reads.
+ */
+TEST_F(Medium_MOTRunnerTest, OcSortWritesToTheOcsortFolder)
+{
+    TrackerBridge::OCSORTAdapter adapter;
+
+    EXPECT_TRUE(wrote_under(adapter, "ocsort"));
 }
 
 /**
