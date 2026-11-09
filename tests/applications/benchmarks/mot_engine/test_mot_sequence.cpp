@@ -23,12 +23,14 @@
 
 /**
  * @file test_mot_sequence.cpp
- * @brief Tests read_mot_detections and read_frame_rate on files written to a temporary folder.
+ * @brief Tests parse_mot_detections and parse_frame_rate on streams, and read_mot_detections and
+ *        read_frame_rate on the files they open.
  * @author Mustafa Garip
  */
 
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <string>
 
 #include <gtest/gtest.h>
@@ -41,94 +43,189 @@ using namespace MOTEngine;
 
 namespace
 {
-    /** @brief Writes @p text to a fresh file in the temporary folder and returns its path. */
-    std::filesystem::path write_temp(const std::string& name, const std::string& text)
+    /// @brief The detections path no test creates.
+    constexpr const char* K_MISSING_DETECTIONS = "this/path/does/not/exist/det.txt";
+    /// @brief The seqinfo path no test creates.
+    constexpr const char* K_MISSING_SEQINFO = "this/path/does/not/exist/seqinfo.ini";
+
+    /** @brief Writes @p text to a file named after the running test and returns its path. */
+    std::filesystem::path write_temp(const std::string& text)
     {
-        const std::filesystem::path path = std::filesystem::temp_directory_path() / name;
+        const std::filesystem::path path =
+            std::filesystem::temp_directory_path() /
+            (std::string("sushitrack_mot_sequence_") +
+             ::testing::UnitTest::GetInstance()->current_test_info()->name());
         std::ofstream(path) << text;
         return path;
+    }
+
+    /** @brief Parses @p text as a detections file. */
+    MOTFrames parse(const std::string& text)
+    {
+        std::istringstream rows(text);
+        return parse_mot_detections(rows, "det.txt");
+    }
+
+    /** @brief Parses @p text as a seqinfo file, with 30 as the fallback. */
+    int parse_rate(const std::string& text)
+    {
+        std::istringstream lines(text);
+        return parse_frame_rate(lines, "seqinfo.ini", 30);
     }
 } // namespace
 
 /**
- * @brief Rows group by frame, the box and score come from columns 3 to 7, and a comment, a blank
- *        line and a short row are skipped.
+ * @brief Rows group by the frame number in column 1.
  */
-TEST(Medium_MOTSequenceTest, ReadsDetectionsByFrame)
+TEST(Small_MOTSequenceTest, GroupsRowsByFrame)
 {
-    const std::filesystem::path path = write_temp(
-        "sushitrack_mot_sequence_det.txt",
-        "# comment\n1,-1,10,20,30,40,0.9\n1,-1,50,60,70,80,0.8,2\n\n2,-1,1,2\n3,-1,5,6,7,8,0.7\n");
+    const MOTFrames frames =
+        parse("1,-1,10,20,30,40,0.9\n1,-1,50,60,70,80,0.8\n3,-1,5,6,7,8,0.7\n");
+
+    ASSERT_EQ(frames.size(), 2U);
+    EXPECT_EQ(frames.at(1).size(), 2U);
+    EXPECT_EQ(frames.at(3).size(), 1U);
+}
+
+/**
+ * @brief The box comes from columns 3 to 6 and the score from column 7.
+ */
+TEST(Small_MOTSequenceTest, ReadsTheBoxAndTheScoreFromTheirColumns)
+{
+    const MOTFrames frames = parse("1,-1,10,20,30,40,0.5\n");
+
+    const TrackerBridge::MOTDetection& det = frames.at(1).at(0);
+    EXPECT_EQ(det.x, 10.f);
+    EXPECT_EQ(det.y, 20.f);
+    EXPECT_EQ(det.w, 30.f);
+    EXPECT_EQ(det.h, 40.f);
+    EXPECT_EQ(det.score, 0.5f);
+}
+
+/**
+ * @brief The label comes from column 8 and is 1 when the row has no such column.
+ */
+TEST(Small_MOTSequenceTest, TakesTheLabelFromColumnEightOrOne)
+{
+    const MOTFrames frames = parse("1,-1,10,20,30,40,0.9\n1,-1,50,60,70,80,0.8,2\n");
+
+    EXPECT_EQ(frames.at(1).at(0).label, 1);
+    EXPECT_EQ(frames.at(1).at(1).label, 2);
+}
+
+/**
+ * @brief A comment and a blank line are skipped without a word.
+ */
+TEST(Small_MOTSequenceTest, SkipsCommentsAndBlankLinesSilently)
+{
+    const SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_MOT_ENGINE_LOG_CATEGORY});
+
+    const MOTFrames frames = parse("# comment\n\n1,-1,10,20,30,40,0.9\n");
+
+    EXPECT_EQ(frames.size(), 1U);
+    EXPECT_EQ(log.count("skipped"), 0);
+}
+
+/**
+ * @brief Rows with fewer than seven numbers are left out and counted in one WARN with the origin
+ *        and the number of rows read: 2 of the 3 rows below.
+ */
+TEST(Small_MOTSequenceTest, SkippedRowsAreCountedInOneWarn)
+{
+    const SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_MOT_ENGINE_LOG_CATEGORY});
+
+    const MOTFrames frames = parse("1,-1,10,20,30,40,0.9\n2,-1,1,2\n3,-1,x,2,3,4,5\n");
+
+    EXPECT_EQ(frames.size(), 1U);
+    EXPECT_EQ(log.count("det.txt: skipped 2 of 3 rows"), 1);
+}
+
+/**
+ * @brief The frame rate is the number after `frameRate=`.
+ */
+TEST(Small_MOTSequenceTest, ReadsTheFrameRate)
+{
+    EXPECT_EQ(parse_rate("[Sequence]\nframeRate=25\n"), 25);
+}
+
+/**
+ * @brief A seqinfo without `frameRate=` gives the fallback and one WARN.
+ */
+TEST(Small_MOTSequenceTest, AMissingFrameRateGivesTheFallbackAndOneWarn)
+{
+    const SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_MOT_ENGINE_LOG_CATEGORY});
+
+    EXPECT_EQ(parse_rate("[Sequence]\nname=x\n"), 30);
+    EXPECT_EQ(log.count("holds no positive frameRate; using 30 frames per second"), 1);
+}
+
+/**
+ * @brief A frame rate that is not positive gives the fallback and one WARN.
+ */
+TEST(Small_MOTSequenceTest, AFrameRateThatIsNotPositiveGivesTheFallbackAndOneWarn)
+{
+    const SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_MOT_ENGINE_LOG_CATEGORY});
+
+    EXPECT_EQ(parse_rate("frameRate=0\n"), 30);
+    EXPECT_EQ(log.count("holds no positive frameRate; using 30 frames per second"), 1);
+}
+
+/**
+ * @brief read_mot_detections opens the file it is given and reads its rows.
+ */
+TEST(Medium_MOTSequenceTest, ReadsTheDetectionsOfAFile)
+{
+    const std::filesystem::path path = write_temp("1,-1,10,20,30,40,0.9\n");
 
     const MOTFrames frames = read_mot_detections(path.string());
     std::filesystem::remove(path);
 
-    ASSERT_EQ(frames.size(), 2u);
-    ASSERT_EQ(frames.at(1).size(), 2u);
-    EXPECT_FLOAT_EQ(frames.at(1)[0].x, 10.f);
-    EXPECT_FLOAT_EQ(frames.at(1)[0].score, 0.9f);
-    EXPECT_EQ(frames.at(1)[0].label, 1);
-    EXPECT_EQ(frames.at(1)[1].label, 2);
-    EXPECT_FLOAT_EQ(frames.at(3)[0].h, 8.f);
+    ASSERT_EQ(frames.size(), 1U);
+    EXPECT_EQ(frames.at(1).at(0).x, 10.f);
 }
 
 /**
- * @brief The frame rate comes from `frameRate=`; a missing file gives the fallback.
+ * @brief A detections file that cannot be opened reads as empty.
  */
-TEST(Medium_MOTSequenceTest, ReadsTheFrameRateOrFallsBack)
+TEST(Medium_MOTSequenceTest, UnreadableDetectionsReadNothing)
 {
-    const std::filesystem::path path =
-        write_temp("sushitrack_mot_sequence_seqinfo.ini", "[Sequence]\nframeRate=25\n");
-
-    EXPECT_EQ(read_frame_rate(path.string(), 30), 25);
-    std::filesystem::remove(path);
-    EXPECT_EQ(read_frame_rate(path.string(), 30), 30);
+    EXPECT_TRUE(read_mot_detections(K_MISSING_DETECTIONS).empty());
 }
 
 /**
- * @brief A detections file that cannot be opened reads as empty and logs one WARN naming it, where
- *        it once returned an empty map without a word.
+ * @brief A detections file that cannot be opened logs one WARN naming it, where it once returned
+ *        an empty map without a word.
  */
-TEST(Medium_MOTSequenceTest, UnreadableDetectionsLogAWarnAndReadNothing)
+TEST(Medium_MOTSequenceTest, UnreadableDetectionsLogAWarnNamingTheFile)
 {
-    SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_MOT_ENGINE_LOG_CATEGORY});
+    const SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_MOT_ENGINE_LOG_CATEGORY});
 
-    const MOTFrames frames = read_mot_detections("this/path/does/not/exist/det.txt");
+    static_cast<void>(read_mot_detections(K_MISSING_DETECTIONS));
 
-    EXPECT_TRUE(frames.empty());
     EXPECT_EQ(log.count("this/path/does/not/exist/det.txt cannot be opened"), 1);
     EXPECT_EQ(log.level_of("cannot be opened"), SushiLog::LogLevel::Warn);
 }
 
 /**
- * @brief Skipped rows are counted in one WARN with the file and the number of rows read.
+ * @brief read_frame_rate opens the file it is given and returns its frame rate.
  */
-TEST(Medium_MOTSequenceTest, SkippedRowsAreCountedInOneWarn)
+TEST(Medium_MOTSequenceTest, ReadsTheFrameRateOfAFile)
 {
-    SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_MOT_ENGINE_LOG_CATEGORY});
-    const std::filesystem::path path = write_temp(
-        "sushitrack_mot_sequence_skipped.txt", "1,-1,10,20,30,40,0.9\n2,-1,1,2\n3,-1,x,2,3,4,5\n");
+    const std::filesystem::path path = write_temp("[Sequence]\nframeRate=25\n");
 
-    const MOTFrames frames = read_mot_detections(path.string());
+    const int fps = read_frame_rate(path.string(), 30);
     std::filesystem::remove(path);
 
-    EXPECT_EQ(frames.size(), 1U);
-    EXPECT_EQ(log.count("skipped 2 of 3 rows"), 1);
+    EXPECT_EQ(fps, 25);
 }
 
 /**
- * @brief A missing seqinfo.ini or a missing frameRate gives the fallback and one WARN each.
+ * @brief A seqinfo.ini that cannot be opened gives the fallback and one WARN.
  */
-TEST(Medium_MOTSequenceTest, FrameRateFallbackIsLogged)
+TEST(Medium_MOTSequenceTest, AMissingSeqinfoGivesTheFallbackAndOneWarn)
 {
-    SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_MOT_ENGINE_LOG_CATEGORY});
-    const std::filesystem::path path =
-        write_temp("sushitrack_mot_sequence_no_rate.ini", "[Sequence]\nname=x\n");
+    const SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_MOT_ENGINE_LOG_CATEGORY});
 
-    EXPECT_EQ(read_frame_rate("this/path/does/not/exist/seqinfo.ini", 30), 30);
-    EXPECT_EQ(read_frame_rate(path.string(), 30), 30);
-    std::filesystem::remove(path);
-
+    EXPECT_EQ(read_frame_rate(K_MISSING_SEQINFO, 30), 30);
     EXPECT_EQ(log.count("seqinfo.ini cannot be opened; using 30 frames per second"), 1);
-    EXPECT_EQ(log.count("holds no positive frameRate; using 30 frames per second"), 1);
 }
