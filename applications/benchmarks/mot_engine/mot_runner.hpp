@@ -31,8 +31,11 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <ostream>
 #include <string>
+#include <vector>
 
+#include <track_result.hpp>
 #include <tracker_adapter.hpp>
 
 namespace MOTEngine
@@ -67,6 +70,13 @@ namespace MOTEngine
                                              TrackerBridge::TrackerAdapter& adapter,
                                              const std::filesystem::path& predictions = {},
                                              const std::filesystem::path& profiles = {});
+
+    /**
+     * @brief Writes the @p tracks of @p frame to @p out, one MOTChallenge row each:
+     *        `frame,id,x,y,w,h,score,-1,-1,-1`.
+     */
+    void write_mot_tracks(std::ostream& out, int frame,
+                          const std::vector<TrackerBridge::TrackResult>& tracks);
 
     /**
      * @brief Returns the `[ PERF <tracker> ]` line of a run, or an empty string for a run that

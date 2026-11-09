@@ -108,13 +108,17 @@ namespace MOTEngine
         result.profile_dropped = recording.dropped;
 
         for (const auto& [frame, tracks] : reported)
-        {
-            for (const TrackerBridge::TrackResult& t : tracks)
-            {
-                out << frame << "," << t.track_id << "," << t.x << "," << t.y << "," << t.w << ","
-                    << t.h << "," << t.score << ",-1,-1,-1\n";
-            }
-        }
+            write_mot_tracks(out, frame, tracks);
         return result;
+    }
+
+    void write_mot_tracks(std::ostream& out, int frame,
+                          const std::vector<TrackerBridge::TrackResult>& tracks)
+    {
+        for (const TrackerBridge::TrackResult& t : tracks)
+        {
+            out << frame << "," << t.track_id << "," << t.x << "," << t.y << "," << t.w << ","
+                << t.h << "," << t.score << ",-1,-1,-1\n";
+        }
     }
 } // namespace MOTEngine
