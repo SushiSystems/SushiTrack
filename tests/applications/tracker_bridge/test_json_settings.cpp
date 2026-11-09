@@ -23,13 +23,14 @@
 
 /**
  * @file test_json_settings.cpp
- * @brief Tests parse_json_settings, read_json_settings, json_section and json_number.
+ * @brief Tests the settings helpers of the reference trackers on streams and on the file door.
  * @author Mustafa Garip
  */
 
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <string>
 
 #include <gtest/gtest.h>
 
@@ -39,22 +40,64 @@
 
 using namespace TrackerBridge;
 
-/**
- * @brief A file with comments is read, and a number it holds is returned.
- */
-TEST(Medium_JsonSettingsTest, ReadsANumberFromAFileWithComments)
+namespace
 {
-    const std::filesystem::path path =
-        std::filesystem::temp_directory_path() / "sushitrack_json_settings_test.json";
+    /** @brief Parses @p text as a settings file named `settings.json`. */
+    nlohmann::json parse(const std::string& text)
     {
-        std::ofstream file(path);
-        file << "{ // the reference tracker\n  \"bytetrack\": { \"track_buffer\": 45 }\n}\n";
+        std::istringstream stream(text);
+        return parse_json_settings(stream, "settings.json");
     }
+
+    /** @brief Writes @p text to a file named after the running test and returns its path. */
+    std::filesystem::path write_temp(const std::string& text)
+    {
+        const std::filesystem::path path =
+            std::filesystem::temp_directory_path() /
+            (std::string("sushitrack_json_settings_") +
+             ::testing::UnitTest::GetInstance()->current_test_info()->name() + ".json");
+        std::ofstream(path) << text;
+        return path;
+    }
+} // namespace
+
+/**
+ * @brief A document with comments parses to its content, and a number it holds is returned.
+ */
+TEST(Small_JsonSettingsTest, ADocumentWithCommentsParsesToItsContent)
+{
+    const nlohmann::json doc =
+        parse("{ // the reference tracker\n  \"bytetrack\": { \"track_buffer\": 45 }\n}\n");
+
+    EXPECT_EQ(json_number(doc["bytetrack"], "track_buffer", 30.f), 45.f);
+}
+
+/**
+ * @brief A document that is not valid JSON reads as an empty object and logs one ERROR naming it.
+ */
+TEST(Small_JsonSettingsTest, InvalidJsonReadsAsAnEmptyObjectAndLogsError)
+{
+    const SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_TRACKER_BRIDGE_LOG_CATEGORY});
+
+    const nlohmann::json doc = parse("{ \"bytetrack\": ");
+
+    EXPECT_TRUE(doc.is_object());
+    EXPECT_TRUE(doc.empty());
+    EXPECT_EQ(log.count("Settings file settings.json is not valid JSON"), 1);
+    EXPECT_EQ(log.level_of("is not valid JSON"), SushiLog::LogLevel::Error);
+}
+
+/**
+ * @brief read_json_settings opens the file it is given and returns its document.
+ */
+TEST(Medium_JsonSettingsTest, ReadsTheDocumentOfAFile)
+{
+    const std::filesystem::path path = write_temp("{ \"bytetrack\": { \"track_buffer\": 45 } }\n");
 
     const nlohmann::json doc = read_json_settings(path.string());
     std::filesystem::remove(path);
 
-    EXPECT_FLOAT_EQ(json_number(doc["bytetrack"], "track_buffer", 30.f), 45.f);
+    EXPECT_EQ(json_number(doc["bytetrack"], "track_buffer", 30.f), 45.f);
 }
 
 /**
@@ -62,7 +105,7 @@ TEST(Medium_JsonSettingsTest, ReadsANumberFromAFileWithComments)
  */
 TEST(Medium_JsonSettingsTest, MissingFileReadsAsAnEmptyObject)
 {
-    SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_TRACKER_BRIDGE_LOG_CATEGORY});
+    const SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_TRACKER_BRIDGE_LOG_CATEGORY});
 
     const nlohmann::json doc = read_json_settings("this/path/does/not/exist.json");
 
@@ -72,31 +115,53 @@ TEST(Medium_JsonSettingsTest, MissingFileReadsAsAnEmptyObject)
 }
 
 /**
- * @brief A key that is absent or not a number gives the fallback.
+ * @brief The named section is returned when the document holds it.
  */
-TEST(Small_JsonSettingsTest, AbsentOrNonNumericKeyGivesTheFallback)
+TEST(Small_JsonSettingsTest, ThePresentSectionIsReturned)
 {
-    const nlohmann::json section = {{"name", "x"}};
-    EXPECT_FLOAT_EQ(json_number(section, "name", 1.5f), 1.5f);
-    EXPECT_FLOAT_EQ(json_number(section, "missing", 2.5f), 2.5f);
+    const nlohmann::json document = {{"bytetrack", {{"track_buffer", 45}}}};
+
+    EXPECT_EQ(json_section(document, "bytetrack", "settings.json"), document["bytetrack"]);
 }
 
 /**
- * @brief A missing section and a key that is not a number each log one WARN, on the one stream
- *        every adapter uses.
+ * @brief A key that is absent gives the fallback, and says nothing.
  */
-TEST(Small_JsonSettingsTest, UnusableSettingsAreLogged)
+TEST(Small_JsonSettingsTest, AnAbsentKeyGivesTheFallbackSilently)
 {
-    SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_TRACKER_BRIDGE_LOG_CATEGORY});
-    std::istringstream text("{ // no section\n}\n");
+    const SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_TRACKER_BRIDGE_LOG_CATEGORY});
+    const nlohmann::json section = {{"name", "x"}};
 
-    const nlohmann::json document = parse_json_settings(text, "settings.json");
+    EXPECT_EQ(json_number(section, "missing", 2.5f), 2.5f);
+    EXPECT_EQ(log.records().size(), 0U);
+}
+
+/**
+ * @brief A key that is not a number gives the fallback after one WARN naming the key and the
+ *        value kept.
+ */
+TEST(Small_JsonSettingsTest, ANonNumericKeyGivesTheFallbackAfterOneWarn)
+{
+    const SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_TRACKER_BRIDGE_LOG_CATEGORY});
+    const nlohmann::json section = {{"track_buffer", "many"}};
+
+    EXPECT_EQ(json_number(section, "track_buffer", 30.f), 30.f);
+    EXPECT_EQ(log.count("Setting track_buffer is not a number; keeping 30"), 1);
+    EXPECT_EQ(log.level_of("is not a number"), SushiLog::LogLevel::Warn);
+}
+
+/**
+ * @brief A document without the asked section gives an empty one after one WARN naming the file
+ *        and the section.
+ */
+TEST(Small_JsonSettingsTest, AMissingSectionGivesAnEmptyOneAfterOneWarn)
+{
+    const SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace, {K_TRACKER_BRIDGE_LOG_CATEGORY});
+    const nlohmann::json document = parse("{ // no section\n}\n");
+
     const nlohmann::json& section = json_section(document, "bytetrack", "settings.json");
-    const nlohmann::json typed = {{"track_buffer", "many"}};
-    const float value = json_number(typed, "track_buffer", 30.f);
 
     EXPECT_TRUE(section.empty());
-    EXPECT_FLOAT_EQ(value, 30.f);
     EXPECT_EQ(log.count("Settings file settings.json has no \"bytetrack\" section"), 1);
-    EXPECT_EQ(log.count("Setting track_buffer is not a number; keeping 30"), 1);
+    EXPECT_EQ(log.level_of("has no \"bytetrack\" section"), SushiLog::LogLevel::Warn);
 }
