@@ -1,6 +1,20 @@
 # Test review: plan
 
-**Status:** Open — not started; the owner chooses inline or parallel
+**Status:** Open — M1 in progress (stopped by the owner on 2026-11-10); the owner chooses inline or parallel
+
+**Resume note (M1, applications).** Done and pushed, one commit each: `test_frame_recorder.cpp`,
+`test_mot_engine_log_category.cpp` (deleted, `compile_mot_engine_log_category.cpp` registered in
+`tests/CMakeLists.txt`), `test_mot_runner.cpp` (with `write_mot_tracks` in `mot_runner.hpp`),
+`test_mot_sequence.cpp`, `test_tracker_adapter.cpp`, `test_oc_sort_adapter.cpp`,
+`test_byte_track_adapter.cpp`, `test_json_settings.cpp`. Next file: `test_mot_detection.cpp` (delete,
+add `compile_mot_detection.cpp`), then `test_sushitrack_adapter.cpp`, `test_track_result.cpp`
+(delete, compile check), `test_tracker_bridge.cpp`, `test_tracker_bridge_log_category.cpp` (delete,
+compile check), `test_tracker_registry.cpp`; also `test_tracker_builder.cpp` and
+`test_default_trackers.cpp` have no REPORT.md record and were not touched. Open adds of M1:
+`FrameRecorder` lost-events row (needs a way to lose events), `SushiTrackAdapter` unloadable-file row,
+`delete_tracker` NULL, `tracker_process_c` null tracker and throwing update, `TrackerRegistry`
+second registration. No syntax check ran: the machine has no compiler and `build/` has no
+`compile_commands.json`. M2 to M13 are untouched.
 
 Applies the verdicts of `REPORT.md`, in hierarchy order: the shared helpers, adapters and seams the
 rewrites need come first, then the defects the review found, then each module's tests. A module job
