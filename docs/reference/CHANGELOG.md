@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-11-09 — tests: Gave each configuration loader test a temporary folder of its own that it removes.
 - 2026-11-09 — tests: Made the TRACE gating-log tests assert one line (skipped where TRACE is compiled out) and the LAPJV NaN test assert that the NaN pair stays unmatched.
 - 2026-11-09 — c_api: Refused a negative `frame_rate` in `sushitrack_create_ex` with `SUSHITRACK_INVALID_ARGUMENT` in place of clamping it to 1; 0 is still clamped with a WARN (`sushitrack_c.cpp`).
 - 2026-11-09 — profiling: Moved the zone, counter and instant macros to the public `include/SushiTrack/profiling/profiling.hpp`, so no test includes a private header, and removed `source/private_include` (RW-35, `profiling.hpp`).

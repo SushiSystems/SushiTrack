@@ -31,6 +31,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <system_error>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -574,17 +575,55 @@ namespace
     };
 
     /**
-     * @brief Writes @p text to a file named @p name in a temporary folder and returns its path.
+     * @brief Owns a temporary folder named after the running test and removes it on exit.
      */
-    std::string write_temp_config(const std::string& name, const std::string& text)
+    class TempConfigFolder final
     {
-        const std::filesystem::path folder =
-            std::filesystem::temp_directory_path() / "sushitrack_config_loader_tests";
-        std::filesystem::create_directories(folder);
-        const std::filesystem::path path = folder / name;
-        std::ofstream(path) << text;
-        return path.string();
-    }
+        public:
+            /// @brief Creates the folder, empty.
+            TempConfigFolder()
+                : folder_(std::filesystem::temp_directory_path() /
+                          ("sushitrack_config_" + test_name()))
+            {
+                std::filesystem::remove_all(folder_);
+                std::filesystem::create_directories(folder_);
+            }
+
+            TempConfigFolder(const TempConfigFolder&) = delete;
+            TempConfigFolder& operator=(const TempConfigFolder&) = delete;
+            TempConfigFolder(TempConfigFolder&&) = delete;
+            TempConfigFolder& operator=(TempConfigFolder&&) = delete;
+
+            /// @brief Removes the folder and everything written into it.
+            ~TempConfigFolder()
+            {
+                std::error_code ignored;
+                std::filesystem::remove_all(folder_, ignored);
+            }
+
+            /// @brief Returns the folder.
+            [[nodiscard]] const std::filesystem::path& path() const { return folder_; }
+
+            /// @brief Writes @p text to a file named @p name in the folder and returns its path.
+            [[nodiscard]] std::string write(const std::string& name, const std::string& text) const
+            {
+                const std::filesystem::path path = folder_ / name;
+                std::ofstream(path) << text;
+                return path.string();
+            }
+
+        private:
+            /// @brief Returns `<suite>_<test>` of the running test.
+            static std::string test_name()
+            {
+                const ::testing::TestInfo* info =
+                    ::testing::UnitTest::GetInstance()->current_test_info();
+                return std::string(info->test_suite_name()) + "_" + info->name();
+            }
+
+            /// @brief The folder this object owns.
+            std::filesystem::path folder_;
+    };
 } // namespace
 
 /**
@@ -610,10 +649,8 @@ TEST(Medium_ConfigLoaderLibraryApiTest, NothingNamedAndNothingFoundSucceedsAtInf
 {
     const ScopedEnvironment environment("SUSHITRACK_CONFIG", "");
     const std::filesystem::path previous = std::filesystem::current_path();
-    const std::filesystem::path empty_folder =
-        std::filesystem::temp_directory_path() / "sushitrack_config_loader_empty";
-    std::filesystem::create_directories(empty_folder);
-    std::filesystem::current_path(empty_folder);
+    const TempConfigFolder folder;
+    std::filesystem::current_path(folder.path());
     SushiTrack::CapturedLog log;
     sushitrack_params_t params{};
     sushitrack_get_default_params(&params);
@@ -631,8 +668,9 @@ TEST(Medium_ConfigLoaderLibraryApiTest, NothingNamedAndNothingFoundSucceedsAtInf
  */
 TEST(Medium_ConfigLoaderStrictReaderTest, WrongTypedValueIsRefusedWithItsPath)
 {
+    const TempConfigFolder folder;
     SushiTrack::CapturedLog log;
-    const std::string path = write_temp_config(
+    const std::string path = folder.write(
         "wrong_kind.json",
         R"({"sushitrack": {"basic": {"frame_rate": "fast", "track_buffer": 90}}})");
     sushitrack_params_t before{};
@@ -650,9 +688,10 @@ TEST(Medium_ConfigLoaderStrictReaderTest, WrongTypedValueIsRefusedWithItsPath)
  */
 TEST(Medium_ConfigLoaderStrictReaderTest, FractionInAnIntegerFieldIsRefused)
 {
+    const TempConfigFolder folder;
     SushiTrack::CapturedLog log;
     const std::string path =
-        write_temp_config("fraction.json", R"({"basic": {"frame_rate": 29.97}})");
+        folder.write("fraction.json", R"({"basic": {"frame_rate": 29.97}})");
     sushitrack_params_t params{};
     sushitrack_get_default_params(&params);
     const int before = params.frame_rate;
@@ -668,24 +707,25 @@ TEST(Medium_ConfigLoaderStrictReaderTest, FractionInAnIntegerFieldIsRefused)
  */
 TEST(Medium_ConfigLoaderStrictReaderTest, UnknownKeyIsRefusedWhereverItSits)
 {
+    const TempConfigFolder folder;
     SushiTrack::CapturedLog log;
     sushitrack_params_t params{};
     sushitrack_get_default_params(&params);
 
     const std::string in_section =
-        write_temp_config("typo_in_section.json", R"({"basic": {"frame_rat": 30}})");
+        folder.write("typo_in_section.json", R"({"basic": {"frame_rat": 30}})");
     EXPECT_EQ(sushitrack_load_params_from_json(in_section.c_str(), &params),
               SUSHITRACK_INVALID_ARGUMENT);
     EXPECT_EQ(log.count("basic.frame_rat: unknown key"), 1);
 
-    const std::string in_advanced = write_temp_config(
+    const std::string in_advanced = folder.write(
         "typo_in_advanced.json", R"({"sushitrack": {"advanced": {"asociation": {}}}})");
     EXPECT_EQ(sushitrack_load_params_from_json(in_advanced.c_str(), &params),
               SUSHITRACK_INVALID_ARGUMENT);
     EXPECT_EQ(log.count("sushitrack.advanced.asociation: unknown key"), 1);
 
     const std::string at_root =
-        write_temp_config("typo_at_root.json", R"({"sushitrack": {}, "extra": 1})");
+        folder.write("typo_at_root.json", R"({"sushitrack": {}, "extra": 1})");
     EXPECT_EQ(sushitrack_load_params_from_json(at_root.c_str(), &params),
               SUSHITRACK_INVALID_ARGUMENT);
     EXPECT_EQ(log.count("extra: unknown key"), 1);
@@ -696,7 +736,8 @@ TEST(Medium_ConfigLoaderStrictReaderTest, UnknownKeyIsRefusedWhereverItSits)
  */
 TEST(Medium_ConfigLoaderStrictReaderTest, FlagsAndWholeNumbersApply)
 {
-    const std::string path = write_temp_config(
+    const TempConfigFolder folder;
+    const std::string path = folder.write(
         "flags.json",
         R"({"basic": {"enable_reid": true, "frame_rate": 30.0, "match_thresh": 0.6}})");
     sushitrack_params_t params{};
@@ -713,8 +754,9 @@ TEST(Medium_ConfigLoaderStrictReaderTest, FlagsAndWholeNumbersApply)
  */
 TEST(Medium_ConfigLoaderStrictReaderTest, MalformedJsonReturnsRuntimeError)
 {
+    const TempConfigFolder folder;
     SushiTrack::CapturedLog log;
-    const std::string path = write_temp_config("malformed.json", "{ not json");
+    const std::string path = folder.write("malformed.json", "{ not json");
     sushitrack_params_t params{};
     sushitrack_get_default_params(&params);
 
@@ -728,9 +770,10 @@ TEST(Medium_ConfigLoaderStrictReaderTest, MalformedJsonReturnsRuntimeError)
  */
 TEST(Medium_ConfigLoaderCreateTest, RefusedFileGivesNoTracker)
 {
+    const TempConfigFolder folder;
     SushiTrack::CapturedLog log;
     const std::string path =
-        write_temp_config("refused_for_create.json", R"({"basic": {"frame_rate": "x"}})");
+        folder.write("refused_for_create.json", R"({"basic": {"frame_rate": "x"}})");
 
     EXPECT_EQ(sushitrack_create_from_config(path.c_str()), nullptr);
     EXPECT_EQ(log.count("refused_for_create.json"), 1);
