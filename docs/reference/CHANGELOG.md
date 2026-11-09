@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-11-09 — tests: Made the four weak CLI checks assert what they claim: every env spelling of a bool field, each README, the runtime library name per platform, and the one error line of an unchoosable package.
 - 2026-11-09 — tests: Gave each configuration loader test a temporary folder of its own that it removes.
 - 2026-11-09 — tests: Made the TRACE gating-log tests assert one line (skipped where TRACE is compiled out) and the LAPJV NaN test assert that the NaN pair stays unmatched.
 - 2026-11-09 — c_api: Refused a negative `frame_rate` in `sushitrack_create_ex` with `SUSHITRACK_INVALID_ARGUMENT` in place of clamping it to 1; 0 is still clamped with a WARN (`sushitrack_c.cpp`).

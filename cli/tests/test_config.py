@@ -90,12 +90,17 @@ def test_a_platform_table_overlays_the_current_platform_only(tmp_path):
     assert cfg.build_type == "MinSizeRel"
 
 
-def test_a_bool_field_coerces_common_truthy_env_spellings(tmp_path, monkeypatch):
-    monkeypatch.setenv("ST_DOCKER_GPUS", "no")
+@pytest.mark.parametrize(("spelling", "expected"), [
+    ("1", True), ("true", True), ("YES", True), (" on ", True),
+    ("0", False), ("no", False), ("off", False), ("maybe", False),
+])
+def test_a_bool_field_coerces_common_truthy_env_spellings(tmp_path, monkeypatch, spelling, expected):
+    """Assert each truthy spelling of a bool variable reads as True and anything else as False."""
+    monkeypatch.setenv("ST_DOCKER_GPUS", spelling)
 
     cfg = config_module.load_config(tmp_path)
 
-    assert cfg.docker_gpus is False
+    assert cfg.docker_gpus is expected
 
 
 def test_tool_settings_carry_the_platform_generator(st_checkout, monkeypatch):

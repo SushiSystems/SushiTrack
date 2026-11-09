@@ -9,6 +9,7 @@ from __future__ import annotations
 import pytest
 
 import ast
+import sys
 from types import SimpleNamespace
 
 from sushitrack_cli.services import deploy
@@ -29,12 +30,14 @@ def test_the_python_example_parses():
     ast.parse(deploy._template("example.py.in"))
 
 
-def test_the_readmes_name_every_runtime_library():
-    """Fills both READMEs with the SushiTrack and SushiLog library names."""
-    for name in ("cpp_readme.md.in", "python_readme.md.in"):
-        text = deploy._template(name).format(import_lib="i", runtime_lib="r",
-                                             sushilog_lib="s", platform="p")
-        assert "r" in text and "s" in text and "NOTICE.md" in text
+@pytest.mark.parametrize("name", ["cpp_readme.md.in", "python_readme.md.in"])
+def test_the_readmes_name_every_runtime_library(name):
+    """Fills each README with the SushiTrack and SushiLog library names and names NOTICE.md."""
+    text = deploy._template(name).format(import_lib="IMPORT_LIB_NAME", runtime_lib="RUNTIME_LIB_NAME",
+                                         sushilog_lib="SUSHILOG_LIB_NAME", platform="PLATFORM_NAME")
+    assert "RUNTIME_LIB_NAME" in text
+    assert "SUSHILOG_LIB_NAME" in text
+    assert "NOTICE.md" in text
 
 
 def test_notices_reach_the_package(tmp_path, session):
@@ -62,4 +65,6 @@ def test_deploy_kind_values_match_kinds():
 
 
 def test_the_runtime_library_names_follow_the_platform():
-    assert deploy.shared_lib_name() in ("sushitrack.dll", "libsushitrack.so")
+    """Names the runtime library sushitrack.dll on Windows and libsushitrack.so elsewhere."""
+    expected = "sushitrack.dll" if sys.platform == "win32" else "libsushitrack.so"
+    assert deploy.shared_lib_name() == expected

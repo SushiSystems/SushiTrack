@@ -136,7 +136,8 @@ def test_a_package_that_cannot_be_chosen_ends_the_build_in_one_error_line(tmp_pa
     code, _ = _build(runner, tmp_path, tool)
 
     assert code == 1
-    assert runner.said("SushiLog has no cli and no stored package.")
+    assert [(call.kind, call.text) for call in runner.console.calls if call.kind == "error"] == [
+        ("error", "SushiLog has no cli and no stored package.")]
     assert runner.commands == []
 
 
