@@ -46,6 +46,12 @@ namespace
         SUSHITRACK_COUNTER("test_items", ProfilerKeys::K_UNIT_TRACKS, Add, items);
         SUSHITRACK_COUNTER("test_items", ProfilerKeys::K_UNIT_TRACKS, Add, items);
     }
+
+    /// @brief Records @p value at one Set counter site.
+    void set_level(int value)
+    {
+        SUSHITRACK_COUNTER("test_level", ProfilerKeys::K_UNIT_TRACKS, Set, value);
+    }
 } // namespace
 
 /**
@@ -64,19 +70,13 @@ TEST(Medium_ProfilingCompiledInTest, ZoneAppearsInTheRecordUnderItsGroup)
 
     ASSERT_EQ(record.periods.size(), 1U);
     EXPECT_EQ(zone_names(record, record.periods[0]).count("test_stage"), 1U);
-    bool grouped = false;
-    for (const SushiProfiler::SiteRecord& site : record.sites)
-    {
-        if (site.name == "test_stage")
-            grouped = site.group == ProfilerKeys::K_GROUP_TRACK;
-    }
-    EXPECT_TRUE(grouped);
+    EXPECT_EQ(site_group(record, "test_stage"), ProfilerKeys::K_GROUP_TRACK);
 }
 
 /**
- * @brief A counter site takes the value of its argument and an Add counter sums its samples.
+ * @brief An Add counter sums its samples: two samples of 3 give 6.
  */
-TEST(Medium_ProfilingCompiledInTest, CounterHoldsTheValueAndAddSums)
+TEST(Medium_ProfilingCompiledInTest, AddCounterSumsItsSamples)
 {
     ProfiledFrames session(1U);
     ASSERT_TRUE(session.ok()) << session.error();
@@ -92,11 +92,42 @@ TEST(Medium_ProfilingCompiledInTest, CounterHoldsTheValueAndAddSums)
 }
 
 /**
- * @brief With no session the macros run and record nothing.
+ * @brief A Set counter holds its last sample: samples 4 then 9 give 9.
+ */
+TEST(Medium_ProfilingCompiledInTest, SetCounterHoldsItsLastSample)
+{
+    ProfiledFrames session(1U);
+    ASSERT_TRUE(session.ok()) << session.error();
+    session.frame(
+        []
+        {
+            set_level(4);
+            set_level(9);
+        });
+    const SushiProfiler::RunRecord record = session.finish();
+
+    ASSERT_EQ(record.periods.size(), 1U);
+    EXPECT_EQ(counter_value(record, record.periods[0], "test_level"), 9.0);
+}
+
+/**
+ * @brief With no session the macros run and record nothing: a session started afterwards holds
+ *        neither the zone nor the counter of the earlier call.
  */
 TEST(Medium_ProfilingCompiledInTest, RunsWithoutASession)
 {
-    EXPECT_NO_THROW(recorded_work(1));
+    recorded_work(1);
+    ProfiledFrames session(1U);
+    ASSERT_TRUE(session.ok()) << session.error();
+    session.frame(
+        []
+        {
+        });
+    const SushiProfiler::RunRecord record = session.finish();
+
+    ASSERT_EQ(record.periods.size(), 1U);
+    EXPECT_EQ(zone_names(record, record.periods[0]).count("test_stage"), 0U);
+    EXPECT_EQ(counter_value(record, record.periods[0], "test_items"), -1.0);
 }
 
 #endif
