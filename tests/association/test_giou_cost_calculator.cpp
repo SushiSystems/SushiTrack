@@ -38,9 +38,17 @@
 #include <SushiTrack/association/giou_cost_calculator.hpp>
 #include <SushiTrack/tracking/tracklet.hpp>
 
+#include <support/tolerance.hpp>
 #include <tracklet_builders.hpp>
 
 using namespace SushiTrack;
+
+namespace
+{
+    /// @brief Rounded operations on the longest path from a box to its cost, counted from the
+    ///        formula: corners, areas, intersection, union, quotients and the penalty terms.
+    constexpr std::size_t K_ROUNDED_OPERATIONS = 20;
+} // namespace
 
 // GIoUCostCalculator
 
@@ -72,16 +80,31 @@ TEST(Small_GIoUCostCalculatorTest, SeparatedBoxesCostPositive)
     EXPECT_GT(m(0, 0), 0.f);
 }
 
-/** @brief calculate_single agrees with batch for a partial overlap pair. */
-TEST(Small_GIoUCostCalculatorTest, SingleMatchesBatch)
+/**
+ * @brief The batch cost of a partial overlap pair is the hand value: IoU is 9/41 (intersection 3600 over union 16400); the enclosing box is 140 x 140 = 19600, so (enclosure - union) / enclosure = 3200 / 19600 = 8/49; cost = 1 - (IoU - 8/49).
+ */
+TEST(Small_GIoUCostCalculatorTest, BatchCostOfAPartialOverlapIsTheHandValue)
 {
     GIoUCostCalculator calc;
-    auto a = make_t(0.f, 0.f, 100.f, 100.f);
-    auto b = make_t(40.f, 40.f, 100.f, 100.f);
-
-    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    std::vector<std::shared_ptr<Tracklet>> av{make_t(0.f, 0.f, 100.f, 100.f)};
+    std::vector<std::shared_ptr<Tracklet>> bv{make_t(40.f, 40.f, 100.f, 100.f)};
     CostMatrix m;
+
     calc.calculate(av, bv, m);
 
-    EXPECT_NEAR(m(0, 0), calc.calculate_single(a, b), 1e-5f);
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<float>(
+        m(0, 0), 1.0 - 9.0 / 41.0 + 8.0 / 49.0, K_ROUNDED_OPERATIONS)));
+}
+
+/**
+ * @brief The single cost of the same pair is the same hand value.
+ */
+TEST(Small_GIoUCostCalculatorTest, SingleCostOfAPartialOverlapIsTheHandValue)
+{
+    GIoUCostCalculator calc;
+    const std::shared_ptr<Tracklet> a = make_t(0.f, 0.f, 100.f, 100.f);
+    const std::shared_ptr<Tracklet> b = make_t(40.f, 40.f, 100.f, 100.f);
+
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<float>(
+        calc.calculate_single(a, b), 1.0 - 9.0 / 41.0 + 8.0 / 49.0, K_ROUNDED_OPERATIONS)));
 }
