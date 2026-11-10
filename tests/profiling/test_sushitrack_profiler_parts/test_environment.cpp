@@ -73,20 +73,25 @@ namespace
 } // namespace
 
 /**
- * @brief A record made through the contributor holds the library name, version, commit, profile
- *        level and a UTC date.
+ * @brief A record made through the contributor holds the library fact, a version that reads as
+ *        major.minor.patch, a commit that is a hexadecimal id or `unknown`, the profile level
+ *        and a UTC date.
  */
 TEST(Medium_SushiTrackProfilerPartsTest, RecordHoldsTheLibraryFacts)
 {
     const SushiProfiler::RunRecord record = short_record();
 
-    EXPECT_EQ(fact(record, ProfilerKeys::K_FACT_LIBRARY), "SushiTrack");
-    EXPECT_NE(fact(record, ProfilerKeys::K_FACT_VERSION), "<absent>");
-    EXPECT_NE(fact(record, ProfilerKeys::K_FACT_COMMIT), "<absent>");
+    EXPECT_NE(fact(record, ProfilerKeys::K_FACT_LIBRARY), "<absent>");
+    EXPECT_TRUE(std::regex_match(fact(record, ProfilerKeys::K_FACT_VERSION),
+                                 std::regex(R"(\d+\.\d+\.\d+.*)")))
+        << fact(record, ProfilerKeys::K_FACT_VERSION);
+    EXPECT_TRUE(std::regex_match(fact(record, ProfilerKeys::K_FACT_COMMIT),
+                                 std::regex(R"([0-9a-f]{7,40}|unknown)")))
+        << fact(record, ProfilerKeys::K_FACT_COMMIT);
     EXPECT_EQ(fact(record, ProfilerKeys::K_FACT_PROFILE_LEVEL),
               std::to_string(SUSHITRACK_PROFILE_LEVEL));
-    const std::regex date(R"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)");
-    EXPECT_TRUE(std::regex_match(fact(record, ProfilerKeys::K_FACT_DATE), date))
+    EXPECT_TRUE(std::regex_match(fact(record, ProfilerKeys::K_FACT_DATE),
+                                 std::regex(R"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)")))
         << fact(record, ProfilerKeys::K_FACT_DATE);
 }
 
