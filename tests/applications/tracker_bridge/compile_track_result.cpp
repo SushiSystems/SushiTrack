@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* test_track_result.cpp                                                  */
+/* compile_track_result.cpp                                               */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -22,23 +22,19 @@
 /**************************************************************************/
 
 /**
- * @file test_track_result.cpp
- * @brief Tests that TrackResult keeps its fields in identity, box, score order.
+ * @file compile_track_result.cpp
+ * @brief Checks at compile time that TrackResult keeps its fields in identity, box, score order.
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-
 #include <track_result.hpp>
 
-/**
- * @brief Brace initialisation fills identity, box and score in that order, as the bridge does.
- */
-TEST(Small_TrackResultTest, BraceInitialisationFollowsTheFieldOrder)
+namespace
 {
-    const TrackerBridge::TrackResult result{7, 1.f, 2.f, 3.f, 4.f, 0.5f};
-    EXPECT_EQ(result.track_id, 7);
-    EXPECT_FLOAT_EQ(result.x, 1.f);
-    EXPECT_FLOAT_EQ(result.h, 4.f);
-    EXPECT_FLOAT_EQ(result.score, 0.5f);
-}
+    constexpr TrackerBridge::TrackResult K_RESULT{7, 1.f, 2.f, 3.f, 4.f, 0.5f};
+} // namespace
+
+static_assert(K_RESULT.track_id == 7, "the identity comes first");
+static_assert(K_RESULT.x == 1.f && K_RESULT.y == 2.f, "the box origin follows the identity");
+static_assert(K_RESULT.w == 3.f && K_RESULT.h == 4.f, "the box size follows the origin");
+static_assert(K_RESULT.score == 0.5f, "the score comes last");
