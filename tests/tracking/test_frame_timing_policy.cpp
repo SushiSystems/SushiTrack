@@ -33,54 +33,59 @@
 
 using namespace SushiTrack;
 
-// FrameTimingPolicy
-
 /**
- * @brief to_kf_dt() returns 1.0 for any raw_dt value.
+ * @brief to_kf_dt() returns 1.0 for any raw_dt: zero, a frame at 25 fps, a long gap and a
+ *        negative interval.
  */
-TEST(Small_FrameTimingPolicyTest, ToKfDtAlwaysReturnsOne)
+class Small_FrameTimingPolicyStepTest : public ::testing::TestWithParam<float>
 {
-    FrameTimingPolicy p;
-    EXPECT_FLOAT_EQ(p.to_kf_dt(0.f), 1.f);
-    EXPECT_FLOAT_EQ(p.to_kf_dt(0.04f), 1.f);
-    EXPECT_FLOAT_EQ(p.to_kf_dt(100.f), 1.f);
-    EXPECT_FLOAT_EQ(p.to_kf_dt(-1.f), 1.f);
+};
+
+TEST_P(Small_FrameTimingPolicyStepTest, ToKfDtAlwaysReturnsOne)
+{
+    const FrameTimingPolicy policy;
+
+    EXPECT_FLOAT_EQ(policy.to_kf_dt(GetParam()), 1.f);
 }
 
-/**
- * @brief is_expired() returns false when frame_count equals buffer_frames
- *        (strict greater-than, not greater-than-or-equal).
- */
-TEST(Small_FrameTimingPolicyTest, IsExpiredFalseAtExactThreshold)
+INSTANTIATE_TEST_SUITE_P(RawIntervals, Small_FrameTimingPolicyStepTest,
+                         ::testing::Values(0.f, 0.04f, 100.f, -1.f));
+
+namespace
 {
-    FrameTimingPolicy p;
-    EXPECT_FALSE(p.is_expired(30.f, 30));
-}
+    /**
+     * @brief One is_expired() call and its verdict.
+     */
+    struct ExpiryRow
+    {
+            float frame_count;
+            int buffer_frames;
+            bool expired;
+    };
+} // namespace
 
 /**
- * @brief is_expired() returns false when frame_count is below buffer_frames.
+ * @brief is_expired() is true only when frame_count is strictly above buffer_frames.
  */
-TEST(Small_FrameTimingPolicyTest, IsExpiredFalseBelow)
+class Small_FrameTimingPolicyExpiryTest : public ::testing::TestWithParam<ExpiryRow>
 {
-    FrameTimingPolicy p;
-    EXPECT_FALSE(p.is_expired(29.f, 30));
+};
+
+TEST_P(Small_FrameTimingPolicyExpiryTest, IsExpiredOnlyAboveTheLimit)
+{
+    const FrameTimingPolicy policy;
+
+    EXPECT_EQ(policy.is_expired(GetParam().frame_count, GetParam().buffer_frames),
+              GetParam().expired);
 }
 
-/**
- * @brief is_expired() returns true when frame_count strictly exceeds buffer_frames.
- */
-TEST(Small_FrameTimingPolicyTest, IsExpiredTrueAbove)
-{
-    FrameTimingPolicy p;
-    EXPECT_TRUE(p.is_expired(31.f, 30));
-}
-
-/**
- * @brief FrameTimingPolicy::is_expired() with frame_count = 0 and buffer_frames = 0
- *        returns false (0 is not strictly greater than 0).
- */
-TEST(Small_FrameTimingPolicyTest, ZeroFrameCountAndZeroBufferNotExpired)
-{
-    FrameTimingPolicy p;
-    EXPECT_FALSE(p.is_expired(0.f, 0));
-}
+INSTANTIATE_TEST_SUITE_P(AroundTheLimit, Small_FrameTimingPolicyExpiryTest,
+                         ::testing::Values(
+                             // 30 is not above 30
+                             ExpiryRow{30.f, 30, false},
+                             // 29 is below 30
+                             ExpiryRow{29.f, 30, false},
+                             // 31 is above 30
+                             ExpiryRow{31.f, 30, true},
+                             // 0 is not above a limit of 0
+                             ExpiryRow{0.f, 0, false}));
