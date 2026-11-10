@@ -200,3 +200,43 @@ TEST(Small_RectTest, GenerateByTlbrWithReversedCornersKeepsNegativeExtents)
     EXPECT_FLOAT_EQ(rect.width(), -40.f);  // x2 - x1 = 10 - 50
     EXPECT_FLOAT_EQ(rect.height(), -40.f); // y2 - y1 = 20 - 60
 }
+
+namespace
+{
+    /**
+     * @brief The top-left, width and height of a box that must not touch the box (0, 0, 10, 10).
+     */
+    struct DisjointRow
+    {
+            float x;
+            float y;
+            float width;
+            float height;
+    };
+} // namespace
+
+/**
+ * @brief The boxes of the disjoint rows against the box (0, 0, 10, 10).
+ */
+class Small_RectIouDisjointTest : public ::testing::TestWithParam<DisjointRow>
+{
+};
+
+/**
+ * @brief iou() of disjoint boxes is zero.
+ */
+TEST_P(Small_RectIouDisjointTest, IouOfDisjointBoxesIsZero)
+{
+    const Rect<float> unit(0.f, 0.f, 10.f, 10.f);
+    const Rect<float> other(GetParam().x, GetParam().y, GetParam().width, GetParam().height);
+
+    EXPECT_EQ(iou(unit, other), 0.f);
+    EXPECT_EQ(iou(other, unit), 0.f);
+}
+
+INSTANTIATE_TEST_SUITE_P(Boxes, Small_RectIouDisjointTest,
+                         ::testing::Values(
+                             // apart in x: overlap width min(10, 30) - max(0, 20) = -10
+                             DisjointRow{20.f, 0.f, 10.f, 10.f},
+                             // apart in y: overlap width 10, overlap height 10 - 20 = -10
+                             DisjointRow{0.f, 20.f, 10.f, 10.f}));
