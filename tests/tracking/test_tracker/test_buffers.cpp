@@ -35,12 +35,43 @@
 
 #include <c_detection_builders.hpp>
 
-// Small_TrackerBuffersTest — standard 0.08 s buffer window
+using CDetections::make_det;
+using CDetections::update_frame;
+
+namespace
+{
+    /** @brief Returns the last of the first @p n tracks of @p out whose x is below @p x, or null. */
+    const sushitrack_track_t* track_left_of(const std::vector<sushitrack_track_t>& out, int n,
+                                            float x)
+    {
+        const sushitrack_track_t* found = nullptr;
+        for (int i = 0; i < n; ++i)
+        {
+            if (out[static_cast<std::size_t>(i)].x < x)
+                found = &out[static_cast<std::size_t>(i)];
+        }
+        return found;
+    }
+
+    /** @brief Returns the last of the first @p n tracks of @p out whose x is above @p x, or null. */
+    const sushitrack_track_t* track_right_of(const std::vector<sushitrack_track_t>& out, int n,
+                                             float x)
+    {
+        const sushitrack_track_t* found = nullptr;
+        for (int i = 0; i < n; ++i)
+        {
+            if (out[static_cast<std::size_t>(i)].x > x)
+                found = &out[static_cast<std::size_t>(i)];
+        }
+        return found;
+    }
+} // namespace
 
 /**
  * @brief Tracker fixture configured for time-aware buffer expiry testing.
  *
- * track_buffer=2, frame_rate=25 → buffer window ≈ 0.08 s (2 frames).
+ * track_buffer=2, frame_rate=25 → buffer window ≈ 0.08 s (2 frames); start() builds a tracker
+ * with another track_buffer.
  * tentative_confirm_hits=3       → track confirmed after three consecutive hits.
  */
 class Small_TrackerBuffersTest : public ::testing::Test
@@ -49,14 +80,20 @@ class Small_TrackerBuffersTest : public ::testing::Test
         sushitrack_tracker_t hdl_ = nullptr;
         sushitrack_params_t params_ = {};
 
-        void SetUp() override
+        void SetUp() override { start(2); }
+
+        void TearDown() override { sushitrack_destroy(hdl_); }
+
+        /** @brief Replaces the tracker with a new one whose lost buffer is @p track_buffer frames. */
+        void start(int track_buffer)
         {
+            sushitrack_destroy(hdl_);
             sushitrack_get_default_params(&params_);
             params_.time_aware = 1;
             params_.enable_tentative = 1;
             params_.tentative_confirm_hits = 3;
             params_.tentative_max_age_seconds = 0.08f;
-            params_.track_buffer = 2;
+            params_.track_buffer = track_buffer;
             params_.frame_rate = 25;
             params_.tentative_match_thresh = 0.9f;
             params_.track_thresh = 0.1f;
@@ -66,64 +103,82 @@ class Small_TrackerBuffersTest : public ::testing::Test
             ASSERT_NE(hdl_, nullptr);
         }
 
-        void TearDown() override { sushitrack_destroy(hdl_); }
-
-        /** @brief Returns a detection at the given top-left position. */
-        sushitrack_object_t det(float x, float y) const
-        {
-            sushitrack_object_t o{};
-            o.x = x;
-            o.y = y;
-            o.width = 50.0f;
-            o.height = 100.0f;
-            o.score = 0.9f;
-            o.label = 1;
-            return o;
-        }
-
         /**
          * @brief Drives the tracker through three matched frames to reach Tracked state.
          * @param out Output buffer (must have capacity >= 1).
          */
         void confirm_track(std::vector<sushitrack_track_t>& out)
         {
-            CDetections::update_frame(hdl_, det(100.0f, 200.0f), out.data(), 10, 0.04f);
-            CDetections::update_frame(hdl_, det(102.0f, 202.0f), out.data(), 10, 0.04f);
-            CDetections::update_frame(hdl_, det(104.0f, 204.0f), out.data(), 10, 0.04f);
+            update_frame(hdl_, make_det(100.0f, 200.0f), out.data(), 10, 0.04f);
+            update_frame(hdl_, make_det(102.0f, 202.0f), out.data(), 10, 0.04f);
+            update_frame(hdl_, make_det(104.0f, 204.0f), out.data(), 10, 0.04f);
             ASSERT_EQ(out[0].state, 1) << "Precondition: track must be Tracked before buffer tests";
+        }
+
+        /**
+         * @brief Drives two tracks, one at x = 100 and one at x = 600, through three matched
+         *        frames; the tracker holds two Tracked tracks afterwards.
+         */
+        void confirm_two_tracks(std::vector<sushitrack_track_t>& out)
+        {
+            const sushitrack_object_t detections[2] = {make_det(100.0f, 200.0f),
+                                                       make_det(600.0f, 400.0f)};
+            update_frame(hdl_, detections, 2, out.data(), 10, 0.04f);
+            update_frame(hdl_, detections, 2, out.data(), 10, 0.04f);
+            update_frame(hdl_, detections, 2, out.data(), 10, 0.04f);
+        }
+
+        /** @brief Feeds @p count frames without detections of 0.04 s and returns the last count. */
+        int feed_empty_frames(std::vector<sushitrack_track_t>& out, int count)
+        {
+            int tracks = 0;
+            for (int frame = 0; frame < count; ++frame)
+                tracks = update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+            return tracks;
         }
 };
 
+namespace
+{
+    /**
+     * @brief The number of missed frames after a confirmed track and the lost time they add up to.
+     */
+    struct MissRow
+    {
+            int misses;
+            float lost_time;
+    };
+} // namespace
+
 /**
- * @brief A confirmed Tracked track transitions to Lost on the first missed frame
- *        and accurately initialises its accumulated lost time.
+ * @brief The fixture, run over the number of missed frames.
  */
-TEST_F(Small_TrackerBuffersTest, TrackedTransitionsToLostOnFirstMiss)
+class Small_TrackerBuffersMissTest : public Small_TrackerBuffersTest,
+                                     public ::testing::WithParamInterface<MissRow>
+{
+};
+
+/**
+ * @brief A confirmed Tracked track is Lost after its first missed frame and after the second,
+ *        and its lost time is the sum of the missed frames' intervals.
+ *
+ * Each missed frame is 0.04 s, so one miss is 0.04 s and two are 0.04 + 0.04 = 0.08 s, both
+ * exact in float. The buffer window is 2 frames, 0.08 s, which the lost time does not pass.
+ */
+TEST_P(Small_TrackerBuffersMissTest, LostTimeAddsUpTheMissedFrames)
 {
     std::vector<sushitrack_track_t> out(10);
     confirm_track(out);
 
-    int n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
-    ASSERT_EQ(n, 1);
-    EXPECT_EQ(out[0].state, 2);
-    EXPECT_FLOAT_EQ(out[0].lost_time, 0.04f);
-}
-
-/**
- * @brief Lost time accumulates monotonically across consecutive missed frames.
- */
-TEST_F(Small_TrackerBuffersTest, LostTimeAccumulatesAcrossMissedFrames)
-{
-    std::vector<sushitrack_track_t> out(10);
-    confirm_track(out);
-
-    CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
-    int n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    const int n = feed_empty_frames(out, GetParam().misses);
 
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 2);
-    EXPECT_FLOAT_EQ(out[0].lost_time, 0.08f);
+    EXPECT_FLOAT_EQ(out[0].lost_time, GetParam().lost_time);
 }
+
+INSTANTIATE_TEST_SUITE_P(MissedFrames, Small_TrackerBuffersMissTest,
+                         ::testing::Values(MissRow{1, 0.04f}, MissRow{2, 0.08f}));
 
 /**
  * @brief A Lost track moves to Removed once accumulated lost time exceeds
@@ -134,10 +189,9 @@ TEST_F(Small_TrackerBuffersTest, LostTrackRemovedAfterBufferExpiry)
     std::vector<sushitrack_track_t> out(10);
     confirm_track(out);
 
-    CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
-    CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    feed_empty_frames(out, 2);
 
-    int n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 2.0f);
+    int n = update_frame(hdl_, nullptr, 0, out.data(), 10, 2.0f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 3);
 }
@@ -151,11 +205,11 @@ TEST_F(Small_TrackerBuffersTest, LostTrackRecoveredWhenReassociated)
     std::vector<sushitrack_track_t> out(10);
     confirm_track(out);
 
-    CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    feed_empty_frames(out, 1);
     ASSERT_EQ(out[0].state, 2) << "Precondition: track must be Lost before recovery test";
 
-    sushitrack_object_t recovery = det(105.0f, 202.0f);
-    int n = CDetections::update_frame(hdl_, &recovery, 1, out.data(), 10, 0.04f);
+    sushitrack_object_t recovery = make_det(105.0f, 202.0f);
+    int n = update_frame(hdl_, &recovery, 1, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(out[0].state, 1);
     EXPECT_FLOAT_EQ(out[0].lost_time, 0.0f);
@@ -170,155 +224,94 @@ TEST_F(Small_TrackerBuffersTest, RemovedTrackAbsentFromNextFrameOutput)
     std::vector<sushitrack_track_t> out(10);
     confirm_track(out);
 
-    CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    feed_empty_frames(out, 1);
 
-    int n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 2.0f);
+    int n = update_frame(hdl_, nullptr, 0, out.data(), 10, 2.0f);
     ASSERT_EQ(n, 1);
     ASSERT_EQ(out[0].state, 3) << "Precondition: track must reach Removed state";
 
-    int n2 = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 1.0f);
+    int n2 = update_frame(hdl_, nullptr, 0, out.data(), 10, 1.0f);
     EXPECT_EQ(n2, 0);
 }
 
 /**
- * @brief Two detections at well-separated positions both reach Tracked state after
- *        three consecutive matched frames and are assigned distinct non-zero IDs.
+ * @brief When no detections arrive after two confirmed tracks, both go Lost.
  */
-TEST_F(Small_TrackerBuffersTest, MultipleTracksRetainIndependentIds)
+TEST_F(Small_TrackerBuffersTest, TwoTracksBothGoLostWhenNoDetectionArrives)
 {
     std::vector<sushitrack_track_t> out(10);
+    confirm_two_tracks(out);
 
-    sushitrack_object_t dets[2];
-    dets[0] = det(100.0f, 200.0f);
-    dets[1] = det(600.0f, 400.0f);
-
-    CDetections::update_frame(hdl_, dets, 2, out.data(), 10, 0.04f);
-    CDetections::update_frame(hdl_, dets, 2, out.data(), 10, 0.04f);
-    int n = CDetections::update_frame(hdl_, dets, 2, out.data(), 10, 0.04f);
+    const int n = feed_empty_frames(out, 1);
 
     ASSERT_EQ(n, 2);
-    EXPECT_EQ(out[0].state, 1);
-    EXPECT_EQ(out[1].state, 1);
-    EXPECT_NE(out[0].track_id, 0);
-    EXPECT_NE(out[1].track_id, 0);
-    EXPECT_NE(out[0].track_id, out[1].track_id);
+    ASSERT_NE(track_left_of(out, n, 300.0f), nullptr);
+    ASSERT_NE(track_right_of(out, n, 300.0f), nullptr);
+    EXPECT_EQ(track_left_of(out, n, 300.0f)->state, 2);
+    EXPECT_EQ(track_right_of(out, n, 300.0f)->state, 2);
 }
 
 /**
- * @brief When no detections arrive after two confirmed tracks, both transition to
- *        Lost independently.  Re-presenting only the first track's detection returns
- *        that track to Tracked while the second remains Lost.
+ * @brief After both tracks went Lost, presenting only the first track's detection returns that
+ *        track to Tracked while the second stays Lost.
  */
-TEST_F(Small_TrackerBuffersTest, MultipleTrackIndependentLostState)
+TEST_F(Small_TrackerBuffersTest, OnlyThePresentedLostTrackRecovers)
 {
     std::vector<sushitrack_track_t> out(10);
+    confirm_two_tracks(out);
+    feed_empty_frames(out, 1);
+    const sushitrack_object_t single = make_det(100.0f, 200.0f);
 
-    sushitrack_object_t dets[2];
-    dets[0] = det(100.0f, 200.0f);
-    dets[1] = det(600.0f, 400.0f);
+    const int n = update_frame(hdl_, &single, 1, out.data(), 10, 0.04f);
 
-    CDetections::update_frame(hdl_, dets, 2, out.data(), 10, 0.04f);
-    CDetections::update_frame(hdl_, dets, 2, out.data(), 10, 0.04f);
-    CDetections::update_frame(hdl_, dets, 2, out.data(), 10, 0.04f);
-
-    int n_lost = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
-    ASSERT_EQ(n_lost, 2);
-    for (int i = 0; i < 2; ++i)
-        EXPECT_EQ(out[i].state, 2);
-
-    sushitrack_object_t single = det(100.0f, 200.0f);
-    int n_mixed = CDetections::update_frame(hdl_, &single, 1, out.data(), 10, 0.04f);
-    ASSERT_EQ(n_mixed, 2);
-
-    int tracked_count = 0;
-    int lost_count = 0;
-    for (int i = 0; i < n_mixed; ++i)
-    {
-        if (out[i].state == 1)
-            ++tracked_count;
-        else if (out[i].state == 2)
-            ++lost_count;
-    }
-    EXPECT_EQ(tracked_count, 1);
-    EXPECT_EQ(lost_count, 1);
+    ASSERT_EQ(n, 2);
+    ASSERT_NE(track_left_of(out, n, 300.0f), nullptr);
+    ASSERT_NE(track_right_of(out, n, 300.0f), nullptr);
+    EXPECT_EQ(track_left_of(out, n, 300.0f)->state, 1);
+    EXPECT_EQ(track_right_of(out, n, 300.0f)->state, 2);
 }
 
-// Small_TrackerBuffersLargeBufferTest — wide 0.4 s expiry window
+namespace
+{
+    /**
+     * @brief A lost buffer, the missed frames of 0.04 s that follow a confirmed track, and the
+     *        state the track reports after them.
+     */
+    struct WindowRow
+    {
+            int track_buffer;
+            int misses;
+            int state;
+    };
+} // namespace
 
 /**
- * @brief Tracker fixture with track_buffer=10 yielding a 0.4 s expiry window.
- *
- * track_buffer=10, frame_rate=25 → window = 10/25 = 0.4 s.
- * tentative_confirm_hits=3 → track confirmed after three consecutive hits.
+ * @brief The fixture, run over the lost buffer and the number of missed frames.
  */
-class Small_TrackerBuffersLargeBufferTest : public ::testing::Test
+class Small_TrackerBufferWindowTest : public Small_TrackerBuffersTest,
+                                      public ::testing::WithParamInterface<WindowRow>
 {
-    protected:
-        sushitrack_tracker_t hdl_ = nullptr;
-        sushitrack_params_t params_ = {};
-
-        void SetUp() override
-        {
-            sushitrack_get_default_params(&params_);
-            params_.time_aware = 1;
-            params_.enable_tentative = 1;
-            params_.tentative_confirm_hits = 3;
-            params_.tentative_max_age_seconds = 0.08f;
-            params_.track_buffer = 10;
-            params_.frame_rate = 25;
-            params_.tentative_match_thresh = 0.9f;
-            params_.track_thresh = 0.1f;
-            params_.high_thresh = 0.2f;
-
-            hdl_ = sushitrack_create(&params_);
-            ASSERT_NE(hdl_, nullptr);
-        }
-
-        void TearDown() override { sushitrack_destroy(hdl_); }
-
-        /** @brief Returns a detection at the given top-left position. */
-        sushitrack_object_t det(float x, float y) const
-        {
-            sushitrack_object_t o{};
-            o.x = x;
-            o.y = y;
-            o.width = 50.0f;
-            o.height = 100.0f;
-            o.score = 0.9f;
-            o.label = 1;
-            return o;
-        }
-
-        /**
-         * @brief Drives three matched frames to bring the track to Tracked state.
-         * @param out Output buffer (capacity >= 1).
-         */
-        void confirm_track(std::vector<sushitrack_track_t>& out)
-        {
-            CDetections::update_frame(hdl_, det(100.0f, 200.0f), out.data(), 10, 0.04f);
-            CDetections::update_frame(hdl_, det(102.0f, 202.0f), out.data(), 10, 0.04f);
-            CDetections::update_frame(hdl_, det(104.0f, 204.0f), out.data(), 10, 0.04f);
-            ASSERT_EQ(out[0].state, 1) << "Precondition: track must be Tracked";
-        }
 };
 
 /**
- * @brief A Lost track whose accumulated lost_time has not yet exceeded the wider
- *        buffer window remains in Lost state rather than transitioning to Removed.
+ * @brief A Lost track is Removed once its lost time passes track_buffer / frame_rate seconds.
  *
- * Five miss frames at dt=0.04 s yield lost_time=0.2 s, which is below the 0.4 s
- * window configured by track_buffer=10 at frame_rate=25.
+ * At 25 fps a buffer of 2 frames is 0.08 s: 2 misses are 0.08 s, which does not pass it (Lost),
+ * and 3 misses are 0.12 s, which does (Removed). A buffer of 10 frames is 0.4 s: 5 misses are
+ * 0.2 s (Lost) and 11 misses are 0.44 s (Removed).
  */
-TEST_F(Small_TrackerBuffersLargeBufferTest, DifferentBufferWindowAffectsExpiry)
+TEST_P(Small_TrackerBufferWindowTest, LostTrackIsRemovedOncePastTheWindow)
 {
+    start(GetParam().track_buffer);
     std::vector<sushitrack_track_t> out(10);
     confirm_track(out);
 
-    int n = 0;
-    for (int i = 0; i < 5; ++i)
-        n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
+    const int n = feed_empty_frames(out, GetParam().misses);
 
     ASSERT_EQ(n, 1);
-    EXPECT_EQ(out[0].state, 2);
-    EXPECT_LT(out[0].lost_time, 0.4f);
+    EXPECT_EQ(out[0].state, GetParam().state);
 }
+
+INSTANTIATE_TEST_SUITE_P(Windows, Small_TrackerBufferWindowTest,
+                         ::testing::Values(WindowRow{2, 2, 2}, WindowRow{2, 3, 3},
+                                           WindowRow{10, 5, 2}, WindowRow{10, 11, 3}));
