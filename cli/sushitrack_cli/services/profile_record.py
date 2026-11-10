@@ -43,20 +43,16 @@ def _percentile(sorted_values: list[float], fraction: float) -> float:
     return sorted_values[below] * (1.0 - weight) + sorted_values[above] * weight
 
 
-def read_latency(path: Path) -> Latency | None:
-    """Returns the frame latency of the record at *path*, or None when it holds none.
+def parse_latency(document: object) -> Latency | None:
+    """Returns the frame latency a decoded record holds, or None when it holds none.
 
     Args:
-        path: A `.sprec.json` file written by `mot_engine`.
+        document: The decoded JSON of a `.sprec.json` file.
 
     Returns:
         The median and quartiles of the `sushitrack.frame` periods that are not warm-up, or None
-        when the file is missing, is not a version 2 record or holds no such period.
+        when *document* is not a version 2 record or holds no such period.
     """
-    try:
-        document = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
     if not isinstance(document, dict):
         return None
     if document.get("sushiprofiler_record") != RECORD_FORMAT_VERSION:
@@ -73,3 +69,20 @@ def read_latency(path: Path) -> Latency | None:
     lengths.sort()
     return Latency(median_us=_percentile(lengths, 0.5), low_us=_percentile(lengths, 0.25),
                    high_us=_percentile(lengths, 0.75), periods=len(lengths))
+
+
+def read_latency(path: Path) -> Latency | None:
+    """Returns the frame latency of the record at *path*, or None when it holds none.
+
+    Args:
+        path: A `.sprec.json` file written by `mot_engine`.
+
+    Returns:
+        What `parse_latency` returns for the file's JSON, or None when the file is missing or
+        is not JSON.
+    """
+    try:
+        document = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return parse_latency(document)
