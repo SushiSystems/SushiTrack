@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* test_sushitrack_log_project.cpp                                       */
+/* compile_sushitrack_log_project.cpp                                     */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -22,22 +22,14 @@
 /**************************************************************************/
 
 /**
- * @file test_sushitrack_log_project.cpp
- * @brief Tests the project every SushiTrack log category belongs to.
+ * @file compile_sushitrack_log_project.cpp
+ * @brief Checks at compile time the project name and the level variable of SushiTrack's logs.
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-
 #include <SushiTrack/logging/sushitrack_log_project.hpp>
 
-using namespace SushiTrack;
-
-/**
- * @brief The project is `sushitrack` and its levels come from SUSHITRACK_LOG_LEVEL.
- */
-TEST(Small_SushiTrackLogProjectTest, NamesTheProjectAndItsVariable)
-{
-    EXPECT_EQ(K_SUSHITRACK_LOG_PROJECT.name(), "sushitrack");
-    EXPECT_EQ(K_SUSHITRACK_LOG_PROJECT.level_variable(), "SUSHITRACK_LOG_LEVEL");
-}
+static_assert(SushiTrack::K_SUSHITRACK_LOG_PROJECT.name() == "sushitrack",
+              "the project of SushiTrack's records is sushitrack");
+static_assert(SushiTrack::K_SUSHITRACK_LOG_PROJECT.level_variable() == "SUSHITRACK_LOG_LEVEL",
+              "SUSHITRACK_LOG_LEVEL sets the levels of the sushitrack project");
