@@ -32,6 +32,10 @@
 
 #if SUSHITRACK_ENABLE_PROFILER
 
+#include <cstddef>
+#include <optional>
+#include <set>
+#include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -117,30 +121,71 @@ namespace
         sushitrack_destroy(tracker);
         return session.finish();
     }
+    /// @brief Returns how many periods of @p record hold a zone named @p zone.
+    std::size_t periods_holding(const SushiProfiler::RunRecord& record, const char* zone)
+    {
+        std::size_t holding = 0U;
+        for (const SushiProfiler::PeriodRecord& period : record.periods)
+        {
+            if (zone_names(record, period).count(zone) == 1U)
+                ++holding;
+        }
+        return holding;
+    }
+
+    /// @brief Returns how many tracks of @p first differ from those of @p second in id, state,
+    ///        x or y; the two hold the same number.
+    std::size_t differing_tracks(const std::vector<sushitrack_track_t>& first,
+                                 const std::vector<sushitrack_track_t>& second)
+    {
+        std::size_t differing = 0U;
+        for (std::size_t i = 0; i < first.size(); ++i)
+        {
+            if (first[i].track_id != second[i].track_id || first[i].state != second[i].state ||
+                first[i].x != second[i].x || first[i].y != second[i].y)
+            {
+                ++differing;
+            }
+        }
+        return differing;
+    }
+
+    /// @brief A zone and the number of the three periods that must hold it.
+    struct ZoneRow
+    {
+            const char* zone;
+            std::size_t periods;
+    };
 } // namespace
 
 /**
- * @brief Every level 1 zone the plain path runs appears in each of the three periods.
+ * @brief The level 1 zones of the plain path, run over each zone and the number of periods that
+ *        hold it.
  */
-TEST(Medium_TrackerProfilingTest, EveryLevelOneZoneAppearsInEachFrame)
+class Medium_TrackerLevelOneZonesTest : public ::testing::TestWithParam<ZoneRow>
+{
+};
+
+/**
+ * @brief Each level 1 zone the plain path runs appears in all three periods, and the zones of
+ *        the stages it does not run (lost recovery, tentative) appear in none.
+ */
+TEST_P(Medium_TrackerLevelOneZonesTest, ZoneAppearsInTheExpectedPeriods)
 {
     const SushiProfiler::RunRecord record = record_scenario(1U);
 
     ASSERT_EQ(record.periods.size(), 3U);
-    for (const SushiProfiler::PeriodRecord& period : record.periods)
-    {
-        const std::set<std::string> names = zone_names(record, period);
-        for (const char* expected :
-             {Keys::K_ZONE_UPDATE, Keys::K_ZONE_SPLIT, Keys::K_ZONE_PREDICT,
-              Keys::K_ZONE_MATCH_HIGH, Keys::K_ZONE_MATCH_LOW, Keys::K_ZONE_UNCONFIRMED,
-              Keys::K_ZONE_CLEANUP_LOST, Keys::K_ZONE_FINALIZE, Keys::K_ZONE_OUTPUT})
-        {
-            EXPECT_EQ(names.count(expected), 1U) << expected << " in period " << period.index;
-        }
-        EXPECT_EQ(names.count(Keys::K_ZONE_LOST_RECOVERY), 0U);
-        EXPECT_EQ(names.count(Keys::K_ZONE_TENTATIVE), 0U);
-    }
+    EXPECT_EQ(periods_holding(record, GetParam().zone), GetParam().periods);
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    Zones, Medium_TrackerLevelOneZonesTest,
+    ::testing::Values(ZoneRow{Keys::K_ZONE_UPDATE, 3U}, ZoneRow{Keys::K_ZONE_SPLIT, 3U},
+                      ZoneRow{Keys::K_ZONE_PREDICT, 3U}, ZoneRow{Keys::K_ZONE_MATCH_HIGH, 3U},
+                      ZoneRow{Keys::K_ZONE_MATCH_LOW, 3U}, ZoneRow{Keys::K_ZONE_UNCONFIRMED, 3U},
+                      ZoneRow{Keys::K_ZONE_CLEANUP_LOST, 3U}, ZoneRow{Keys::K_ZONE_FINALIZE, 3U},
+                      ZoneRow{Keys::K_ZONE_OUTPUT, 3U}, ZoneRow{Keys::K_ZONE_LOST_RECOVERY, 0U},
+                      ZoneRow{Keys::K_ZONE_TENTATIVE, 0U}));
 
 /**
  * @brief The tentative zone replaces the unconfirmed zone when the tentative stage is on.
@@ -181,40 +226,68 @@ TEST(Medium_TrackerProfilingTest, OutputIsEqualWithTheGateOpenAndClosed)
     static_cast<void>(session.finish());
 
     ASSERT_EQ(with.size(), without.size());
-    for (std::size_t i = 0; i < with.size(); ++i)
-    {
-        EXPECT_EQ(with[i].track_id, without[i].track_id);
-        EXPECT_EQ(with[i].state, without[i].state);
-        EXPECT_FLOAT_EQ(with[i].x, without[i].x);
-        EXPECT_FLOAT_EQ(with[i].y, without[i].y);
-    }
+    EXPECT_EQ(differing_tracks(with, without), 0U);
 }
 
 /**
- * @brief The level 1 counters equal the counts the scenario's tracks give, frame by frame.
+ * @brief Fixture of the level 1 record of the three-frame scenario.
  */
-TEST(Medium_TrackerProfilingTest, LevelOneCountersMatchTheScenario)
+class Medium_TrackerLevelOneCountersTest : public ::testing::Test
 {
-    const SushiProfiler::RunRecord record = record_scenario(1U);
-    ASSERT_EQ(record.periods.size(), 3U);
-    const auto value = [&](std::size_t frame, const char* name)
-    {
-        return counter_value(record, record.periods[frame], name);
-    };
+    protected:
+        std::optional<SushiProfiler::RunRecord> record_;
 
+        void SetUp() override
+        {
+            record_ = record_scenario(1U);
+            ASSERT_EQ(record_->periods.size(), 3U);
+        }
+
+        /// @brief Returns the value counter @p name folded to in period @p frame.
+        double value(std::size_t frame, const char* name) const
+        {
+            return counter_value(*record_, record_->periods[frame], name);
+        }
+};
+
+/**
+ * @brief The detections counter holds the two, one and zero detections of the three frames.
+ */
+TEST_F(Medium_TrackerLevelOneCountersTest, DetectionsCounterFollowsTheFrames)
+{
     EXPECT_EQ(value(0, Keys::K_COUNTER_DETECTIONS_IN), 2.0);
     EXPECT_EQ(value(1, Keys::K_COUNTER_DETECTIONS_IN), 1.0);
     EXPECT_EQ(value(2, Keys::K_COUNTER_DETECTIONS_IN), 0.0);
+}
 
+/**
+ * @brief The lifecycle counters record the seed in frame 1, the match in frame 2 and the loss
+ *        in frame 3.
+ */
+TEST_F(Medium_TrackerLevelOneCountersTest, LifecycleCountersFollowTheScenario)
+{
     EXPECT_EQ(value(0, Keys::K_COUNTER_TENTATIVE_CONFIRMED), 1.0);
     EXPECT_EQ(value(1, Keys::K_COUNTER_MATCHES_HIGH), 1.0);
     EXPECT_EQ(value(2, Keys::K_COUNTER_TRACKS_NEWLY_LOST), 1.0);
+}
 
+/**
+ * @brief The alive counters hold one Tracked track in frames 1 and 2 and one Lost track in
+ *        frame 3.
+ */
+TEST_F(Medium_TrackerLevelOneCountersTest, AliveCountersFollowTheScenario)
+{
     EXPECT_EQ(value(0, Keys::K_COUNTER_ALIVE_TRACKED), 1.0);
     EXPECT_EQ(value(1, Keys::K_COUNTER_ALIVE_TRACKED), 1.0);
     EXPECT_EQ(value(2, Keys::K_COUNTER_ALIVE_TRACKED), 0.0);
     EXPECT_EQ(value(2, Keys::K_COUNTER_ALIVE_LOST), 1.0);
+}
 
+/**
+ * @brief The output counters hold the one track written in frames 1 and 3 and no dropped track.
+ */
+TEST_F(Medium_TrackerLevelOneCountersTest, OutputCountersFollowTheScenario)
+{
     EXPECT_EQ(value(0, Keys::K_COUNTER_TRACKS_WRITTEN), 1.0);
     EXPECT_EQ(value(2, Keys::K_COUNTER_TRACKS_WRITTEN), 1.0);
     EXPECT_EQ(value(0, Keys::K_COUNTER_TRACKS_DROPPED), 0.0);
@@ -249,25 +322,33 @@ TEST(Medium_TrackerProfilingTest, OverflowIsCountedAsDroppedTracks)
 }
 
 /**
- * @brief The cost matrix zone and the level 2 counters and instants are absent from a record
- *        made at runtime level 1 and present at level 2 when the build compiled level 2 in.
+ * @brief The cost matrix zone and the level 2 counters are absent from a record made at runtime
+ *        level 1.
  */
-TEST(Medium_TrackerProfilingTest, LevelTwoRecordsAppearOnlyAtLevelTwo)
+TEST(Medium_TrackerProfilingTest, LevelTwoRecordsAreAbsentAtLevelOne)
 {
     const SushiProfiler::RunRecord shallow = record_scenario(1U);
+
     ASSERT_EQ(shallow.periods.size(), 3U);
     EXPECT_EQ(zone_names(shallow, shallow.periods[1]).count(Keys::K_ZONE_COST_MATRIX), 0U);
     EXPECT_EQ(counter_value(shallow, shallow.periods[1], Keys::K_COUNTER_COST_CELLS), -1.0);
+}
 
-    if (SUSHITRACK_PROFILE_LEVEL < 2)
-        GTEST_SKIP() << "the build compiled level 2 out";
-
+#if SUSHITRACK_PROFILE_LEVEL >= 2
+/**
+ * @brief The cost matrix and solve zones, the cost cells counter and the lost instant appear at
+ *        runtime level 2, in a build that compiled level 2 in.
+ */
+TEST(Medium_TrackerProfilingTest, LevelTwoRecordsAppearAtLevelTwo)
+{
     const SushiProfiler::RunRecord fine = record_scenario(2U);
+
     ASSERT_EQ(fine.periods.size(), 3U);
     EXPECT_EQ(zone_names(fine, fine.periods[1]).count(Keys::K_ZONE_COST_MATRIX), 1U);
     EXPECT_EQ(zone_names(fine, fine.periods[1]).count(Keys::K_ZONE_SOLVE), 1U);
     EXPECT_GT(counter_value(fine, fine.periods[1], Keys::K_COUNTER_COST_CELLS), 0.0);
     EXPECT_EQ(instant_count(fine, fine.periods[2], Keys::K_INSTANT_TRACK_LOST), 1U);
 }
+#endif
 
 #endif
