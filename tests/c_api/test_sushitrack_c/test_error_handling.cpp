@@ -42,6 +42,8 @@
 #include <SushiTrack/c_api/c_api_log_category.hpp>
 #include <SushiTrack/tracking/tracking_log_category.hpp>
 
+#include <c_detection_builders.hpp>
+
 namespace
 {
 
@@ -92,31 +94,44 @@ class Small_SushiTrackCInvalidArgumentTest : public ::testing::Test
 };
 
 /**
- * @brief GetDefaultParams must tolerate a null pointer without crashing.
+ * @brief GetDefaultParams tolerates a null pointer and changes nothing: the defaults it fills
+ *        afterwards still build a tracker.
  *
  * The C contract documents the parameter only as the output destination, so
- * a null input is considered an unintentional misuse. The implementation must
- * not segfault; passing the call is the success criterion.
+ * a null input is considered an unintentional misuse.
  */
-TEST(Small_SushiTrackCInvalidArgumentStandaloneTest, GetDefaultParamsNullPointerDoesNotCrash)
+TEST(Small_SushiTrackCInvalidArgumentStandaloneTest, GetDefaultParamsNullPointerChangesNothing)
 {
     sushitrack_get_default_params(nullptr);
-    SUCCEED();
+    sushitrack_params_t params{};
+    sushitrack_get_default_params(&params);
+
+    sushitrack_tracker_t hdl = sushitrack_create(&params);
+
+    EXPECT_NE(hdl, nullptr);
+    sushitrack_destroy(hdl);
 }
 
 /**
- * @brief sushitrack_create with a null params pointer auto-loads the runtime
- *        config (sushitrack_create_from_config) and returns a valid handle.
+ * @brief sushitrack_create with a null params pointer overlays the runtime config on the
+ *        defaults (sushitrack_create_from_config): the first detection starts a Tentative track,
+ *        where the defaults, which turn tentative tracking off, start a Tracked one.
  *
- * A null params pointer is no longer a misuse: it is the documented opt-in to
- * the library-owned config path (defaults overlaid with sushitrack.json when one
+ * The overlay is the file SUSHITRACK_CONFIG names, assets/sushitrack.json under the test runner,
+ * which sets enable_tentative to 1.
  */
-TEST(Medium_SushiTrackCInvalidArgumentStandaloneTest, CreateWithNullParamsAutoLoadsConfig)
+TEST(Medium_SushiTrackCInvalidArgumentStandaloneTest, CreateWithNullParamsOverlaysTheConfig)
 {
     sushitrack_tracker_t hdl = sushitrack_create(nullptr);
-    EXPECT_NE(hdl, nullptr);
-    if (hdl != nullptr)
-        sushitrack_destroy(hdl);
+    ASSERT_NE(hdl, nullptr);
+    std::vector<sushitrack_track_t> out(4);
+    sushitrack_object_t d = make_det(10.0f, 20.0f);
+
+    EXPECT_EQ(CDetections::update_frame(hdl, &d, 1, out.data(), 4, 0.04f), 1);
+
+    EXPECT_EQ(out[0].state, CDetections::K_TENTATIVE);
+    EXPECT_EQ(out[0].is_confirmed, 0);
+    sushitrack_destroy(hdl);
 }
 
 /**
@@ -252,30 +267,32 @@ class Small_SushiTrackCParameterRangeTest : public ::testing::Test
 };
 
 /**
- * @brief Zero frame_rate must either be rejected at construction or, if the
- *        tracker is created, must not produce promoted tracks (the timing
- *        denominator is undefined).
+ * @brief A frame_rate of 0 is clamped to 1: with time_aware on and track_buffer 1, a lost track
+ *        expires once its lost time exceeds 1 s.
+ *
+ * Lost time is 0.5 s after the first missed frame, 0.9 s after the second (0.5 + 0.4) and 1.1 s
+ * after the third (0.9 + 0.2). The limit is track_buffer / frame_rate + 0.0001 = 1.0001 s, so the
+ * track is Lost at 0.9 s and Removed at 1.1 s. A frame_rate left at 0 never expires it.
  */
-TEST_F(Small_SushiTrackCParameterRangeTest, ZeroFrameRateIsRejectedOrInert)
+TEST_F(Small_SushiTrackCParameterRangeTest, ZeroFrameRateIsClampedToOne)
 {
     params_.frame_rate = 0;
+    params_.time_aware = 1;
+    params_.track_buffer = 1;
     sushitrack_tracker_t hdl = nullptr;
-    sushitrack_status_t s = sushitrack_create_ex(&params_, &hdl);
-
-    if (s == SUSHITRACK_INVALID_ARGUMENT)
-    {
-        EXPECT_EQ(hdl, nullptr);
-        return;
-    }
-
-    ASSERT_NE(hdl, nullptr);
+    ASSERT_EQ(sushitrack_create_ex(&params_, &hdl), SUSHITRACK_SUCCESS);
     std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d = make_det(10.0f, 20.0f, 0.9f);
-    int count = -1;
-    EXPECT_EQ(
-        sushitrack_update(hdl, &d, 1, out.data(), static_cast<int>(out.size()), 0.04f, &count),
-        SUSHITRACK_SUCCESS);
-    EXPECT_GE(count, 0);
+    sushitrack_object_t d = make_det(10.0f, 20.0f);
+
+    EXPECT_EQ(CDetections::update_frame(hdl, &d, 1, out.data(), 4, 0.04f), 1);
+    EXPECT_EQ(out[0].state, CDetections::K_TRACKED);
+    EXPECT_EQ(CDetections::update_frame(hdl, nullptr, 0, out.data(), 4, 0.5f), 1);
+    EXPECT_EQ(out[0].state, CDetections::K_LOST);
+    EXPECT_EQ(CDetections::update_frame(hdl, nullptr, 0, out.data(), 4, 0.4f), 1);
+    EXPECT_EQ(out[0].state, CDetections::K_LOST);
+    EXPECT_EQ(CDetections::update_frame(hdl, nullptr, 0, out.data(), 4, 0.2f), 1);
+    EXPECT_EQ(out[0].state, CDetections::K_REMOVED);
+
     sushitrack_destroy(hdl);
 }
 
@@ -292,22 +309,26 @@ TEST_F(Small_SushiTrackCParameterRangeTest, NegativeFrameRateIsRefused)
 }
 
 /**
- * @brief Negative track_buffer must be rejected or normalised; a negative
- *        lost-track lifetime would otherwise cause underflow on buffer arithmetic.
+ * @brief A negative track_buffer is clamped to 1: with time_aware off, a lost track is removed on
+ *        the second frame after its last match, not kept for the default 30.
+ *
+ * The track matches in frame 1 and turns Lost in frame 2. In frame 3 its age is 3 - 1 = 2 frames
+ * and the frame policy expires an age above the buffer: 2 > 1. With track_buffer 2 it would stay.
  */
-TEST_F(Small_SushiTrackCParameterRangeTest, NegativeTrackBufferIsRejectedOrNormalised)
+TEST_F(Small_SushiTrackCParameterRangeTest, NegativeTrackBufferIsClampedToOne)
 {
     params_.track_buffer = -5;
     sushitrack_tracker_t hdl = nullptr;
-    sushitrack_status_t s = sushitrack_create_ex(&params_, &hdl);
+    ASSERT_EQ(sushitrack_create_ex(&params_, &hdl), SUSHITRACK_SUCCESS);
+    std::vector<sushitrack_track_t> out(4);
+    sushitrack_object_t d = make_det(10.0f, 20.0f);
 
-    if (s != SUSHITRACK_SUCCESS)
-    {
-        EXPECT_EQ(hdl, nullptr);
-        return;
-    }
+    EXPECT_EQ(CDetections::update_frame(hdl, &d, 1, out.data(), 4, 0.04f), 1);
+    EXPECT_EQ(CDetections::update_frame(hdl, nullptr, 0, out.data(), 4, 0.04f), 1);
+    EXPECT_EQ(out[0].state, CDetections::K_LOST);
+    EXPECT_EQ(CDetections::update_frame(hdl, nullptr, 0, out.data(), 4, 0.04f), 1);
+    EXPECT_EQ(out[0].state, CDetections::K_REMOVED);
 
-    ASSERT_NE(hdl, nullptr);
     sushitrack_destroy(hdl);
 }
 
@@ -324,25 +345,28 @@ TEST_F(Small_SushiTrackCParameterRangeTest, MatchThreshGreaterThanOneIsTolerated
 }
 
 /**
- * @brief track_thresh greater than high_thresh inverts the score-pool split
- *        rule. The tracker must not crash and should not silently fabricate
- *        a track from a low-score detection.
+ * @brief With track_thresh above high_thresh, a detection scoring between them is a low-score
+ *        detection and starts no track.
+ *
+ * A detection joins the high pool when its score reaches track_thresh. The score 0.5 is below
+ * 0.9, so it goes to the low pool, and new tracks start only from the high pool: the first frame
+ * writes 0 tracks.
  */
-TEST_F(Small_SushiTrackCParameterRangeTest, TrackThreshGreaterThanHighThreshDoesNotCrash)
+TEST_F(Small_SushiTrackCParameterRangeTest, TrackThreshAboveHighThreshStartsNoTrackFromALowScore)
 {
     params_.track_thresh = 0.9f;
     params_.high_thresh = 0.1f;
     sushitrack_tracker_t hdl = sushitrack_create(&params_);
     ASSERT_NE(hdl, nullptr);
-
     std::vector<sushitrack_track_t> out(4);
     sushitrack_object_t d = make_det(10.0f, 20.0f, 0.5f);
     int count = -1;
+
     EXPECT_EQ(
         sushitrack_update(hdl, &d, 1, out.data(), static_cast<int>(out.size()), 0.04f, &count),
         SUSHITRACK_SUCCESS);
-    EXPECT_GE(count, 0);
 
+    EXPECT_EQ(count, 0);
     sushitrack_destroy(hdl);
 }
 
@@ -433,33 +457,43 @@ TEST_F(Small_SushiTrackCBufferCapacityTest, TracksWithinTheCapacityReturnSuccess
 // Small_SushiTrackCLifecycleSafetyTest
 
 /**
- * @brief Destroying a null handle must be a safe no-op so consumers can call
- *        Destroy unconditionally from cleanup paths.
+ * @brief Destroying a null handle is a safe no-op: a live tracker still updates afterwards, so
+ *        consumers can call Destroy unconditionally from cleanup paths.
  */
-TEST(Small_SushiTrackCLifecycleSafetyTest, DestroyNullHandleIsNoOp)
-{
-    sushitrack_destroy(nullptr);
-    SUCCEED();
-}
-
-/**
- * @brief Create / Destroy cycles must reclaim resources cleanly; running many
- *        rapid cycles must not leak or fail.
- */
-TEST(Small_SushiTrackCLifecycleSafetyTest, RepeatedCreateDestroyCycleSucceeds)
+TEST(Small_SushiTrackCLifecycleSafetyTest, DestroyNullHandleLeavesALiveTrackerWorking)
 {
     sushitrack_params_t params{};
     sushitrack_get_default_params(&params);
+    sushitrack_tracker_t hdl = sushitrack_create(&params);
+    ASSERT_NE(hdl, nullptr);
+    std::vector<sushitrack_track_t> out(4);
+    sushitrack_object_t d = make_det(10.0f, 20.0f);
 
-    for (int i = 0; i < 50; ++i)
-    {
-        sushitrack_tracker_t hdl = sushitrack_create(&params);
-        ASSERT_NE(hdl, nullptr);
-        sushitrack_destroy(hdl);
-    }
+    sushitrack_destroy(nullptr);
+
+    EXPECT_EQ(CDetections::update_frame(hdl, &d, 1, out.data(), 4, 0.04f), 1);
+    sushitrack_destroy(hdl);
 }
 
-// Small_SushiTrackCBoundaryExceptionTest
+/**
+ * @brief A tracker can be created again after another was destroyed. Leaks are the sanitizers'
+ *        promise, not this test's.
+ */
+TEST(Small_SushiTrackCLifecycleSafetyTest, CreateAfterDestroySucceeds)
+{
+    sushitrack_params_t params{};
+    sushitrack_get_default_params(&params);
+    sushitrack_tracker_t first = sushitrack_create(&params);
+    ASSERT_NE(first, nullptr);
+    sushitrack_destroy(first);
+
+    sushitrack_tracker_t second = sushitrack_create(&params);
+
+    EXPECT_NE(second, nullptr);
+    sushitrack_destroy(second);
+}
+
+// Medium_SushiTrackCBoundaryExceptionTest
 
 /**
  * @brief Fixture that owns one tracker and installs a SushiLog sink that throws on every record.
@@ -467,7 +501,7 @@ TEST(Small_SushiTrackCLifecycleSafetyTest, RepeatedCreateDestroyCycleSucceeds)
  * SushiLog contains an exception from its sink, so no C entry point sees one: each test checks
  * that a call keeps its normal result while every record it logs throws in the sink.
  */
-class Small_SushiTrackCBoundaryExceptionTest : public ::testing::Test
+class Medium_SushiTrackCBoundaryExceptionTest : public ::testing::Test
 {
     protected:
         sushitrack_tracker_t hdl_ = nullptr;
@@ -510,7 +544,7 @@ class Small_SushiTrackCBoundaryExceptionTest : public ::testing::Test
 /**
  * @brief sushitrack_update returns its track while the sink throws.
  */
-TEST_F(Small_SushiTrackCBoundaryExceptionTest, UpdateSurvivesAThrowingSink)
+TEST_F(Medium_SushiTrackCBoundaryExceptionTest, UpdateSurvivesAThrowingSink)
 {
     std::vector<sushitrack_track_t> out(4);
     sushitrack_object_t d = make_det(10.0f, 20.0f);
@@ -527,7 +561,7 @@ TEST_F(Small_SushiTrackCBoundaryExceptionTest, UpdateSurvivesAThrowingSink)
  * @brief sushitrack_get_tracklets truncates to its capacity, logging the warning, while the sink
  *        throws.
  */
-TEST_F(Small_SushiTrackCBoundaryExceptionTest, GetTrackletsSurvivesAThrowingSink)
+TEST_F(Medium_SushiTrackCBoundaryExceptionTest, GetTrackletsSurvivesAThrowingSink)
 {
     std::vector<sushitrack_object_t> dets;
     for (int i = 0; i < 3; ++i)
@@ -548,7 +582,7 @@ TEST_F(Small_SushiTrackCBoundaryExceptionTest, GetTrackletsSurvivesAThrowingSink
 /**
  * @brief sushitrack_create_ex succeeds while the sink throws.
  */
-TEST_F(Small_SushiTrackCBoundaryExceptionTest, CreateExSurvivesAThrowingSink)
+TEST_F(Medium_SushiTrackCBoundaryExceptionTest, CreateExSurvivesAThrowingSink)
 {
     sushitrack_tracker_t created = nullptr;
     sushitrack_status_t status = SUSHITRACK_RUNTIME_ERROR;
@@ -564,7 +598,7 @@ TEST_F(Small_SushiTrackCBoundaryExceptionTest, CreateExSurvivesAThrowingSink)
 /**
  * @brief sushitrack_destroy releases the tracker while the sink throws.
  */
-TEST_F(Small_SushiTrackCBoundaryExceptionTest, DestroySurvivesAThrowingSink)
+TEST_F(Medium_SushiTrackCBoundaryExceptionTest, DestroySurvivesAThrowingSink)
 {
     EXPECT_NO_THROW(sushitrack_destroy(hdl_));
     hdl_ = nullptr;
