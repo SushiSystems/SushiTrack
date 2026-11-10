@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* test_tracking_log_category.cpp                                         */
+/* compile_tracking_log_category.cpp                                      */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -22,22 +22,15 @@
 /**************************************************************************/
 
 /**
- * @file test_tracking_log_category.cpp
- * @brief Tests the category the tracking area logs under.
+ * @file compile_tracking_log_category.cpp
+ * @brief Checks at compile time that the tracking category belongs to `sushitrack`, module
+ *        `tracking`.
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-
 #include <SushiTrack/tracking/tracking_log_category.hpp>
 
-using namespace SushiTrack;
-
-/**
- * @brief The category belongs to `sushitrack` and its module is `tracking`.
- */
-TEST(Small_TrackingLogCategoryTest, NamesTheProjectAndTheModule)
-{
-    EXPECT_EQ(K_TRACKING_LOG_CATEGORY.project().name(), "sushitrack");
-    EXPECT_EQ(K_TRACKING_LOG_CATEGORY.module(), "tracking");
-}
+static_assert(SushiTrack::K_TRACKING_LOG_CATEGORY.project().name() == "sushitrack",
+              "the tracking category belongs to the sushitrack project");
+static_assert(SushiTrack::K_TRACKING_LOG_CATEGORY.module() == "tracking",
+              "the tracking category names the tracking module");
