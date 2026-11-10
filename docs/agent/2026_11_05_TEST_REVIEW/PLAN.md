@@ -1,24 +1,8 @@
 # Test review: plan
 
-**Status:** Open — M1 to M8 applied (2026-11-10); M9 partial; M10 to M13 untouched; the owner chooses inline or parallel
+**Status:** Open — M1 to M12 applied (2026-11-10); M13 partial (11 of 25 files); the owner chooses inline or parallel
 
-**Resume note (M9, filtering).** M7 and M8 are applied and pushed, one commit per file. RW-37 is closed: the
-configuration search reads files, variables and the working directory through `ConfigHost`
-(`include/SushiTrack/configuration/config_host.hpp`, with `SystemConfigHost` and `InMemoryConfigHost`), and the
-loader tests describe their machine in memory. The `_putenv_s` claim of the record was not confirmed: Microsoft's
-documentation says an empty value removes the variable, so the helper may have worked, but it is gone either way
-and no run could settle it here. M8: `FeatureDefaultsToEmpty` and six rect tests are deleted, the
-square box and the stored negative origin are folded in, the xywh tests compare exactly. One row waits on the
-owner: `GenerateByTlbrReversesCorners` stays unmerged until the owner confirms that a reversed-corner contract
-exists (the header states none). M9 applied so far: `test_filtering_log_category.cpp` (now `compile_filtering_log_category.cpp`),
-`test_null_gate_validator.cpp`, `test_kalman_types.cpp`, `test_state_predictor.cpp`, and in `test_imm_filter.cpp` the
-prior test, the probability test and the checkpoint test. M9 left: `test_gate_validator.cpp` (needs an in-memory
-`GateValidator` adapter in the filtering module), `test_gated_state_predictor.cpp`, `test_generic_kalman_factory.cpp`,
-`test_kalman_factory.cpp` and `test_kalman_filter_registry.cpp` (all take the registry seam T2 built; the registry
-has a public constructor now), `test_kalman_filter.cpp` (many loop rewrites with hand-derived values) and
-`test_nsa_kalman_filter.cpp`. M10 to M13 untouched. No compiler and no `build*/compile_commands.json` exist on this
-machine, so no C++ syntax check ran for any file changed since M7; the commit hook (comment rules, test mirror) ran
-and passed. The `Totals` table of `REPORT.md` was not recounted. Resume at `tests/filtering/test_gate_validator.cpp`.
+**Resume note (M13, tracking).** M8 closed with the owner's ruling (REPORT decision 14) and its missing iou add; M9 is applied (seams: `InMemoryGateValidator` in `include/SushiTrack/filtering/in_memory_gate_validator.hpp`; the registry seam T2 built already serves the factory and registry tests); M10 is applied with one seam, `LogThrottle::admit(suppressed, generation)`; M11 is applied; M12 is void, since both of its files were deleted by T6 and T7. M13 applied so far, one commit per file: `test_frame_timing_policy.cpp`, `test_wall_clock_timing_policy.cpp`, `test_timing_policy.cpp` (deleted for `compile_timing_policy.cpp`), `test_advanced_path.cpp`, `test_association_stages.cpp`, `test_boundary_conditions.cpp`, `test_buffers.cpp`, `test_byte_association.cpp`, `test_config_variations.cpp` and `test_duplicate_suppression.cpp`. Resume at `tests/tracking/test_tracker/test_end_to_end.cpp`; then `test_full_stack.cpp`, `test_kinematic_regimes.cpp`, `test_multi_object.cpp`, `test_observation_momentum.cpp`, `test_occlusion_recovery.cpp`, `test_profiling.cpp`, `test_tentative_lifecycle.cpp`, `test_time_aware.cpp`, `tests/tracking/test_tracker_config.cpp`, `tests/tracking/test_tracking_log_category.cpp` and `tests/tracking/test_tracklet/`. The Adds of tracking (tracklet kinematic state, last-seen state, maneuver probability, appearance eviction, OCM and ORU) are still to write. No compiler and no `build*/compile_commands.json` exist on this machine, so no C++ syntax check ran for any file changed since M7, and no test ran; every new expected value has its hand derivation in the test comment. The commit hook (comment rules, test mirror) ran and passed for each commit. The `Totals` table of `REPORT.md` was not recounted.
 
 Applies the verdicts of `REPORT.md`, in hierarchy order: the shared helpers, adapters and seams the
 rewrites need come first, then the defects the review found, then each module's tests. A module job
@@ -43,12 +27,12 @@ writes each add. Nothing in a module job changes production code except a seam a
 | M5 | the tests of `cli/services` (12 files): 44 rewrite, 5 resize, 2 split, 4 delete | T1, T2, T3, T4, T5, T6, T7 | done |
 | M6 | the tests of `cli/test_cli` (2 files): 8 rewrite, 4 delete | T1, T2, T3, T4, T5, T6, T7 | done |
 | M7 | the tests of `configuration` (2 files): 19 rewrite, 1 delete | T1, T2, T3, T4, T5, T6, T7 | done |
-| M8 | the tests of `detection` (2 files): 3 rewrite, 3 merge, 7 delete | T1, T2, T3, T4, T5, T6, T7 | done (one merge row waits on the owner) |
-| M9 | the tests of `filtering` (12 files): 23 rewrite, 3 resize, 4 split, 8 delete | T1, T2, T3, T4, T5, T6, T7 | partial |
-| M10 | the tests of `logging` (3 files): 4 rewrite, 5 resize, 1 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
-| M11 | the tests of `profiling` (4 files): 6 rewrite, 1 split | T1, T2, T3, T4, T5, T6, T7 | todo |
-| M12 | the tests of `tools` (2 files): 1 rewrite, 2 resize, 1 split, 5 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
-| M13 | the tests of `tracking` (25 files): 63 rewrite, 4 resize, 5 split, 36 merge, 17 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
+| M8 | the tests of `detection` (2 files): 3 rewrite, 3 merge, 7 delete | T1, T2, T3, T4, T5, T6, T7 | done |
+| M9 | the tests of `filtering` (12 files): 23 rewrite, 3 resize, 4 split, 8 delete | T1, T2, T3, T4, T5, T6, T7 | done |
+| M10 | the tests of `logging` (3 files): 4 rewrite, 5 resize, 1 delete | T1, T2, T3, T4, T5, T6, T7 | done |
+| M11 | the tests of `profiling` (4 files): 6 rewrite, 1 split | T1, T2, T3, T4, T5, T6, T7 | done |
+| M12 | the tests of `tools` (2 files): 1 rewrite, 2 resize, 1 split, 5 delete | T1, T2, T3, T4, T5, T6, T7 | done (void: both files were deleted by T6 and T7) |
+| M13 | the tests of `tracking` (25 files): 63 rewrite, 4 resize, 5 split, 36 merge, 17 delete | T1, T2, T3, T4, T5, T6, T7 | partial |
 
 ## Acceptance
 
