@@ -118,7 +118,7 @@ constructed by the C-API entry point (`sushitrack_create_ex` in
 | Interface | Responsibility | Implementations |
 |---|---|---|
 | `StatePredictor` | Propagate/update motion state | `KalmanFilter`, `NSAKalmanFilter`, `IMMFilter` |
-| `GateValidator` | Mahalanobis gating | `KalmanFilter`, `NSAKalmanFilter`, `IMMFilter`, `NullGateValidator` |
+| `GateValidator` | Mahalanobis gating | `KalmanFilter`, `NSAKalmanFilter`, `IMMFilter`, `NullGateValidator`, `InMemoryGateValidator` |
 | `GatedStatePredictor` | Predictor + validator union | `KalmanFilter`, `NSAKalmanFilter`, `IMMFilter` |
 | `KalmanFactory` | Per-tracklet predictor factory | `GenericKalmanFactory` (registry-backed) |
 | `CostCalculator` | Pairwise association cost | IoU/DIoU/GIoU/SIoU, Cosine, ReIDFirst, PureReID, Fused, GatedIoU, and the FuseScore and ObservationMomentum decorators |

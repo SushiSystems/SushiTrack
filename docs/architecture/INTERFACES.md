@@ -5,7 +5,7 @@ The runtime is organised around interfaces that the tracker depends on. Concrete
 | Interface | Purpose | Concrete implementations |
 |---|---|---|
 | `StatePredictor` | State propagation/update | `KalmanFilter`, `NSAKalmanFilter` |
-| `GateValidator` | Mahalanobis gating | `KalmanFilter`, `NSAKalmanFilter`, `NullGateValidator` |
+| `GateValidator` | Mahalanobis gating | `KalmanFilter`, `NSAKalmanFilter`, `NullGateValidator`, `InMemoryGateValidator` |
 | `GatedStatePredictor` | Unified predictor + validator | `KalmanFilter`, `NSAKalmanFilter` |
 | `KalmanFactory` | Per-tracklet predictor factory | `GenericKalmanFactory` (registry-driven) |
 | `CostCalculator` | Pairwise association cost | `IoUCostCalculator`, `DIoUCostCalculator`, `GIoUCostCalculator`, `SIoUCostCalculator`, `CosineCostCalculator`, `ReIDFirstCostCalculator`, `PureReIDCostCalculator`, `FusedCostCalculator`, `GatedIoUCostCalculator`, `FuseScoreDecorator` |
