@@ -82,7 +82,10 @@ TEST(Small_DIoUCostCalculatorTest, SeparatedBoxesCostPositive)
 }
 
 /**
- * @brief The batch cost of a partial overlap pair is the hand value: intersection 60 x 60 = 3600 over union 20000 - 3600 = 16400 gives IoU 9/41; the centres are 40 px apart on both axes, so d2 = 3200, and the enclosing box is 140 x 140, so c2 = 39200 and d2 / c2 = 4/49; cost = 1 - IoU + d2 / c2.
+ * @brief The batch cost of a partial overlap pair is the hand value: intersection 60 x 60 = 3600
+ *        over union 20000 - 3600 = 16400 gives IoU 9/41; the centres are 40 px apart on both axes,
+ *        so d2 = 3200, and the enclosing box is 140 x 140, so c2 = 39200 and d2 / c2 = 4/49; cost =
+ *        1 - IoU + d2 / c2.
  */
 TEST(Small_DIoUCostCalculatorTest, BatchCostOfAPartialOverlapIsTheHandValue)
 {
