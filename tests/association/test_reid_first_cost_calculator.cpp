@@ -76,7 +76,28 @@ TEST(Small_ReIDFirstCostCalculatorTest, DirectAssignmentWhenBothHaveFeaturesAndC
     CostMatrix m;
     calc.calculate(av, bv, m);
 
-    EXPECT_NEAR(m(0, 0), 0.f, 1e-4f);
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_error(m(0, 0), 0.0, K_COSINE_BOUND)));
+}
+
+/**
+ * @brief Orthogonal unit features have a distance of 1, beyond the threshold of 0.3, so the cost
+ *        blends it with the IoU cost 3/4 of boxes 30 px apart: (1 - w) * 1 + w * 3/4 with the IoU
+ *        weight w = 0.3 is 0.925 (swapped weights would give 0.825). The bound is the 10 IoU
+ *        operations, scaled by w <= 1, plus the roundings of 1 - w, w * iou_d and the sum.
+ */
+TEST(Small_ReIDFirstCostCalculatorTest, FeaturesBeyondTheThresholdBlendTheReIDAndGeometryCosts)
+{
+    auto iou = std::make_shared<IoUCostCalculator>();
+    auto cosine = std::make_shared<CosineCostCalculator>();
+    ReIDFirstCostCalculator calc(0.3f, 0.3f, 0.2f, iou, cosine);
+    std::vector<std::shared_ptr<Tracklet>> av{make_feat_t(100.f, 100.f, 4, 0)};
+    std::vector<std::shared_ptr<Tracklet>> bv{make_feat_t(130.f, 100.f, 4, 1)};
+    CostMatrix m;
+
+    calc.calculate(av, bv, m);
+
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<float>(
+        m(0, 0), 0.925, K_IOU_OPERATIONS + 3)));
 }
 
 /**
