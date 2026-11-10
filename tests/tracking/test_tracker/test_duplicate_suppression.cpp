@@ -27,7 +27,8 @@
  * @author Mustafa Garip
  */
 
-#include <cmath>
+#include <algorithm>
+#include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -41,7 +42,6 @@ using namespace CDetections;
 
 namespace
 {
-
     /**
      * @brief IoU of two TLWH output tracks (inclusive of the +1 convention is
      *        unnecessary here — a coarse overlap measure suffices for the invariant).
@@ -59,29 +59,38 @@ namespace
     }
 
     /**
-     * @brief Asserts no two simultaneously-Tracked output tracks overlap above 0.85.
+     * @brief Returns whether two Tracked tracks among the first @p n of @p out overlap above 0.85.
      */
-    void expect_no_overlapping_tracked_pair(const std::vector<sushitrack_track_t>& out, int n)
+    bool has_overlapping_tracked_pair(const std::vector<sushitrack_track_t>& out, int n)
     {
         for (int i = 0; i < n; ++i)
+        {
             for (int j = i + 1; j < n; ++j)
             {
                 const sushitrack_track_t& a = out[static_cast<std::size_t>(i)];
                 const sushitrack_track_t& b = out[static_cast<std::size_t>(j)];
-                if (a.state == K_TRACKED && b.state == K_TRACKED)
-                {
-                    EXPECT_LE(track_io_u(a, b), 0.85f)
-                        << "Two Tracked tracks (" << a.track_id << ", " << b.track_id
-                        << ") survived with > 0.85 IoU — duplicate not suppressed.";
-                }
+                if (a.state == K_TRACKED && b.state == K_TRACKED && track_io_u(a, b) > 0.85f)
+                    return true;
             }
+        }
+        return false;
     }
+
+    /**
+     * @brief What feed_singles() saw: the Tracked count of the last frame and how many frames
+     *        held two overlapping Tracked tracks.
+     */
+    struct SingleFrames
+    {
+            int final_tracked = 0;
+            int overlapping_frames = 0;
+    };
 
     /**
      * @brief Suppression fixture: core path, tentative off so an unmatched
      *        high-confidence detection seeds a track immediately.
      */
-    class Small_TrackerDuplicateSuppressionTest : public ::testing::Test
+    class Small_TrackerDuplicateSuppressionBase : public ::testing::Test
     {
         protected:
             sushitrack_tracker_t hdl_ = nullptr;
@@ -109,105 +118,108 @@ namespace
                 if (hdl_)
                     sushitrack_destroy(hdl_);
             }
+
+            /**
+             * @brief Feeds a single detection at (@p x, @p y) for @p frames frames of 0.04 s.
+             */
+            SingleFrames feed_singles(std::vector<sushitrack_track_t>& out, float x, float y,
+                                      int frames)
+            {
+                SingleFrames seen;
+                for (int frame = 0; frame < frames; ++frame)
+                {
+                    const sushitrack_object_t detection = make_det(x, y);
+                    const int n = update_frame(hdl_, &detection, 1, out.data(), 8, 0.04f);
+                    seen.final_tracked = count_tracked(out, n);
+                    if (has_overlapping_tracked_pair(out, n))
+                        ++seen.overlapping_frames;
+                }
+                return seen;
+            }
+
+            /**
+             * @brief Feeds two detections, one at (@p x, @p y) and one 3 px to its right (IoU
+             *        above 0.85), for one frame of 0.04 s and returns the track count.
+             */
+            int feed_twins(std::vector<sushitrack_track_t>& out, float x, float y)
+            {
+                const sushitrack_object_t twins[2] = {make_det(x, y), make_det(x + 3.0f, y)};
+                return update_frame(hdl_, twins, 2, out.data(), 8, 0.04f);
+            }
     };
 
     /**
-     * @brief A confirmed track briefly split by a near-coincident second detection
-     *        collapses back to one identity: the spurious twin is suppressed and a
-     *        single Tracked track remains.
+     * @brief The place of a box, the frames it is fed alone before its twin appears and the
+     *        frames after.
      */
-    TEST_F(Small_TrackerDuplicateSuppressionTest, TransientDuplicateCollapsesToSingleIdentity)
+    struct TwinRow
     {
-        std::vector<sushitrack_track_t> out(8);
-
-        // Confirm a single, long-lived track at a fixed location
-        for (int i = 0; i < 6; ++i)
-        {
-            sushitrack_object_t d = make_det(100.0f, 200.0f);
-            int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 8, 0.04f);
-            ASSERT_GE(n, 1);
-            expect_no_overlapping_tracked_pair(out, n);
-        }
-
-        // One frame with a near-coincident twin (IoU ~0.89). The extra high-confidence detection seeds a second, younger track.
-        {
-            sushitrack_object_t d1 = make_det(100.0f, 200.0f);
-            sushitrack_object_t d2 = make_det(103.0f, 200.0f); // 3 px offset -> IoU > 0.85
-            sushitrack_object_t dets[2] = {d1, d2};
-            int n = CDetections::update_frame(hdl_, dets, 2, out.data(), 8, 0.04f);
-            ASSERT_GE(n, 1);
-        }
-
-        // Resume single detections. The unmatched twin falls to Lost and is removed as a duplicate of the surviving track within a few frames.
-        int final_tracked = 0;
-        for (int i = 0; i < 4; ++i)
-        {
-            sushitrack_object_t d = make_det(100.0f, 200.0f);
-            int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 8, 0.04f);
-            ASSERT_GE(n, 1);
-            expect_no_overlapping_tracked_pair(out, n);
-            final_tracked = count_tracked(out, n);
-        }
-
-        EXPECT_EQ(final_tracked, 1)
-            << "A transient duplicate detection left a permanently duplicated identity.";
-    }
-
-    /**
-     * @brief Two heavily overlapping detections presented on the very first frame do
-     *        not establish two persistent identities for the same object: the
-     *        duplicate suppressor converges the scene to a single Tracked track.
-     */
-    TEST_F(Small_TrackerDuplicateSuppressionTest, CoincidentDetectionsDoNotEstablishTwinIdentities)
-    {
-        std::vector<sushitrack_track_t> out(8);
-
-        // Seed with two near-identical detections, then feed a single detection.
-        sushitrack_object_t s1 = make_det(250.0f, 250.0f);
-        sushitrack_object_t s2 = make_det(253.0f, 250.0f);
-        sushitrack_object_t seed[2] = {s1, s2};
-        int n0 = CDetections::update_frame(hdl_, seed, 2, out.data(), 8, 0.04f);
-        ASSERT_GE(n0, 1);
-
-        int final_tracked = 0;
-        for (int i = 0; i < 6; ++i)
-        {
-            sushitrack_object_t d = make_det(250.0f, 250.0f);
-            int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 8, 0.04f);
-            ASSERT_GE(n, 1);
-            expect_no_overlapping_tracked_pair(out, n);
-            final_tracked = count_tracked(out, n);
-        }
-
-        EXPECT_EQ(final_tracked, 1)
-            << "Coincident detections produced two lasting identities for one object.";
-    }
-
+            float x;
+            float y;
+            int settle_frames;
+            int tail_frames;
+    };
 } // namespace
 
-namespace
+/**
+ * @brief The fixture, run over a twin that appears on an established track and a twin present
+ *        from the first frame.
+ */
+class Small_TrackerDuplicateSuppressionTest : public Small_TrackerDuplicateSuppressionBase,
+                                              public ::testing::WithParamInterface<TwinRow>
 {
-    /**
-     * @brief A duplicate drop writes one DEBUG naming the dropped track, the kept one and the frame.
-     *
-     * Two coincident detections on the first frame confirm two tracks at once; the twin that
-     * misses the next frame turns Lost and is dropped as a duplicate of the Tracked one.
-     */
-    TEST_F(Small_TrackerDuplicateSuppressionTest, DuplicateDropLogsBothTrackIds)
-    {
-        SushiTrack::CapturedLog log(SushiLog::LogLevel::Debug);
-        std::vector<sushitrack_track_t> out(8);
+};
 
-        sushitrack_object_t seed[2] = {make_det(100.0f, 200.0f), make_det(103.0f, 200.0f)};
-        CDetections::update_frame(hdl_, seed, 2, out.data(), 8, 0.04f);
-        for (int i = 0; i < 4; ++i)
-        {
-            sushitrack_object_t d = make_det(100.0f, 200.0f);
-            CDetections::update_frame(hdl_, &d, 1, out.data(), 8, 0.04f);
-        }
+/**
+ * @brief A near-coincident second detection (3 px away, IoU above 0.85) does not leave two
+ *        identities for one object: the scene converges to one Tracked track and no frame
+ *        of the single-box phases holds two overlapping Tracked tracks.
+ */
+TEST_P(Small_TrackerDuplicateSuppressionTest, DuplicateDetectionsCollapseToOneIdentity)
+{
+    std::vector<sushitrack_track_t> out(8);
+    const TwinRow row = GetParam();
+    const SingleFrames settle = feed_singles(out, row.x, row.y, row.settle_frames);
+    ASSERT_GE(feed_twins(out, row.x, row.y), 1);
 
-        EXPECT_GE(log.count("dropped as a duplicate of track"), 1);
-        EXPECT_EQ(log.level_of("dropped as a duplicate of track"), SushiLog::LogLevel::Debug);
-        EXPECT_NE(log.last("dropped as a duplicate of track").find("Frame "), std::string::npos);
-    }
-} // namespace
+    const SingleFrames tail = feed_singles(out, row.x, row.y, row.tail_frames);
+
+    EXPECT_EQ(settle.overlapping_frames + tail.overlapping_frames, 0);
+    EXPECT_EQ(tail.final_tracked, 1) << "the twin left a lasting second identity";
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Twins, Small_TrackerDuplicateSuppressionTest,
+    ::testing::Values(
+        // a track settled over 6 frames meets a twin for one frame, then 4 single frames
+        TwinRow{100.0f, 200.0f, 6, 4},
+        // the twin is there from the first frame, then 6 single frames
+        TwinRow{250.0f, 250.0f, 0, 6}));
+
+/**
+ * @brief A duplicate drop writes one DEBUG naming the dropped track and the kept one.
+ *
+ * Two coincident detections on the first frame confirm two tracks at once; the twin that
+ * misses the next frame turns Lost and is dropped as a duplicate of the Tracked one. Which of
+ * the two is dropped is not fixed, so either order of the two ids passes.
+ */
+class Small_TrackerDuplicateLogTest : public Small_TrackerDuplicateSuppressionBase
+{
+};
+
+TEST_F(Small_TrackerDuplicateLogTest, DuplicateDropLogsBothTrackIds)
+{
+    SushiTrack::CapturedLog log(SushiLog::LogLevel::Debug);
+    std::vector<sushitrack_track_t> out(8);
+    ASSERT_EQ(feed_twins(out, 100.0f, 200.0f), 2);
+    const std::string first = std::to_string(out[0].track_id);
+    const std::string second = std::to_string(out[1].track_id);
+
+    feed_singles(out, 100.0f, 200.0f, 4);
+
+    const std::string dropped = " dropped as a duplicate of track ";
+    EXPECT_GE(log.count("track " + first + dropped + second) +
+                  log.count("track " + second + dropped + first),
+              1);
+    EXPECT_EQ(log.level_of("dropped as a duplicate of track"), SushiLog::LogLevel::Debug);
+}
