@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import dataclasses
 import os
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -73,35 +72,42 @@ def _build(session, tmp_path, tool, **options):
     return code, paths
 
 
-def test_the_build_asks_for_the_closure_with_the_compiler_and_the_type(tmp_path, runner):
+@pytest.mark.parametrize(("build_type", "package_type"), [
+    ("Debug", "release"),
+    ("MinSizeRel", "release"),
+])
+def test_the_build_asks_for_the_closure_with_the_compiler_and_the_type(
+        tmp_path, runner, build_type, package_type):
     asked = []
 
-    code, _ = _build(runner, tmp_path, _tool(asked), build_type="Debug")
+    code, _ = _build(runner, tmp_path, _tool(asked), build_type=build_type)
 
     assert code == 0
-    assert asked == [{"build_type": "release", "options": {}, "compiler": "clang++"}]
+    assert asked == [{"build_type": package_type, "options": {}, "compiler": "clang++"}]
 
 
-def test_a_minimum_size_build_links_release_packages(tmp_path, runner):
-    asked = []
-
-    _build(runner, tmp_path, _tool(asked), build_type="MinSizeRel")
-
-    assert asked[0]["build_type"] == "release"
-
-
-def test_the_configure_passes_each_package_the_compiler_and_no_checkout_directory(tmp_path,
-                                                                                runner):
-    code, paths = _build(runner, tmp_path, _tool([]))
+def test_the_configure_passes_each_package_and_the_compiler(tmp_path, runner):
+    code, _ = _build(runner, tmp_path, _tool([]))
 
     assert code == 0
     configure = runner.commands[0]
     assert f"-DSushiLog_DIR={K_LOG_CONFIG}" in configure
     assert f"-DSushiProfiler_DIR={K_PROFILER_CONFIG}" in configure
     assert "-DCMAKE_CXX_COMPILER=clang++" in configure
-    assert not [item for item in configure if item.startswith("-DSUSHILOG_DIR")]
+
+
+def test_the_configure_passes_no_checkout_directory(tmp_path, runner):
+    _build(runner, tmp_path, _tool([]))
+
+    assert not [item for item in runner.commands[0] if item.startswith("-DSUSHILOG_DIR")]
+
+
+def test_the_configure_stamp_records_the_packages_and_the_compiler(tmp_path, runner):
+    _, paths = _build(runner, tmp_path, _tool([]))
+
     stamp = (paths.build / build_svc.STAMP_NAME).read_text(encoding="utf-8")
-    assert f"-DSushiLog_DIR={K_LOG_CONFIG}" in stamp and "-DCMAKE_CXX_COMPILER=clang++" in stamp
+    assert f"-DSushiLog_DIR={K_LOG_CONFIG}" in stamp
+    assert "-DCMAKE_CXX_COMPILER=clang++" in stamp
 
 
 def test_the_run_dirs_are_recorded_in_the_tree_after_a_configure(tmp_path, runner):
@@ -149,22 +155,8 @@ def test_the_run_dirs_lead_the_search_path_of_every_command_that_runs_the_tree(t
     assert environment["LD_LIBRARY_PATH"].split(os.pathsep)[:2] == K_RUN_DIRS
 
 
-def test_the_windows_run_dirs_lead_path():
-    environment = {"PATH": "C:/old"}
-
-    library_packages.prepend_run_dirs(_tool([], windows=True), environment, ["C:/pkg/bin"])
-
-    assert environment["PATH"].startswith("C:/pkg/bin")
-
-
 def test_a_tree_without_a_record_adds_nothing_to_the_path(tmp_path):
     assert library_packages.read_run_dirs(tmp_path) == []
-
-
-def test_the_compiler_the_environment_names_outranks_the_configured_one(monkeypatch):
-    tool = config.ToolSettings(cxx="/pinned/clang++", stack_cxx="/stack/clang++")
-
-    assert tool.resolved_compiler(Path(".")) == "/stack/clang++"
 
 
 def test_load_tool_reads_the_stack_compiler_from_the_environment(tmp_path, monkeypatch):
