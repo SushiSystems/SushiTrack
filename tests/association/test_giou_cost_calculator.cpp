@@ -81,7 +81,9 @@ TEST(Small_GIoUCostCalculatorTest, SeparatedBoxesCostPositive)
 }
 
 /**
- * @brief The batch cost of a partial overlap pair is the hand value: IoU is 9/41 (intersection 3600 over union 16400); the enclosing box is 140 x 140 = 19600, so (enclosure - union) / enclosure = 3200 / 19600 = 8/49; cost = 1 - (IoU - 8/49).
+ * @brief The batch cost of a partial overlap pair is the hand value: IoU is 9/41 (intersection 3600
+ *        over union 16400); the enclosing box is 140 x 140 = 19600, so (enclosure - union) /
+ *        enclosure = 3200 / 19600 = 8/49; cost = 1 - (IoU - 8/49).
  */
 TEST(Small_GIoUCostCalculatorTest, BatchCostOfAPartialOverlapIsTheHandValue)
 {
