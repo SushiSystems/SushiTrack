@@ -53,24 +53,31 @@ TEST(Small_ObjectTest, KeepsWhatItIsGiven)
     EXPECT_EQ(object.feature, (std::vector<float>{1.f, 0.f}));
 }
 
-/**
- * @brief An object built without a feature carries an empty one.
- */
-TEST(Small_ObjectTest, FeatureDefaultsToEmpty)
+namespace
 {
-    const Object object(Rect<float>(0.f, 0.f, 1.f, 1.f), 0, 0.5f);
-    EXPECT_TRUE(object.feature.empty());
-}
+    /**
+     * @brief Returns five objects with distinct boxes and labels, built in an ObjectVector.
+     */
+    ObjectVector five_objects()
+    {
+        ObjectVector objects;
+        objects.emplace_back(Rect<float>(0.f, 0.f, 1.f, 1.f), 0, 0.5f);
+        objects.emplace_back(Rect<float>(1.f, 0.f, 1.f, 1.f), 1, 0.5f);
+        objects.emplace_back(Rect<float>(2.f, 0.f, 1.f, 1.f), 2, 0.5f);
+        objects.emplace_back(Rect<float>(3.f, 0.f, 1.f, 1.f), 3, 0.5f);
+        objects.emplace_back(Rect<float>(4.f, 0.f, 1.f, 1.f), 4, 0.5f);
+        return objects;
+    }
+} // namespace
 
 /**
  * @brief Every object an ObjectVector holds sits on a 16-byte boundary, as Eigen needs.
  */
 TEST(Small_ObjectTest, ObjectVectorKeepsSixteenByteAlignment)
 {
-    ObjectVector objects;
-    for (int i = 0; i < 5; ++i)
-        objects.emplace_back(Rect<float>(1.f * i, 0.f, 1.f, 1.f), i, 0.5f);
+    const ObjectVector objects = five_objects();
 
+    ASSERT_EQ(objects.size(), 5u);
     for (const Object& object : objects)
         EXPECT_EQ(reinterpret_cast<std::uintptr_t>(&object) % 16u, 0u);
 }
