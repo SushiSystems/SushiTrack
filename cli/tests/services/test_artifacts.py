@@ -41,12 +41,17 @@ def test_find_file_answers_none_without_a_build_tree(tmp_path):
     assert artifacts.find_file(tmp_path / "absent", "x") is None
 
 
-def test_the_index_skips_git_and_walks_deeper_than_four(tmp_path):
-    """Keeps st's unbounded-enough walk and its .git prune."""
+def test_the_index_walks_deeper_than_four_levels(tmp_path):
+    """Finds an executable five directories down."""
     exe = artifacts.executable_name("deep_tool")
     deep = _plant(tmp_path / "a" / "b" / "c" / "d" / "e" / exe)
-    _plant(tmp_path / ".git" / artifacts.executable_name("hook"))
     assert artifacts.EXECUTABLES.find(tmp_path) == [deep]
+
+
+def test_the_index_skips_the_git_folder(tmp_path):
+    """Leaves out an executable under .git."""
+    _plant(tmp_path / ".git" / artifacts.executable_name("hook"))
+    assert artifacts.EXECUTABLES.find(tmp_path) == []
 
 
 def test_match_prefers_an_exact_name(tmp_path):
@@ -62,7 +67,11 @@ def test_find_binary_adds_the_platform_suffix(tmp_path):
     assert artifacts.find_binary(tmp_path, "tool") == exe
 
 
-def test_import_lib_name_names_the_link_library():
-    """Names the library a C++ consumer links against."""
-    expected = "sushitrack.lib" if artifacts.IS_WINDOWS else "libsushitrack.so"
+@pytest.mark.parametrize(("is_windows", "expected"), [
+    (True, "sushitrack.lib"),
+    (False, "libsushitrack.so"),
+])
+def test_import_lib_name_names_the_link_library(monkeypatch, is_windows, expected):
+    """Names the library a C++ consumer links against on each platform."""
+    monkeypatch.setattr(artifacts, "IS_WINDOWS", is_windows)
     assert artifacts.import_lib_name() == expected
