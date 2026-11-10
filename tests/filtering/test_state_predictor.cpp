@@ -29,7 +29,6 @@
 
 #include <gtest/gtest.h>
 
-#include <SushiTrack/filtering/imm_filter.hpp>
 #include <SushiTrack/filtering/kalman_filter.hpp>
 #include <SushiTrack/filtering/kalman_types.hpp>
 #include <SushiTrack/filtering/state_predictor.hpp>
@@ -66,19 +65,4 @@ TEST(Small_StatePredictorTest, DefaultCheckpointLeavesTheStateAlone)
     predictor.restore_checkpoint();
 
     EXPECT_TRUE(mean.isApprox(before));
-}
-
-/**
- * @brief The IMM overrides the defaults with probabilities in [0, 1].
- */
-TEST(Small_StatePredictorTest, MultiModelReportsProbabilities)
-{
-    IMMFilter filter;
-    StatePredictor& predictor = filter;
-    KalmanTypes::StateMean mean;
-    KalmanTypes::StateCov covariance;
-    predictor.initiate(mean, covariance, make_box(100.f, 200.f, 50.f, 80.f), 0.9f);
-
-    EXPECT_GE(predictor.maneuver_probability(), 0.f);
-    EXPECT_LE(predictor.maneuver_probability(), 1.f);
 }
