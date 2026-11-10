@@ -40,9 +40,21 @@
 #include <SushiTrack/association/reid_first_cost_calculator.hpp>
 #include <SushiTrack/tracking/tracklet.hpp>
 
+#include <support/tolerance.hpp>
 #include <tracklet_builders.hpp>
 
 using namespace SushiTrack;
+
+namespace
+{
+    /// @brief Rounded operations from a box to its IoU cost: corners, areas, intersection, union and
+    ///        the quotient.
+    constexpr std::size_t K_IOU_OPERATIONS = 10;
+
+    /// @brief Bound of 1 - cos(a, a) on a unit vector times the direct weight: four rounded
+    ///        operations of unit roundoff on a magnitude of 1.
+    const double K_COSINE_BOUND = 4.0 * TestSupport::unit_roundoff<float>();
+} // namespace
 
 // ReIDFirstCostCalculator
 
@@ -67,44 +79,46 @@ TEST(Small_ReIDFirstCostCalculatorTest, DirectAssignmentWhenBothHaveFeaturesAndC
 }
 
 /**
- * @brief Neither tracklet has a feature vector; the blended path runs with
- *        reid_dist = 1 and IoU cost, producing a cost in [0, 1].
+ * @brief Neither tracklet has a feature vector, so the cost is the geometry cost alone: two
+ *        50 x 80 boxes 30 px apart overlap 20 x 80 = 1600 of a union of 8000 - 1600 = 6400, an
+ *        IoU of 1/4 and a cost of 3/4.
  */
-TEST(Small_ReIDFirstCostCalculatorTest, BlendedPathWhenNoFeatures)
+TEST(Small_ReIDFirstCostCalculatorTest, NoFeaturesFallBackToTheGeometryCost)
 {
     auto iou = std::make_shared<IoUCostCalculator>();
     auto cosine = std::make_shared<CosineCostCalculator>();
     ReIDFirstCostCalculator calc(0.3f, 0.3f, 0.2f, iou, cosine);
 
     auto a = make_t(100.f, 100.f, 50.f, 80.f);
-    auto b = make_t(100.f, 100.f, 50.f, 80.f);
+    auto b = make_t(130.f, 100.f, 50.f, 80.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
     calc.calculate(av, bv, m);
 
-    EXPECT_GE(m(0, 0), 0.f);
-    EXPECT_LE(m(0, 0), 1.f);
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_relative_error<float>(m(0, 0), 0.75, K_IOU_OPERATIONS)));
 }
 
 /**
- * @brief Tracklet A has a feature but B does not; the blended path applies
- *        with reid_dist = 1 (missing feature penalty), giving cost ≥ 0.
+ * @brief Tracklet A has a feature but B does not, so the cost is the geometry cost alone: the
+ *        same 3/4 as for two featureless boxes 30 px apart.
  */
-TEST(Small_ReIDFirstCostCalculatorTest, MissingFeatureOnBProducesFallback)
+TEST(Small_ReIDFirstCostCalculatorTest, MissingFeatureOnBFallsBackToTheGeometryCost)
 {
     auto iou = std::make_shared<IoUCostCalculator>();
     auto cosine = std::make_shared<CosineCostCalculator>();
     ReIDFirstCostCalculator calc(0.3f, 0.3f, 0.2f, iou, cosine);
 
     auto a = make_feat_t(100.f, 100.f, 4, 0);
-    auto b = make_t(100.f, 100.f, 50.f, 80.f);
+    auto b = make_t(130.f, 100.f, 50.f, 80.f);
 
     std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
     CostMatrix m;
     calc.calculate(av, bv, m);
 
-    EXPECT_GE(m(0, 0), 0.f);
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_relative_error<float>(m(0, 0), 0.75, K_IOU_OPERATIONS)));
 }
 
 /**
@@ -125,20 +139,34 @@ TEST(Small_ReIDFirstCostCalculatorTest, EmptyCollectionProducesEmptyMatrix)
 }
 
 /**
- * @brief calculate_single returns the same value as the corresponding batch cell.
+ * @brief The batch cost of the pair is 0: identical features have a distance of 0, under the confidence threshold of 0.3, and 0 times the direct assignment weight of 0.2 is 0.
  */
-TEST(Small_ReIDFirstCostCalculatorTest, SingleMatchesBatch)
+TEST(Small_ReIDFirstCostCalculatorTest, BatchCostOfIdenticalFeaturesIsZero)
 {
     auto iou = std::make_shared<IoUCostCalculator>();
     auto cosine = std::make_shared<CosineCostCalculator>();
     ReIDFirstCostCalculator calc(0.3f, 0.3f, 0.2f, iou, cosine);
-
-    auto a = make_feat_t(0.f, 0.f, 4, 2);
-    auto b = make_feat_t(30.f, 0.f, 4, 2);
-
-    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    std::vector<std::shared_ptr<Tracklet>> av{make_feat_t(0.f, 0.f, 4, 2)};
+    std::vector<std::shared_ptr<Tracklet>> bv{make_feat_t(30.f, 0.f, 4, 2)};
     CostMatrix m;
+
     calc.calculate(av, bv, m);
 
-    EXPECT_NEAR(m(0, 0), calc.calculate_single(a, b), 1e-5f);
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_error(m(0, 0), 0.0, K_COSINE_BOUND)));
+}
+
+/**
+ * @brief The single cost of the same pair is the same value.
+ */
+TEST(Small_ReIDFirstCostCalculatorTest, SingleCostOfIdenticalFeaturesIsZero)
+{
+    auto iou = std::make_shared<IoUCostCalculator>();
+    auto cosine = std::make_shared<CosineCostCalculator>();
+    ReIDFirstCostCalculator calc(0.3f, 0.3f, 0.2f, iou, cosine);
+    const std::shared_ptr<Tracklet> a = make_feat_t(0.f, 0.f, 4, 2);
+    const std::shared_ptr<Tracklet> b = make_feat_t(30.f, 0.f, 4, 2);
+
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_error(calc.calculate_single(a, b), 0.0, K_COSINE_BOUND)));
 }
