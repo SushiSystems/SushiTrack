@@ -27,16 +27,15 @@
  * @author Mustafa Garip
  */
 
-#include <cmath>
-#include <string>
+#include <vector>
 
-#include <Eigen/Dense>
 #include <gtest/gtest.h>
 
 #include <SushiTrack/filtering/kalman_types.hpp>
 #include <SushiTrack/filtering/nsa_kalman_filter.hpp>
 
 #include <measurement_builders.hpp>
+#include <support/tolerance.hpp>
 
 using namespace SushiTrack;
 
@@ -46,7 +45,40 @@ using StateCov = KalmanTypes::StateCov;
 
 using DetectBox = KalmanTypes::DetectBox;
 
-// NSAKalmanFilter
+namespace
+{
+    /** @brief Returns the state [x, y, w, h, vx, vy, vw, vh] with the eight values given. */
+    StateMean make_state(float x, float y, float w, float h, float vx, float vy, float vw, float vh)
+    {
+        StateMean state;
+        state << x, y, w, h, vx, vy, vw, vh;
+        return state;
+    }
+
+    /** @brief Runs @p cycles predict-update cycles of one second each on the same box. */
+    void run_cycles(NSAKalmanFilter& filter, StateMean& mean, StateCov& cov, const DetectBox& box,
+                    float score, int cycles)
+    {
+        for (int cycle = 0; cycle < cycles; ++cycle)
+        {
+            filter.predict(mean, cov, 1.0f);
+            filter.update(mean, cov, box, score);
+        }
+    }
+
+    /**
+     * @brief Returns the squared Mahalanobis distance of a box 20 px right and 20 px below the
+     *        predicted start box (100, 200, 50, 80) for a noise scale of @p noise_scale.
+     *
+     * The predicted variances of the start box at score 0.5 are 28.515625 for x and 73 for y;
+     * the measurement noise adds 6.25 and 16 times the noise scale, and the difference is
+     * (20, 20, 0, 0), so the distance is 20^2 / S_x + 20^2 / S_y.
+     */
+    double expected_distance(double noise_scale)
+    {
+        return 400.0 / (28.515625 + 6.25 * noise_scale) + 400.0 / (73.0 + 16.0 * noise_scale);
+    }
+} // namespace
 
 class Small_NSAKalmanFilterTest : public ::testing::Test
 {
@@ -60,60 +92,65 @@ class Small_NSAKalmanFilterTest : public ::testing::Test
 };
 
 /**
- * @brief NSAKalmanFilter::initiate() produces a valid non-zero covariance.
+ * @brief NSAKalmanFilter::initiate() produces a covariance whose diagonal is positive.
  */
-TEST_F(Small_NSAKalmanFilterTest, InitiateProducesValidCovariance)
+TEST_F(Small_NSAKalmanFilterTest, InitiateCovarianceDiagonalIsPositive)
 {
     kf_.initiate(mean_, cov_, default_box_, 0.8f);
 
-    for (int i = 0; i < 8; ++i)
-        EXPECT_GT(cov_(i, i), 0.f) << "NSA diagonal entry " << i << " not positive";
+    EXPECT_GT(cov_.diagonal().minCoeff(), 0.f);
 }
 
 /**
- * @brief NSAKalmanFilter predict-update cycle does not diverge or produce NaN.
+ * @brief Twenty predict-update cycles on one box leave the mean and covariance finite and the
+ *        covariance diagonal positive.
  */
 TEST_F(Small_NSAKalmanFilterTest, PredictUpdateCycleIsNumericallyStable)
 {
     kf_.initiate(mean_, cov_, default_box_, 0.8f);
 
-    for (int step = 0; step < 20; ++step)
-    {
-        kf_.predict(mean_, cov_, 1.0f);
-        kf_.update(mean_, cov_, default_box_, 0.8f);
-    }
+    run_cycles(kf_, mean_, cov_, default_box_, 0.8f, 20);
 
-    for (int i = 0; i < 8; ++i)
-    {
-        EXPECT_FALSE(std::isnan(mean_(i))) << "NaN in mean_ at " << i;
-        EXPECT_FALSE(std::isinf(mean_(i))) << "Inf in mean_ at " << i;
-        EXPECT_FALSE(std::isnan(cov_(i, i))) << "NaN in cov_ diagonal at " << i;
-        EXPECT_GT(cov_(i, i), 0.f) << "non-positive covariance at " << i;
-    }
+    EXPECT_TRUE(mean_.allFinite());
+    EXPECT_TRUE(cov_.allFinite());
+    EXPECT_GT(cov_.diagonal().minCoeff(), 0.f);
 }
 
 /**
- * @brief NSAKalmanFilter initiate scales position/size covariance inversely with score.
+ * @brief initiate() scales the position and size variances by the noise scale 1 - score.
+ *
+ * Each of these variances is (k * dimension)^2 times the noise scale, so the variance at score
+ * 0.1 (noise scale 1 - 0.1) over the one at score 0.9 (noise scale 1 - 0.9) is the ratio of the
+ * two scales, about 9. The scales are taken from the float scores. The bound is 12 u times 9.
  */
-TEST_F(Small_NSAKalmanFilterTest, InitiateCovarianceScalesWithScore)
+TEST_F(Small_NSAKalmanFilterTest, InitiatePositionVarianceScalesWithTheNoiseScale)
+{
+    StateMean mean_high, mean_low;
+    StateCov cov_high, cov_low;
+    const double expected_ratio = (1.0 - static_cast<double>(0.1f)) / (1.0 - static_cast<double>(0.9f));
+
+    kf_.initiate(mean_high, cov_high, default_box_, 0.9f);
+    kf_.initiate(mean_low, cov_low, default_box_, 0.1f);
+
+    const Eigen::Array<double, 4, 1> ratio = cov_low.diagonal().head<4>().cast<double>().array() /
+                                             cov_high.diagonal().head<4>().cast<double>().array();
+    const double deviation = (ratio - expected_ratio).abs().maxCoeff();
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_error(
+        deviation, 0.0, 12.0 * TestSupport::unit_roundoff<float>() * expected_ratio)));
+}
+
+/**
+ * @brief initiate() leaves the velocity variances unscaled: they do not depend on the score.
+ */
+TEST_F(Small_NSAKalmanFilterTest, InitiateVelocityVarianceIgnoresTheScore)
 {
     StateMean mean_high, mean_low;
     StateCov cov_high, cov_low;
 
-    kf_.initiate(mean_high, cov_high, default_box_, 0.9f); // High confidence
-    kf_.initiate(mean_low, cov_low, default_box_, 0.1f);   // Low confidence
+    kf_.initiate(mean_high, cov_high, default_box_, 0.9f);
+    kf_.initiate(mean_low, cov_low, default_box_, 0.1f);
 
-    for (int i = 0; i < 4; ++i)
-    {
-        EXPECT_GT(cov_low(i, i), cov_high(i, i))
-            << "Position/size covariance index " << i << " did not scale appropriately with score.";
-    }
-
-    for (int i = 4; i < 8; ++i)
-    {
-        EXPECT_FLOAT_EQ(cov_low(i, i), cov_high(i, i))
-            << "Velocity covariance index " << i << " should not be scaled by score.";
-    }
+    EXPECT_TRUE(cov_low.diagonal().tail<4>() == cov_high.diagonal().tail<4>());
 }
 
 /**
@@ -163,31 +200,59 @@ TEST_F(Small_NSAKalmanFilterTest, MahalanobisDistanceScalesWithScore)
 }
 
 /**
- * @brief Batch gating methods correctly apply per-measurement scores.
+ * @brief The batch squared distances use each measurement's own score: a measurement 20 px off
+ *        in x and y has distance 20^2 / S_x + 20^2 / S_y, with the noise scale 1 - score in S.
+ *
+ * At score 0.9 that is about 19.09 and at score 0.1 about 16.29. The bound is 24 u times the
+ * expected distance, for the covariance chain and the solve.
  */
-TEST_F(Small_NSAKalmanFilterTest, BatchGatingWithScores)
+TEST_F(Small_NSAKalmanFilterTest, BatchSquaredDistancesFollowTheScores)
 {
     kf_.initiate(mean_, cov_, default_box_, 0.5f);
     kf_.predict(mean_, cov_, 1.0f);
+    const KalmanTypes::DetectBoxVector measurements = {make_box(120.f, 220.f, 50.f, 80.f),
+                                                       make_box(120.f, 220.f, 50.f, 80.f)};
 
-    KalmanTypes::DetectBoxVector meas_vec = {make_box(120.f, 220.f, 50.f, 80.f),
-                                             make_box(120.f, 220.f, 50.f, 80.f)};
-    std::vector<float> scores = {0.9f, 0.1f};
+    const std::vector<float> distances =
+        kf_.get_gate_sq_distances(mean_, cov_, measurements, {0.9f, 0.1f});
 
-    auto dists = kf_.get_gate_sq_distances(mean_, cov_, meas_vec, scores);
-    EXPECT_GT(dists[0], dists[1]) << "Low score should result in lower squared distance.";
-
-    float tight_thresh = (dists[0] + dists[1]) / 2.0f; // Threshold between the two distances
-    auto flags = kf_.get_gate_flags(mean_, cov_, meas_vec, tight_thresh, scores);
-
-    EXPECT_FALSE(flags[0]) << "High score measurement should fail tight gate.";
-    EXPECT_TRUE(flags[1]) << "Low score measurement should pass tight gate due to inflated noise.";
+    ASSERT_EQ(distances.size(), 2U);
+    const double high = expected_distance(1.0 - static_cast<double>(0.9f));
+    const double low = expected_distance(1.0 - static_cast<double>(0.1f));
+    const double unit = TestSupport::unit_roundoff<float>();
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_error(distances[0], high, 24.0 * unit * high)));
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_error(distances[1], low, 24.0 * unit * low)));
 }
 
 /**
- * @brief Negative or zero scores gracefully default to base noise scaling.
+ * @brief The batch gate flags use each measurement's own score.
+ *
+ * The two distances are about 19.09 at score 0.9 and about 16.29 at score 0.1 (see the test of
+ * the batch distances), so a threshold of 17.5 lies between them: the high-score measurement
+ * fails the gate and the low-score one passes.
  */
-TEST_F(Small_NSAKalmanFilterTest, NegativeScoreHandledGracefully)
+TEST_F(Small_NSAKalmanFilterTest, BatchGateFlagsFollowTheScores)
+{
+    kf_.initiate(mean_, cov_, default_box_, 0.5f);
+    kf_.predict(mean_, cov_, 1.0f);
+    const KalmanTypes::DetectBoxVector measurements = {make_box(120.f, 220.f, 50.f, 80.f),
+                                                       make_box(120.f, 220.f, 50.f, 80.f)};
+
+    const std::vector<bool> flags =
+        kf_.get_gate_flags(mean_, cov_, measurements, 17.5f, {0.9f, 0.1f});
+
+    EXPECT_EQ(flags, (std::vector<bool>{false, true}));
+}
+
+/**
+ * @brief A negative score gives the covariance a score of zero gives.
+ *
+ * Both take a noise scale of 1: a negative score selects 1 and a score of zero gives
+ * max(1 - 0, 0.01) = 1, so the two covariances are the same bit for bit.
+ */
+TEST_F(Small_NSAKalmanFilterTest, NegativeScoreGivesTheCovarianceOfScoreZero)
 {
     StateMean mean_neg, mean_zero;
     StateCov cov_neg, cov_zero;
@@ -195,55 +260,47 @@ TEST_F(Small_NSAKalmanFilterTest, NegativeScoreHandledGracefully)
     kf_.initiate(mean_neg, cov_neg, default_box_, -0.5f);
     kf_.initiate(mean_zero, cov_zero, default_box_, 0.0f);
 
-    for (int i = 0; i < 8; ++i)
-    {
-        EXPECT_FLOAT_EQ(cov_neg(i, i), cov_zero(i, i))
-            << "Negative score should be handled identically to zero/missing score.";
-    }
+    EXPECT_EQ(cov_neg, cov_zero);
 }
 
 /**
- * @brief XYAH coordinate mode functions correctly with NSA scaling.
+ * @brief In XYAH mode, initiate() stores [cx, cy, aspect, height] as given with zero velocity.
  */
-TEST(Small_NSAKalmanFilterXYAHTest, XYAHModeSupport)
+TEST(Small_NSAKalmanFilterXYAHTest, InitiateMeanMatchesMeasurement)
 {
     NSAKalmanFilter kf_xyah(true);
     StateMean mean;
     StateCov cov;
 
-    DetectBox box;
-    box << 150.f, 300.f, 0.6f, 120.f; // cx, cy, aspect, height
+    kf_xyah.initiate(mean, cov, make_box(150.f, 300.f, 0.6f, 120.f), 0.8f);
 
-    kf_xyah.initiate(mean, cov, box, 0.8f);
-
-    EXPECT_FLOAT_EQ(mean(0), 150.f);
-    EXPECT_FLOAT_EQ(mean(1), 300.f);
-    EXPECT_NEAR(mean(2), 0.6f, 1e-3f);
-    EXPECT_FLOAT_EQ(mean(3), 120.f);
-
-    for (int i = 0; i < 8; ++i)
-    {
-        EXPECT_GT(cov(i, i), 0.f);
-    }
+    EXPECT_EQ(mean, make_state(150.f, 300.f, 0.6f, 120.f, 0.f, 0.f, 0.f, 0.f));
 }
 
 /**
- * @brief Validates that NSAKalmanFilter does not produce negative covariance
- *        diagonal entries when updated with a detection score of zero.
+ * @brief In XYAH mode, initiate() produces a covariance whose diagonal is positive.
+ */
+TEST(Small_NSAKalmanFilterXYAHTest, InitiateCovarianceDiagonalIsPositive)
+{
+    NSAKalmanFilter kf_xyah(true);
+    StateMean mean;
+    StateCov cov;
+
+    kf_xyah.initiate(mean, cov, make_box(150.f, 300.f, 0.6f, 120.f), 0.8f);
+
+    EXPECT_GT(cov.diagonal().minCoeff(), 0.f);
+}
+
+/**
+ * @brief An update with a detection score of zero leaves no covariance diagonal entry negative.
  */
 TEST_F(Small_NSAKalmanFilterTest, ScoreZeroDoesNotProduceNegativeCovariance)
 {
-    NSAKalmanFilter nsa_kf(false);
-    KalmanTypes::StateMean mean_;
-    KalmanTypes::StateCov cov_;
-    KalmanTypes::DetectBox box;
-    box << 10.0f, 10.0f, 20.0f, 20.0f;
+    const DetectBox box = make_box(10.f, 10.f, 20.f, 20.f);
+    kf_.initiate(mean_, cov_, box, 1.0f);
+    kf_.predict(mean_, cov_, 1.0f);
 
-    nsa_kf.initiate(mean_, cov_, box, 1.0f);
-    nsa_kf.predict(mean_, cov_, 1.0f);
+    kf_.update(mean_, cov_, box, 0.0f);
 
-    nsa_kf.update(mean_, cov_, box, 0.0f);
-
-    for (int i = 0; i < 8; ++i)
-        EXPECT_GE(cov_(i, i), 0.0f);
+    EXPECT_GE(cov_.diagonal().minCoeff(), 0.0f);
 }
