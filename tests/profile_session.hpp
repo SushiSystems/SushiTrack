@@ -163,6 +163,17 @@ namespace SushiTrack
         return folded;
     }
 
+    /// @brief Returns the group of the first site named @p name, or `<absent>` with none.
+    inline std::string site_group(const SushiProfiler::RunRecord& record, const std::string& name)
+    {
+        for (const SushiProfiler::SiteRecord& site : record.sites)
+        {
+            if (site.name == name)
+                return site.group;
+        }
+        return "<absent>";
+    }
+
     /// @brief Returns how many instants named @p name @p period holds.
     inline std::size_t instant_count(const SushiProfiler::RunRecord& record,
                                      const SushiProfiler::PeriodRecord& period,
