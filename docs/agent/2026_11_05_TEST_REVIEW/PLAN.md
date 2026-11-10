@@ -1,21 +1,24 @@
 # Test review: plan
 
-**Status:** Open — M1 to M6 applied (2026-11-10); M7 half applied; M8 to M13 untouched; the owner chooses inline or parallel
+**Status:** Open — M1 to M8 applied (2026-11-10); M9 partial; M10 to M13 untouched; the owner chooses inline or parallel
 
-**Resume note (M7, configuration).** M5 and M6 are applied and pushed, one commit per file. RW-39 is closed
-(decision 13 of `REPORT.md`). Records already met and not redone in M5: every `test_build.py` "same fixture"
-rewrite and the stub of `test_diag.py`, `test_runner.py` and the sandbox rows of `test_tests.py` (T5 moved them
-onto the session); the three `test_the_service_uses_the_shared_runner` deletes (the tests were gone);
-`test_checks.py` and the kept rows. M6: the docker word and malformed-config rewrites were met. M5 added a
-`parse_latency` seam to `profile_record.py` and the stand-in evaluator of `test_label.py`. `st env` is checked
-on its help page only, since running it reads the machine's compiler environment. M7 is done except the
-records that wait on a seam: `MissingFileNamedByTheEnvironmentIsRefusedAndLogged` (the Windows
-`_putenv_s` empty-value claim was not re-checked), `NothingNamedAndNothingFoundSucceedsAtInfo` (RW-37), and the
-two adds of the loader (`SUSHITRACK_CONFIG` with a null path, and `K_MAX_SEARCH_DEPTH`), which need the search
-seam of RW-37. No compiler and no `build*/compile_commands.json` exist on this machine, so no C++ syntax check
-ran (`test_config_loader.cpp` and `compile_configuration_log_category.cpp` are unchecked), and no Python test
-ran; each Python file was parsed with `ast`. The `Totals` table of `REPORT.md` was not recounted. Start M8 with
-`tests/detection/test_object.cpp`.
+**Resume note (M9, filtering).** M7 and M8 are applied and pushed, one commit per file. RW-37 is closed: the
+configuration search reads files, variables and the working directory through `ConfigHost`
+(`include/SushiTrack/configuration/config_host.hpp`, with `SystemConfigHost` and `InMemoryConfigHost`), and the
+loader tests describe their machine in memory. The `_putenv_s` claim of the record was not confirmed: Microsoft's
+documentation says an empty value removes the variable, so the helper may have worked, but it is gone either way
+and no run could settle it here. M8: `FeatureDefaultsToEmpty` and six rect tests are deleted, the
+square box and the stored negative origin are folded in, the xywh tests compare exactly. One row waits on the
+owner: `GenerateByTlbrReversesCorners` stays unmerged until the owner confirms that a reversed-corner contract
+exists (the header states none). M9 applied so far: `test_filtering_log_category.cpp` (now `compile_filtering_log_category.cpp`),
+`test_null_gate_validator.cpp`, `test_kalman_types.cpp`, `test_state_predictor.cpp`, and in `test_imm_filter.cpp` the
+prior test, the probability test and the checkpoint test. M9 left: `test_gate_validator.cpp` (needs an in-memory
+`GateValidator` adapter in the filtering module), `test_gated_state_predictor.cpp`, `test_generic_kalman_factory.cpp`,
+`test_kalman_factory.cpp` and `test_kalman_filter_registry.cpp` (all take the registry seam T2 built; the registry
+has a public constructor now), `test_kalman_filter.cpp` (many loop rewrites with hand-derived values) and
+`test_nsa_kalman_filter.cpp`. M10 to M13 untouched. No compiler and no `build*/compile_commands.json` exist on this
+machine, so no C++ syntax check ran for any file changed since M7; the commit hook (comment rules, test mirror) ran
+and passed. The `Totals` table of `REPORT.md` was not recounted. Resume at `tests/filtering/test_gate_validator.cpp`.
 
 Applies the verdicts of `REPORT.md`, in hierarchy order: the shared helpers, adapters and seams the
 rewrites need come first, then the defects the review found, then each module's tests. A module job
@@ -39,9 +42,9 @@ writes each add. Nothing in a module job changes production code except a seam a
 | M4 | the tests of `cli` (8 files): 21 rewrite, 3 resize, 2 delete | T1, T2, T3, T4, T5, T6, T7 | done |
 | M5 | the tests of `cli/services` (12 files): 44 rewrite, 5 resize, 2 split, 4 delete | T1, T2, T3, T4, T5, T6, T7 | done |
 | M6 | the tests of `cli/test_cli` (2 files): 8 rewrite, 4 delete | T1, T2, T3, T4, T5, T6, T7 | done |
-| M7 | the tests of `configuration` (2 files): 19 rewrite, 1 delete | T1, T2, T3, T4, T5, T6, T7 | partial (two rewrites and two adds wait on RW-37) |
-| M8 | the tests of `detection` (2 files): 3 rewrite, 3 merge, 7 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
-| M9 | the tests of `filtering` (12 files): 23 rewrite, 3 resize, 4 split, 8 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
+| M7 | the tests of `configuration` (2 files): 19 rewrite, 1 delete | T1, T2, T3, T4, T5, T6, T7 | done |
+| M8 | the tests of `detection` (2 files): 3 rewrite, 3 merge, 7 delete | T1, T2, T3, T4, T5, T6, T7 | done (one merge row waits on the owner) |
+| M9 | the tests of `filtering` (12 files): 23 rewrite, 3 resize, 4 split, 8 delete | T1, T2, T3, T4, T5, T6, T7 | partial |
 | M10 | the tests of `logging` (3 files): 4 rewrite, 5 resize, 1 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
 | M11 | the tests of `profiling` (4 files): 6 rewrite, 1 split | T1, T2, T3, T4, T5, T6, T7 | todo |
 | M12 | the tests of `tools` (2 files): 1 rewrite, 2 resize, 1 split, 5 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
