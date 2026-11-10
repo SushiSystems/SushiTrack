@@ -121,8 +121,8 @@ TEST(Small_FuseScoreDecoratorTest, BatchFusedCostIsTheHandValue)
 
     dec.calculate(av, bv, m);
 
-    EXPECT_TRUE(TestSupport::is_within(
-        TestSupport::measure_relative_error<float>(m(0, 0), 1.0 - (7.0 / 13.0) * 0.7, K_ROUNDED_OPERATIONS)));
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<float>(
+        m(0, 0), 1.0 - (7.0 / 13.0) * 0.7, K_ROUNDED_OPERATIONS)));
 }
 
 /**
@@ -135,8 +135,8 @@ TEST(Small_FuseScoreDecoratorTest, SingleFusedCostIsTheHandValue)
     const std::shared_ptr<Tracklet> a = make_t(0.f, 0.f, 100.f, 100.f, 0.9f);
     const std::shared_ptr<Tracklet> b = make_t(30.f, 0.f, 100.f, 100.f, 0.7f);
 
-    EXPECT_TRUE(TestSupport::is_within(
-        TestSupport::measure_relative_error<float>(dec.calculate_single(a, b), 1.0 - (7.0 / 13.0) * 0.7, K_ROUNDED_OPERATIONS)));
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<float>(
+        dec.calculate_single(a, b), 1.0 - (7.0 / 13.0) * 0.7, K_ROUNDED_OPERATIONS)));
 }
 
 /**
