@@ -29,6 +29,7 @@
 
 #include <cmath>
 #include <limits>
+#include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -36,40 +37,16 @@
 #include <SushiTrack/c_api/sushitrack_c.h>
 
 #include <c_detection_builders.hpp>
+#include <support/tolerance.hpp>
+
+using CDetections::find_by_id;
+using CDetections::make_det;
+using CDetections::make_det_with_feat;
+using CDetections::one_hot_feature;
+using CDetections::update_frame;
 
 namespace
 {
-
-    /**
-     * @brief Constructs a benign detection without feature data.
-     */
-    sushitrack_object_t make_det(float x, float y, float w = 50.0f, float h = 100.0f,
-                                 float score = 0.9f)
-    {
-        sushitrack_object_t o{};
-        o.x = x;
-        o.y = y;
-        o.width = w;
-        o.height = h;
-        o.score = score;
-        o.label = 1;
-        o.feat = nullptr;
-        o.feat_dim = 0;
-        return o;
-    }
-
-    /**
-     * @brief Constructs a detection backed by an external feature pointer.
-     */
-    sushitrack_object_t make_det_with_feat(float x, float y, const float* feat, int feat_dim,
-                                           float score = 0.95f)
-    {
-        sushitrack_object_t o = make_det(x, y, 50.0f, 100.0f, score);
-        o.feat = feat;
-        o.feat_dim = feat_dim;
-        return o;
-    }
-
     /**
      * @brief Verifies that every active track in the buffer has finite geometry.
      */
@@ -85,28 +62,87 @@ namespace
         }
     }
 
+    /**
+     * @brief Returns the last track of the first @p n in @p out whose x is above @p x, or null.
+     */
+    const sushitrack_track_t* find_track_right_of(const std::vector<sushitrack_track_t>& out, int n,
+                                                  float x)
+    {
+        const sushitrack_track_t* found = nullptr;
+        for (int i = 0; i < n; ++i)
+        {
+            if (out[static_cast<std::size_t>(i)].x > x)
+                found = &out[static_cast<std::size_t>(i)];
+        }
+        return found;
+    }
+
+    /**
+     * @brief One malformed or degenerate detection and whether its feature is NaN.
+     */
+    struct MalformedRow
+    {
+            const char* name;
+            float x;
+            float y;
+            float width;
+            float height;
+            float score;
+            bool nan_feature;
+    };
+
+    constexpr float K_INF = std::numeric_limits<float>::infinity();
+
+    /**
+     * @brief One step of a large-coordinate row: the box of the first frame and of the second.
+     */
+    struct JumpRow
+    {
+            const char* name;
+            float x0;
+            float y0;
+            float x1;
+            float y1;
+            int min_tracks;
+    };
+
+    /**
+     * @brief Returns the detection of @p row, with @p nan_feature as its feature when the row
+     *        asks for a NaN feature.
+     */
+    sushitrack_object_t malformed_detection(const MalformedRow& row,
+                                            const std::vector<float>& nan_feature)
+    {
+        sushitrack_object_t detection =
+            make_det(row.x, row.y, row.score, row.width, row.height);
+        if (row.nan_feature)
+        {
+            detection.feat = nan_feature.data();
+            detection.feat_dim = static_cast<int>(nan_feature.size());
+        }
+        return detection;
+    }
+
+    /**
+     * @brief Feeds @p frames frames of the stationary box (100, 200, 50, 100) at 30 fps and
+     *        leaves the last frame's tracks in @p out; returns the last frame's track count.
+     */
+    int feed_stationary_frames(sushitrack_tracker_t tracker, std::vector<sushitrack_track_t>& out,
+                               int frames)
+    {
+        int count = 0;
+        const sushitrack_object_t detection = make_det(100.0f, 200.0f);
+        for (int frame = 0; frame < frames; ++frame)
+            count = update_frame(tracker, &detection, 1, out.data(), 4, 1.0f / 30.0f);
+        return count;
+    }
 } // namespace
 
-// Small_TrackerHighDimensionalReIDTest
-
 /**
- * @brief Builds a unit feature vector with all mass on a single axis.
- * @param dim Vector dimensionality.
- * @param axis Index of the active component (must be < dim).
+ * @brief Fixture providing a clean tracker for each malformed-input row; a row with a NaN
+ *        feature turns ReID on.
  */
-std::vector<float> unit_feature(int dim, int axis)
-{
-    std::vector<float> v(static_cast<std::size_t>(dim), 0.0f);
-    v[static_cast<std::size_t>(axis)] = 1.0f;
-    return v;
-}
-
-// Small_TrackerMalformedDetectionTest
-
-/**
- * @brief Fixture providing a clean tracker for each malformed-input test.
- */
-class Small_TrackerMalformedDetectionTest : public ::testing::Test
+class Small_TrackerMalformedDetectionTest : public ::testing::TestWithParam<MalformedRow>
 {
     protected:
         sushitrack_tracker_t hdl_ = nullptr;
@@ -120,6 +156,7 @@ class Small_TrackerMalformedDetectionTest : public ::testing::Test
             params_.track_thresh = 0.1f;
             params_.high_thresh = 0.2f;
             params_.frame_rate = 25;
+            params_.enable_reid = GetParam().nan_feature ? 1 : 0;
 
             hdl_ = sushitrack_create(&params_);
             ASSERT_NE(hdl_, nullptr);
@@ -129,115 +166,75 @@ class Small_TrackerMalformedDetectionTest : public ::testing::Test
 };
 
 /**
- * @brief A zero-width detection must not crash; the returned output (if any)
- *        must remain finite.
+ * @brief A degenerate or non-finite detection does not crash the update and leaves every
+ *        reported track with finite geometry.
  */
-TEST_F(Small_TrackerMalformedDetectionTest, ZeroWidthDetectionDoesNotCrash)
+TEST_P(Small_TrackerMalformedDetectionTest, LeavesEveryReportedTrackFinite)
 {
     std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d = make_det(100.0f, 200.0f, /*w*/ 0.0f, /*h*/ 80.0f);
-    int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 4, 0.04f);
+    const std::vector<float> nan_feature(16, std::numeric_limits<float>::quiet_NaN());
+    const sushitrack_object_t detection = malformed_detection(GetParam(), nan_feature);
+
+    const int n = update_frame(hdl_, &detection, 1, out.data(), 4, 0.04f);
+
     EXPECT_GE(n, 0);
     expect_finite_geometry(out, n);
 }
 
-/**
- * @brief A zero-height detection must not crash.
- */
-TEST_F(Small_TrackerMalformedDetectionTest, ZeroHeightDetectionDoesNotCrash)
-{
-    std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d = make_det(100.0f, 200.0f, /*w*/ 50.0f, /*h*/ 0.0f);
-    int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 4, 0.04f);
-    EXPECT_GE(n, 0);
-    expect_finite_geometry(out, n);
-}
+INSTANTIATE_TEST_SUITE_P(
+    DegenerateInput, Small_TrackerMalformedDetectionTest,
+    ::testing::Values(MalformedRow{"ZeroWidth", 100.0f, 200.0f, 0.0f, 80.0f, 0.9f, false},
+                      MalformedRow{"ZeroHeight", 100.0f, 200.0f, 50.0f, 0.0f, 0.9f, false},
+                      MalformedRow{"NegativeScore", 100.0f, 200.0f, 50.0f, 100.0f, -0.5f, false},
+                      MalformedRow{"InfCoordinates", K_INF, K_INF, 50.0f, 100.0f, 0.9f, false},
+                      MalformedRow{"NaNFeature", 100.0f, 200.0f, 50.0f, 100.0f, 0.95f, true}),
+    [](const ::testing::TestParamInfo<MalformedRow>& info)
+    {
+        return std::string(info.param.name);
+    });
 
 /**
- * @brief A negative-score detection is implementation-defined; it must at
- *        minimum not introduce NaN into reported track geometry.
+ * @brief A detection with NaN coordinates is ignored: the call does not crash, no track
+ *        appears for it, and the other track of the same frame stays on its path.
+ *
+ * The good track starts at (100, 200) with zero velocity, so the second frame predicts the same
+ * place; its detection at (102, 202) pulls the estimate by a gain between 0 and 1, so the
+ * reported position lies in [100, 102] by [200, 202].
  */
-TEST_F(Small_TrackerMalformedDetectionTest, NegativeScoreDoesNotProduceNaNGeometry)
+TEST(Small_TrackerNaNDetectionTest, NaNCoordinatesDoNotCorruptOtherTracks)
 {
-    std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d = make_det(100.0f, 200.0f);
-    d.score = -0.5f;
-    int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 4, 0.04f);
-    EXPECT_GE(n, 0);
-    expect_finite_geometry(out, n);
-}
-
-/**
- * @brief A detection with NaN coordinates is ignored, so it neither crashes nor corrupts the
- *        other tracks of the same frame.
- */
-TEST_F(Small_TrackerMalformedDetectionTest, NaNCoordinatesDoNotCorruptOtherTracks)
-{
+    sushitrack_params_t params{};
+    sushitrack_get_default_params(&params);
+    params.time_aware = 1;
+    params.enable_tentative = 0;
+    params.track_thresh = 0.1f;
+    params.high_thresh = 0.2f;
+    params.frame_rate = 25;
+    sushitrack_tracker_t hdl = sushitrack_create(&params);
+    ASSERT_NE(hdl, nullptr);
     std::vector<sushitrack_track_t> out(8);
-
-    sushitrack_object_t good = make_det(100.0f, 200.0f);
-    CDetections::update_frame(hdl_, &good, 1, out.data(), 8, 0.04f);
-    ASSERT_GE(out[0].state, 0);
+    const sushitrack_object_t good = make_det(100.0f, 200.0f);
+    update_frame(hdl, &good, 1, out.data(), 8, 0.04f);
     const int64_t good_id = out[0].track_id;
+    const float not_a_number = std::numeric_limits<float>::quiet_NaN();
+    const sushitrack_object_t detections[2] = {make_det(102.0f, 202.0f), make_det(not_a_number, not_a_number)};
 
-    const float K_NAN = std::numeric_limits<float>::quiet_NaN();
-    sushitrack_object_t bad = make_det(K_NAN, K_NAN);
-    sushitrack_object_t good2 = make_det(102.0f, 202.0f);
-    sushitrack_object_t dets[2] = {good2, bad};
-    int n = CDetections::update_frame(hdl_, dets, 2, out.data(), 8, 0.04f);
-    EXPECT_GE(n, 0);
-    expect_finite_geometry(out, n);
+    const int n = update_frame(hdl, detections, 2, out.data(), 8, 0.04f);
 
-    // The original good track must remain finite at its expected location.
-    for (int i = 0; i < n; ++i)
-        if (out[static_cast<std::size_t>(i)].track_id == good_id)
-        {
-            EXPECT_TRUE(std::isfinite(out[static_cast<std::size_t>(i)].x));
-            EXPECT_TRUE(std::isfinite(out[static_cast<std::size_t>(i)].y));
-        }
+    EXPECT_EQ(n, 1);
+    const sushitrack_track_t* kept = find_by_id(out, n, good_id);
+    ASSERT_NE(kept, nullptr);
+    EXPECT_GE(kept->x, 100.0f);
+    EXPECT_LE(kept->x, 102.0f);
+    EXPECT_GE(kept->y, 200.0f);
+    EXPECT_LE(kept->y, 202.0f);
+    sushitrack_destroy(hdl);
 }
-
-/**
- * @brief A detection with Inf coordinates is ignored: the call does not crash and no track
- *        reports non-finite geometry.
- */
-TEST_F(Small_TrackerMalformedDetectionTest, InfCoordinatesDoNotCrash)
-{
-    std::vector<sushitrack_track_t> out(4);
-    const float K_INF = std::numeric_limits<float>::infinity();
-    sushitrack_object_t d = make_det(K_INF, K_INF);
-    int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 4, 0.04f);
-    EXPECT_GE(n, 0);
-    expect_finite_geometry(out, n);
-}
-
-/**
- * @brief A detection whose feature vector contains NaN entries must not
- *        propagate NaN into a Tracked track's reported geometry.
- */
-TEST_F(Small_TrackerMalformedDetectionTest, NaNFeatureVectorDoesNotPoisonTracker)
-{
-    sushitrack_destroy(hdl_);
-    params_.enable_reid = 1;
-    hdl_ = sushitrack_create(&params_);
-    ASSERT_NE(hdl_, nullptr);
-
-    std::vector<sushitrack_track_t> out(4);
-    const float K_NAN = std::numeric_limits<float>::quiet_NaN();
-    std::vector<float> bad_feat(16, K_NAN);
-
-    sushitrack_object_t d = make_det_with_feat(100.0f, 200.0f, bad_feat.data(), 16);
-    int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 4, 0.04f);
-    EXPECT_GE(n, 0);
-    expect_finite_geometry(out, n);
-}
-
-// Small_TrackerLargeCoordinateTest
 
 /**
  * @brief Fixture validating numerical headroom at large coordinate magnitudes.
  */
-class Small_TrackerLargeCoordinateTest : public ::testing::Test
+class Small_TrackerLargeCoordinateTest : public ::testing::TestWithParam<JumpRow>
 {
     protected:
         sushitrack_tracker_t hdl_ = nullptr;
@@ -260,35 +257,33 @@ class Small_TrackerLargeCoordinateTest : public ::testing::Test
 };
 
 /**
- * @brief Tracks reported near image coordinates of 1e6 must remain finite.
+ * @brief Tracks stay finite at coordinates of 1e6, and after a jump of tens of thousands of
+ *        pixels in one frame, where identity may be lost.
  */
-TEST_F(Small_TrackerLargeCoordinateTest, MillionPixelCoordinatesRemainFinite)
+TEST_P(Small_TrackerLargeCoordinateTest, ReportedTracksStayFinite)
 {
     std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d0 = make_det(1.0e6f, 1.0e6f);
-    sushitrack_object_t d1 = make_det(1.0e6f + 2.0f, 1.0e6f + 2.0f);
-    CDetections::update_frame(hdl_, &d0, 1, out.data(), 4, 1.0f / 30.0f);
-    int n = CDetections::update_frame(hdl_, &d1, 1, out.data(), 4, 1.0f / 30.0f);
-    EXPECT_GE(n, 1);
+    const sushitrack_object_t first = make_det(GetParam().x0, GetParam().y0);
+    const sushitrack_object_t second = make_det(GetParam().x1, GetParam().y1);
+    update_frame(hdl_, &first, 1, out.data(), 4, 1.0f / 30.0f);
+
+    const int n = update_frame(hdl_, &second, 1, out.data(), 4, 1.0f / 30.0f);
+
+    EXPECT_GE(n, GetParam().min_tracks);
     expect_finite_geometry(out, n);
 }
 
-/**
- * @brief A detection that jumps by tens of thousands of pixels per frame must
- *        not produce NaN/Inf in subsequent reports (although identity may be
- *        lost — this test only asserts numerical safety).
- */
-TEST_F(Small_TrackerLargeCoordinateTest, HugeFrameToFrameJumpDoesNotProduceNonFinite)
-{
-    std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d0 = make_det(100.0f, 200.0f);
-    CDetections::update_frame(hdl_, &d0, 1, out.data(), 4, 1.0f / 30.0f);
-
-    sushitrack_object_t d_jump = make_det(50000.0f, 50000.0f);
-    int n = CDetections::update_frame(hdl_, &d_jump, 1, out.data(), 4, 1.0f / 30.0f);
-    EXPECT_GE(n, 0);
-    expect_finite_geometry(out, n);
-}
+INSTANTIATE_TEST_SUITE_P(
+    Magnitudes, Small_TrackerLargeCoordinateTest,
+    ::testing::Values(
+        // a box near 1e6 that moves 2 px: the track continues
+        JumpRow{"MillionPixels", 1.0e6f, 1.0e6f, 1.0e6f + 2.0f, 1.0e6f + 2.0f, 1},
+        // a box that jumps from (100, 200) to (50000, 50000): the track may be lost
+        JumpRow{"HugeJump", 100.0f, 200.0f, 50000.0f, 50000.0f, 0}),
+    [](const ::testing::TestParamInfo<JumpRow>& info)
+    {
+        return std::string(info.param.name);
+    });
 
 /**
  * @brief Fixture exercising large ReID feature vectors.
@@ -323,16 +318,17 @@ class Small_TrackerHighDimensionalReIDTest : public ::testing::TestWithParam<int
 TEST_P(Small_TrackerHighDimensionalReIDTest, HighDimUnitFeaturePreservesIdentity)
 {
     const int dim = GetParam();
-    std::vector<float> feat = unit_feature(dim, 0);
+    const std::vector<float> feat = one_hot_feature(dim, 0);
 
     std::vector<sushitrack_track_t> out(4);
-    sushitrack_object_t d0 = make_det_with_feat(100.0f, 200.0f, feat.data(), dim);
-    CDetections::update_frame(hdl_, &d0, 1, out.data(), 4, 0.04f);
+    const sushitrack_object_t d0 = make_det_with_feat(100.0f, 200.0f, feat.data(), dim, 0.95f);
+    update_frame(hdl_, &d0, 1, out.data(), 4, 0.04f);
     ASSERT_EQ(out[0].state, 1);
     const int64_t id = out[0].track_id;
 
-    sushitrack_object_t d1 = make_det_with_feat(102.0f, 202.0f, feat.data(), dim);
-    int n = CDetections::update_frame(hdl_, &d1, 1, out.data(), 4, 0.04f);
+    const sushitrack_object_t d1 = make_det_with_feat(102.0f, 202.0f, feat.data(), dim, 0.95f);
+    const int n = update_frame(hdl_, &d1, 1, out.data(), 4, 0.04f);
+
     ASSERT_GE(n, 1);
     EXPECT_EQ(out[0].track_id, id);
     expect_finite_geometry(out, n);
@@ -355,40 +351,26 @@ TEST(Small_TrackerHighDimensionalReIDZeroNormTest, ZeroNormFeatureIsToleratedWit
     params.track_thresh = 0.1f;
     params.high_thresh = 0.2f;
     params.frame_rate = 25;
-
     sushitrack_tracker_t hdl = sushitrack_create(&params);
     ASSERT_NE(hdl, nullptr);
-
-    std::vector<float> zero_feat(128, 0.0f);
-    sushitrack_object_t o{};
-    o.x = 100.0f;
-    o.y = 200.0f;
-    o.width = 50.0f;
-    o.height = 100.0f;
-    o.score = 0.9f;
-    o.label = 1;
-    o.feat = zero_feat.data();
-    o.feat_dim = 128;
-
+    const std::vector<float> zero_feat(128, 0.0f);
+    const sushitrack_object_t detection = make_det_with_feat(100.0f, 200.0f, zero_feat.data(), 128);
     std::vector<sushitrack_track_t> out(4);
-    int n = CDetections::update_frame(hdl, &o, 1, out.data(), 4, 0.04f);
+
+    const int n = update_frame(hdl, &detection, 1, out.data(), 4, 0.04f);
+
     EXPECT_GE(n, 0);
-
-    for (int i = 0; i < n; ++i)
-    {
-        EXPECT_TRUE(std::isfinite(out[static_cast<std::size_t>(i)].x));
-        EXPECT_TRUE(std::isfinite(out[static_cast<std::size_t>(i)].y));
-    }
-
+    expect_finite_geometry(out, n);
     sushitrack_destroy(hdl);
 }
 
-// Small_TrackerLongRunStabilityTest
-
 /**
- * @brief 1000 frames of a stationary detection must not produce NaN/Inf in
- *        any reported field. This verifies that the Kalman covariance does
- *        not numerically diverge under repeated near-zero innovations.
+ * @brief 1000 frames of a stationary detection leave the track exactly where the detection is.
+ *
+ * Every innovation is zero, since the estimate equals the detection, so the Kalman update adds
+ * nothing and the covariance has no cause to diverge. The box is dyadic (100, 200, 50, 100),
+ * so the conversions to centre form and back are exact. The bound is 16 u times the value,
+ * which only rounding noise would use.
  */
 TEST(Small_TrackerLongRunStabilityTest, OneThousandFramesStationaryNoNumericalDrift)
 {
@@ -402,135 +384,90 @@ TEST(Small_TrackerLongRunStabilityTest, OneThousandFramesStationaryNoNumericalDr
     params.track_buffer = 60;
     sushitrack_tracker_t hdl = sushitrack_create(&params);
     ASSERT_NE(hdl, nullptr);
-
     std::vector<sushitrack_track_t> out(4);
-    constexpr int K_FRAMES = 1000;
-    for (int i = 0; i < K_FRAMES; ++i)
-    {
-        sushitrack_object_t d{};
-        d.x = 100.0f;
-        d.y = 200.0f;
-        d.width = 50.0f;
-        d.height = 100.0f;
-        d.score = 0.9f;
-        d.label = 1;
-        int n = CDetections::update_frame(hdl, &d, 1, out.data(), 4, 1.0f / 30.0f);
-        ASSERT_GE(n, 1);
 
-        // Spot check every 100 frames to keep the loop fast.
-        if (i % 100 == 0)
-        {
-            EXPECT_TRUE(std::isfinite(out[0].x)) << "frame " << i;
-            EXPECT_TRUE(std::isfinite(out[0].y)) << "frame " << i;
-            EXPECT_TRUE(std::isfinite(out[0].width)) << "frame " << i;
-            EXPECT_TRUE(std::isfinite(out[0].height)) << "frame " << i;
-        }
-    }
+    const int n = feed_stationary_frames(hdl, out, 1000);
 
+    ASSERT_GE(n, 1);
+    const double unit = TestSupport::unit_roundoff<float>();
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_error(out[0].x, 100.0, 16.0 * unit * 100.0)));
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_error(out[0].y, 200.0, 16.0 * unit * 200.0)));
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_error(out[0].width, 50.0, 16.0 * unit * 50.0)));
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_error(out[0].height, 100.0, 16.0 * unit * 100.0)));
     sushitrack_destroy(hdl);
 }
 
-// Small_TrackerSimilarityBoundaryTest
-
 /**
- * @brief Near-unity cosine similarity (almost-identical features) must be
- *        accepted without crashing. The two unit vectors differ by 0.01 on
- *        a single component, then renormalised.
+ * @brief Two nearly identical features (cosine near 1) keep one object's id across two frames.
+ *
+ * The unit vectors differ by 1e-4 on one component, then are renormalised.
  */
-TEST(Small_TrackerSimilarityBoundaryTest, NearUnitySimilarityIsAccepted)
+TEST(Small_TrackerSimilarityBoundaryTest, NearUnitySimilarityKeepsTheId)
 {
     sushitrack_params_t params{};
     sushitrack_get_default_params(&params);
     params.time_aware = 1;
+    params.enable_tentative = 0;
     params.enable_reid = 1;
     params.frame_rate = 25;
     params.track_thresh = 0.1f;
     params.high_thresh = 0.2f;
     sushitrack_tracker_t hdl = sushitrack_create(&params);
     ASSERT_NE(hdl, nullptr);
-
     std::vector<float> a(32, 0.0f);
     std::vector<float> b(32, 0.0f);
     a[0] = 1.0f;
     b[0] = std::sqrt(1.0f - 1.0e-8f);
     b[1] = 1.0e-4f;
-
-    sushitrack_object_t d0{};
-    d0.x = 100.0f;
-    d0.y = 200.0f;
-    d0.width = 50.0f;
-    d0.height = 100.0f;
-    d0.score = 0.95f;
-    d0.label = 1;
-    d0.feat = a.data();
-    d0.feat_dim = 32;
-
-    sushitrack_object_t d1{};
-    d1.x = 102.0f;
-    d1.y = 202.0f;
-    d1.width = 50.0f;
-    d1.height = 100.0f;
-    d1.score = 0.95f;
-    d1.label = 1;
-    d1.feat = b.data();
-    d1.feat_dim = 32;
-
+    const sushitrack_object_t d0 = make_det_with_feat(100.0f, 200.0f, a.data(), 32, 0.95f);
+    const sushitrack_object_t d1 = make_det_with_feat(102.0f, 202.0f, b.data(), 32, 0.95f);
     std::vector<sushitrack_track_t> out(4);
-    int n0 = CDetections::update_frame(hdl, &d0, 1, out.data(), 4, 0.04f);
-    int n1 = CDetections::update_frame(hdl, &d1, 1, out.data(), 4, 0.04f);
-    EXPECT_GE(n0, 1);
-    EXPECT_GE(n1, 1);
+    update_frame(hdl, &d0, 1, out.data(), 4, 0.04f);
+    const int64_t first_id = out[0].track_id;
 
+    const int n = update_frame(hdl, &d1, 1, out.data(), 4, 0.04f);
+
+    ASSERT_GE(n, 1);
+    EXPECT_NE(find_by_id(out, n, first_id), nullptr);
     sushitrack_destroy(hdl);
 }
 
 /**
- * @brief Near-zero cosine similarity (nearly orthogonal features) must be
- *        accepted without crashing.
+ * @brief A far detection with a nearly orthogonal feature (cosine about 1e-4) starts a track
+ *        with a new id.
  */
-TEST(Small_TrackerSimilarityBoundaryTest, NearOrthogonalSimilarityIsAccepted)
+TEST(Small_TrackerSimilarityBoundaryTest, NearOrthogonalSimilarityGivesAFreshId)
 {
     sushitrack_params_t params{};
     sushitrack_get_default_params(&params);
     params.time_aware = 1;
+    params.enable_tentative = 0;
     params.enable_reid = 1;
     params.frame_rate = 25;
     params.track_thresh = 0.1f;
     params.high_thresh = 0.2f;
     sushitrack_tracker_t hdl = sushitrack_create(&params);
     ASSERT_NE(hdl, nullptr);
-
     std::vector<float> a(32, 0.0f);
     std::vector<float> b(32, 0.0f);
     a[0] = 1.0f;
     b[1] = 1.0f;
-    b[0] = 1.0e-4f; // nearly orthogonal — cosine ≈ 1e-4
-
-    sushitrack_object_t d0{};
-    d0.x = 100.0f;
-    d0.y = 200.0f;
-    d0.width = 50.0f;
-    d0.height = 100.0f;
-    d0.score = 0.95f;
-    d0.label = 1;
-    d0.feat = a.data();
-    d0.feat_dim = 32;
-
-    sushitrack_object_t d1{};
-    d1.x = 600.0f;
-    d1.y = 600.0f;
-    d1.width = 50.0f;
-    d1.height = 100.0f;
-    d1.score = 0.95f;
-    d1.label = 1;
-    d1.feat = b.data();
-    d1.feat_dim = 32;
-
+    b[0] = 1.0e-4f;
+    const sushitrack_object_t d0 = make_det_with_feat(100.0f, 200.0f, a.data(), 32, 0.95f);
+    const sushitrack_object_t d1 = make_det_with_feat(600.0f, 600.0f, b.data(), 32, 0.95f);
     std::vector<sushitrack_track_t> out(4);
-    int n0 = CDetections::update_frame(hdl, &d0, 1, out.data(), 4, 0.04f);
-    int n1 = CDetections::update_frame(hdl, &d1, 1, out.data(), 4, 0.04f);
-    EXPECT_GE(n0, 1);
-    EXPECT_GE(n1, 1);
+    update_frame(hdl, &d0, 1, out.data(), 4, 0.04f);
+    const int64_t first_id = out[0].track_id;
 
+    const int n = update_frame(hdl, &d1, 1, out.data(), 4, 0.04f);
+
+    ASSERT_GE(n, 1);
+    const sushitrack_track_t* far = find_track_right_of(out, n, 500.0f);
+    ASSERT_NE(far, nullptr);
+    EXPECT_NE(far->track_id, first_id);
     sushitrack_destroy(hdl);
 }
