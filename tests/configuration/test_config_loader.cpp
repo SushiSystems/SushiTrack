@@ -41,6 +41,7 @@
 #include <nlohmann/json.hpp>
 
 #include <SushiTrack/c_api/sushitrack_c.h>
+#include <SushiTrack/configuration/config_host.hpp>
 #include <SushiTrack/configuration/config_loader.hpp>
 
 #include <c_detection_builders.hpp>
@@ -538,55 +539,6 @@ TEST(Medium_ConfigLoaderLibraryApiTest, MissingNamedFileIsRefusedAndLogged)
 namespace
 {
     /**
-     * @brief Sets an environment variable for one scope and puts the old value back.
-     */
-    class ScopedEnvironment final
-    {
-        public:
-            /// @brief Sets @p name to @p value.
-            ScopedEnvironment(const char* name, const std::string& value) : name_(name)
-            {
-                const char* old = std::getenv(name);
-                had_old_ = old != nullptr;
-                if (had_old_)
-                    old_ = old;
-                set(value);
-            }
-
-            ScopedEnvironment(const ScopedEnvironment&) = delete;
-            ScopedEnvironment& operator=(const ScopedEnvironment&) = delete;
-            ScopedEnvironment(ScopedEnvironment&&) = delete;
-            ScopedEnvironment& operator=(ScopedEnvironment&&) = delete;
-
-            /// @brief Restores the value the variable had.
-            ~ScopedEnvironment()
-            {
-                set(old_);
-            }
-
-        private:
-            /// @brief Sets the variable, or clears it when it had no value and @p value is empty.
-            void set(const std::string& value) const
-            {
-#ifdef _WIN32
-                _putenv_s(name_.c_str(), value.c_str());
-#else
-                if (value.empty() && !had_old_)
-                    unsetenv(name_.c_str());
-                else
-                    setenv(name_.c_str(), value.c_str(), 1);
-#endif
-            }
-
-            /// @brief The variable's name.
-            std::string name_;
-            /// @brief Whether the variable had a value before.
-            bool had_old_ = false;
-            /// @brief The value it had.
-            std::string old_;
-    };
-
-    /**
      * @brief Owns a temporary folder named after the running test and removes it on exit.
      */
     class TempConfigFolder final
@@ -638,40 +590,105 @@ namespace
     };
 } // namespace
 
+namespace
+{
+    /**
+     * @brief Returns the generic form of @p path, so a test reads one spelling on every platform.
+     */
+    std::string generic(const std::string& path)
+    {
+        return std::filesystem::path(path).generic_string();
+    }
+
+    /// @brief A current directory with ten components, d0 the highest and d9 the lowest.
+    constexpr const char* K_DEEP_DIRECTORY = "/d0/d1/d2/d3/d4/d5/d6/d7/d8/d9";
+} // namespace
+
 /**
  * @brief SUSHITRACK_CONFIG naming a file that does not exist is refused like a named path, so a
  *        typo in the variable does not fall back to a search silently.
  */
-TEST(Medium_ConfigLoaderLibraryApiTest, MissingFileNamedByTheEnvironmentIsRefusedAndLogged)
+TEST(Small_ConfigLoaderSearchTest, MissingFileNamedByTheEnvironmentIsRefusedAndLogged)
 {
-    const ScopedEnvironment environment("SUSHITRACK_CONFIG", "no/such/sushitrack_env.json");
+    SushiTrack::InMemoryConfigHost host;
+    host.set_variable("SUSHITRACK_CONFIG", "/etc/missing.json");
+    host.set_working_directory("/work");
+    host.add_file("/work/sushitrack.json", R"({"basic": {"frame_rate": 20}})");
     SushiTrack::CapturedLog log;
     sushitrack_params_t params{};
     sushitrack_get_default_params(&params);
 
-    EXPECT_EQ(sushitrack_load_params_from_json(nullptr, &params), SUSHITRACK_INVALID_ARGUMENT);
-    EXPECT_EQ(log.count("SUSHITRACK_CONFIG names no/such/sushitrack_env.json"), 1);
+    EXPECT_EQ(SushiTrack::load_params_from_path(nullptr, host, params),
+              SUSHITRACK_INVALID_ARGUMENT);
+    EXPECT_EQ(params.frame_rate, 25);
+    EXPECT_EQ(log.count("SUSHITRACK_CONFIG names /etc/missing.json"), 1);
 }
 
 /**
  * @brief With no path, no variable and no file in the search, the load succeeds and says so at
  *        INFO.
  */
-TEST(Medium_ConfigLoaderLibraryApiTest, NothingNamedAndNothingFoundSucceedsAtInfo)
+TEST(Small_ConfigLoaderSearchTest, NothingNamedAndNothingFoundSucceedsAtInfo)
 {
-    const ScopedEnvironment environment("SUSHITRACK_CONFIG", "");
-    const std::filesystem::path previous = std::filesystem::current_path();
-    const TempConfigFolder folder;
-    std::filesystem::current_path(folder.path());
+    SushiTrack::InMemoryConfigHost host;
+    host.set_working_directory("/work/a/b");
     SushiTrack::CapturedLog log;
     sushitrack_params_t params{};
     sushitrack_get_default_params(&params);
 
-    const sushitrack_status_t status = sushitrack_load_params_from_json(nullptr, &params);
-
-    std::filesystem::current_path(previous);
-    EXPECT_EQ(status, SUSHITRACK_SUCCESS);
+    EXPECT_EQ(SushiTrack::load_params_from_path(nullptr, host, params), SUSHITRACK_SUCCESS);
+    EXPECT_EQ(params.frame_rate, 25);
     EXPECT_EQ(log.level_of("No configuration file found"), SushiLog::LogLevel::Info);
+}
+
+/**
+ * @brief SUSHITRACK_CONFIG naming an existing file loads it when the path is null, ahead of the
+ *        sushitrack.json the search would find.
+ */
+TEST(Small_ConfigLoaderSearchTest, EnvironmentNamingAnExistingFileLoadsItWhenThePathIsNull)
+{
+    SushiTrack::InMemoryConfigHost host;
+    host.set_variable("SUSHITRACK_CONFIG", "/etc/track.json");
+    host.set_working_directory("/work");
+    host.add_file("/etc/track.json", R"({"basic": {"frame_rate": 45}})");
+    host.add_file("/work/sushitrack.json", R"({"basic": {"frame_rate": 20}})");
+    SushiTrack::CapturedLog log;
+    sushitrack_params_t params{};
+    sushitrack_get_default_params(&params);
+
+    EXPECT_EQ(SushiTrack::load_params_from_path(nullptr, host, params), SUSHITRACK_SUCCESS);
+    EXPECT_EQ(params.frame_rate, 45);
+    EXPECT_EQ(log.count("Configuration loaded from /etc/track.json"), 1);
+}
+
+/**
+ * @brief The search finds a sushitrack.json in the eighth parent of the current directory.
+ *
+ * The current directory /d0/.../d9 is depth 0; the parent at depth k is d(9-k), so depth 8 is
+ * /d0/d1.
+ */
+TEST(Small_ConfigLoaderSearchTest, SearchFindsTheFileInTheEighthParent)
+{
+    SushiTrack::InMemoryConfigHost host;
+    host.set_working_directory(K_DEEP_DIRECTORY);
+    host.add_file("/d0/d1/sushitrack.json", "{}");
+
+    EXPECT_EQ(generic(SushiTrack::resolve_config_path(nullptr, host)), "/d0/d1/sushitrack.json");
+}
+
+/**
+ * @brief The search stops after K_MAX_SEARCH_DEPTH parents: a sushitrack.json in the ninth parent
+ *        is not found.
+ *
+ * The ninth parent of /d0/.../d9 is depth 9, /d0, one beyond the last directory read.
+ */
+TEST(Small_ConfigLoaderSearchTest, SearchStopsBeforeTheNinthParent)
+{
+    SushiTrack::InMemoryConfigHost host;
+    host.set_working_directory(K_DEEP_DIRECTORY);
+    host.add_file("/d0/sushitrack.json", "{}");
+
+    EXPECT_TRUE(SushiTrack::resolve_config_path(nullptr, host).empty());
 }
 
 /**
