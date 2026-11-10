@@ -1,20 +1,16 @@
 # Test review: plan
 
-**Status:** Open — M1 in progress (stopped by the owner on 2026-11-10); the owner chooses inline or parallel
+**Status:** Open — M1 and M2 applied (2026-11-10); M3 to M13 untouched; the owner chooses inline or parallel
 
-**Resume note (M1, applications).** Done and pushed, one commit each: `test_frame_recorder.cpp`,
-`test_mot_engine_log_category.cpp` (deleted, `compile_mot_engine_log_category.cpp` registered in
-`tests/CMakeLists.txt`), `test_mot_runner.cpp` (with `write_mot_tracks` in `mot_runner.hpp`),
-`test_mot_sequence.cpp`, `test_tracker_adapter.cpp`, `test_oc_sort_adapter.cpp`,
-`test_byte_track_adapter.cpp`, `test_json_settings.cpp`. Next file: `test_mot_detection.cpp` (delete,
-add `compile_mot_detection.cpp`), then `test_sushitrack_adapter.cpp`, `test_track_result.cpp`
-(delete, compile check), `test_tracker_bridge.cpp`, `test_tracker_bridge_log_category.cpp` (delete,
-compile check), `test_tracker_registry.cpp`; also `test_tracker_builder.cpp` and
-`test_default_trackers.cpp` have no REPORT.md record and were not touched. Open adds of M1:
-`FrameRecorder` lost-events row (needs a way to lose events), `SushiTrackAdapter` unloadable-file row,
-`delete_tracker` NULL, `tracker_process_c` null tracker and throwing update, `TrackerRegistry`
-second registration. No syntax check ran: the machine has no compiler and `build/` has no
-`compile_commands.json`. M2 to M13 are untouched.
+**Resume note (M3, c_api).** M1 and M2 are applied and pushed, one commit per file. Not done in M1:
+the `FrameRecorder` lost-events row (needs a way to lose events) and the `tracker_process_c` throwing
+update row (no real adapter throws on any input; it needs a throwing adapter in production source under
+ruling 12a). Not done in M2: nothing in the records; `Small_LAPJVSolverTest.EmptyMatrixWithCountsLogsAnError`
+(record: resize) stays small because T3's scoped in-memory sink is the seam. The test build now registers
+every `compile_*.cpp` outside `applications/` as the object library `sushitrack_compile_checks`. No syntax
+check ran: the machine has no compiler and no `build*/compile_commands.json`. The `Totals` table of
+`REPORT.md` was not recounted for the records added to `test_tracker_builder.cpp` and
+`test_default_trackers.cpp`.
 
 Applies the verdicts of `REPORT.md`, in hierarchy order: the shared helpers, adapters and seams the
 rewrites need come first, then the defects the review found, then each module's tests. A module job
@@ -32,8 +28,8 @@ writes each add. Nothing in a module job changes production code except a seam a
 | T5 | The CLI runner fixtures replaced by sushicore's in-memory runner and console | sushicore T1 | done |
 | T6 | The defects of this report, each with a test that fails first; `docs/guides/TESTING.md` aligned with the skill |  | done |
 | T7 | `tools/testing/check_test_additions.py`, `tools/tests/test_check_test_additions.py` deleted |  | done |
-| M1 | the tests of `applications` (14 files): 21 rewrite, 2 resize, 7 split, 1 merge, 5 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
-| M2 | the tests of `association` (17 files): 20 rewrite, 1 resize, 6 merge, 6 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
+| M1 | the tests of `applications` (14 files): 21 rewrite, 2 resize, 7 split, 1 merge, 5 delete | T1, T2, T3, T4, T5, T6, T7 | done |
+| M2 | the tests of `association` (17 files): 20 rewrite, 1 resize, 6 merge, 6 delete | T1, T2, T3, T4, T5, T6, T7 | done |
 | M3 | the tests of `c_api` (5 files): 11 rewrite, 9 resize, 3 split, 1 merge, 6 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
 | M4 | the tests of `cli` (8 files): 21 rewrite, 3 resize, 2 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
 | M5 | the tests of `cli/services` (12 files): 44 rewrite, 5 resize, 2 split, 4 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
