@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* test_tracker_bridge_log_category.cpp                                   */
+/* compile_tracker_bridge_log_category.cpp                                */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -22,22 +22,14 @@
 /**************************************************************************/
 
 /**
- * @file test_tracker_bridge_log_category.cpp
- * @brief Tests the category the tracker_bridge application logs under.
+ * @file compile_tracker_bridge_log_category.cpp
+ * @brief Checks at compile time that the tracker_bridge category belongs to `sushitrack`, module `tracker_bridge`.
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-
 #include <tracker_bridge_log_category.hpp>
 
-using namespace TrackerBridge;
-
-/**
- * @brief The category belongs to `sushitrack` and its module is `tracker_bridge`.
- */
-TEST(Small_TrackerBridgeLogCategoryTest, NamesTheProjectAndTheModule)
-{
-    EXPECT_EQ(K_TRACKER_BRIDGE_LOG_CATEGORY.project().name(), "sushitrack");
-    EXPECT_EQ(K_TRACKER_BRIDGE_LOG_CATEGORY.module(), "tracker_bridge");
-}
+static_assert(TrackerBridge::K_TRACKER_BRIDGE_LOG_CATEGORY.project().name() == "sushitrack",
+              "the tracker_bridge category belongs to the sushitrack project");
+static_assert(TrackerBridge::K_TRACKER_BRIDGE_LOG_CATEGORY.module() == "tracker_bridge",
+              "the tracker_bridge category names the tracker_bridge module");
