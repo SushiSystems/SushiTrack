@@ -18,14 +18,24 @@ from sushitrack_cli.services import diag
 pytestmark = pytest.mark.medium
 
 
-def _repository_detail(session, tmp_path):
-    """Run the status report over an empty tree and return the detail cell of its repository row."""
+def _status_row(session, tmp_path, item):
+    """Run the status report over an empty tree and return its row named *item*."""
     paths = SimpleNamespace(root=tmp_path, build=tmp_path / "build", package=tmp_path / "package",
                             benchmark_names=lambda: [], data_root=lambda name: tmp_path / name)
     assert diag.status(SimpleNamespace(), paths, workspace=session.workspace) == 0
     (call,) = [call for call in session.console.calls if call.kind == "table"]
-    (row,) = [row for row in call.args[1] if row[0] == "repository"]
-    return row[2]
+    (row,) = [row for row in call.args[1] if row[0] == item]
+    return row
+
+
+def _repository_detail(session, tmp_path):
+    """Return the detail cell of the repository row of an empty tree's status."""
+    return _status_row(session, tmp_path, "repository")[2]
+
+
+def test_status_shows_a_missing_build_tree_as_absent(tmp_path, session):
+    """Marks the build tree absent and still returns 0."""
+    assert "absent" in _status_row(session, tmp_path, "build tree")[1]
 
 
 def test_status_names_the_checkout_folder_when_git_is_missing(tmp_path, session):
