@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-11-10 — cli: Required sushicore 0.12.2, which narrows a sharded test run by `--filter` and reruns a failed shard's cases.
 - 2026-11-10 — tracking: Fixed a Lost track being listed once more for every frame it stayed lost while ReID recovery is on (`tracker.cpp`, `6976f2a`).
 - 2026-11-10 — tests: Registered the cases of each test program as CTest shards per size and gave one Kalman factory check a suite of its own, since `TEST` and `TEST_P` cannot share one (RW-42).
 - 2026-11-10 — logging: Added `LogThrottle::admit(suppressed, generation)`, which counts against a generation the caller gives; `admit(suppressed)` passes the process-wide one (`log_throttle.hpp`).
