@@ -27,6 +27,7 @@
  * @author Mustafa Garip
  */
 
+#include <cmath>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -39,42 +40,92 @@ using namespace CDetections;
 
 namespace
 {
+    /** @brief Whether follow_path() also requires every reported track to be Tracked. */
+    enum class StateCheck
+    {
+        RequireTracked,
+        Ignore
+    };
 
     /**
-     * @brief Drives a single object on a smooth curved trajectory and asserts the
-     *        id is stable and geometry sane for the whole run.
-     *
-     * Shared by every variation below so the differences between configs are the
-     * only moving part.
+     * @brief What follow_path() found: whether the first frame seeded a track, and the first
+     *        later step at which the track was missing, changed id, left the required state or
+     *        had insane geometry (K_NO_BAD_STEP when none did).
      */
-    void run_single_object_stable(sushitrack_params_t params, const char* label)
+    struct PathOutcome
     {
-        sushitrack_tracker_t hdl = sushitrack_create(&params);
-        ASSERT_NE(hdl, nullptr) << "[" << label << "] tracker creation failed.";
+            static constexpr int K_NO_BAD_STEP = -1;
 
+            bool seeded = false;
+            int first_bad_step = K_NO_BAD_STEP;
+    };
+
+    /**
+     * @brief Feeds @p path to @p tracker one detection per frame at 0.04 s and reports where the
+     *        track seeded by the first detection stopped being the same sane track.
+     */
+    PathOutcome follow_path(sushitrack_tracker_t tracker,
+                            const std::vector<sushitrack_object_t>& path, StateCheck state_check)
+    {
+        PathOutcome outcome;
         std::vector<sushitrack_track_t> out(4);
-
-        sushitrack_object_t d0 = make_det(100.0f, 200.0f);
-        int n0 = CDetections::update_frame(hdl, &d0, 1, out.data(), 4, 0.04f);
-        ASSERT_GE(n0, 1) << "[" << label << "] failed to seed a track.";
+        if (update_frame(tracker, &path[0], 1, out.data(), 4, 0.04f) < 1)
+            return outcome;
+        outcome.seeded = true;
         const int64_t id = out[0].track_id;
 
+        for (std::size_t step = 1; step < path.size(); ++step)
+        {
+            const int n = update_frame(tracker, &path[step], 1, out.data(), 4, 0.04f);
+            const sushitrack_track_t* track = find_by_id(out, n, id);
+            const bool state_ok =
+                state_check == StateCheck::Ignore || (track != nullptr && track->state == K_TRACKED);
+            if (n < 1 || track == nullptr || !state_ok || !geometry_is_sane(*track))
+            {
+                outcome.first_bad_step = static_cast<int>(step);
+                return outcome;
+            }
+        }
+        return outcome;
+    }
+
+    /** @brief Returns a smooth curve: accelerating in x, a slow sine drift in y; 31 frames. */
+    std::vector<sushitrack_object_t> curved_path()
+    {
+        std::vector<sushitrack_object_t> path{make_det(100.0f, 200.0f)};
         for (int k = 1; k <= 30; ++k)
         {
-            // Gentle curve: accelerating in x, sinusoidal-ish drift in y.
             const float x = 100.0f + 3.0f * k + 0.05f * k * k;
             const float y = 200.0f + 8.0f * std::sin(0.2f * k);
-            sushitrack_object_t d = make_det(x, y);
-            int n = CDetections::update_frame(hdl, &d, 1, out.data(), 4, 0.04f);
-            ASSERT_GE(n, 1) << "[" << label << "] dropped the object at step " << k;
-
-            const sushitrack_track_t* t = find_by_id(out, n, id);
-            ASSERT_NE(t, nullptr) << "[" << label << "] id churned at step " << k;
-            EXPECT_EQ(t->state, K_TRACKED) << "[" << label << "] left Tracked at step " << k;
-            EXPECT_TRUE(geometry_is_sane(*t)) << "[" << label << "] insane geometry at step " << k;
+            path.push_back(make_det(x, y));
         }
+        return path;
+    }
 
-        sushitrack_destroy(hdl);
+    /** @brief Returns a box that grows in width and height as it moves right; 21 frames. */
+    std::vector<sushitrack_object_t> growing_box_path()
+    {
+        std::vector<sushitrack_object_t> path{make_det(100.0f, 200.0f, 0.9f, 50.0f, 100.0f)};
+        for (int k = 1; k <= 20; ++k)
+        {
+            path.push_back(make_det(100.0f + 3.0f * k, 200.0f, 0.9f, 50.0f + 1.5f * k,
+                                    100.0f + 2.0f * k));
+        }
+        return path;
+    }
+
+    /** @brief Returns a diagonal path whose score alternates between high and low; 9 frames. */
+    std::vector<sushitrack_object_t> fluctuating_score_path()
+    {
+        std::vector<sushitrack_object_t> path{make_det(100.0f, 200.0f, 0.95f)};
+        const float scores[] = {0.9f, 0.4f, 0.85f, 0.3f, 0.95f, 0.5f, 0.8f, 0.45f};
+        int k = 1;
+        for (const float score : scores)
+        {
+            path.push_back(make_det(100.0f + 4.0f * k, 200.0f + 1.0f * k, score));
+            ++k;
+        }
+        return path;
     }
 
     sushitrack_params_t base_params()
@@ -91,96 +142,67 @@ namespace
         p.match_thresh = 0.9f;
         return p;
     }
-
-    // IoU variant sweep
-
-    /** @brief Parameterised over iou_type: 0=IoU, 1=DIoU, 2=GIoU, 3=SIoU. */
-    class Small_TrackerIoUVariantTest : public ::testing::TestWithParam<int>
-    {
-    };
-
-    TEST_P(Small_TrackerIoUVariantTest, EachIoUVariantTracksSingleObjectStably)
-    {
-        sushitrack_params_t p = base_params();
-        p.iou_type = GetParam();
-        run_single_object_stable(p, "iou_type");
-    }
-
-    INSTANTIATE_TEST_SUITE_P(AllVariants, Small_TrackerIoUVariantTest,
-                             ::testing::Values(0, 1, 2, 3));
-
-    // Coordinate parameterisation
-
-    /**
-     * @brief XYAH (centroid / aspect-ratio / height) mode tracks an object whose
-     *        box changes aspect ratio over time without destabilising identity.
-     */
-    TEST(Small_TrackerCoordinateSystemTest, XyahModeHandlesAspectChange)
-    {
-        sushitrack_params_t p = base_params();
-        p.enable_xyah = 1;
-
-        sushitrack_tracker_t hdl = sushitrack_create(&p);
-        ASSERT_NE(hdl, nullptr);
-
-        std::vector<sushitrack_track_t> out(4);
-        sushitrack_object_t d0 = make_det(100.0f, 200.0f, 0.9f, 50.0f, 100.0f);
-        int n0 = CDetections::update_frame(hdl, &d0, 1, out.data(), 4, 0.04f);
-        ASSERT_GE(n0, 1);
-        const int64_t id = out[0].track_id;
-
-        // Grow the box (person stands up / approaches camera): width and height both increase, changing the aspect ratio the XYAH state tracks directly.
-        for (int k = 1; k <= 20; ++k)
-        {
-            const float w = 50.0f + 1.5f * k;
-            const float h = 100.0f + 2.0f * k;
-            sushitrack_object_t d = make_det(100.0f + 3.0f * k, 200.0f, 0.9f, w, h);
-            int n = CDetections::update_frame(hdl, &d, 1, out.data(), 4, 0.04f);
-            ASSERT_GE(n, 1);
-            const sushitrack_track_t* t = find_by_id(out, n, id);
-            ASSERT_NE(t, nullptr) << "XYAH track churned at step " << k;
-            EXPECT_TRUE(geometry_is_sane(*t));
-        }
-
-        sushitrack_destroy(hdl);
-    }
-
-    // Kalman filter variant
-
-    /**
-     * @brief The NSA (Noise Scale Adaptive) Kalman filter tracks an object whose
-     *        detection confidence fluctuates frame to frame — the exact regime NSA
-     *        is designed for — without losing identity.
-     */
-    TEST(Small_TrackerKalmanVariantTest, NsaFilterHandlesFluctuatingConfidence)
-    {
-        sushitrack_params_t p = base_params();
-        p.kalman_type = 1;     // NSA
-        p.track_thresh = 0.1f; // keep mid/low scores in the primary pool
-
-        sushitrack_tracker_t hdl = sushitrack_create(&p);
-        ASSERT_NE(hdl, nullptr);
-
-        std::vector<sushitrack_track_t> out(4);
-        sushitrack_object_t d0 = make_det(100.0f, 200.0f, 0.95f);
-        int n0 = CDetections::update_frame(hdl, &d0, 1, out.data(), 4, 0.04f);
-        ASSERT_GE(n0, 1);
-        const int64_t id = out[0].track_id;
-
-        const float scores[] = {0.9f, 0.4f, 0.85f, 0.3f, 0.95f, 0.5f, 0.8f, 0.45f};
-        int k = 1;
-        for (float s : scores)
-        {
-            sushitrack_object_t d = make_det(100.0f + 4.0f * k, 200.0f + 1.0f * k, s);
-            int n = CDetections::update_frame(hdl, &d, 1, out.data(), 4, 0.04f);
-            ASSERT_GE(n, 1);
-            const sushitrack_track_t* t = find_by_id(out, n, id);
-            ASSERT_NE(t, nullptr) << "NSA track churned at step " << k << " (score " << s << ")";
-            EXPECT_TRUE(geometry_is_sane(*t));
-            ++k;
-        }
-
-        sushitrack_destroy(hdl);
-    }
-
 } // namespace
+
+/** @brief Parameterised over iou_type: 0=IoU, 1=DIoU, 2=GIoU, 3=SIoU. */
+class Small_TrackerIoUVariantTest : public ::testing::TestWithParam<int>
+{
+};
+
+/**
+ * @brief With each IoU variant, one object on a smooth curve keeps its id, stays Tracked and
+ *        keeps sane geometry for 30 frames.
+ */
+TEST_P(Small_TrackerIoUVariantTest, EachIoUVariantKeepsOneObjectTrackedOnACurve)
+{
+    sushitrack_params_t p = base_params();
+    p.iou_type = GetParam();
+    sushitrack_tracker_t hdl = sushitrack_create(&p);
+    ASSERT_NE(hdl, nullptr);
+
+    const PathOutcome outcome = follow_path(hdl, curved_path(), StateCheck::RequireTracked);
+
+    EXPECT_TRUE(outcome.seeded);
+    EXPECT_EQ(outcome.first_bad_step, PathOutcome::K_NO_BAD_STEP);
+    sushitrack_destroy(hdl);
+}
+
+INSTANTIATE_TEST_SUITE_P(AllVariants, Small_TrackerIoUVariantTest, ::testing::Values(0, 1, 2, 3));
+
+/**
+ * @brief In XYAH mode a box that grows in width and height, so its aspect ratio changes, keeps
+ *        one id and sane geometry for 20 frames.
+ */
+TEST(Small_TrackerCoordinateSystemTest, XyahModeKeepsTheIdWhileTheAspectChanges)
+{
+    sushitrack_params_t p = base_params();
+    p.enable_xyah = 1;
+    sushitrack_tracker_t hdl = sushitrack_create(&p);
+    ASSERT_NE(hdl, nullptr);
+
+    const PathOutcome outcome = follow_path(hdl, growing_box_path(), StateCheck::Ignore);
+
+    EXPECT_TRUE(outcome.seeded);
+    EXPECT_EQ(outcome.first_bad_step, PathOutcome::K_NO_BAD_STEP);
+    sushitrack_destroy(hdl);
+}
+
+/**
+ * @brief With the NSA Kalman filter an object whose score swings between 0.3 and 0.95 keeps one
+ *        id and sane geometry for eight frames.
+ */
+TEST(Small_TrackerKalmanVariantTest, NsaFilterKeepsTheIdWhileTheScoreFluctuates)
+{
+    sushitrack_params_t p = base_params();
+    p.kalman_type = 1;     // NSA
+    p.track_thresh = 0.1f; // keep mid/low scores in the primary pool
+    sushitrack_tracker_t hdl = sushitrack_create(&p);
+    ASSERT_NE(hdl, nullptr);
+
+    const PathOutcome outcome =
+        follow_path(hdl, fluctuating_score_path(), StateCheck::Ignore);
+
+    EXPECT_TRUE(outcome.seeded);
+    EXPECT_EQ(outcome.first_bad_step, PathOutcome::K_NO_BAD_STEP);
+    sushitrack_destroy(hdl);
+}
