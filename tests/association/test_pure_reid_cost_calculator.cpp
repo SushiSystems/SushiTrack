@@ -48,7 +48,8 @@ using namespace SushiTrack;
 
 namespace
 {
-    /// @brief Bound of 1 - cos(a, a) on a unit vector: a dot product, two norms and a quotient, four rounded operations of unit roundoff on a magnitude of 1.
+    /// @brief Bound of 1 - cos(a, a) on a unit vector: a dot product, two norms and a quotient,
+    ///        four rounded operations of unit roundoff on a magnitude of 1.
     const double K_COSINE_BOUND = 4.0 * TestSupport::unit_roundoff<float>();
 } // namespace
 
@@ -125,7 +126,8 @@ TEST(Small_PureReIDCostCalculatorTest, EmptyCollectionProducesEmptyMatrix)
 }
 
 /**
- * @brief The batch cost of the pair is 0: identical features have a cosine distance of 0, under the threshold of 0.4, and the box offset plays no part.
+ * @brief The batch cost of the pair is 0: identical features have a cosine distance of 0, under the
+ *        threshold of 0.4, and the box offset plays no part.
  */
 TEST(Small_PureReIDCostCalculatorTest, BatchCostOfIdenticalFeaturesIsZero)
 {
