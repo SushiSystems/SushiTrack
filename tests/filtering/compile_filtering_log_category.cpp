@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* test_filtering_log_category.cpp                                        */
+/* compile_filtering_log_category.cpp                                     */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -22,22 +22,15 @@
 /**************************************************************************/
 
 /**
- * @file test_filtering_log_category.cpp
- * @brief Tests the category the filtering area logs under.
+ * @file compile_filtering_log_category.cpp
+ * @brief Checks at compile time that the filtering category belongs to `sushitrack`, module
+ *        `filtering`.
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-
 #include <SushiTrack/filtering/filtering_log_category.hpp>
 
-using namespace SushiTrack;
-
-/**
- * @brief The category belongs to `sushitrack` and its module is `filtering`.
- */
-TEST(Small_FilteringLogCategoryTest, NamesTheProjectAndTheModule)
-{
-    EXPECT_EQ(K_FILTERING_LOG_CATEGORY.project().name(), "sushitrack");
-    EXPECT_EQ(K_FILTERING_LOG_CATEGORY.module(), "filtering");
-}
+static_assert(SushiTrack::K_FILTERING_LOG_CATEGORY.project().name() == "sushitrack",
+              "the filtering category belongs to the sushitrack project");
+static_assert(SushiTrack::K_FILTERING_LOG_CATEGORY.module() == "filtering",
+              "the filtering category names the filtering module");
