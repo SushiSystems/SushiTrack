@@ -27,12 +27,14 @@
  * @author Mustafa Garip
  */
 
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <vector>
 
 #include <gtest/gtest.h>
 
 #include <SushiTrack/c_api/sushitrack_c.h>
-#include <SushiTrack/filtering/imm_filter.hpp>
 
 #include <c_detection_builders.hpp>
 
@@ -40,168 +42,291 @@ using namespace CDetections;
 
 namespace
 {
+    /** @brief Lane split of the two-object scene: A runs above this y, B below it. */
+    constexpr float K_LANE_SPLIT = 275.0f;
+} // namespace
 
-    class Small_TrackerFullStackTest : public ::testing::Test
-    {
-        protected:
-            sushitrack_tracker_t hdl_ = nullptr;
-            sushitrack_params_t params_ = {};
-            static constexpr int K_DIM = 128;
-            std::vector<float> feat_a_;
-            std::vector<float> feat_b_;
+/**
+ * @brief Fixture of the full stack: time aware, ReID, Mahalanobis gating, tentative confirmation
+ *        and the IMM filter, over two objects of orthogonal 128 dimensional features.
+ *
+ * Object A runs along y 150 and object B along y 400, both at 6 px per frame from x 100. The
+ * steps of the scene are methods, so that each test reads one promise.
+ */
+class Small_TrackerFullStackTest : public ::testing::Test
+{
+    protected:
+        static constexpr int K_DIM = 128;
+        static constexpr float K_AY = 150.0f;
+        static constexpr float K_BY = 400.0f;
+        static constexpr float K_VX = 6.0f;
 
-            void SetUp() override
-            {
-                sushitrack_get_default_params(&params_);
-                // Everything on.
-                params_.time_aware = 1;
-                params_.enable_reid = 1;
-                params_.enable_mahalanobis = 1;
-                params_.enable_tentative = 1;
-                params_.kalman_type = 2; // IMM multi-model
-                params_.primary_assoc_mode = 1;
-                params_.frame_rate = 25;
-                params_.track_buffer = 30;
-                params_.track_thresh = 0.2f;
-                params_.high_thresh = 0.4f;
-                params_.match_thresh = 0.9f;
-                // Confirm quickly on strong detections so the scenario stays short.
-                params_.tentative_fast_thresh = 0.85f;
-                params_.tentative_fast_hits = 1;
-                hdl_ = sushitrack_create(&params_);
-                ASSERT_NE(hdl_, nullptr);
+        sushitrack_tracker_t hdl_ = nullptr;
+        sushitrack_params_t params_ = {};
+        std::vector<float> feat_a_;
+        std::vector<float> feat_b_;
+        std::vector<sushitrack_track_t> out_ = std::vector<sushitrack_track_t>(8);
+        int last_count_ = 0;
+        float ax_ = 100.0f;
+        float bx_ = 100.0f;
+        int64_t id_a_ = -1;
+        int64_t id_b_ = -1;
+        int id_changes_ = 0;
+        int insane_tracks_ = 0;
 
-                feat_a_ = one_hot_feature(K_DIM, /*axis=*/0);
-                feat_b_ = one_hot_feature(K_DIM, /*axis=*/1); // orthogonal to A
-            }
-
-            void TearDown() override
-            {
-                if (hdl_)
-                    sushitrack_destroy(hdl_);
-            }
-    };
-
-    /**
-     * @brief The full advanced stack tracks two distinct objects through
-     *        confirmation, sustained motion, a short occlusion of one object, and
-     *        its ReID-driven recovery — with no NaN geometry and no identity loss
-     *        for the continuously observed object.
-     */
-    TEST_F(Small_TrackerFullStackTest, AdvancedStackTracksConfirmsAndRecovers)
-    {
-        std::vector<sushitrack_track_t> out(8);
-
-        auto step = [&](float ax, float ay, float bx, float by) -> int
+        void SetUp() override
         {
-            sushitrack_object_t a = make_det_with_feat(ax, ay, feat_a_.data(), K_DIM, 0.9f);
-            sushitrack_object_t b = make_det_with_feat(bx, by, feat_b_.data(), K_DIM, 0.9f);
-            sushitrack_object_t dets[2] = {a, b};
-            return CDetections::update_frame(hdl_, dets, 2, out.data(), 8, 0.04f);
-        };
+            sushitrack_get_default_params(&params_);
+            params_.time_aware = 1;
+            params_.enable_reid = 1;
+            params_.enable_mahalanobis = 1;
+            params_.enable_tentative = 1;
+            params_.kalman_type = 2;
+            params_.primary_assoc_mode = 1;
+            params_.frame_rate = 25;
+            params_.track_buffer = 30;
+            params_.track_thresh = 0.2f;
+            params_.high_thresh = 0.4f;
+            params_.match_thresh = 0.9f;
+            params_.tentative_fast_thresh = 0.85f;
+            params_.tentative_fast_hits = 1;
+            hdl_ = sushitrack_create(&params_);
+            ASSERT_NE(hdl_, nullptr);
 
-        // Confirmation + sustained tracking over several frames
-        float ax = 100.0f, bx = 100.0f;
-        const float ay = 150.0f, by = 400.0f; // separate lanes
-        const float vx = 6.0f;
+            feat_a_ = one_hot_feature(K_DIM, 0);
+            feat_b_ = one_hot_feature(K_DIM, 1);
+        }
 
-        int64_t id_a = -1, id_b = -1;
-        for (int i = 0; i < 6; ++i)
+        void TearDown() override
         {
-            int n = step(ax, ay, bx, by);
-            ASSERT_GE(n, 2);
+            if (hdl_)
+                sushitrack_destroy(hdl_);
+        }
+
+        /**
+         * @brief Feeds both objects at their current x, moves both on by one step and returns
+         *        the track count; the lane ids and the counters follow what the frame showed.
+         */
+        int step()
+        {
+            const sushitrack_object_t pair[2] = {
+                make_det_with_feat(ax_, K_AY, feat_a_.data(), K_DIM, 0.9f),
+                make_det_with_feat(bx_, K_BY, feat_b_.data(), K_DIM, 0.9f)};
+            last_count_ = update_frame(hdl_, pair, 2, out_.data(), 8, 0.04f);
+            ax_ += K_VX;
+            bx_ += K_VX;
+            read_lanes(last_count_);
+            return last_count_;
+        }
+
+        /**
+         * @brief Feeds seven frames of the pair, so that both tracks are past their confirmation.
+         */
+        void settle()
+        {
+            for (int frame = 0; frame < 7; ++frame)
+                ASSERT_GE(step(), 2) << "frame " << frame;
+            ASSERT_NE(id_a_, -1);
+            ASSERT_NE(id_b_, -1);
+            ASSERT_NE(id_a_, id_b_);
+        }
+
+        /**
+         * @brief Feeds @p frames frames in which only B is visible and A keeps its pace unseen,
+         *        and returns how many of them did not show B as a Tracked track under its id.
+         */
+        int occlude_a(int frames)
+        {
+            int frames_without_b = 0;
+            for (int i = 0; i < frames; ++i)
+            {
+                const sushitrack_object_t b =
+                    make_det_with_feat(bx_, K_BY, feat_b_.data(), K_DIM, 0.9f);
+                last_count_ = update_frame(hdl_, &b, 1, out_.data(), 8, 0.04f);
+                const sushitrack_track_t* track = find_by_id(out_, last_count_, id_b_);
+                if (track == nullptr || track->state != K_TRACKED)
+                    ++frames_without_b;
+                ax_ += K_VX;
+                bx_ += K_VX;
+            }
+            return frames_without_b;
+        }
+
+    private:
+        /**
+         * @brief Assigns each track of the frame to its lane by y, counts a lane whose id
+         *        changed and the tracks whose box is not finite with a positive extent.
+         */
+        void read_lanes(int n)
+        {
             for (int k = 0; k < n; ++k)
             {
-                const sushitrack_track_t& t = out[static_cast<std::size_t>(k)];
-                EXPECT_TRUE(geometry_is_sane(t)) << "Insane geometry during tracking, frame " << i;
-                if (t.y < 275.0f)
-                    id_a = t.track_id;
-                else
-                    id_b = t.track_id;
+                const sushitrack_track_t& track = out_[static_cast<std::size_t>(k)];
+                if (!geometry_is_sane(track))
+                    ++insane_tracks_;
+                int64_t& lane_id = track.y < K_LANE_SPLIT ? id_a_ : id_b_;
+                if (lane_id != -1 && lane_id != track.track_id)
+                    ++id_changes_;
+                lane_id = track.track_id;
             }
-            ax += vx;
-            bx += vx;
         }
-        ASSERT_NE(id_a, -1);
-        ASSERT_NE(id_b, -1);
-        ASSERT_NE(id_a, id_b);
+};
 
-        // Both should be confirmed Tracked by now.
+/**
+ * @brief Both objects are confirmed Tracked after the settling frames.
+ *
+ * Both detections score 0.9, at least tentative_fast_thresh 0.85, so the requirement is
+ * tentative_fast_hits, 1. Frame 1 seeds two tentative tracks, and the 6 px shift of frame 2
+ * keeps the IoU cost near 0.21, under tentative_match_thresh 0.3, so both are confirmed there.
+ */
+TEST_F(Small_TrackerFullStackTest, BothObjectsAreConfirmedTracked)
+{
+    ASSERT_NO_FATAL_FAILURE(settle());
+
+    const sushitrack_track_t* a = find_by_id(out_, last_count_, id_a_);
+    const sushitrack_track_t* b = find_by_id(out_, last_count_, id_b_);
+    ASSERT_NE(a, nullptr);
+    ASSERT_NE(b, nullptr);
+    EXPECT_EQ(a->state, K_TRACKED);
+    EXPECT_EQ(b->state, K_TRACKED);
+    EXPECT_EQ(a->is_confirmed, 1);
+    EXPECT_EQ(b->is_confirmed, 1);
+}
+
+/**
+ * @brief Each lane keeps the id its track got when it was seeded while the objects move.
+ */
+TEST_F(Small_TrackerFullStackTest, EachLaneKeepsItsIdWhileTheObjectsMove)
+{
+    ASSERT_NO_FATAL_FAILURE(settle());
+
+    EXPECT_EQ(id_changes_, 0);
+}
+
+/**
+ * @brief Every reported box is finite with a positive extent while the objects move.
+ */
+TEST_F(Small_TrackerFullStackTest, GeometryStaysSaneWhileTheObjectsMove)
+{
+    ASSERT_NO_FATAL_FAILURE(settle());
+
+    EXPECT_EQ(insane_tracks_, 0);
+}
+
+/**
+ * @brief The visible object keeps its id and its Tracked state while the other is occluded.
+ */
+TEST_F(Small_TrackerFullStackTest, VisibleObjectKeepsItsIdDuringTheOcclusion)
+{
+    ASSERT_NO_FATAL_FAILURE(settle());
+
+    EXPECT_EQ(occlude_a(3), 0);
+}
+
+/**
+ * @brief The occluded object returns on its own lane under its original id.
+ *
+ * After three unseen frames the track is Lost and in the lost pool. The reappearing detection
+ * carries the same feature, so the visual recovery costs 1 - 1 = 0, under
+ * reid_recovery_thresh 0.4, when the detection lies inside the gate of the track.
+ */
+TEST_F(Small_TrackerFullStackTest, OccludedObjectIsRecoveredByItsFeature)
+{
+    ASSERT_NO_FATAL_FAILURE(settle());
+    ASSERT_EQ(occlude_a(3), 0);
+
+    step();
+
+    const sushitrack_track_t* recovered = find_by_id(out_, last_count_, id_a_);
+    ASSERT_NE(recovered, nullptr) << "ReID recovery did not restore the id of object A";
+    EXPECT_EQ(recovered->state, K_TRACKED);
+    EXPECT_LT(recovered->y, K_LANE_SPLIT) << "the recovered track surfaced in the wrong lane";
+    EXPECT_TRUE(geometry_is_sane(*recovered));
+    EXPECT_NE(find_by_id(out_, last_count_, id_b_), nullptr)
+        << "object B lost its id at the reappearance";
+}
+
+/**
+ * @brief Fixture of a single object that accelerates and weaves for 120 frames at a score that
+ *        swings between 0.4 and 0.9; it runs the whole sequence once.
+ *
+ * The first frame seeds a tentative track. Once a frame reports the track Tracked and confirmed,
+ * its id is frozen and every later frame must show that id.
+ */
+class Small_TrackerFullStackLongRunTest : public Small_TrackerFullStackTest
+{
+    protected:
+        int64_t confirmed_id_ = -1;
+        int frames_without_confirmed_id_ = 0;
+        int frames_with_bad_geometry_ = 0;
+
+        void SetUp() override
         {
-            int n = step(ax, ay, bx, by);
-            ASSERT_GE(n, 2);
-            const sushitrack_track_t* a = find_by_id(out, n, id_a);
-            const sushitrack_track_t* b = find_by_id(out, n, id_b);
-            ASSERT_NE(a, nullptr);
-            ASSERT_NE(b, nullptr);
-            EXPECT_EQ(a->state, K_TRACKED);
-            EXPECT_EQ(b->state, K_TRACKED);
-            ax += vx;
-            bx += vx;
+            Small_TrackerFullStackTest::SetUp();
+            run_sequence();
         }
 
-        // Occlude object A for 3 frames; B stays visible
-        constexpr int K_GAP = 3;
-        for (int i = 0; i < K_GAP; ++i)
+    private:
+        void run_sequence()
         {
-            sushitrack_object_t b = make_det_with_feat(bx, by, feat_b_.data(), K_DIM, 0.9f);
-            int n = CDetections::update_frame(hdl_, &b, 1, out.data(), 8, 0.04f);
-            ASSERT_GE(n, 1);
-            const sushitrack_track_t* tb = find_by_id(out, n, id_b);
-            ASSERT_NE(tb, nullptr) << "Visible object B lost identity during A's occlusion.";
-            EXPECT_EQ(tb->state, K_TRACKED);
-            bx += vx;
-            ax += vx; // A keeps moving while unobserved
+            std::vector<sushitrack_track_t> out(4);
+            const sushitrack_object_t seed =
+                make_det_with_feat(100.0f, 200.0f, feat_a_.data(), K_DIM, 0.95f);
+            ASSERT_GE(update_frame(hdl_, seed, out.data(), 4, 0.04f), 1);
+
+            float x = 100.0f;
+            float y = 200.0f;
+            for (int k = 1; k <= 120; ++k)
+            {
+                const float frame = static_cast<float>(k);
+                x += 2.0f + 0.02f * frame;
+                y += 4.0f * std::sin(0.1f * frame);
+                const float score = 0.4f + 0.5f * std::abs(std::sin(0.3f * frame));
+                const sushitrack_object_t detection =
+                    make_det_with_feat(x, y, feat_a_.data(), K_DIM, score);
+                const int n = update_frame(hdl_, detection, out.data(), 4, 0.04f);
+                if (n < 1)
+                    continue;
+                if (confirmed_id_ == -1)
+                {
+                    if (out[0].state == K_TRACKED && out[0].is_confirmed == 1)
+                        confirmed_id_ = out[0].track_id;
+                    continue;
+                }
+                const sushitrack_track_t* track = find_by_id(out, n, confirmed_id_);
+                if (track == nullptr)
+                    ++frames_without_confirmed_id_;
+                else if (!geometry_is_sane(*track))
+                    ++frames_with_bad_geometry_;
+            }
         }
+};
 
-        // A reappears on its trajectory with the SAME feature
-        int n = step(ax, ay, bx, by);
-        ASSERT_GE(n, 1);
+/**
+ * @brief The track becomes Tracked and confirmed at some frame of the run.
+ */
+TEST_F(Small_TrackerFullStackLongRunTest, TrackConfirmsDuringTheRun)
+{
+    EXPECT_NE(confirmed_id_, -1);
+}
 
-        const sushitrack_track_t* a_rec = find_by_id(out, n, id_a);
-        const sushitrack_track_t* b_now = find_by_id(out, n, id_b);
-        ASSERT_NE(b_now, nullptr) << "Object B lost its identity at reappearance frame.";
-        ASSERT_NE(a_rec, nullptr)
-            << "ReID + Mahalanobis recovery failed to restore object A's identity "
-               "after a short occlusion.";
-        EXPECT_EQ(a_rec->state, K_TRACKED);
-        EXPECT_LT(a_rec->y, 275.0f) << "Recovered A surfaced in the wrong lane (id swap).";
-        EXPECT_TRUE(geometry_is_sane(*a_rec));
-    }
+/**
+ * @brief After its confirmation the track shows its id on every frame, so no swap or re-seed
+ *        hides behind a re-anchored id.
+ */
+TEST_F(Small_TrackerFullStackLongRunTest, ConfirmedIdIsShownOnEveryLaterFrame)
+{
+    ASSERT_NE(confirmed_id_, -1);
 
-    /**
-     * @brief Smoke invariant: the full stack survives a long single-object run
-     *        (120 frames) with a fluctuating detection score and an accelerating
-     *        trajectory, never emitting NaN geometry and never churning the id.
-     */
-    TEST_F(Small_TrackerFullStackTest, LongRunUnderFullStackStaysStable)
-    {
-        std::vector<sushitrack_track_t> out(4);
+    EXPECT_EQ(frames_without_confirmed_id_, 0);
+}
 
-        sushitrack_object_t d0 = make_det_with_feat(100.0f, 200.0f, feat_a_.data(), K_DIM, 0.95f);
-        int n0 = CDetections::update_frame(hdl_, &d0, 1, out.data(), 4, 0.04f);
-        ASSERT_GE(n0, 1);
-        int64_t id = out[0].track_id;
+/**
+ * @brief After its confirmation the track's box stays finite with a positive extent.
+ */
+TEST_F(Small_TrackerFullStackLongRunTest, ConfirmedTrackGeometryStaysSane)
+{
+    ASSERT_NE(confirmed_id_, -1);
 
-        // The id can legitimately settle after the tentative window; capture it once the track is confirmed Tracked.
-        float x = 100.0f, y = 200.0f;
-        for (int k = 1; k <= 120; ++k)
-        {
-            x += 2.0f + 0.02f * k;                                          // accelerating
-            y += 4.0f * std::sin(0.1f * k);                                 // weaving
-            const float score = 0.4f + 0.5f * std::abs(std::sin(0.3f * k)); // fluctuates
-            sushitrack_object_t d = make_det_with_feat(x, y, feat_a_.data(), K_DIM, score);
-            int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 4, 0.04f);
-            ASSERT_GE(n, 1) << "Full-stack tracker dropped the object at frame " << k;
-
-            // Re-anchor the id when confirmed (handles the tentative->Tracked transition without assuming the frame it occurs on).
-            if (out[0].state == K_TRACKED && out[0].is_confirmed)
-                id = out[0].track_id;
-
-            const sushitrack_track_t* t = find_by_id(out, n, id);
-            ASSERT_NE(t, nullptr) << "Full-stack id churned at frame " << k;
-            EXPECT_TRUE(geometry_is_sane(*t)) << "Insane geometry at frame " << k;
-        }
-    }
-
-} // namespace
+    EXPECT_EQ(frames_with_bad_geometry_, 0);
+}
