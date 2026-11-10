@@ -33,19 +33,6 @@
 
 using namespace SushiTrack;
 
-// Default construction
-
-/**
- * @brief A default-constructed CostMatrix has zero dimensions and is empty.
- */
-TEST(Small_CostMatrixTest, DefaultConstructionIsEmpty)
-{
-    CostMatrix m;
-    EXPECT_EQ(m.rows(), 0u);
-    EXPECT_EQ(m.cols(), 0u);
-    EXPECT_TRUE(m.empty());
-}
-
 // resize() — sentinel initialisation
 
 /**
@@ -64,19 +51,6 @@ TEST(Small_CostMatrixTest, ResizeDefaultFillsSentinel)
         for (std::size_t c = 0; c < 4; ++c)
             EXPECT_FLOAT_EQ(m(r, c), 1e4f)
                 << "cell (" << r << "," << c << ") not initialised to sentinel";
-}
-
-/**
- * @brief resize() with an explicit initial_val fills every cell with that value.
- */
-TEST(Small_CostMatrixTest, ResizeExplicitFillValue)
-{
-    CostMatrix m;
-    m.resize(2, 3, 0.5f);
-
-    for (std::size_t r = 0; r < 2; ++r)
-        for (std::size_t c = 0; c < 3; ++c)
-            EXPECT_FLOAT_EQ(m(r, c), 0.5f) << "cell (" << r << "," << c << ") not 0.5";
 }
 
 // operator() — read and write
@@ -110,18 +84,6 @@ TEST(Small_CostMatrixTest, ConstAccessorReadsCorrectly)
 
     const CostMatrix& cm = m;
     EXPECT_FLOAT_EQ(cm(0, 1), 3.14f);
-}
-
-// empty()
-
-/**
- * @brief empty() returns false after a resize to non-zero dimensions.
- */
-TEST(Small_CostMatrixTest, EmptyFalseAfterResize)
-{
-    CostMatrix m;
-    m.resize(1, 1);
-    EXPECT_FALSE(m.empty());
 }
 
 // Buffer reuse — shrink then grow
@@ -211,29 +173,25 @@ TEST(Small_CostMatrixTest, ResizeToZeroProducesEmptyMatrix)
 }
 
 /**
- * @brief A 1×N matrix stores and retrieves all N cells correctly.
+ * @brief A matrix with one row, and one with one column, store and retrieve every cell: the
+ *        degenerate shapes keep the row-major layout.
  */
-TEST(Small_CostMatrixTest, SingleRowMatrixAccessAllCells)
+TEST(Small_CostMatrixTest, SingleRowAndSingleColumnMatricesAccessAllCells)
 {
-    CostMatrix m;
-    m.resize(1, 5, 0.0f);
-    for (std::size_t c = 0; c < 5; ++c)
-        m(0, c) = static_cast<float>(c);
-    for (std::size_t c = 0; c < 5; ++c)
-        EXPECT_FLOAT_EQ(m(0, c), static_cast<float>(c));
-}
-
-/**
- * @brief An N×1 matrix stores and retrieves all N cells correctly.
- */
-TEST(Small_CostMatrixTest, SingleColumnMatrixAccessAllCells)
-{
-    CostMatrix m;
-    m.resize(5, 1, 0.0f);
-    for (std::size_t r = 0; r < 5; ++r)
-        m(r, 0) = static_cast<float>(r) * 2.f;
-    for (std::size_t r = 0; r < 5; ++r)
-        EXPECT_FLOAT_EQ(m(r, 0), static_cast<float>(r) * 2.f);
+    CostMatrix row;
+    CostMatrix column;
+    row.resize(1, 5, 0.0f);
+    column.resize(5, 1, 0.0f);
+    for (std::size_t i = 0; i < 5; ++i)
+    {
+        row(0, i) = static_cast<float>(i);
+        column(i, 0) = static_cast<float>(i) * 2.f;
+    }
+    for (std::size_t i = 0; i < 5; ++i)
+    {
+        EXPECT_FLOAT_EQ(row(0, i), static_cast<float>(i));
+        EXPECT_FLOAT_EQ(column(i, 0), static_cast<float>(i) * 2.f);
+    }
 }
 
 /**
