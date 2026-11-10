@@ -1,16 +1,23 @@
 # Test review: plan
 
-**Status:** Open — M1 and M2 applied (2026-11-10); M3 to M13 untouched; the owner chooses inline or parallel
+**Status:** Open — M1 to M4 applied (2026-11-10); M5 to M13 untouched; the owner chooses inline or parallel
 
-**Resume note (M3, c_api).** M1 and M2 are applied and pushed, one commit per file. Not done in M1:
-the `FrameRecorder` lost-events row (needs a way to lose events) and the `tracker_process_c` throwing
-update row (no real adapter throws on any input; it needs a throwing adapter in production source under
-ruling 12a). Not done in M2: nothing in the records; `Small_LAPJVSolverTest.EmptyMatrixWithCountsLogsAnError`
-(record: resize) stays small because T3's scoped in-memory sink is the seam. The test build now registers
-every `compile_*.cpp` outside `applications/` as the object library `sushitrack_compile_checks`. No syntax
-check ran: the machine has no compiler and no `build*/compile_commands.json`. The `Totals` table of
-`REPORT.md` was not recounted for the records added to `test_tracker_builder.cpp` and
-`test_default_trackers.cpp`.
+**Resume note (M5, cli/services).** M1 to M4 are applied and pushed, one commit per file except the
+config commit, which carries `test_config.py` and the new `test_legacy_tool_keys.py` together. Open
+from M1: the `FrameRecorder` lost-events row is backlog `RW-38`, since a 64-event ring is the smallest
+the profiler accepts but whether a run overflows it depends on the consumer thread's speed, so no
+deterministic test exists without a drain seam. The `tracker_process_c` throwing-update row is written
+with `ThrowingTrackerAdapter` (`applications/tracker_bridge/throwing_tracker_adapter.hpp`). Open from
+M3: `MatchThreshGreaterThanOneIsTolerated` is unchanged, backlog `RW-39` (a decision): the record asks
+for an assertion that no track is confirmed, the solver accepts every pair at a threshold of 5, and a
+track started in frame 1 is confirmed, so the record cannot be applied as written. The two
+`Small_SushiTrackCLogTest` resizes of M3 are void: `CapturedLog` is the scoped sink they waited for.
+Several M4 records predate T5 and were already met: `test_env.py` stubs sushicore's `snapshot_vcvars`,
+`test_config.py` passes a `warn` callback, and `test_library_packages.py` runs on the session. M4 added
+`console.is_built()` and `console.config_sources()` as the seam for `test_console.py`. No compiler and
+no `build*/compile_commands.json` exist on this machine, so no C++ syntax check ran, and no Python
+test ran. The `Totals` table of `REPORT.md` was not recounted. Start M5 with
+`cli/tests/services/test_artifacts.py`.
 
 Applies the verdicts of `REPORT.md`, in hierarchy order: the shared helpers, adapters and seams the
 rewrites need come first, then the defects the review found, then each module's tests. A module job
@@ -28,10 +35,10 @@ writes each add. Nothing in a module job changes production code except a seam a
 | T5 | The CLI runner fixtures replaced by sushicore's in-memory runner and console | sushicore T1 | done |
 | T6 | The defects of this report, each with a test that fails first; `docs/guides/TESTING.md` aligned with the skill |  | done |
 | T7 | `tools/testing/check_test_additions.py`, `tools/tests/test_check_test_additions.py` deleted |  | done |
-| M1 | the tests of `applications` (14 files): 21 rewrite, 2 resize, 7 split, 1 merge, 5 delete | T1, T2, T3, T4, T5, T6, T7 | done |
+| M1 | the tests of `applications` (14 files): 21 rewrite, 2 resize, 7 split, 1 merge, 5 delete | T1, T2, T3, T4, T5, T6, T7 | done (one add filed as RW-38) |
 | M2 | the tests of `association` (17 files): 20 rewrite, 1 resize, 6 merge, 6 delete | T1, T2, T3, T4, T5, T6, T7 | done |
-| M3 | the tests of `c_api` (5 files): 11 rewrite, 9 resize, 3 split, 1 merge, 6 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
-| M4 | the tests of `cli` (8 files): 21 rewrite, 3 resize, 2 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
+| M3 | the tests of `c_api` (5 files): 11 rewrite, 9 resize, 3 split, 1 merge, 6 delete | T1, T2, T3, T4, T5, T6, T7 | done (one rewrite open as RW-39) |
+| M4 | the tests of `cli` (8 files): 21 rewrite, 3 resize, 2 delete | T1, T2, T3, T4, T5, T6, T7 | done |
 | M5 | the tests of `cli/services` (12 files): 44 rewrite, 5 resize, 2 split, 4 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
 | M6 | the tests of `cli/test_cli` (2 files): 8 rewrite, 4 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
 | M7 | the tests of `configuration` (2 files): 19 rewrite, 1 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
