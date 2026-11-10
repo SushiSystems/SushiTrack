@@ -37,131 +37,155 @@
 
 using namespace CDetections;
 
-namespace
+/**
+ * @brief Tracker fixture for the two-stage association: scores below 0.5 are the low pool, scores
+ *        from 0.5 to 0.6 the high pool that may only continue a track, and 0.6 and above may
+ *        also seed one.
+ */
+class Small_TrackerByteAssociationTest : public ::testing::Test
 {
+    protected:
+        sushitrack_tracker_t hdl_ = nullptr;
+        sushitrack_params_t params_ = {};
 
-    class Small_TrackerByteAssociationTest : public ::testing::Test
-    {
-        protected:
-            sushitrack_tracker_t hdl_ = nullptr;
-            sushitrack_params_t params_ = {};
+        void SetUp() override
+        {
+            sushitrack_get_default_params(&params_);
+            params_.time_aware = 0;
+            params_.enable_tentative = 0;
+            params_.primary_assoc_mode = 1;
+            params_.frame_rate = 25;
+            params_.track_buffer = 30;
+            // High/low split at 0.5; new tracks require >= 0.6.
+            params_.track_thresh = 0.5f;
+            params_.high_thresh = 0.6f;
+            params_.match_thresh = 0.9f;
+            params_.iou_match_thresh = 0.5f;
 
-            void SetUp() override
+            hdl_ = sushitrack_create(&params_);
+            ASSERT_NE(hdl_, nullptr);
+        }
+
+        void TearDown() override
+        {
+            if (hdl_)
+                sushitrack_destroy(hdl_);
+        }
+
+        /**
+         * @brief Confirms a track on four high-score frames moving 4 px per frame, then follows
+         *        it for three frames of score 0.35 (the low pool); returns its id.
+         */
+        int64_t sustain_with_low_scores(std::vector<sushitrack_track_t>& out, int& tracks)
+        {
+            int64_t id = -1;
+            for (int i = 0; i < 4; ++i)
             {
-                sushitrack_get_default_params(&params_);
-                params_.time_aware = 0;
-                params_.enable_tentative = 0;
-                params_.primary_assoc_mode = 1;
-                params_.frame_rate = 25;
-                params_.track_buffer = 30;
-                // High/low split at 0.5; new tracks require >= 0.6.
-                params_.track_thresh = 0.5f;
-                params_.high_thresh = 0.6f;
-                params_.match_thresh = 0.9f;
-                params_.iou_match_thresh = 0.5f;
-
-                hdl_ = sushitrack_create(&params_);
-                ASSERT_NE(hdl_, nullptr);
+                const sushitrack_object_t high = make_det(100.0f + 4.0f * i, 200.0f, 0.9f);
+                if (update_frame(hdl_, &high, 1, out.data(), 8, 0.04f) < 1)
+                    return -1;
+                id = out[0].track_id;
             }
-
-            void TearDown() override
+            for (int i = 0; i < 3; ++i)
             {
-                if (hdl_)
-                    sushitrack_destroy(hdl_);
+                const sushitrack_object_t low = make_det(116.0f + 4.0f * i, 200.0f, 0.35f);
+                tracks = update_frame(hdl_, &low, 1, out.data(), 8, 0.04f);
             }
-    };
-
-    /**
-     * @brief A confirmed track survives a run of low-confidence detections via the
-     *        secondary association stage, keeping its identity throughout, and is
-     *        not duplicated by the low-score boxes.
-     */
-    TEST_F(Small_TrackerByteAssociationTest, ConfirmedTrackSustainedByLowConfidenceDetections)
-    {
-        std::vector<sushitrack_track_t> out(8);
-
-        // Confirm the track on high-confidence detections.
-        int64_t id = -1;
-        for (int i = 0; i < 4; ++i)
-        {
-            sushitrack_object_t d = make_det(100.0f + 4.0f * i, 200.0f, /*score=*/0.9f);
-            int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 8, 0.04f);
-            ASSERT_GE(n, 1);
-            id = out[0].track_id;
-        }
-        ASSERT_NE(id, -1);
-
-        // Three frames of low-confidence (below track_thresh) detections on the object's path. These land in the low pool and must keep the track alive.
-        for (int i = 0; i < 3; ++i)
-        {
-            sushitrack_object_t d_low = make_det(116.0f + 4.0f * i, 200.0f, /*score=*/0.35f);
-            int n = CDetections::update_frame(hdl_, &d_low, 1, out.data(), 8, 0.04f);
-            ASSERT_GE(n, 1);
-
-            const sushitrack_track_t* t = find_by_id(out, n, id);
-            ASSERT_NE(t, nullptr)
-                << "Track was dropped when its detection fell into the low-confidence "
-                   "pool (frame "
-                << i << ").";
-            EXPECT_EQ(t->state, K_TRACKED)
-                << "Low-confidence-sustained track should remain Tracked, not Lost.";
-
-            // The low-score box must not have spawned a parallel identity.
-            EXPECT_EQ(count_tracked(out, n), 1)
-                << "A low-confidence detection seeded a spurious second track.";
+            return id;
         }
 
-        // Score recovers: the object returns to the high pool under the same id.
-        sushitrack_object_t d_high = make_det(130.0f, 200.0f, /*score=*/0.9f);
-        int n = CDetections::update_frame(hdl_, &d_high, 1, out.data(), 8, 0.04f);
-        ASSERT_GE(n, 1);
-        const sushitrack_track_t* t = find_by_id(out, n, id);
-        ASSERT_NE(t, nullptr) << "Track lost its identity on return to high confidence.";
-        EXPECT_EQ(t->state, K_TRACKED);
-    }
-
-    /**
-     * @brief A low-confidence detection presented to an empty tracker creates no
-     *        track at all — low scores may never seed an identity.
-     */
-    TEST_F(Small_TrackerByteAssociationTest, LowConfidenceDetectionDoesNotSeedNewTrack)
-    {
-        std::vector<sushitrack_track_t> out(8);
-
-        // Several frames of nothing but low-score boxes.
-        for (int i = 0; i < 5; ++i)
+        /** @brief Feeds @p detection for @p frames frames and returns the last frame's count. */
+        int feed_same_box(const sushitrack_object_t& detection, int frames,
+                          std::vector<sushitrack_track_t>& out)
         {
-            sushitrack_object_t d_low = make_det(300.0f, 300.0f, /*score=*/0.3f);
-            int n = CDetections::update_frame(hdl_, &d_low, 1, out.data(), 8, 0.04f);
-            EXPECT_EQ(count_tracked(out, n), 0)
-                << "Low-confidence detection seeded a track at frame " << i << ".";
+            int tracks = 0;
+            for (int frame = 0; frame < frames; ++frame)
+                tracks = update_frame(hdl_, &detection, 1, out.data(), 8, 0.04f);
+            return tracks;
         }
-    }
+};
 
-    /**
-     * @brief A mid-confidence detection (>= track_thresh but < high_thresh) is high
-     *        enough to associate but too low to seed: with no existing track it
-     *        must not create one.
-     */
-    TEST_F(Small_TrackerByteAssociationTest, MidConfidenceDetectionDoesNotSeedNewTrack)
-    {
-        std::vector<sushitrack_track_t> out(8);
+/**
+ * @brief A confirmed track survives three frames of low-confidence detections on its path, via
+ *        the secondary association stage, under its own id and still Tracked.
+ */
+TEST_F(Small_TrackerByteAssociationTest, LowConfidenceDetectionsSustainTheTrack)
+{
+    std::vector<sushitrack_track_t> out(8);
+    int tracks = 0;
+    const int64_t id = sustain_with_low_scores(out, tracks);
+    ASSERT_NE(id, -1);
 
-        // score 0.55 is in [track_thresh=0.5, high_thresh=0.6): primary pool, but below the new-track seeding bar.
-        for (int i = 0; i < 4; ++i)
-        {
-            sushitrack_object_t d = make_det(300.0f, 300.0f, /*score=*/0.55f);
-            int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 8, 0.04f);
-            EXPECT_EQ(count_tracked(out, n), 0)
-                << "A sub-high_thresh detection seeded a track at frame " << i << ".";
-        }
+    const sushitrack_track_t* kept = find_by_id(out, tracks, id);
 
-        // Raising the score above high_thresh finally seeds the identity.
-        sushitrack_object_t d_high = make_det(300.0f, 300.0f, /*score=*/0.9f);
-        int n = CDetections::update_frame(hdl_, &d_high, 1, out.data(), 8, 0.04f);
-        ASSERT_GE(n, 1);
-        EXPECT_GE(count_tracked(out, n), 1)
-            << "A high-confidence detection failed to seed a track.";
-    }
+    ASSERT_NE(kept, nullptr) << "the track was dropped in the low-confidence pool";
+    EXPECT_EQ(kept->state, K_TRACKED);
+}
 
-} // namespace
+/**
+ * @brief Low-confidence detections that sustain a track do not seed a second one.
+ */
+TEST_F(Small_TrackerByteAssociationTest, LowConfidenceDetectionsSeedNoSecondTrack)
+{
+    std::vector<sushitrack_track_t> out(8);
+    int tracks = 0;
+    ASSERT_NE(sustain_with_low_scores(out, tracks), -1);
+
+    EXPECT_EQ(count_tracked(out, tracks), 1);
+}
+
+/**
+ * @brief When the score recovers, the object returns to the high pool under the same id.
+ */
+TEST_F(Small_TrackerByteAssociationTest, TheTrackKeepsItsIdWhenTheScoreRecovers)
+{
+    std::vector<sushitrack_track_t> out(8);
+    int tracks = 0;
+    const int64_t id = sustain_with_low_scores(out, tracks);
+    ASSERT_NE(id, -1);
+    const sushitrack_object_t recovered = make_det(130.0f, 200.0f, 0.9f);
+
+    const int n = update_frame(hdl_, &recovered, 1, out.data(), 8, 0.04f);
+
+    const sushitrack_track_t* kept = find_by_id(out, n, id);
+    ASSERT_NE(kept, nullptr) << "the track lost its id on return to high confidence";
+    EXPECT_EQ(kept->state, K_TRACKED);
+}
+
+/**
+ * @brief The fixture, run over the scores that may not seed a track.
+ */
+class Small_TrackerByteAssociationSeedTest : public Small_TrackerByteAssociationTest,
+                                             public ::testing::WithParamInterface<float>
+{
+};
+
+/**
+ * @brief Four frames of a detection scoring below high_thresh, with no track yet, create no
+ *        track: 0.3 is in the low pool, 0.55 is in the high pool but under the seeding bar.
+ */
+TEST_P(Small_TrackerByteAssociationSeedTest, ScoreBelowHighThreshDoesNotSeedATrack)
+{
+    std::vector<sushitrack_track_t> out(8);
+    const sushitrack_object_t detection = make_det(300.0f, 300.0f, GetParam());
+
+    const int tracks = feed_same_box(detection, 4, out);
+
+    EXPECT_EQ(count_tracked(out, tracks), 0);
+}
+
+INSTANTIATE_TEST_SUITE_P(Scores, Small_TrackerByteAssociationSeedTest,
+                         ::testing::Values(0.3f, 0.55f));
+
+/**
+ * @brief A detection above high_thresh seeds a track.
+ */
+TEST_F(Small_TrackerByteAssociationTest, HighConfidenceDetectionSeedsATrack)
+{
+    std::vector<sushitrack_track_t> out(8);
+    const sushitrack_object_t detection = make_det(300.0f, 300.0f, 0.9f);
+
+    const int n = update_frame(hdl_, &detection, 1, out.data(), 8, 0.04f);
+
+    EXPECT_EQ(count_tracked(out, n), 1);
+}
