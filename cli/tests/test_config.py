@@ -7,13 +7,11 @@
 from __future__ import annotations
 
 import platform
-from dataclasses import fields
 
 import pytest
-from sushicore.provision.config import ProvisionSettings
 
 from sushitrack_cli import config as config_module
-from sushitrack_cli.config import IS_WINDOWS, Config, ToolSettings, load_config
+from sushitrack_cli.config import load_config
 
 pytestmark = pytest.mark.medium
 
@@ -77,12 +75,18 @@ def test_an_env_override_wins_over_every_file(tmp_path, monkeypatch):
     assert cfg.sources["build_type"] == "env:ST_BUILD_TYPE"
 
 
-def test_a_platform_table_overlays_the_current_platform_only(tmp_path):
-    other = "linux" if platform.system().lower() == "windows" else "windows"
+@pytest.mark.parametrize(("current", "other"), [
+    ("Windows", "Linux"),
+    ("Linux", "Windows"),
+    ("Darwin", "Linux"),
+])
+def test_a_platform_table_overlays_the_current_platform_only(tmp_path, monkeypatch, current, other):
+    """Applies the table of the platform the process runs on and not the table of another."""
+    monkeypatch.setattr(platform, "system", lambda: current)
     _cli_folder(tmp_path, "config.toml").write_text(
-        f"[build]\ntype = \"Debug\"\n"
-        f"[platform.{platform.system().lower()}]\nbuild.type = \"MinSizeRel\"\n"
-        f"[platform.{other}]\nbuild.type = \"RelWithDebInfo\"\n",
+        '[build]\ntype = "Debug"\n'
+        f'[platform.{current.lower()}]\nbuild.type = "MinSizeRel"\n'
+        f'[platform.{other.lower()}]\nbuild.type = "RelWithDebInfo"\n',
         encoding="utf-8")
 
     cfg = config_module.load_config(tmp_path)
@@ -94,7 +98,8 @@ def test_a_platform_table_overlays_the_current_platform_only(tmp_path):
     ("1", True), ("true", True), ("YES", True), (" on ", True),
     ("0", False), ("no", False), ("off", False), ("maybe", False),
 ])
-def test_a_bool_field_coerces_common_truthy_env_spellings(tmp_path, monkeypatch, spelling, expected):
+def test_a_bool_field_coerces_common_truthy_env_spellings(
+        tmp_path, monkeypatch, spelling, expected):
     """Assert each truthy spelling of a bool variable reads as True and anything else as False."""
     monkeypatch.setenv("ST_DOCKER_GPUS", spelling)
 
@@ -103,11 +108,18 @@ def test_a_bool_field_coerces_common_truthy_env_spellings(tmp_path, monkeypatch,
     assert cfg.docker_gpus is expected
 
 
-def test_tool_settings_carry_the_platform_generator(st_checkout, monkeypatch):
-    """Assert the split config keeps Ninja on Windows and CMake's default elsewhere."""
+@pytest.mark.parametrize(("system", "generator"), [
+    ("Windows", "Ninja"),
+    ("Linux", ""),
+    ("Darwin", ""),
+])
+def test_tool_settings_carry_the_platform_generator(st_checkout, monkeypatch, system, generator):
+    """Reads Ninja from the shipped config.toml on Windows and CMake's default elsewhere."""
+    monkeypatch.setattr(platform, "system", lambda: system)
+
     cfg = load_config(st_checkout)
-    expected = "Ninja" if IS_WINDOWS else ""
-    assert cfg.tool.generator == expected
+
+    assert cfg.tool.generator == generator
 
 
 def test_legacy_environment_names_still_override(st_checkout, monkeypatch):
@@ -120,28 +132,16 @@ def test_legacy_environment_names_still_override(st_checkout, monkeypatch):
         "C:/x/cmake.exe", "C:/x/ctest.exe", "Unix Makefiles")
 
 
-def test_config_no_longer_has_build_tool_fields():
-    """Assert the tool fields moved out of the sectioned config."""
-    names = {f.name for f in fields(Config)}
-    assert not names & {"build_cmake", "build_ctest", "build_generator"}
+@pytest.mark.parametrize("field", [
+    "vcpkg_root", "vs_vcvars", "ninja_exe", "pkgconf_exe", "doxygen_exe", "vcpkg_triplet",
+])
+def test_tool_settings_carry_the_fields_provision_reads(st_checkout, monkeypatch, field):
+    """Loads each provision field from the variable the profile names for it."""
+    monkeypatch.setenv(config_module.PROFILE.env_overrides()[field], "value-from-the-environment")
 
+    tool = load_config(st_checkout).tool
 
-def test_tool_settings_are_a_provision_config():
-    """Assert st's tool settings carry every field provision reads."""
-    assert issubclass(ToolSettings, ProvisionSettings)
-
-
-def test_legacy_tool_keys_name_each_old_key_and_its_replacement():
-    document = {
-        "build": {"cmake": "c", "ctest": "t", "type": "Debug"},
-        "platform": {platform.system().lower(): {"build": {"generator": "Ninja"}}},
-    }
-    found = config_module.legacy_tool_keys(document)
-    assert found == [
-        ("[build] cmake", "[tool] cmake_exe"),
-        ("[build] ctest", "[tool] ctest_exe"),
-        (f"[platform.{platform.system().lower()}.build] generator", "[tool] generator"),
-    ]
+    assert getattr(tool, field) == "value-from-the-environment"
 
 
 def test_load_config_warns_once_per_legacy_key(tmp_path):
@@ -157,7 +157,8 @@ def test_load_config_warns_once_per_legacy_key(tmp_path):
 
 
 def test_a_key_no_setting_reads_is_warned_and_ignored(tmp_path):
-    _cli_folder(tmp_path, "config.local.toml").write_text('[build]\nno_such_key = 1\n', encoding="utf-8")
+    _cli_folder(tmp_path, "config.local.toml").write_text(
+        '[build]\nno_such_key = 1\n', encoding="utf-8")
     said = []
 
     config_module.load_config(tmp_path, warn=said.append)
@@ -167,9 +168,12 @@ def test_a_key_no_setting_reads_is_warned_and_ignored(tmp_path):
     assert "config.local.toml" in said[0]
 
 
-def test_an_integer_field_that_cannot_read_its_value_keeps_it_and_warns():
+def test_an_integer_field_that_cannot_read_its_value_keeps_it_and_warns(tmp_path, monkeypatch):
+    """Keeps the default of a field whose variable is not an integer and says so."""
+    monkeypatch.setenv("ST_JOBS", "many")
     said = []
 
-    assert config_module._coerce(4, "many", "env:ST_JOBS", said.append) == 4
+    cfg = config_module.load_config(tmp_path, warn=said.append)
 
-    assert said == ["env:ST_JOBS: 'many' is not an integer; keeping 4"]
+    assert cfg.build_jobs == 0
+    assert said == ["env:ST_JOBS: 'many' is not an integer; keeping 0"]
