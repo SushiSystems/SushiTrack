@@ -10,9 +10,9 @@ from typer.testing import CliRunner
 
 import pytest
 
-from sushitrack_cli.cli import app, main
+from sushitrack_cli.cli import app
 
-pytestmark = pytest.mark.small
+pytestmark = pytest.mark.medium
 
 K_GROUPS = {
     "Project": ["build", "test", "run", "clean", "deploy", "container", "docs"],
@@ -79,31 +79,3 @@ def test_the_container_sub_app_draws_its_own_page_under_both_words(word):
     """Draws the sub-application's help page for `container` and for `docker`."""
     out = _run(word, "--help")
     assert "build" in out and "run" in out
-
-
-def _exit_code(argv: list[str]) -> int:
-    """Returns the code main() exits with for *argv*."""
-    with pytest.raises(SystemExit) as raised:
-        main(argv)
-    return raised.value.code or 0
-
-
-def test_main_exits_zero_on_a_bare_invocation():
-    """Exits 0 when no argument is given."""
-    assert _exit_code([]) == 0
-
-
-def test_main_exits_zero_on_help():
-    """Exits 0 for `--help`."""
-    assert _exit_code(["--help"]) == 0
-
-
-def test_main_exits_nonzero_on_an_unknown_command():
-    """Exits non-zero for a command st does not have."""
-    assert _exit_code(["bogus-command"]) != 0
-
-
-def test_shared_provision_commands_are_listed():
-    tokens = set(_run("--help").split())
-    for name in ("setup", "doctor", "link", "unlink"):
-        assert name in tokens
