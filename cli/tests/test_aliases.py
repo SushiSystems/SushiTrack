@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -26,6 +26,14 @@ def test_each_old_spelling_names_its_replacement_and_the_shared_date(old, new):
     assert row.removed_after == date(2027, 3, 25)
 
 
-def test_no_alias_has_expired_today():
-    """Holds no row whose last day has passed."""
-    assert aliases.ALIASES.expired(date.today()) == []
+@pytest.mark.parametrize("days_after_the_last_day, expired_spellings", [
+    (0, []),
+    (1, ["st docker build", "st docker run"]),
+])
+def test_an_alias_expires_the_day_after_its_last_day(days_after_the_last_day, expired_spellings):
+    """Lists no row on the last day and every row on the day after it."""
+    day = aliases.K_REMOVED_AFTER + timedelta(days=days_after_the_last_day)
+
+    expired = aliases.ALIASES.expired(day)
+
+    assert sorted(row.old for row in expired) == expired_spellings
