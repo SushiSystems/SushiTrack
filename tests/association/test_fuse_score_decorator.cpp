@@ -68,7 +68,8 @@ TEST(Small_FuseScoreDecoratorTest, HighScoreLowersCost)
     dec.calculate(av, bv, m);
 
     // Raw IoU cost = 0.  Fused = 1 - (1-0)*0.8 = 0.2.
-    EXPECT_NEAR(m(0, 0), 0.2f, 1e-4f);
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_relative_error<float>(m(0, 0), 0.2, K_ROUNDED_OPERATIONS)));
 }
 
 /** @brief Score = 1.0 leaves the cost unchanged. */
@@ -86,8 +87,9 @@ TEST(Small_FuseScoreDecoratorTest, ScoreOnePreservesCost)
     inner->calculate(av, bv, raw_m);
     dec.calculate(av, bv, fused_m);
 
-    // fused = 1 - (1 - c) * 1.0 = c  → same as raw.
-    EXPECT_NEAR(fused_m(0, 0), raw_m(0, 0), 1e-5f);
+    // fused = 1 - (1 - c) * 1.0 = c, raw up to the clamp, product and subtraction: 3 operations.
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_relative_error<float>(fused_m(0, 0), raw_m(0, 0), 3)));
 }
 
 /** @brief Sentinel cells (≥ 1e3) produced by the inner calculator are preserved. */
@@ -155,5 +157,6 @@ TEST(Small_FuseScoreDecoratorTest, ScoreZeroProducesCostOne)
     CostMatrix m;
     dec.calculate(av, bv, m);
 
-    EXPECT_NEAR(m(0, 0), 1.f, 1e-5f);
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_relative_error<float>(m(0, 0), 1.0, K_ROUNDED_OPERATIONS)));
 }
