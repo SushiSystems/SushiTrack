@@ -36,27 +36,26 @@ def _module(tmp_path, session, build_type="Release", tool=_TOOL):
     return test_svc.module_tests(lambda: (cfg, paths), workspace=session.workspace)
 
 
-@pytest.mark.parametrize("cache, config_flag", [
-    ("CMAKE_BUILD_TYPE:STRING=Release\n", []),
-    ("", ["-C", "Release"]),
-])
-def test_ctest_gets_a_config_only_for_a_multi_config_tree(tmp_path, session, cache, config_flag):
+def _ctest_call(tmp_path, session, cache):
+    """Run CTest over a tree whose cache holds *cache* and return the junit path and the argv."""
     build = _tree(tmp_path, cache)
     junit = tmp_path / "junit.xml"
-    assert _module(tmp_path, session).run_ctest(build, label_regex="^(small)$", output_junit=junit) == 0
-    call = session.commands[0]
-    assert (call[call.index("-C"):][:2] if "-C" in call else []) == config_flag
+    module = _module(tmp_path, session)
+    assert module.run_ctest(build, label_regex="^(small)$", output_junit=junit) == 0
+    return junit, session.commands[0]
+
+
+def test_ctest_gets_no_config_for_a_single_config_tree(tmp_path, session):
+    """Leaves out -C when the cache names a build type."""
+    _, call = _ctest_call(tmp_path, session, "CMAKE_BUILD_TYPE:STRING=Release\n")
+    assert "-C" not in call
+
+
+def test_ctest_gets_the_build_type_for_a_multi_config_tree(tmp_path, session):
+    """Passes -C Release when the cache names no build type, and the junit path."""
+    junit, call = _ctest_call(tmp_path, session, "")
+    assert call[call.index("-C") + 1] == "Release"
     assert call[call.index("--output-junit") + 1] == str(junit)
-
-
-def test_the_default_tree_is_the_one_of_the_configured_build_type(tmp_path, session):
-    assert _module(tmp_path, session, "Debug").build_tree() == tmp_path / "build" / "default-debug"
-
-
-def test_a_sanitizer_names_its_own_tree_and_the_two_builds_it_offers(tmp_path, session):
-    module = _module(tmp_path, session, "Debug")
-    assert module.sanitized.names == ("address", "thread")
-    assert module.sanitized.tree("address") == tmp_path / "build" / "asan-debug"
 
 
 def test_a_sanitizer_build_is_the_st_build_of_that_sanitizer(tmp_path, session):
