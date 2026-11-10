@@ -30,16 +30,18 @@
 
 #include <SushiTrack/configuration/config_loader.hpp>
 
-#include <cstdlib>
 #include <exception>
 #include <filesystem>
-#include <fstream>
 #include <istream>
+#include <memory>
 #include <string>
+#include <system_error>
+#include <utility>
 
 #include <nlohmann/json.hpp>
 
 #include <SushiTrack/c_api/sushitrack_c.h>
+#include <SushiTrack/configuration/config_host.hpp>
 #include <SushiTrack/configuration/configuration_log_category.hpp>
 #include <SushiTrack/logging/logger.hpp>
 
@@ -67,15 +69,13 @@ namespace
     /**
      * @brief Returns the file the caller named: the path argument first, then SUSHITRACK_CONFIG.
      */
-    RequestedFile requested_file(const char* path)
+    RequestedFile requested_file(const char* path, const SushiTrack::ConfigHost& host)
     {
         if (path && path[0] != '\0')
             return {path, "the path argument"};
-        if (const char* env = std::getenv(K_CONFIG_VARIABLE))
-        {
-            if (env[0] != '\0')
-                return {env, K_CONFIG_VARIABLE};
-        }
+        std::string env = host.variable(K_CONFIG_VARIABLE);
+        if (!env.empty())
+            return {std::move(env), K_CONFIG_VARIABLE};
         return {std::string(), ""};
     }
 } // namespace
@@ -86,28 +86,25 @@ namespace SushiTrack
      * @brief Resolves configuration file path from explicit path, environment, or search.
      * @return Resolved path string, or empty string when no file found.
      */
-    std::string resolve_config_path(const char* path)
+    std::string resolve_config_path(const char* path, const ConfigHost& host)
     {
-        std::error_code ec;
-
         if (path && path[0] != '\0')
         {
-            if (fs::exists(path, ec))
+            if (host.exists(path))
             {
                 return std::string(path);
             }
             return std::string();
         }
 
-        if (const char* env = std::getenv(K_CONFIG_VARIABLE))
+        const std::string env = host.variable(K_CONFIG_VARIABLE);
+        if (!env.empty() && host.exists(env))
         {
-            if (env[0] != '\0' && fs::exists(env, ec))
-            {
-                return std::string(env);
-            }
+            return env;
         }
 
-        fs::path dir = fs::current_path(ec);
+        std::error_code ec;
+        fs::path dir = host.working_directory(ec);
         if (ec)
         {
             SUSHITRACK_LOG_DEBUG(K_CONFIGURATION_LOG_CATEGORY,
@@ -118,7 +115,7 @@ namespace SushiTrack
         for (int depth = 0; depth <= K_MAX_SEARCH_DEPTH && !dir.empty(); ++depth)
         {
             fs::path candidate = dir / K_DEFAULT_CONFIG_NAME;
-            if (fs::exists(candidate, ec))
+            if (host.exists(candidate.string()))
             {
                 return candidate.string();
             }
@@ -136,6 +133,11 @@ namespace SushiTrack
         }
 
         return std::string();
+    }
+
+    std::string resolve_config_path(const char* path)
+    {
+        return resolve_config_path(path, SystemConfigHost());
     }
 
     /**
@@ -175,6 +177,63 @@ namespace SushiTrack
             return SUSHITRACK_RUNTIME_ERROR;
         }
     }
+
+    /**
+     * @brief Finds the file through @p host and overlays it onto @p params.
+     * @return SUCCESS when the file applied or none was asked for and none was found,
+     *         INVALID_ARGUMENT for a named file that does not exist or a document the reader
+     *         refuses, RUNTIME_ERROR for a file that cannot be read or parsed.
+     */
+    sushitrack_status_t load_params_from_path(const char* path, const ConfigHost& host,
+                                              sushitrack_params_t& params)
+    {
+        std::string resolved;
+
+        try
+        {
+            const RequestedFile requested = requested_file(path, host);
+            if (!requested.path.empty() && !host.exists(requested.path))
+            {
+                SUSHITRACK_LOG_ERROR(K_CONFIGURATION_LOG_CATEGORY,
+                                     "Configuration load refused: {} names {}, which does not "
+                                     "exist; params is unchanged.",
+                                     requested.origin, requested.path);
+                return SUSHITRACK_INVALID_ARGUMENT;
+            }
+
+            resolved = resolve_config_path(path, host);
+            if (resolved.empty())
+            {
+                SUSHITRACK_LOG_INFO(K_CONFIGURATION_LOG_CATEGORY,
+                                    "No configuration file found -- using provided parameters.");
+                return SUSHITRACK_SUCCESS;
+            }
+
+            const std::unique_ptr<std::istream> file = host.open(resolved);
+            if (!file)
+            {
+                SUSHITRACK_LOG_ERROR(K_CONFIGURATION_LOG_CATEGORY,
+                                     "Configuration load failed: {} exists but cannot be opened; "
+                                     "params is unchanged.",
+                                     resolved);
+                return SUSHITRACK_RUNTIME_ERROR;
+            }
+
+            return load_params(*file, resolved, params);
+        }
+        catch (const std::exception& e)
+        {
+            SUSHITRACK_LOG_ERROR(K_CONFIGURATION_LOG_CATEGORY,
+                                 "Failed to parse configuration {}: {}", resolved, e.what());
+            return SUSHITRACK_RUNTIME_ERROR;
+        }
+        catch (...)
+        {
+            SUSHITRACK_LOG_ERROR(K_CONFIGURATION_LOG_CATEGORY,
+                                 "Failed to load configuration {}: unknown exception.", resolved);
+            return SUSHITRACK_RUNTIME_ERROR;
+        }
+    }
 } // namespace SushiTrack
 
 extern "C"
@@ -197,53 +256,7 @@ extern "C"
             return SUSHITRACK_INVALID_ARGUMENT;
         }
 
-        std::string resolved;
-
-        try
-        {
-            const RequestedFile requested = requested_file(path);
-            std::error_code ec;
-            if (!requested.path.empty() && !fs::exists(requested.path, ec))
-            {
-                SUSHITRACK_LOG_ERROR(K_CONFIGURATION_LOG_CATEGORY,
-                                     "Configuration load refused: {} names {}, which does not "
-                                     "exist; params is unchanged.",
-                                     requested.origin, requested.path);
-                return SUSHITRACK_INVALID_ARGUMENT;
-            }
-
-            resolved = SushiTrack::resolve_config_path(path);
-            if (resolved.empty())
-            {
-                SUSHITRACK_LOG_INFO(K_CONFIGURATION_LOG_CATEGORY,
-                                    "No configuration file found -- using provided parameters.");
-                return SUSHITRACK_SUCCESS;
-            }
-
-            std::ifstream file(resolved);
-            if (!file.is_open())
-            {
-                SUSHITRACK_LOG_ERROR(K_CONFIGURATION_LOG_CATEGORY,
-                                     "Configuration load failed: {} exists but cannot be opened; "
-                                     "params is unchanged.",
-                                     resolved);
-                return SUSHITRACK_RUNTIME_ERROR;
-            }
-
-            return SushiTrack::load_params(file, resolved, *params);
-        }
-        catch (const std::exception& e)
-        {
-            SUSHITRACK_LOG_ERROR(K_CONFIGURATION_LOG_CATEGORY,
-                                 "Failed to parse configuration {}: {}", resolved, e.what());
-            return SUSHITRACK_RUNTIME_ERROR;
-        }
-        catch (...)
-        {
-            SUSHITRACK_LOG_ERROR(K_CONFIGURATION_LOG_CATEGORY,
-                                 "Failed to load configuration {}: unknown exception.", resolved);
-            return SUSHITRACK_RUNTIME_ERROR;
-        }
+        return SushiTrack::load_params_from_path(path, SushiTrack::SystemConfigHost(), *params);
     }
 
     /**

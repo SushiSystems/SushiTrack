@@ -34,6 +34,7 @@
 
 #include <SushiTrack/c_api/sushitrack_c.h>
 #include <SushiTrack/c_api/sushitrack_export.hpp>
+#include <SushiTrack/configuration/config_host.hpp>
 
 namespace SushiTrack
 {
@@ -43,6 +44,12 @@ namespace SushiTrack
      * @return Resolved path string, or empty string when no file found.
      */
     SUSHITRACK_API std::string resolve_config_path(const char* path);
+
+    /**
+     * @brief Resolves the configuration file path as above, reading files, variables and the
+     *        current directory through @p host.
+     */
+    SUSHITRACK_API std::string resolve_config_path(const char* path, const ConfigHost& host);
 
     /**
      * @brief Overlays the JSON configuration read from @p document onto @p params, as
@@ -55,4 +62,15 @@ namespace SushiTrack
     [[nodiscard]] SUSHITRACK_API sushitrack_status_t load_params(std::istream& document,
                                                                  const std::string& origin,
                                                                  sushitrack_params_t& params);
+
+    /**
+     * @brief Finds the configuration file through @p host and overlays it onto @p params, as
+     *        sushitrack_load_params_from_json does with the system host.
+     * @param path Explicit file path, or null to use the variable and the search.
+     * @return SUCCESS when the file applied or none was asked for and none was found,
+     *         INVALID_ARGUMENT for a named file that does not exist or a document the reader
+     *         refuses, RUNTIME_ERROR for a file that cannot be read or parsed.
+     */
+    [[nodiscard]] SUSHITRACK_API sushitrack_status_t load_params_from_path(
+        const char* path, const ConfigHost& host, sushitrack_params_t& params);
 } // namespace SushiTrack
