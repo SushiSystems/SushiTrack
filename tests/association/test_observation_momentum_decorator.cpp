@@ -118,7 +118,8 @@ TEST(Small_ObservationMomentumDecoratorTest, AlignedDetectionGetsLowerCost)
     CostMatrix m;
     dec.calculate(av, bv, m);
 
-    EXPECT_NEAR(m(0, 0), 0.3f, 1e-3f);
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_relative_error<float>(m(0, 0), 0.3, K_ROUNDED_OPERATIONS)));
 }
 
 /** @brief A detection directly behind travel has its cost raised by the full weight. */
@@ -134,7 +135,8 @@ TEST(Small_ObservationMomentumDecoratorTest, OpposingDetectionGetsHigherCost)
     CostMatrix m;
     dec.calculate(av, bv, m);
 
-    EXPECT_NEAR(m(0, 0), 0.7f, 1e-3f);
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_relative_error<float>(m(0, 0), 0.7, K_ROUNDED_OPERATIONS)));
 }
 
 /** @brief A detection perpendicular to travel leaves the cost unchanged (cos = 0). */
@@ -150,7 +152,8 @@ TEST(Small_ObservationMomentumDecoratorTest, PerpendicularDetectionUnchanged)
     CostMatrix m;
     dec.calculate(av, bv, m);
 
-    EXPECT_NEAR(m(0, 0), 0.5f, 1e-3f);
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_relative_error<float>(m(0, 0), 0.5, K_ROUNDED_OPERATIONS)));
 }
 
 /** @brief Sentinel cells from the inner calculator are passed through untouched. */
@@ -182,7 +185,8 @@ TEST(Small_ObservationMomentumDecoratorTest, SlowTrackIsGatedOff)
     CostMatrix m;
     dec.calculate(av, bv, m);
 
-    EXPECT_NEAR(m(0, 0), 0.5f, 1e-4f);
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_relative_error<float>(m(0, 0), 0.5, K_ROUNDED_OPERATIONS)));
 }
 
 /** @brief A track whose last observation is older than max_age contributes no momentum. */
@@ -201,7 +205,8 @@ TEST(Small_ObservationMomentumDecoratorTest, StaleTrackIsGatedOff)
     CostMatrix m;
     dec.calculate(av, bv, m);
 
-    EXPECT_NEAR(m(0, 0), 0.5f, 1e-4f);
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_relative_error<float>(m(0, 0), 0.5, K_ROUNDED_OPERATIONS)));
 }
 
 /** @brief A track with only one observation has no direction and contributes no momentum. */
@@ -219,7 +224,8 @@ TEST(Small_ObservationMomentumDecoratorTest, TrackWithoutVelocityIsGatedOff)
     CostMatrix m;
     dec.calculate(av, bv, m);
 
-    EXPECT_NEAR(m(0, 0), 0.5f, 1e-4f);
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_relative_error<float>(m(0, 0), 0.5, K_ROUNDED_OPERATIONS)));
 }
 
 /** @brief The single cost of a detection straight ahead is the hand value 0.5 - 0.2 = 0.3. */
@@ -254,5 +260,7 @@ TEST(Small_ObservationMomentumDecoratorTest, ManeuverScaleDoesNotAffectCruisingT
     on.calculate(av, bv, mn);
 
     EXPECT_FLOAT_EQ(mo(0, 0), mn(0, 0));
-    EXPECT_NEAR(mn(0, 0), 0.3f, 1e-3f); // full 0.2 bonus, not scaled
+    // The full 0.2 bonus, not scaled: 0.5 - 0.2.
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_relative_error<float>(mn(0, 0), 0.3, K_ROUNDED_OPERATIONS)));
 }
