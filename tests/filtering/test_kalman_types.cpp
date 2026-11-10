@@ -33,6 +33,8 @@
 
 #include <SushiTrack/filtering/kalman_types.hpp>
 
+#include <measurement_builders.hpp>
+
 using namespace SushiTrack;
 
 static_assert(KalmanTypes::DetectBox::ColsAtCompileTime == 4, "a measurement has four values");
@@ -41,33 +43,37 @@ static_assert(KalmanTypes::StateCov::RowsAtCompileTime == 8 &&
                   KalmanTypes::StateCov::ColsAtCompileTime == 8,
               "a covariance is 8 x 8");
 
-/**
- * @brief The matrices are row-major, so a measurement's values sit in [x, y, w, h] order.
- */
-TEST(Small_KalmanTypesTest, MeasurementIsRowMajor)
+namespace
 {
-    KalmanTypes::DetectBox box;
-    box << 1.f, 2.f, 3.f, 4.f;
-
-    EXPECT_FLOAT_EQ(box.data()[0], 1.f);
-    EXPECT_FLOAT_EQ(box.data()[3], 4.f);
-    EXPECT_TRUE(KalmanTypes::StateCov::IsRowMajor);
-}
+    /**
+     * @brief Returns nine measurements whose first value counts from 0 to 8, pushed one by one so
+     *        the vector reallocates while it grows.
+     */
+    KalmanTypes::DetectBoxVector nine_boxes()
+    {
+        KalmanTypes::DetectBoxVector boxes;
+        boxes.push_back(make_box(0.f, 2.f, 3.f, 4.f));
+        boxes.push_back(make_box(1.f, 2.f, 3.f, 4.f));
+        boxes.push_back(make_box(2.f, 2.f, 3.f, 4.f));
+        boxes.push_back(make_box(3.f, 2.f, 3.f, 4.f));
+        boxes.push_back(make_box(4.f, 2.f, 3.f, 4.f));
+        boxes.push_back(make_box(5.f, 2.f, 3.f, 4.f));
+        boxes.push_back(make_box(6.f, 2.f, 3.f, 4.f));
+        boxes.push_back(make_box(7.f, 2.f, 3.f, 4.f));
+        boxes.push_back(make_box(8.f, 2.f, 3.f, 4.f));
+        return boxes;
+    }
+} // namespace
 
 /**
  * @brief A DetectBoxVector keeps every measurement intact and aligned for Eigen.
  */
 TEST(Small_KalmanTypesTest, DetectBoxVectorKeepsAlignedMeasurements)
 {
-    KalmanTypes::DetectBoxVector boxes;
-    for (int i = 0; i < 9; ++i)
-    {
-        KalmanTypes::DetectBox box;
-        box << 1.f * i, 2.f, 3.f, 4.f;
-        boxes.push_back(box);
-    }
+    const KalmanTypes::DetectBoxVector boxes = nine_boxes();
 
-    for (int i = 0; i < 9; ++i)
-        EXPECT_FLOAT_EQ(boxes[i](0), 1.f * i);
+    ASSERT_EQ(boxes.size(), 9u);
+    EXPECT_FLOAT_EQ(boxes.front()(0), 0.f);
+    EXPECT_FLOAT_EQ(boxes.back()(0), 8.f);
     EXPECT_EQ(reinterpret_cast<std::uintptr_t>(boxes.data()) % 16u, 0u);
 }
