@@ -34,3 +34,12 @@ def test_run_mounts_the_checkout_and_asks_for_the_gpus(session):
     assert session.commands == [["docker", "run", "-it", "--rm", "--gpus", "all",
                                  "-v", f"{Path('/repo')}:/work",
                                  "-w", "/work", "st-dev", "bash"]]
+
+
+def test_a_failed_build_returns_the_childs_exit_code_and_says_so(session):
+    session.runner.script(3)
+
+    code = docker.build(_CFG, _PATHS, workspace=session.workspace)
+
+    assert code == 3
+    assert session.said("Docker build failed.")
