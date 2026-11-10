@@ -37,6 +37,7 @@
 
 #include <measurement_builders.hpp>
 #include <support/kalman_registry_builders.hpp>
+#include <support/tolerance.hpp>
 
 using namespace SushiTrack;
 
@@ -69,7 +70,11 @@ TEST_P(Small_GatedStatePredictorTest, GatesItsStartInAndAFarBoxOut)
 }
 
 /**
- * @brief The covariance stays symmetric through a predict and an update.
+ * @brief The covariance stays symmetric through a predict and an update, up to rounding.
+ *
+ * Bound: 32 u max|P|, u the float roundoff. An entry of F P F^T sums 16 rounded terms and the
+ * rows of F sum to at most 2, so mirrored entries differ by at most 2 * 16 u * 4 max|P|; K S K^T
+ * adds at most 2 * 12 u max|P|. The total, under 152 u max|P|, fits the helper's 16 * 32 u.
  */
 TEST_P(Small_GatedStatePredictorTest, CovarianceStaysSymmetric)
 {
@@ -83,7 +88,10 @@ TEST_P(Small_GatedStatePredictorTest, CovarianceStaysSymmetric)
     filter->predict(mean, covariance, 1.0f);
     filter->update(mean, covariance, make_box(104.f, 201.f, 50.f, 80.f), 0.9f);
 
-    EXPECT_TRUE(covariance.isApprox(covariance.transpose(), 1e-4f));
+    const double largest_entry = covariance.cwiseAbs().maxCoeff();
+    const double asymmetry = (covariance - covariance.transpose()).cwiseAbs().maxCoeff();
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_error(
+        asymmetry, 0.0, 32.0 * TestSupport::unit_roundoff<float>() * largest_entry)));
 }
 
 INSTANTIATE_TEST_SUITE_P(EveryRegisteredType, Small_GatedStatePredictorTest,
