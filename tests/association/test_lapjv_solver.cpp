@@ -149,61 +149,37 @@ TEST(Small_LAPJVSolverTest, IdentityMatrixPerfectDiagonalMatch)
 // Rectangular: more rows than columns
 
 /**
- * @brief In a 4×2 identity-like matrix, rows 2 and 3 are unmatched;
- *        rows 0 and 1 match their diagonal column.
+ * @brief The surplus side of a rectangular matrix stays unmatched and the short side matches in
+ *        full: 4 x 2 leaves rows 2 and 3, 2 x 4 leaves columns 2 and 3, and both match the
+ *        diagonal.
  */
-TEST(Small_LAPJVSolverTest, MoreRowsThanColsSurplusRowsUnmatched)
+TEST(Small_LAPJVSolverTest, TheSurplusSideOfARectangularMatrixIsUnmatched)
 {
     LAPJVSolver solver;
-    CostMatrix cost;
-    cost.resize(4, 2, 1.0f);
-    cost(0, 0) = 0.0f;
-    cost(1, 1) = 0.0f;
+    CostMatrix tall;
+    CostMatrix wide;
+    tall.resize(4, 2, 1.0f);
+    wide.resize(2, 4, 1.0f);
+    tall(0, 0) = 0.0f;
+    tall(1, 1) = 0.0f;
+    wide(0, 0) = 0.0f;
+    wide(1, 1) = 0.0f;
+    std::vector<std::vector<int>> tall_matches;
+    std::vector<std::vector<int>> wide_matches;
+    std::vector<int> tall_a_unm, tall_b_unm, wide_a_unm, wide_b_unm;
 
-    std::vector<std::vector<int>> matches;
-    std::vector<int> a_unm, b_unm;
-    solver.solve(cost, 4, 2, 0.5f, matches, a_unm, b_unm);
+    solver.solve(tall, 4, 2, 0.5f, tall_matches, tall_a_unm, tall_b_unm);
+    solver.solve(wide, 2, 4, 0.5f, wide_matches, wide_a_unm, wide_b_unm);
 
-    EXPECT_EQ(matches.size(), 2u);
-    EXPECT_EQ(a_unm.size(), 2u);
-    EXPECT_TRUE(b_unm.empty());
-
-    // Both columns must be matched.
-    std::vector<int> matched_cols;
-    for (const auto& p : matches)
-        matched_cols.push_back(p[1]);
-    std::sort(matched_cols.begin(), matched_cols.end());
-    EXPECT_EQ(matched_cols, (std::vector<int>{0, 1}));
-}
-
-// Rectangular: more columns than rows
-
-/**
- * @brief In a 2×4 identity-like matrix, columns 2 and 3 are unmatched;
- *        rows 0 and 1 match their diagonal column.
- */
-TEST(Small_LAPJVSolverTest, MoreColsThanRowsSurplusColsUnmatched)
-{
-    LAPJVSolver solver;
-    CostMatrix cost;
-    cost.resize(2, 4, 1.0f);
-    cost(0, 0) = 0.0f;
-    cost(1, 1) = 0.0f;
-
-    std::vector<std::vector<int>> matches;
-    std::vector<int> a_unm, b_unm;
-    solver.solve(cost, 2, 4, 0.5f, matches, a_unm, b_unm);
-
-    EXPECT_EQ(matches.size(), 2u);
-    EXPECT_TRUE(a_unm.empty());
-    EXPECT_EQ(b_unm.size(), 2u);
-
-    // Matched columns must be 0 and 1.
-    std::vector<int> matched_cols;
-    for (const auto& p : matches)
-        matched_cols.push_back(p[1]);
-    std::sort(matched_cols.begin(), matched_cols.end());
-    EXPECT_EQ(matched_cols, (std::vector<int>{0, 1}));
+    const std::vector<std::vector<int>> diagonal{{0, 0}, {1, 1}};
+    std::sort(tall_matches.begin(), tall_matches.end());
+    std::sort(wide_matches.begin(), wide_matches.end());
+    EXPECT_EQ(tall_matches, diagonal);
+    EXPECT_EQ(tall_a_unm, (std::vector<int>{2, 3}));
+    EXPECT_TRUE(tall_b_unm.empty());
+    EXPECT_EQ(wide_matches, diagonal);
+    EXPECT_TRUE(wide_a_unm.empty());
+    EXPECT_EQ(wide_b_unm, (std::vector<int>{2, 3}));
 }
 
 // Threshold sensitivity
@@ -246,53 +222,26 @@ TEST(Small_LAPJVSolverTest, ThresholdControlsAcceptedAssignments)
 
 // No double-assignments
 
-/**
- * @brief Each row and each column appears at most once across all returned
- *        match pairs (bijectivity constraint).
- */
-TEST(Small_LAPJVSolverTest, NoDoubleAssignments)
-{
-    const int n = 5;
-    LAPJVSolver solver;
-    CostMatrix cost = make_identity_cost(n);
-
-    std::vector<std::vector<int>> matches;
-    std::vector<int> a_unm, b_unm;
-    solver.solve(cost, n, n, 0.5f, matches, a_unm, b_unm);
-
-    std::vector<bool> rows_seen(n, false), cols_seen(n, false);
-    for (const auto& p : matches)
-    {
-        EXPECT_FALSE(rows_seen[p[0]]) << "row " << p[0] << " assigned twice";
-        EXPECT_FALSE(cols_seen[p[1]]) << "col " << p[1] << " assigned twice";
-        rows_seen[p[0]] = true;
-        cols_seen[p[1]] = true;
-    }
-}
-
 // Repeated calls
 
 /**
- * @brief Two consecutive calls on the same solver instance produce identical
- *        results (internal workspace does not corrupt state).
+ * @brief Two consecutive calls on the same solver both match the diagonal of an identity-like
+ *        matrix: the workspace of the first call does not corrupt the second.
  */
-TEST(Small_LAPJVSolverTest, RepeatedCallsProduceConsistentResults)
+TEST(Small_LAPJVSolverTest, EveryCallOnOneSolverMatchesTheDiagonal)
 {
     LAPJVSolver solver;
     CostMatrix cost = make_identity_cost(3);
+    const std::vector<std::vector<int>> diagonal{{0, 0}, {1, 1}, {2, 2}};
 
-    auto run = [&]()
+    for (int call = 0; call < 2; ++call)
     {
         std::vector<std::vector<int>> matches;
         std::vector<int> a_unm, b_unm;
         solver.solve(cost, 3, 3, 0.5f, matches, a_unm, b_unm);
-        return matches.size();
-    };
-
-    std::size_t first = run();
-    std::size_t second = run();
-    EXPECT_EQ(first, second);
-    EXPECT_EQ(first, 3u);
+        std::sort(matches.begin(), matches.end());
+        EXPECT_EQ(matches, diagonal) << "call " << call;
+    }
 }
 
 // Tier 3 edge cases
