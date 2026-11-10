@@ -40,26 +40,45 @@
 
 using namespace SushiTrack;
 
+namespace
+{
+    /**
+     * @brief Offers @p events events to @p throttle in @p generation and returns the suppressed
+     *        count of each event the throttle admitted, in order.
+     */
+    std::vector<std::uint64_t> admitted_counts(LogThrottle& throttle, int events,
+                                               std::uint64_t generation)
+    {
+        std::vector<std::uint64_t> admitted;
+        for (int event = 0; event < events; ++event)
+        {
+            std::uint64_t suppressed = 99U;
+            if (throttle.admit(suppressed, generation))
+                admitted.push_back(suppressed);
+        }
+        return admitted;
+    }
+
+    /** @brief Logs events 0 to @p events - 1 through the limited WARN macro with @p throttle. */
+    void log_limited_events(LogThrottle& throttle, int events)
+    {
+        for (int event = 0; event < events; ++event)
+            SUSHITRACK_LOG_WARN_LIMITED(K_TRACKING_LOG_CATEGORY, throttle, "event {}", event);
+    }
+} // namespace
+
 /**
  * @brief The first event is admitted with nothing suppressed, then one in `every` is, each
  *        naming the events left out since the last one.
+ *
+ * With every = 10, events 1, 11 and 21 of 25 are admitted. The first has nothing before it, so
+ * its count is 0; each later one follows 9 silent events.
  */
 TEST(Small_LogThrottleTest, AdmitsTheFirstEventAndOneInEvery)
 {
-    reset_log_throttles();
     LogThrottle throttle(10U);
-    std::vector<std::uint64_t> admitted;
-    for (int event = 1; event <= 25; ++event)
-    {
-        std::uint64_t suppressed = 99U;
-        if (throttle.admit(suppressed))
-            admitted.push_back(suppressed);
-    }
 
-    ASSERT_EQ(admitted.size(), 3U);
-    EXPECT_EQ(admitted[0], 0U);
-    EXPECT_EQ(admitted[1], 9U);
-    EXPECT_EQ(admitted[2], 9U);
+    EXPECT_EQ(admitted_counts(throttle, 25, 0U), (std::vector<std::uint64_t>{0U, 9U, 9U}));
 }
 
 /**
@@ -67,40 +86,52 @@ TEST(Small_LogThrottleTest, AdmitsTheFirstEventAndOneInEvery)
  */
 TEST(Small_LogThrottleTest, ZeroEveryAdmitsEveryEvent)
 {
-    reset_log_throttles();
     LogThrottle throttle(0U);
-    std::uint64_t suppressed = 0U;
-    EXPECT_TRUE(throttle.admit(suppressed));
-    EXPECT_TRUE(throttle.admit(suppressed));
-    EXPECT_TRUE(throttle.admit(suppressed));
+
+    EXPECT_EQ(admitted_counts(throttle, 3, 0U), (std::vector<std::uint64_t>{0U, 0U, 0U}));
 }
 
 /**
- * @brief reset_log_throttles() makes a throttle that already admitted its first event admit again.
+ * @brief A new generation makes a throttle that already admitted its first event admit again.
  */
-TEST(Small_LogThrottleTest, ResetMakesTheNextEventTheFirst)
+TEST(Small_LogThrottleTest, ANewGenerationMakesTheNextEventTheFirst)
 {
-    reset_log_throttles();
     LogThrottle throttle(100U);
     std::uint64_t suppressed = 0U;
-    EXPECT_TRUE(throttle.admit(suppressed));
-    EXPECT_FALSE(throttle.admit(suppressed));
+    EXPECT_TRUE(throttle.admit(suppressed, 0U));
+    EXPECT_FALSE(throttle.admit(suppressed, 0U));
 
-    reset_log_throttles();
-
-    EXPECT_TRUE(throttle.admit(suppressed));
+    EXPECT_TRUE(throttle.admit(suppressed, 1U));
     EXPECT_EQ(suppressed, 0U);
 }
 
 /**
+ * @brief A new generation restarts every throttle, not only the one that asks.
+ */
+TEST(Small_LogThrottleTest, ANewGenerationRestartsEveryThrottle)
+{
+    LogThrottle first(100U);
+    LogThrottle second(100U);
+
+    EXPECT_EQ(admitted_counts(first, 2, 0U), (std::vector<std::uint64_t>{0U}));
+    EXPECT_EQ(admitted_counts(second, 2, 0U), (std::vector<std::uint64_t>{0U}));
+
+    EXPECT_EQ(admitted_counts(first, 1, 1U), (std::vector<std::uint64_t>{0U}));
+    EXPECT_EQ(admitted_counts(second, 1, 1U), (std::vector<std::uint64_t>{0U}));
+}
+
+/**
  * @brief The macro writes one WARN per thousand events and ends it with the suppressed count.
+ *
+ * Of events 0 to 2000 the throttle admits the 1st, 1001st and 2001st, which are events 0, 1000
+ * and 2000; the last two follow 999 silent events each.
  */
 TEST(Small_LogThrottleTest, MacroLogsOnceAThousandTimesAndNamesTheSuppressedCount)
 {
     CapturedLog log;
-    static LogThrottle throttle;
-    for (int event = 0; event < 2001; ++event)
-        SUSHITRACK_LOG_WARN_LIMITED(K_TRACKING_LOG_CATEGORY, throttle, "event {}", event);
+    LogThrottle throttle;
+
+    log_limited_events(throttle, 2001);
 
     const auto records = log.records();
     ASSERT_EQ(records.size(), 3U);
