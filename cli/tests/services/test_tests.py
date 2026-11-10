@@ -76,5 +76,6 @@ def test_a_sanitizer_build_is_the_st_build_of_that_sanitizer(tmp_path, session):
 def test_a_stale_tree_is_refused_with_the_clean_hint(tmp_path, session):
     build = tmp_path / "build" / "default-release"
     build.mkdir(parents=True)
-    (build / "CMakeCache.txt").write_text("CMAKE_HOME_DIRECTORY:INTERNAL=/workspace\n", encoding="utf-8")
+    (build / "CMakeCache.txt").write_text("CMAKE_HOME_DIRECTORY:INTERNAL=/workspace\n",
+                                          encoding="utf-8")
     assert "st build --clean" in _module(tmp_path, session).check_tree(build)
