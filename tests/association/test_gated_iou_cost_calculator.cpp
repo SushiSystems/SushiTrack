@@ -158,8 +158,8 @@ TEST(Small_GatedIoUCostCalculatorTest, SingleCostOfAPartialOverlapIsTheHandValue
     const std::shared_ptr<Tracklet> a = make_t(0.f, 0.f, 100.f, 100.f);
     const std::shared_ptr<Tracklet> b = make_t(30.f, 0.f, 100.f, 100.f);
 
-    EXPECT_TRUE(TestSupport::is_within(
-        TestSupport::measure_relative_error<float>(calc.calculate_single(a, b), 6.0 / 13.0, K_ROUNDED_OPERATIONS)));
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<float>(
+        calc.calculate_single(a, b), 6.0 / 13.0, K_ROUNDED_OPERATIONS)));
 }
 
 /** @brief Counts the gating log lines of one call. */
