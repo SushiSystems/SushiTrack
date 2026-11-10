@@ -76,7 +76,17 @@ namespace SushiTrack
              */
             [[nodiscard]] bool admit(std::uint64_t& suppressed) noexcept
             {
-                const std::uint64_t generation = log_throttle_generation();
+                return admit(suppressed, log_throttle_generation());
+            }
+
+            /**
+             * @brief Counts one event against a generation the caller gives.
+             * @param suppressed Receives how many events since the last record stayed silent.
+             * @param generation The generation to compare with; a value other than the one the
+             *        throttle saw last restarts its count, as reset_log_throttles() does.
+             */
+            [[nodiscard]] bool admit(std::uint64_t& suppressed, std::uint64_t generation) noexcept
+            {
                 if (generation_.load(std::memory_order_relaxed) != generation)
                 {
                     generation_.store(generation, std::memory_order_relaxed);
