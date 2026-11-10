@@ -33,101 +33,89 @@
 
 using namespace SushiTrack;
 
-// WallClockTimingPolicy
+namespace
+{
+    /**
+     * @brief One to_kf_dt() call at a frame rate and the step it must give.
+     */
+    struct StepRow
+    {
+            int fps;
+            float raw_dt;
+            float step;
+    };
+
+    /**
+     * @brief One is_expired() call at a frame rate and its verdict.
+     */
+    struct ExpiryRow
+    {
+            int fps;
+            float accumulated_seconds;
+            int buffer_frames;
+            bool expired;
+    };
+} // namespace
 
 /**
- * @brief to_kf_dt(1/fps) converts exactly one real frame to 1.0 (with snap).
+ * @brief to_kf_dt() converts seconds to frame steps, snaps a value within 1e-4 of one to
+ *        exactly one, and caps the step at K_MAX_KF_DT_STEPS.
  */
-TEST(Small_WallClockTimingPolicyTest, OneFpsIntervalConvertsToOne)
+class Small_WallClockTimingPolicyStepTest : public ::testing::TestWithParam<StepRow>
 {
-    WallClockTimingPolicy p(25);
-    // 1/25 = 0.04 s; 0.04 * 25 = 1.0 — should snap to exactly 1.0.
-    EXPECT_FLOAT_EQ(p.to_kf_dt(1.f / 25.f), 1.f);
+};
+
+TEST_P(Small_WallClockTimingPolicyStepTest, ToKfDtConvertsSecondsToFrameSteps)
+{
+    const WallClockTimingPolicy policy(GetParam().fps);
+
+    EXPECT_FLOAT_EQ(policy.to_kf_dt(GetParam().raw_dt), GetParam().step);
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    Intervals, Small_WallClockTimingPolicyStepTest,
+    ::testing::Values(
+        // one frame at 25 fps: 0.04 * 25 = 1, snapped to exactly 1
+        StepRow{25, 1.f / 25.f, 1.f},
+        // 0.99998 frames is within 1e-4 of one and snaps to 1
+        StepRow{25, 0.999980f / 25.f, 1.f},
+        // half a frame at 16 fps: both 1 / 32 and 16 are exact, so the step is 0.5
+        StepRow{16, 1.f / 32.f, 0.5f},
+        // a 10 s gap is 250 frames, capped at 5
+        StepRow{25, 10.f, 5.f},
+        // the interval that is exactly the cap: 5 / 25 s gives 5
+        StepRow{25, K_MAX_KF_DT_STEPS / 25.f, K_MAX_KF_DT_STEPS},
+        // a frame rate of 0 is treated as 1: one second is one frame
+        StepRow{0, 1.f, 1.f}));
 
 /**
- * @brief to_kf_dt() is capped at MAX_KF_DT_STEPS (5.0).
+ * @brief is_expired() is true only when the accumulated seconds pass buffer_frames / fps by
+ *        more than 1e-4.
  */
-TEST(Small_WallClockTimingPolicyTest, LargeDtIsCapped)
+class Small_WallClockTimingPolicyExpiryTest : public ::testing::TestWithParam<ExpiryRow>
 {
-    WallClockTimingPolicy p(25);
-    // 10 s gap * 25 fps = 250 frames; must be capped at 5.0.
-    EXPECT_FLOAT_EQ(p.to_kf_dt(10.f), 5.f);
+};
+
+TEST_P(Small_WallClockTimingPolicyExpiryTest, IsExpiredOnlyPastTheTimeout)
+{
+    const WallClockTimingPolicy policy(GetParam().fps);
+
+    EXPECT_EQ(policy.is_expired(GetParam().accumulated_seconds, GetParam().buffer_frames),
+              GetParam().expired);
 }
 
-/**
- * @brief Values already very close to 1.0 (within 1e-4) snap to exactly 1.0.
- */
-TEST(Small_WallClockTimingPolicyTest, NearOneSnapsToPreciselyOne)
-{
-    WallClockTimingPolicy p(25);
-    // Introduce a tiny floating-point error: 0.039999 * 25 = 0.99998 (≈1.0).
-    float near_one_raw = 0.999980f / 25.f;
-    EXPECT_FLOAT_EQ(p.to_kf_dt(near_one_raw), 1.f);
-}
-
-/**
- * @brief to_kf_dt() scales a half-frame interval to 0.5 at 25 fps.
- */
-TEST(Small_WallClockTimingPolicyTest, HalfFrameScalesCorrectly)
-{
-    WallClockTimingPolicy p(25);
-    float dt = 0.5f / 25.f; // 0.02 s
-    EXPECT_NEAR(p.to_kf_dt(dt), 0.5f, 1e-4f);
-}
-
-/**
- * @brief is_expired() returns false when accumulated_seconds < timeout.
- */
-TEST(Small_WallClockTimingPolicyTest, IsExpiredFalseWhenUnderThreshold)
-{
-    WallClockTimingPolicy p(25);
-    // buffer = 30 frames → timeout = 30/25 = 1.2 s
-    EXPECT_FALSE(p.is_expired(1.0f, 30));
-}
-
-/**
- * @brief is_expired() returns false at exactly the timeout boundary.
- *
- * The implementation computes timeout = buffer_frames / fps_f_ at runtime.
- * Using the same expression in the test avoids a floating-point
- * representation mismatch between the 1.2f literal and the result of
- * 30.0f / 25.0f, which differ in the least-significant bit.
- */
-TEST(Small_WallClockTimingPolicyTest, IsExpiredFalseAtExactBoundary)
-{
-    WallClockTimingPolicy p(25);
-    // Compute the timeout the same way the implementation does so both sides of the comparison hold the identical float bit-pattern.
-    const float timeout = static_cast<float>(30) / 25.0f;
-    EXPECT_FALSE(p.is_expired(timeout, 30));
-}
-
-/**
- * @brief is_expired() returns true when accumulated_seconds > timeout.
- */
-TEST(Small_WallClockTimingPolicyTest, IsExpiredTrueWhenOverThreshold)
-{
-    WallClockTimingPolicy p(25);
-    // timeout = 30/25 = 1.2 s; 1.201 s exceeds it.
-    EXPECT_TRUE(p.is_expired(1.201f, 30));
-}
-
-/**
- * @brief Constructing with fps <= 0 clamps to 1 fps, preventing division-by-zero.
- */
-TEST(Small_WallClockTimingPolicyTest, ZeroFpsClampedToOneHz)
-{
-    WallClockTimingPolicy p(0);
-    // With fps=1: to_kf_dt(1.0) = 1.0 (clamp applied after snap).
-    float kf_dt = p.to_kf_dt(1.0f);
-    EXPECT_FLOAT_EQ(kf_dt, 1.f);
-
-    // is_expired with buffer=5, fps=1 → timeout = 5.0 s.
-    EXPECT_FALSE(p.is_expired(4.9f, 5));
-    EXPECT_TRUE(p.is_expired(5.1f, 5));
-}
-
-// Tier 3 edge cases
+INSTANTIATE_TEST_SUITE_P(
+    AroundTheTimeout, Small_WallClockTimingPolicyExpiryTest,
+    ::testing::Values(
+        // 30 frames at 25 fps is 1.2 s; 1.0 s is under it
+        ExpiryRow{25, 1.0f, 30, false},
+        // 1.2 s is the timeout itself and does not pass it
+        ExpiryRow{25, 1.2f, 30, false},
+        // 1.201 s is 1e-3 over the timeout, more than the 1e-4 slack
+        ExpiryRow{25, 1.201f, 30, true},
+        // a frame rate of 0 is treated as 1: 5 frames are 5 s
+        ExpiryRow{0, 4.9f, 5, false},
+        ExpiryRow{0, 5.1f, 5, true}));
 
 /**
  * @brief to_kf_dt() with a negative raw_dt does not return a positive value
@@ -138,27 +126,4 @@ TEST(Small_WallClockTimingPolicyTest, NegativeDtProducesNonPositiveKfDt)
     WallClockTimingPolicy p(25);
     float result = p.to_kf_dt(-1.0f);
     EXPECT_LE(result, 0.f);
-}
-
-/**
- * @brief to_kf_dt() with a dt that would produce exactly MAX_KF_DT_STEPS is
- *        capped to that value.
- */
-TEST(Small_WallClockTimingPolicyTest, ExactCapBoundaryReturnsCap)
-{
-    WallClockTimingPolicy p(25);
-    float dt_at_cap = K_MAX_KF_DT_STEPS / 25.f;
-    EXPECT_FLOAT_EQ(p.to_kf_dt(dt_at_cap), K_MAX_KF_DT_STEPS);
-}
-
-/**
- * @brief is_expired() with a very small positive epsilon above the boundary
- *        returns true (boundary is open on the upper end).
- */
-TEST(Small_WallClockTimingPolicyTest, SmallEpsilonAboveBoundaryExpires)
-{
-    WallClockTimingPolicy p(25);
-    const float timeout = static_cast<float>(30) / 25.0f;
-    const float just_above = timeout + 1e-3f;
-    EXPECT_TRUE(p.is_expired(just_above, 30));
 }
