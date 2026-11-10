@@ -333,14 +333,29 @@ TEST_F(Small_SushiTrackCParameterRangeTest, NegativeTrackBufferIsClampedToOne)
 }
 
 /**
- * @brief match_thresh greater than 1.0 (impossible cost) is tolerated but must
- *        not match anything — the tracker should still create cleanly.
+ * @brief A match_thresh above 1 is accepted and matches every pair: a detection 100 px away
+ *        continues the frame-1 track.
+ *
+ * Boxes (10, 20, 50x100) and (110, 20, 50x100) do not overlap: IoU 0, d^2 = 100^2, enclosing box
+ * 151 x 101 so c^2 = 33002. DIoU cost 1 + 10000 / 33002 = 1.3030; score fusion at 0.9 gives
+ * 1 - (1 - 1.3030) * 0.9 = 1.2727: above the default 0.7, below 5.
  */
 TEST_F(Small_SushiTrackCParameterRangeTest, MatchThreshGreaterThanOneIsTolerated)
 {
     params_.match_thresh = 5.0f;
-    sushitrack_tracker_t hdl = sushitrack_create(&params_);
-    ASSERT_NE(hdl, nullptr);
+    sushitrack_tracker_t hdl = nullptr;
+    ASSERT_EQ(sushitrack_create_ex(&params_, &hdl), SUSHITRACK_SUCCESS);
+    std::vector<sushitrack_track_t> out(4);
+    sushitrack_object_t first = make_det(10.0f, 20.0f);
+    sushitrack_object_t second = make_det(110.0f, 20.0f);
+
+    ASSERT_EQ(CDetections::update_frame(hdl, &first, 1, out.data(), 4, 0.04f), 1);
+    const int64_t first_id = out[0].track_id;
+
+    EXPECT_EQ(CDetections::update_frame(hdl, &second, 1, out.data(), 4, 0.04f), 1);
+    EXPECT_EQ(out[0].track_id, first_id);
+    EXPECT_EQ(out[0].state, CDetections::K_TRACKED);
+
     sushitrack_destroy(hdl);
 }
 
