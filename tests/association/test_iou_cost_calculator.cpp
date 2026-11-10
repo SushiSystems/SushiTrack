@@ -124,7 +124,8 @@ TEST(Small_IoUCostCalculatorTest, EmptyBCollectionProducesEmptyMatrix)
 }
 
 /**
- * @brief The batch cost of a partial overlap pair is the hand value: intersection 50 x 100 = 5000 over union 20000 - 5000 = 15000 gives IoU 1/3 and cost 2/3.
+ * @brief The batch cost of a partial overlap pair is the hand value: intersection 50 x 100 = 5000
+ *        over union 20000 - 5000 = 15000 gives IoU 1/3 and cost 2/3.
  */
 TEST(Small_IoUCostCalculatorTest, BatchCostOfAPartialOverlapIsTheHandValue)
 {
