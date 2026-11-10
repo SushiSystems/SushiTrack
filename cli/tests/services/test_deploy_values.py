@@ -2,9 +2,11 @@
 # SushiTrack - https://github.com/SushiSystems/SushiTrack
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
 # Licensed under the Apache License 2.0. See LICENSE.
-"""What the deploy service's kind names and runtime library names say, without a build tree."""
+"""What the deploy service says of its kinds and runtime library names, without a build tree."""
 
 from __future__ import annotations
+
+from types import SimpleNamespace
 
 import pytest
 
@@ -26,3 +28,12 @@ def test_the_runtime_library_names_follow_the_platform(monkeypatch, is_windows, 
     """Names the runtime library sushitrack.dll on Windows and libsushitrack.so elsewhere."""
     monkeypatch.setattr(artifacts, "IS_WINDOWS", is_windows)
     assert deploy.shared_lib_name() == expected
+
+
+def test_an_unknown_kind_is_refused_with_the_choices_and_builds_nothing(session):
+    """Returns 2 and names cpp and python; the paths hold nothing a build would read."""
+    code = deploy.deploy(SimpleNamespace(), "rust", workspace=session.workspace)
+
+    assert code == 2
+    assert session.said("Unknown deploy kind 'rust'. Choose: cpp, python.")
+    assert session.commands == []
