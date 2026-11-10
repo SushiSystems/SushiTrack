@@ -186,20 +186,17 @@ TEST(Small_RectTest, NegativeOriginCentroidIsCorrect)
 }
 
 /**
- * @brief Validates behavior when TLBR input has reversed corners (e.g., top > bottom).
- *
- * Verifies that the factory function produces a rectangle with negative dimensions
- * when the input corners are provided in reverse order.
+ * @brief generate_rect_by_tlbr() does not reorder its corners: a box given bottom-right first
+ *        keeps its first corner as the origin and gets negative width and height.
  */
-TEST(Small_RectTest, GenerateByTlbrReversesCorners)
+TEST(Small_RectTest, GenerateByTlbrWithReversedCornersKeepsNegativeExtents)
 {
     Tlbr<float> tlbr;
-    tlbr << 50.0f, 60.0f, 10.0f, 20.0f; // Top > Bottom, Left > Right
+    tlbr << 50.f, 60.f, 10.f, 20.f; // x1 > x2 and y1 > y2
     Rect<float> rect = generate_rect_by_tlbr(tlbr);
-    auto tlwh = rect.get_tlwh();
 
-    // width = x2 - x1 = 10 - 50 = -40
-    EXPECT_FLOAT_EQ(tlwh[2], -40.0f);
-    // height = y2 - y1 = 20 - 60 = -40
-    EXPECT_FLOAT_EQ(tlwh[3], -40.0f);
+    EXPECT_FLOAT_EQ(rect.x(), 50.f);       // x1, taken as given
+    EXPECT_FLOAT_EQ(rect.y(), 60.f);       // y1, taken as given
+    EXPECT_FLOAT_EQ(rect.width(), -40.f);  // x2 - x1 = 10 - 50
+    EXPECT_FLOAT_EQ(rect.height(), -40.f); // y2 - y1 = 20 - 60
 }
