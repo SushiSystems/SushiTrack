@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* test_configuration_log_category.cpp                                    */
+/* compile_configuration_log_category.cpp                                 */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -22,22 +22,15 @@
 /**************************************************************************/
 
 /**
- * @file test_configuration_log_category.cpp
- * @brief Tests the category the configuration area logs under.
+ * @file compile_configuration_log_category.cpp
+ * @brief Checks at compile time that the configuration category belongs to `sushitrack`, module
+ *        `configuration`.
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-
 #include <SushiTrack/configuration/configuration_log_category.hpp>
 
-using namespace SushiTrack;
-
-/**
- * @brief The category belongs to `sushitrack` and its module is `configuration`.
- */
-TEST(Small_ConfigurationLogCategoryTest, NamesTheProjectAndTheModule)
-{
-    EXPECT_EQ(K_CONFIGURATION_LOG_CATEGORY.project().name(), "sushitrack");
-    EXPECT_EQ(K_CONFIGURATION_LOG_CATEGORY.module(), "configuration");
-}
+static_assert(SushiTrack::K_CONFIGURATION_LOG_CATEGORY.project().name() == "sushitrack",
+              "the configuration category belongs to the sushitrack project");
+static_assert(SushiTrack::K_CONFIGURATION_LOG_CATEGORY.module() == "configuration",
+              "the configuration category names the configuration module");
