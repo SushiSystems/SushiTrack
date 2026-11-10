@@ -39,9 +39,17 @@
 #include <SushiTrack/association/iou_cost_calculator.hpp>
 #include <SushiTrack/tracking/tracklet.hpp>
 
+#include <support/tolerance.hpp>
 #include <tracklet_builders.hpp>
 
 using namespace SushiTrack;
+
+namespace
+{
+    /// @brief Rounded operations on the longest path from a box to its cost, counted from the
+    ///        formula: corners, areas, intersection, union, quotients and the penalty terms.
+    constexpr std::size_t K_ROUNDED_OPERATIONS = 24;
+} // namespace
 
 // DIoUCostCalculator
 
@@ -73,18 +81,33 @@ TEST(Small_DIoUCostCalculatorTest, SeparatedBoxesCostPositive)
     EXPECT_GT(m(0, 0), 0.f);
 }
 
-/** @brief calculate_single agrees with batch for a partial overlap pair. */
-TEST(Small_DIoUCostCalculatorTest, SingleMatchesBatch)
+/**
+ * @brief The batch cost of a partial overlap pair is the hand value: intersection 60 x 60 = 3600 over union 20000 - 3600 = 16400 gives IoU 9/41; the centres are 40 px apart on both axes, so d2 = 3200, and the enclosing box is 140 x 140, so c2 = 39200 and d2 / c2 = 4/49; cost = 1 - IoU + d2 / c2.
+ */
+TEST(Small_DIoUCostCalculatorTest, BatchCostOfAPartialOverlapIsTheHandValue)
 {
     DIoUCostCalculator calc;
-    auto a = make_t(0.f, 0.f, 100.f, 100.f);
-    auto b = make_t(40.f, 40.f, 100.f, 100.f);
-
-    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    std::vector<std::shared_ptr<Tracklet>> av{make_t(0.f, 0.f, 100.f, 100.f)};
+    std::vector<std::shared_ptr<Tracklet>> bv{make_t(40.f, 40.f, 100.f, 100.f)};
     CostMatrix m;
+
     calc.calculate(av, bv, m);
 
-    EXPECT_NEAR(m(0, 0), calc.calculate_single(a, b), 1e-5f);
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<float>(
+        m(0, 0), 1.0 - 9.0 / 41.0 + 4.0 / 49.0, K_ROUNDED_OPERATIONS)));
+}
+
+/**
+ * @brief The single cost of the same pair is the same hand value.
+ */
+TEST(Small_DIoUCostCalculatorTest, SingleCostOfAPartialOverlapIsTheHandValue)
+{
+    DIoUCostCalculator calc;
+    const std::shared_ptr<Tracklet> a = make_t(0.f, 0.f, 100.f, 100.f);
+    const std::shared_ptr<Tracklet> b = make_t(40.f, 40.f, 100.f, 100.f);
+
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<float>(
+        calc.calculate_single(a, b), 1.0 - 9.0 / 41.0 + 4.0 / 49.0, K_ROUNDED_OPERATIONS)));
 }
 
 /**
