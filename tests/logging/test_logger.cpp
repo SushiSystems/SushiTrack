@@ -27,9 +27,11 @@
  * @author Mustafa Garip
  */
 
+#include <algorithm>
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -39,6 +41,49 @@
 #include <captured_log.hpp>
 
 using namespace SushiTrack;
+
+namespace
+{
+    /** @brief Returns the message of the std::runtime_error SUSHITRACK_THROW raises. */
+    std::string thrown_message()
+    {
+        try
+        {
+            SUSHITRACK_THROW("sentinel_token_{}", 99);
+        }
+        catch (const std::runtime_error& error)
+        {
+            return error.what();
+        }
+        return "SUSHITRACK_THROW did not throw";
+    }
+
+    /** @brief Logs @p count ERROR records "<prefix> msg <i>" for i from 0. */
+    void log_numbered(const char* prefix, int count)
+    {
+        for (int i = 0; i < count; ++i)
+            SUSHITRACK_LOG_ERROR(K_TRACKING_LOG_CATEGORY, "{} msg {}", prefix, i);
+    }
+
+    /** @brief Returns the messages "<prefix> msg <i>" for i below @p count. */
+    std::vector<std::string> numbered_messages(const std::string& prefix, int count)
+    {
+        std::vector<std::string> messages;
+        for (int i = 0; i < count; ++i)
+            messages.push_back(prefix + " msg " + std::to_string(i));
+        return messages;
+    }
+
+    /** @brief Returns the messages of @p records, sorted. */
+    std::vector<std::string> sorted_messages(const std::vector<SushiLog::CapturedRecord>& records)
+    {
+        std::vector<std::string> messages;
+        for (const SushiLog::CapturedRecord& record : records)
+            messages.push_back(record.message);
+        std::sort(messages.begin(), messages.end());
+        return messages;
+    }
+} // namespace
 
 /**
  * @brief A WARN call reaches the sink with SushiTrack's project, module and formatted message.
@@ -74,15 +119,7 @@ TEST(Small_LoggerTest, RecordBelowTheCategoryLevelIsDropped)
  */
 TEST(Small_LoggerTest, ThrowCarriesTheFormattedMessage)
 {
-    try
-    {
-        SUSHITRACK_THROW("sentinel_token_{}", 99);
-        FAIL() << "SUSHITRACK_THROW did not throw";
-    }
-    catch (const std::runtime_error& error)
-    {
-        EXPECT_NE(std::string(error.what()).find("sentinel_token_99"), std::string::npos);
-    }
+    EXPECT_EQ(thrown_message(), "sentinel_token_99");
 }
 
 /**
@@ -96,27 +133,23 @@ TEST(Small_LoggerTest, ThrowLogsNothing)
 }
 
 /**
- * @brief Calls from two threads both reach the sink, every record intact.
+ * @brief Calls from two threads both reach the sink, and every record arrives whole.
+ *
+ * Each thread logs the messages "t1 msg 0" to "t1 msg 49" and "t2 msg 0" to "t2 msg 49". The
+ * sink holds exactly those hundred messages, so none is lost, doubled or cut.
  */
 TEST(Medium_LoggerConcurrencyTest, CallsFromTwoThreadsReachTheSink)
 {
     CapturedLog log;
-    static constexpr int K_PER_THREAD = 50;
-    std::thread first(
-        []
-        {
-            for (int i = 0; i < K_PER_THREAD; ++i)
-                SUSHITRACK_LOG_ERROR(K_TRACKING_LOG_CATEGORY, "t1 msg {}", i);
-        });
-    std::thread second(
-        []
-        {
-            for (int i = 0; i < K_PER_THREAD; ++i)
-                SUSHITRACK_LOG_ERROR(K_TRACKING_LOG_CATEGORY, "t2 msg {}", i);
-        });
+    constexpr int K_PER_THREAD = 50;
+    std::thread first(log_numbered, "t1", K_PER_THREAD);
+    std::thread second(log_numbered, "t2", K_PER_THREAD);
     first.join();
     second.join();
 
-    EXPECT_EQ(log.count("t1 msg"), K_PER_THREAD);
-    EXPECT_EQ(log.count("t2 msg"), K_PER_THREAD);
+    std::vector<std::string> expected = numbered_messages("t1", K_PER_THREAD);
+    const std::vector<std::string> from_second = numbered_messages("t2", K_PER_THREAD);
+    expected.insert(expected.end(), from_second.begin(), from_second.end());
+    std::sort(expected.begin(), expected.end());
+    EXPECT_EQ(sorted_messages(log.records()), expected);
 }
