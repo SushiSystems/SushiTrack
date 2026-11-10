@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* test_mot_detection.cpp                                                 */
+/* compile_mot_detection.cpp                                              */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -22,23 +22,19 @@
 /**************************************************************************/
 
 /**
- * @file test_mot_detection.cpp
- * @brief Tests the defaults of MOTDetection.
+ * @file compile_mot_detection.cpp
+ * @brief Checks at compile time that MOTDetection is an aggregate that carries its box, score, label and feature.
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-
 #include <mot_detection.hpp>
 
-/**
- * @brief A detection built with no values is an empty class-1 box with no feature.
- */
-TEST(Small_MOTDetectionTest, DefaultsToAnEmptyClassOneBox)
-{
-    const TrackerBridge::MOTDetection det;
-    EXPECT_FLOAT_EQ(det.w, 0.f);
-    EXPECT_FLOAT_EQ(det.score, 0.f);
-    EXPECT_EQ(det.label, 1);
-    EXPECT_TRUE(det.feature.empty());
-}
+#include <type_traits>
+#include <vector>
+
+static_assert(std::is_aggregate_v<TrackerBridge::MOTDetection>,
+              "a detection is brace-initialised field by field");
+static_assert(std::is_same_v<decltype(TrackerBridge::MOTDetection::label), int>,
+              "the label is an integer class");
+static_assert(std::is_same_v<decltype(TrackerBridge::MOTDetection::feature), std::vector<float>>,
+              "the appearance feature is a float vector");
