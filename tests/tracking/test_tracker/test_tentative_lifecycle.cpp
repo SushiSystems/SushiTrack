@@ -27,6 +27,9 @@
  * @author Mustafa Garip
  */
 
+#include <cmath>
+#include <cstddef>
+#include <limits>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -36,7 +39,7 @@
 #include <c_detection_builders.hpp>
 #include <captured_log.hpp>
 
-// Small_TrackerTentativeInitSuppressTest — tentative_init_suppress_iou (#8)
+using namespace CDetections;
 
 namespace
 {
@@ -57,45 +60,110 @@ namespace
         return p;
     }
 
-    /** @brief A 50x100 detection at (x, y) with score 0.9. */
-    sushitrack_object_t obj(float x, float y)
-    {
-        sushitrack_object_t o{};
-        o.x = x;
-        o.y = y;
-        o.width = 50.0f;
-        o.height = 100.0f;
-        o.score = 0.9f;
-        o.label = 1;
-        return o;
-    }
-
     /** @brief Confirms a single track over three matched frames at (100,200)->(104,204). */
     void confirm_track(sushitrack_tracker_t hdl, std::vector<sushitrack_track_t>& out)
     {
-        CDetections::update_frame(hdl, obj(100.0f, 200.0f), out.data(), 10, 0.04f);
-        CDetections::update_frame(hdl, obj(102.0f, 202.0f), out.data(), 10, 0.04f);
-        int n = CDetections::update_frame(hdl, obj(104.0f, 204.0f), out.data(), 10, 0.04f);
+        update_frame(hdl, make_det(100.0f, 200.0f), out.data(), 10, 0.04f);
+        update_frame(hdl, make_det(102.0f, 202.0f), out.data(), 10, 0.04f);
+        const int n = update_frame(hdl, make_det(104.0f, 204.0f), out.data(), 10, 0.04f);
         ASSERT_EQ(n, 1);
-        ASSERT_EQ(out[0].state, 1);
+        ASSERT_EQ(out[0].state, K_TRACKED);
     }
-} // namespace
 
-// Small_TrackerTentativeTest
+    /** @brief Counts the first @p n tracks of @p out in state @p state. */
+    int count_in_state(const std::vector<sushitrack_track_t>& out, int n, int state)
+    {
+        int count = 0;
+        for (int i = 0; i < n; ++i)
+        {
+            if (out[static_cast<std::size_t>(i)].state == state)
+                ++count;
+        }
+        return count;
+    }
+
+    /** @brief Returns the track among the first @p n of @p out whose x is closest to @p x. */
+    const sushitrack_track_t* nearest_x(const std::vector<sushitrack_track_t>& out, int n, float x)
+    {
+        const sushitrack_track_t* nearest = nullptr;
+        float best = std::numeric_limits<float>::max();
+        for (int i = 0; i < n; ++i)
+        {
+            const float distance = std::abs(out[static_cast<std::size_t>(i)].x - x);
+            if (distance < best)
+            {
+                best = distance;
+                nearest = &out[static_cast<std::size_t>(i)];
+            }
+        }
+        return nearest;
+    }
+
+    /** @brief What the DEBUG records of the tracking module said about their frame. */
+    struct LifecycleCounts
+    {
+            int total = 0;
+            int without_frame_prefix = 0;
+    };
+
+    /** @brief Counts the tracking DEBUG records of @p log and those that do not open with "Frame ". */
+    LifecycleCounts count_lifecycle_records(SushiTrack::CapturedLog& log)
+    {
+        LifecycleCounts counts;
+        for (const SushiLog::CapturedRecord& record : log.records())
+        {
+            if (record.module != "tracking" || record.level != SushiLog::LogLevel::Debug)
+                continue;
+            ++counts.total;
+            if (record.message.rfind("Frame ", 0) != 0U)
+                ++counts.without_frame_prefix;
+        }
+        return counts;
+    }
+
+    /**
+     * @brief One or two missed frames of a time-aware tentative track, and the state and lost time
+     *        they leave. A second_dt of zero means there is no second miss.
+     */
+    struct MissRow
+    {
+            float first_dt;
+            float second_dt;
+            int state;
+            float lost_time;
+    };
+
+    /** @brief The missed frames of a frame-counted tentative track, their dt and the state left. */
+    struct FrameMissRow
+    {
+            int misses;
+            float dt;
+            int state;
+    };
+
+    /** @brief An init-suppression IoU and the tracks the scene leaves in each state. */
+    struct SuppressRow
+    {
+            float suppress_iou;
+            int tracks;
+            int tracked;
+            int tentative;
+    };
+} // namespace
 
 /**
  * @brief Tracker fixture configured for time-aware tentative testing.
  *
- * track_buffer=2, frame_rate=25 → one frame interval = 0.04 s.
- * time_aware=1 → age-out uses the wall-clock seconds budget (tentative_max_age_seconds).
- * tentative_max_age_seconds=0.08 → track expires once accumulated lost_time exceeds 0.08 s.
- * tentative_confirm_hits=3       → promotion requires three consecutive hits.
+ * track_buffer=2, frame_rate=25 gives one frame interval of 0.04 s. time_aware=1 makes the age-out
+ * use the seconds budget: tentative_max_age_seconds=0.08 removes a track once its accumulated lost
+ * time exceeds 0.08 s. tentative_confirm_hits=3 makes a promotion need three hits.
  */
 class Small_TrackerTentativeTest : public ::testing::Test
 {
     protected:
         sushitrack_tracker_t hdl_ = nullptr;
         sushitrack_params_t params_ = {};
+        std::vector<sushitrack_track_t> out_ = std::vector<sushitrack_track_t>(10);
 
         void SetUp() override
         {
@@ -117,205 +185,170 @@ class Small_TrackerTentativeTest : public ::testing::Test
 
         void TearDown() override { sushitrack_destroy(hdl_); }
 
-        /** @brief Returns a detection with the given top-left position. */
-        sushitrack_object_t det(float x, float y) const
+        /** @brief Feeds a detection at (@p x, @p y) of 0.04 s and returns the track count. */
+        int feed(float x, float y)
         {
-            sushitrack_object_t o{};
-            o.x = x;
-            o.y = y;
-            o.width = 50.0f;
-            o.height = 100.0f;
-            o.score = 0.9f;
-            o.label = 1;
-            return o;
+            return update_frame(hdl_, make_det(x, y), out_.data(), 10, 0.04f);
+        }
+
+        /** @brief Feeds a frame without detections of @p dt seconds and returns the count. */
+        int miss(float dt) { return update_frame(hdl_, nullptr, 0, out_.data(), 10, dt); }
+};
+
+/**
+ * @brief The tentative fixture, run over the missed frames around the seconds budget.
+ */
+class Small_TrackerTentativeAgeOutTest : public Small_TrackerTentativeTest,
+                                         public ::testing::WithParamInterface<MissRow>
+{
+};
+
+/**
+ * @brief In time-aware mode a tentative track is kept at a lost time up to the budget of 0.08 s
+ *        and removed above it.
+ *
+ * 0.08 s in one miss and 0.04 + 0.04 s (an exact float doubling) equal the budget, so the track
+ * stays Tentative (4); 0.04 + 0.05 s is 0.09 s, so it is Removed (3).
+ */
+TEST_P(Small_TrackerTentativeAgeOutTest, LostTimeAgainstTheSecondsBudgetDecidesTheState)
+{
+    ASSERT_EQ(feed(100.0f, 200.0f), 1);
+    ASSERT_EQ(out_[0].state, K_TENTATIVE);
+    const MissRow row = GetParam();
+
+    int n = miss(row.first_dt);
+    if (row.second_dt > 0.0f)
+        n = miss(row.second_dt);
+
+    ASSERT_EQ(n, 1);
+    EXPECT_EQ(out_[0].state, row.state);
+    EXPECT_FLOAT_EQ(out_[0].lost_time, row.lost_time);
+}
+
+INSTANTIATE_TEST_SUITE_P(Budget, Small_TrackerTentativeAgeOutTest,
+                         ::testing::Values(MissRow{0.08f, 0.0f, K_TENTATIVE, 0.08f},
+                                           MissRow{0.04f, 0.04f, K_TENTATIVE, 0.08f},
+                                           MissRow{0.04f, 0.05f, 3, 0.09f}));
+
+/**
+ * @brief Fixture of a frame-counted tentative tracker: time_aware=0 and a budget of two missed
+ *        frames, so the dt passed to the update has no effect.
+ */
+class Small_TrackerTentativeFrameBudgetTest : public ::testing::TestWithParam<FrameMissRow>
+{
+    protected:
+        sushitrack_tracker_t hdl_ = nullptr;
+        std::vector<sushitrack_track_t> out_ = std::vector<sushitrack_track_t>(10);
+
+        void SetUp() override
+        {
+            sushitrack_params_t params = {};
+            sushitrack_get_default_params(&params);
+            params.time_aware = 0;
+            params.enable_tentative = 1;
+            params.tentative_confirm_hits = 3;
+            params.tentative_max_miss_frames = 2;
+            params.frame_rate = 25;
+            params.tentative_match_thresh = 0.9f;
+            params.track_thresh = 0.1f;
+            params.high_thresh = 0.2f;
+            params.tentative_fast_thresh = 1.0f;
+
+            hdl_ = sushitrack_create(&params);
+            ASSERT_NE(hdl_, nullptr);
+        }
+
+        void TearDown() override { sushitrack_destroy(hdl_); }
+
+        /** @brief Feeds @p misses empty frames of @p dt seconds and returns the last count. */
+        int miss_frames(int misses, float dt)
+        {
+            int n = 0;
+            for (int i = 0; i < misses; ++i)
+                n = update_frame(hdl_, nullptr, 0, out_.data(), 10, dt);
+            return n;
         }
 };
 
 /**
- * @brief In time-aware mode a tentative ages out on the wall-clock seconds budget.
+ * @brief In frame-counted mode a tentative track is kept for two missed frames and removed on the
+ *        third, whatever dt the frames carry.
  *
- * Under the fixture's time_aware=1, age-out tracks real elapsed time: each missed frame
- * adds its dt to lost_time and removal happens once it exceeds tentative_max_age_seconds.
- * The larger dt on the second miss is what tips it past 0.08 s, so removal occurs after
+ * aged_out is true when the frames since the last observation exceed tentative_max_miss_frames, 2.
+ * Each missed frame adds one, so the third miss makes 3 > 2.
  */
-TEST_F(Small_TrackerTentativeTest, AgesOutViaSecondsBudgetWhenTimeAware)
+TEST_P(Small_TrackerTentativeFrameBudgetTest, MissedFramesAgainstTheFrameBudgetDecideTheState)
 {
-    std::vector<sushitrack_track_t> out(10);
-    sushitrack_object_t d0 = det(100.0f, 200.0f);
+    const sushitrack_object_t seed = make_det(100.0f, 200.0f);
+    ASSERT_EQ(update_frame(hdl_, seed, out_.data(), 10, 0.04f), 1);
+    ASSERT_EQ(out_[0].state, K_TENTATIVE);
 
-    int n = CDetections::update_frame(hdl_, &d0, 1, out.data(), 10, 0.04f);
-    ASSERT_EQ(n, 1);
-    EXPECT_EQ(out[0].state, 4);
-    EXPECT_EQ(out[0].is_confirmed, 0);
-    EXPECT_EQ(out[0].hits, 1);
+    const int n = miss_frames(GetParam().misses, GetParam().dt);
 
-    n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f); // lost_time 0.04
     ASSERT_EQ(n, 1);
-    EXPECT_EQ(out[0].state, 4);
-    EXPECT_FLOAT_EQ(out[0].lost_time, 0.04f);
+    EXPECT_EQ(out_[0].state, GetParam().state);
+}
 
-    n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.05f); // lost_time 0.09 > 0.08
-    ASSERT_EQ(n, 1);
-    EXPECT_EQ(out[0].state, 3);
-    EXPECT_FLOAT_EQ(out[0].lost_time, 0.09f);
+INSTANTIATE_TEST_SUITE_P(Budget, Small_TrackerTentativeFrameBudgetTest,
+                         ::testing::Values(FrameMissRow{1, 0.05f, K_TENTATIVE},
+                                           FrameMissRow{2, 0.50f, K_TENTATIVE},
+                                           FrameMissRow{2, 0.01f, K_TENTATIVE},
+                                           FrameMissRow{3, 0.01f, 3}, FrameMissRow{3, 0.50f, 3}));
+
+/**
+ * @brief A missed frame adds its dt to the lost time of a tentative track and leaves it
+ *        Tentative with its single hit.
+ */
+TEST_F(Small_TrackerTentativeTest, MissedFrameAccumulatesLostTime)
+{
+    ASSERT_EQ(feed(100.0f, 200.0f), 1);
+    ASSERT_EQ(out_[0].hits, 1);
+
+    ASSERT_EQ(miss(0.04f), 1);
+
+    EXPECT_EQ(out_[0].state, K_TENTATIVE);
+    EXPECT_FLOAT_EQ(out_[0].lost_time, 0.04f);
 }
 
 /**
- * @brief In frame-counted mode a tentative ages out on a fixed missed-frame budget.
- *
- * With time_aware=0 the per-frame dt is ignored (effective_dt = 1/frame_rate) and age-out
- * uses tentative_max_miss_frames=2, so strictness is constant regardless of frame rate.
- * The varying dt passed to Update has no effect on the outcome; removal happens on the
+ * @brief A match after a missed frame resets the lost time to zero and adds a hit, leaving the
+ *        track Tentative below the hit threshold.
  */
-TEST(Small_TrackerTentativeFrameBudgetTest, AgesOutViaFrameBudgetWhenFrameAware)
+TEST_F(Small_TrackerTentativeTest, MatchAfterAMissResetsLostTimeAndAddsAHit)
 {
-    sushitrack_params_t params = {};
-    sushitrack_get_default_params(&params);
-    params.time_aware = 0;
-    params.enable_tentative = 1;
-    params.tentative_confirm_hits = 3;
-    params.tentative_max_miss_frames = 2;
-    params.frame_rate = 25;
-    params.tentative_match_thresh = 0.9f;
-    params.track_thresh = 0.1f;
-    params.high_thresh = 0.2f;
-    params.tentative_fast_thresh = 1.0f;
+    ASSERT_EQ(feed(100.0f, 200.0f), 1);
+    ASSERT_EQ(miss(0.04f), 1);
 
-    sushitrack_tracker_t hdl = sushitrack_create(&params);
-    ASSERT_NE(hdl, nullptr);
+    ASSERT_EQ(feed(100.0f, 200.0f), 1);
 
-    std::vector<sushitrack_track_t> out(10);
-    sushitrack_object_t o{};
-    o.x = 100.0f;
-    o.y = 200.0f;
-    o.width = 50.0f;
-    o.height = 100.0f;
-    o.score = 0.9f;
-    o.label = 1;
-
-    int n = CDetections::update_frame(hdl, &o, 1, out.data(), 10, 0.04f);
-    ASSERT_EQ(n, 1);
-    EXPECT_EQ(out[0].state, 4);
-
-    n = CDetections::update_frame(hdl, nullptr, 0, out.data(), 10, 0.05f); // 1st miss, dt ignored
-    ASSERT_EQ(n, 1);
-    EXPECT_EQ(out[0].state, 4);
-
-    n = CDetections::update_frame(hdl, nullptr, 0, out.data(), 10, 0.50f); // 2nd miss, dt ignored
-    ASSERT_EQ(n, 1);
-    EXPECT_EQ(out[0].state, 4);
-
-    n = CDetections::update_frame(hdl, nullptr, 0, out.data(), 10, 0.01f); // 3rd miss, removed
-    ASSERT_EQ(n, 1);
-    EXPECT_EQ(out[0].state, 3);
-
-    sushitrack_destroy(hdl);
-}
-
-/**
- * @brief Tentative track is promoted to Tracked after reaching the hit threshold.
- *
- * Three consecutive matched frames must flip state to Tracked (1) and set
- * is_confirmed, with hit count equal to tentative_confirm_hits.
- */
-TEST_F(Small_TrackerTentativeTest, PromotedToTrackedAtHitThreshold)
-{
-    std::vector<sushitrack_track_t> out(10);
-
-    CDetections::update_frame(hdl_, det(100.0f, 200.0f), out.data(), 10, 0.04f);
-    CDetections::update_frame(hdl_, det(102.0f, 202.0f), out.data(), 10, 0.04f);
-
-    int n = CDetections::update_frame(hdl_, det(104.0f, 204.0f), out.data(), 10, 0.04f);
-    ASSERT_EQ(n, 1);
-    EXPECT_EQ(out[0].state, 1);
-    EXPECT_EQ(out[0].is_confirmed, 1);
-    EXPECT_EQ(out[0].hits, 3);
-}
-
-/**
- * @brief Re-association after a missed frame resets lost_time to zero and
- *        increments the hit counter.
- *
- * Frame 1 — detection at (100,200) creates a Tentative track (hits=1, lost_time=0).
- * Frame 2 — no detection: lost_time accumulates to 0.04 s.
- * Frame 3 — detection at (100,200) re-associates: lost_time resets to 0, hits=2.
- */
-TEST_F(Small_TrackerTentativeTest, PartialHitSequenceResetsLostTimeOnMatch)
-{
-    std::vector<sushitrack_track_t> out(10);
-    sushitrack_object_t d0 = det(100.0f, 200.0f);
-
-    int n = CDetections::update_frame(hdl_, &d0, 1, out.data(), 10, 0.04f);
-    ASSERT_EQ(n, 1);
-    EXPECT_EQ(out[0].state, 4);
-    EXPECT_EQ(out[0].hits, 1);
-    EXPECT_FLOAT_EQ(out[0].lost_time, 0.0f);
-
-    n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
-    ASSERT_EQ(n, 1);
-    EXPECT_EQ(out[0].state, 4);
-    EXPECT_FLOAT_EQ(out[0].lost_time, 0.04f);
-
-    n = CDetections::update_frame(hdl_, &d0, 1, out.data(), 10, 0.04f);
-    ASSERT_EQ(n, 1);
-    EXPECT_EQ(out[0].state, 4);
-    EXPECT_EQ(out[0].hits, 2);
-    EXPECT_FLOAT_EQ(out[0].lost_time, 0.0f);
-}
-
-/**
- * @brief A miss whose dt lands exactly on the seconds budget does not expire the track.
- *
- * Under time_aware=1 the boundary is exclusive: lost_time reaching tentative_max_age_seconds
- * (0.08 s) exactly keeps the track, which must remain non-Tracked rather than be removed.
- *
- */
-TEST_F(Small_TrackerTentativeTest, SingleMissDoesNotExpire)
-{
-    std::vector<sushitrack_track_t> out(10);
-    sushitrack_object_t d0 = det(100.0f, 200.0f);
-
-    CDetections::update_frame(hdl_, &d0, 1, out.data(), 10, 0.04f);
-
-    int n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.08f);
-    ASSERT_EQ(n, 1);
-    EXPECT_NE(out[0].state, 1);
-    EXPECT_FLOAT_EQ(out[0].lost_time, 0.08f);
+    EXPECT_EQ(out_[0].state, K_TENTATIVE);
+    EXPECT_EQ(out_[0].hits, 2);
+    EXPECT_FLOAT_EQ(out_[0].lost_time, 0.0f);
 }
 
 /**
  * @brief Two well-separated tentative tracks evolve independently per frame.
  *
- * Frame 1 — two detections create two Tentative tracks.
- * Frame 2 — only the first detection is sent; the matched track gains a hit,
- *            the unmatched track accumulates lost_time.
+ * Frame 1 creates two Tentative tracks. Frame 2 sends only the detection at x 100: that track
+ * gains a hit and keeps a lost time of zero, while the track at x 700 keeps one hit and gains
+ * 0.04 s of lost time, which is under the 0.08 s budget.
  */
 TEST_F(Small_TrackerTentativeTest, TwoSimultaneousTentativeTracksIndependent)
 {
-    std::vector<sushitrack_track_t> out(10);
+    const sushitrack_object_t both[2] = {make_det(100.0f, 200.0f), make_det(700.0f, 500.0f)};
+    ASSERT_EQ(update_frame(hdl_, both, 2, out_.data(), 10, 0.04f), 2);
 
-    sushitrack_object_t both[2];
-    both[0] = det(100.0f, 200.0f);
-    both[1] = det(700.0f, 500.0f);
+    const int n = feed(100.0f, 200.0f);
 
-    int n = CDetections::update_frame(hdl_, both, 2, out.data(), 10, 0.04f);
     ASSERT_EQ(n, 2);
-
-    sushitrack_object_t first = det(100.0f, 200.0f);
-    n = CDetections::update_frame(hdl_, &first, 1, out.data(), 10, 0.04f);
-    ASSERT_EQ(n, 2);
-
-    int hits2_count = 0;
-    int hits1_lost_count = 0;
-    for (int i = 0; i < n; ++i)
-    {
-        if (out[i].hits == 2)
-            ++hits2_count;
-        else if (out[i].hits == 1 && out[i].lost_time > 0.0f)
-            ++hits1_lost_count;
-    }
-    EXPECT_EQ(hits2_count, 1);
-    EXPECT_EQ(hits1_lost_count, 1);
+    const sushitrack_track_t* matched = nearest_x(out_, n, 100.0f);
+    const sushitrack_track_t* unmatched = nearest_x(out_, n, 700.0f);
+    ASSERT_NE(matched, nullptr);
+    ASSERT_NE(unmatched, nullptr);
+    EXPECT_EQ(matched->hits, 2);
+    EXPECT_FLOAT_EQ(matched->lost_time, 0.0f);
+    EXPECT_EQ(unmatched->hits, 1);
+    EXPECT_FLOAT_EQ(unmatched->lost_time, 0.04f);
 }
 
 /**
@@ -324,83 +357,61 @@ TEST_F(Small_TrackerTentativeTest, TwoSimultaneousTentativeTracksIndependent)
  */
 TEST_F(Small_TrackerTentativeTest, TentativePromotedTrackPersistsAfterPromotion)
 {
-    std::vector<sushitrack_track_t> out(10);
-
-    CDetections::update_frame(hdl_, det(100.0f, 200.0f), out.data(), 10, 0.04f);
-    CDetections::update_frame(hdl_, det(102.0f, 202.0f), out.data(), 10, 0.04f);
-    int n = CDetections::update_frame(hdl_, det(104.0f, 204.0f), out.data(), 10, 0.04f);
+    feed(100.0f, 200.0f);
+    feed(102.0f, 202.0f);
+    int n = feed(104.0f, 204.0f);
     ASSERT_EQ(n, 1);
-    EXPECT_EQ(out[0].state, 1);
-    int64_t promoted_id = out[0].track_id;
+    EXPECT_EQ(out_[0].state, K_TRACKED);
+    const int64_t promoted_id = out_[0].track_id;
 
-    n = CDetections::update_frame(hdl_, det(106.0f, 206.0f), out.data(), 10, 0.04f);
+    n = feed(106.0f, 206.0f);
     ASSERT_EQ(n, 1);
-    EXPECT_EQ(out[0].track_id, promoted_id);
-    EXPECT_EQ(out[0].state, 1);
-    EXPECT_EQ(out[0].hits, 4);
+    EXPECT_EQ(out_[0].track_id, promoted_id);
+    EXPECT_EQ(out_[0].state, K_TRACKED);
+    EXPECT_EQ(out_[0].hits, 4);
 }
 
 /**
- * @brief A detection overlapping a confirmed track does not spawn a new tentative.
- *
- * After confirming one track, a frame carries two detections: one on the track (matches
- * it) and one 5 px away that stays unmatched but overlaps the confirmed box well above
- * the suppression gate. With suppression on (default 0.7) the unmatched detection is
- * dropped, so only the confirmed track is output.
+ * @brief The init-suppression fixture, run over the gate on and off.
  */
-TEST(Small_TrackerTentativeInitSuppressTest, OverlappingDetectionDoesNotInitNewTentative)
+class Small_TrackerTentativeInitSuppressTest : public ::testing::TestWithParam<SuppressRow>
 {
-    sushitrack_params_t params = suppress_params(0.7f);
-    sushitrack_tracker_t hdl = sushitrack_create(&params);
-    ASSERT_NE(hdl, nullptr);
+    protected:
+        sushitrack_tracker_t hdl_ = nullptr;
 
-    std::vector<sushitrack_track_t> out(10);
-    confirm_track(hdl, out);
+        void SetUp() override
+        {
+            sushitrack_params_t params = suppress_params(GetParam().suppress_iou);
+            hdl_ = sushitrack_create(&params);
+            ASSERT_NE(hdl_, nullptr);
+        }
 
-    sushitrack_object_t pair[2] = {obj(106.0f, 206.0f), obj(111.0f, 206.0f)};
-    int n = CDetections::update_frame(hdl, pair, 2, out.data(), 10, 0.04f);
-    ASSERT_EQ(n, 1);
-    EXPECT_EQ(out[0].state, 1);
-
-    sushitrack_destroy(hdl);
-}
+        void TearDown() override { sushitrack_destroy(hdl_); }
+};
 
 /**
- * @brief Control: with suppression effectively disabled the overlapping detection inits
- *        a new tentative, proving the gate is what removes it in the test above.
+ * @brief A detection overlapping a confirmed track starts a new tentative track only when the
+ *        init-suppression gate is off.
  *
- * tentative_init_suppress_iou=2.0 can never be exceeded by an IoU in [0,1], so no
- * detection is ever suppressed and the unmatched overlapping detection becomes a
- * Tentative track alongside the confirmed one.
+ * A frame after the confirmation carries a detection on the track and one 5 px right of it, which
+ * stays unmatched and overlaps the track with an IoU near 0.82. At 0.7 it is dropped; at 2.0,
+ * which no IoU exceeds, it becomes a Tentative track beside the confirmed one.
  */
-TEST(Small_TrackerTentativeInitSuppressTest, OverlappingDetectionInitsTentativeWhenGateDisabled)
+TEST_P(Small_TrackerTentativeInitSuppressTest, GateDecidesWhetherTheOverlapStartsATrack)
 {
-    sushitrack_params_t params = suppress_params(2.0f);
-    sushitrack_tracker_t hdl = sushitrack_create(&params);
-    ASSERT_NE(hdl, nullptr);
-
     std::vector<sushitrack_track_t> out(10);
-    confirm_track(hdl, out);
+    ASSERT_NO_FATAL_FAILURE(confirm_track(hdl_, out));
 
-    sushitrack_object_t pair[2] = {obj(106.0f, 206.0f), obj(111.0f, 206.0f)};
-    int n = CDetections::update_frame(hdl, pair, 2, out.data(), 10, 0.04f);
-    ASSERT_EQ(n, 2);
+    const sushitrack_object_t pair[2] = {make_det(106.0f, 206.0f), make_det(111.0f, 206.0f)};
+    const int n = update_frame(hdl_, pair, 2, out.data(), 10, 0.04f);
 
-    int confirmed = 0, tentative = 0;
-    for (int i = 0; i < n; ++i)
-    {
-        if (out[i].state == 1)
-            ++confirmed;
-        else if (out[i].state == 4)
-            ++tentative;
-    }
-    EXPECT_EQ(confirmed, 1);
-    EXPECT_EQ(tentative, 1);
-
-    sushitrack_destroy(hdl);
+    ASSERT_EQ(n, GetParam().tracks);
+    EXPECT_EQ(count_in_state(out, n, K_TRACKED), GetParam().tracked);
+    EXPECT_EQ(count_in_state(out, n, K_TENTATIVE), GetParam().tentative);
 }
 
-// Small_TrackerTentativeDisabledTest — enable_tentative=0
+INSTANTIATE_TEST_SUITE_P(Gate, Small_TrackerTentativeInitSuppressTest,
+                         ::testing::Values(SuppressRow{0.7f, 1, 1, 0}, SuppressRow{2.0f, 2, 1, 1}));
 
 /**
  * @brief Tracker fixture with tentative mode disabled.
@@ -432,19 +443,6 @@ class Small_TrackerTentativeDisabledTest : public ::testing::Test
         }
 
         void TearDown() override { sushitrack_destroy(hdl_); }
-
-        /** @brief Returns a detection at the given top-left position. */
-        sushitrack_object_t det(float x, float y) const
-        {
-            sushitrack_object_t o{};
-            o.x = x;
-            o.y = y;
-            o.width = 50.0f;
-            o.height = 100.0f;
-            o.score = 0.9f;
-            o.label = 1;
-            return o;
-        }
 };
 
 /**
@@ -454,15 +452,13 @@ class Small_TrackerTentativeDisabledTest : public ::testing::Test
 TEST_F(Small_TrackerTentativeDisabledTest, WithTentativeDisabledNewTrackIsImmediatelyTracked)
 {
     std::vector<sushitrack_track_t> out(10);
-    sushitrack_object_t d0 = det(100.0f, 200.0f);
 
-    int n = CDetections::update_frame(hdl_, &d0, 1, out.data(), 10, 0.04f);
+    const int n = update_frame(hdl_, make_det(100.0f, 200.0f), out.data(), 10, 0.04f);
+
     ASSERT_EQ(n, 1);
-    EXPECT_EQ(out[0].state, 1);
+    EXPECT_EQ(out[0].state, K_TRACKED);
     EXPECT_EQ(out[0].is_confirmed, 1);
 }
-
-// Lifecycle records
 
 /**
  * @brief A tentative track confirmed by a low-score detection logs the same DEBUG a high-score
@@ -484,36 +480,49 @@ TEST(Small_TrackerTentativeRecordsTest, LowPoolConfirmationLogsTheConfirmation)
     ASSERT_NE(hdl, nullptr);
     std::vector<sushitrack_track_t> out(4);
 
-    sushitrack_object_t high = obj(100.0f, 200.0f);
-    CDetections::update_frame(hdl, &high, 1, out.data(), 4, 0.04f);
-    sushitrack_object_t low = obj(100.0f, 200.0f);
-    low.score = 0.1f;
-    CDetections::update_frame(hdl, &low, 1, out.data(), 4, 0.04f);
+    const sushitrack_object_t high = make_det(100.0f, 200.0f);
+    update_frame(hdl, high, out.data(), 4, 0.04f);
+    const sushitrack_object_t low = make_det(100.0f, 200.0f, 0.1f);
+    update_frame(hdl, low, out.data(), 4, 0.04f);
     sushitrack_destroy(hdl);
 
     EXPECT_EQ(log.count("tentative track 1 confirmed"), 1);
 }
 
 /**
+ * @brief The fixture of the lifecycle records: one track confirmed over three frames with the
+ *        DEBUG records of the run captured.
+ */
+class Small_TrackerTentativeLifecycleRecordsTest : public ::testing::Test
+{
+    protected:
+        SushiTrack::CapturedLog log_{SushiLog::LogLevel::Debug};
+        LifecycleCounts counts_;
+
+        void SetUp() override
+        {
+            sushitrack_params_t p = suppress_params(0.7f);
+            sushitrack_tracker_t hdl = sushitrack_create(&p);
+            ASSERT_NE(hdl, nullptr);
+            std::vector<sushitrack_track_t> out(10);
+            ASSERT_NO_FATAL_FAILURE(confirm_track(hdl, out));
+            sushitrack_destroy(hdl);
+            counts_ = count_lifecycle_records(log_);
+        }
+};
+
+/**
+ * @brief The run writes lifecycle DEBUG records at all.
+ */
+TEST_F(Small_TrackerTentativeLifecycleRecordsTest, ConfirmationWritesLifecycleRecords)
+{
+    EXPECT_GT(counts_.total, 0);
+}
+
+/**
  * @brief Every DEBUG record one update makes starts with that update's frame number.
  */
-TEST(Small_TrackerTentativeRecordsTest, EveryLifecycleRecordCarriesItsFrame)
+TEST_F(Small_TrackerTentativeLifecycleRecordsTest, EveryLifecycleRecordCarriesItsFrame)
 {
-    SushiTrack::CapturedLog log(SushiLog::LogLevel::Debug);
-    sushitrack_params_t p = suppress_params(0.7f);
-    sushitrack_tracker_t hdl = sushitrack_create(&p);
-    ASSERT_NE(hdl, nullptr);
-    std::vector<sushitrack_track_t> out(10);
-    confirm_track(hdl, out);
-    sushitrack_destroy(hdl);
-
-    int lifecycle = 0;
-    for (const SushiLog::CapturedRecord& record : log.records())
-    {
-        if (record.module != "tracking" || record.level != SushiLog::LogLevel::Debug)
-            continue;
-        ++lifecycle;
-        EXPECT_EQ(record.message.rfind("Frame ", 0), 0U) << record.message;
-    }
-    EXPECT_GT(lifecycle, 0);
+    EXPECT_EQ(counts_.without_frame_prefix, 0);
 }
