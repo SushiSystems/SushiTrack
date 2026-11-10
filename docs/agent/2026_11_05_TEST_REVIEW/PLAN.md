@@ -1,6 +1,6 @@
 # Test review: plan
 
-**Status:** Open — 19 of 20 jobs done; M13 failed on one add not applied as written, listed under "Not done as written"; the owner chooses inline or parallel
+**Status:** Open — 20 of 20 jobs done; the final build and test run is the orchestrator's
 
 **Resume note (M13, tracking).** M13 is applied, one commit per file: every file of `tests/tracking/` except the compile checks, with `test_tracking_log_category.cpp` replaced by `compile_tracking_log_category.cpp`. The Adds of tracking are written: the single-model Cruising and zero manoeuvre probability, the last seen state while coasting, the ORU metamorphic pair and the history eviction (inside `FullFeatureHistoryEvictsItsOldestFeature`). One item stays open. RW-40 is applied since: `ProfileSink` and `MemoryProfileSink` (decision 15 of `REPORT.md`) carry the two resizes and the zone rewrite. RW-41: the OCM add (a crossing scene where OCM on and off assign differently) needs costs that cannot be derived by hand without a compiler, and the two OCM scene tests also pass with OCM off. Two oracles keep the value the old tests held and are not re-derived from the IMM mixing: the Cruising regime after the ramp and the Maneuvering frames after the jerk in `test_kinematic_regimes.cpp`. No compiler and no `build*/compile_commands.json` exist on this machine, so no C++ syntax check ran for any file changed since M7, and no test ran; every new expected value has its hand derivation in the test comment. The commit hook (comment rules, test mirror) ran and passed for each commit. The `Totals` table of `REPORT.md` was recounted from the records (597 tests, 34 adds); the `Verdicts by question` and `Modules` tables follow it.
 
@@ -32,15 +32,13 @@ writes each add. Nothing in a module job changes production code except a seam a
 | M10 | the tests of `logging` (3 files): 4 rewrite, 5 resize, 1 delete | T1, T2, T3, T4, T5, T6, T7 | done |
 | M11 | the tests of `profiling` (4 files): 6 rewrite, 1 split | T1, T2, T3, T4, T5, T6, T7 | done |
 | M12 | the tests of `tools` (2 files): 1 rewrite, 2 resize, 1 split, 5 delete | T1, T2, T3, T4, T5, T6, T7 | done |
-| M13 | the tests of `tracking` (25 files): 63 rewrite, 4 resize, 5 split, 36 merge, 17 delete | T1, T2, T3, T4, T5, T6, T7 | failed |
+| M13 | the tests of `tracking` (25 files): 63 rewrite, 4 resize, 5 split, 36 merge, 17 delete | T1, T2, T3, T4, T5, T6, T7 | done |
 
 ## Not done as written
 
 A job whose status is `failed` keeps every record below until its test exists as the record says.
 
-**M13 (`tracking`).** One add is open.
-
-- Add `tracker: OCM re-ranking changes the primary association when enabled` (small, metamorphic, OCM on and off assign differently on a crossing scene). Not written. The two tracks' predicted boxes come from the IMM filter, so a scene where the momentum bonus alone decides the assignment cannot be derived by hand, and a test that guesses the outcome would be a pasted expectation. The direction bonus itself is tested at its unit in `tests/association/test_observation_momentum_decorator.cpp`. REPORT: `## Adds`. Backlog: RW-41.
+None remain; REPORT decision 18 replaces the last one (the OCM crossing scene).
 
 ## Acceptance
 

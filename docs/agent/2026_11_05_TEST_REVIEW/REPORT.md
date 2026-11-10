@@ -1307,3 +1307,5 @@ tracker: OCM re-ranking changes the primary association when enabled | metamorph
 tracklet: ORU recovery replays the virtual trajectory from the last checkpoint | metamorphic, ORU on and off give different recovered means after a gap | small
 : none. The rules of check_test_additions are a leftover and are not in scope; the settings promise is tested by tools/tests/test_test_budget_settings.py, and its skill-side half cannot run in this repository. Headers and modules read for this section: tools/tests/test_check_test_additions.py; tools/tests/test_test_budget_settings.py; tools/settings.py.
 ```
+
+18. M13 (2026-11-10, the orchestrator, under the owner's delegation), replacing the OCM crossing-scene add (RW-41). The two tracks' predicted boxes come from the IMM filter, so no scene can be worked out by hand in which only the momentum bonus decides the assignment, and an outcome read off a run would be a pasted expectation. The direction bonus is held at its own unit by `tests/association/test_observation_momentum_decorator.cpp`. M13 is applied.
