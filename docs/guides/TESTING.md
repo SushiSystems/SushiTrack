@@ -21,6 +21,10 @@ may touch is the `testing` skill's rule:
 The skill's timeouts per test case are 1 s small, 10 s medium and 120 s large. The build still
 sets 60 s, 300 s and 900 s; RW-36 moves it to the skill's values.
 
+The cases of a program run in CTest tests named `<program>.<size>_shard_<i>of<N>`, so `--filter` is
+a regex over those names; the timeout of a shard is the size's timeout times its cases.
+[Tests](../../tests/README.md) describes the shards.
+
 A suite whose name has no size stops the configure. A test that fails now and then is fixed or
 quarantined: it keeps its size and also carries the label `quarantined`, which takes it out of
 every run that does not name it, and it has an entry in
@@ -35,7 +39,7 @@ a `KalmanFilterRegistry` or `TrackerRegistry` it owns, or parameters passed to a
 ```bash
 st test                              # small and medium, the quarantine left out
 st test --label small                # one size
-st test --label small -f 'RectTest'  # a ctest -R regex over Suite.Case names
+st test --label small -f 'sushitrack_tests.small'  # a ctest -R regex over the shard names
 st test --label medium --repeat 3    # re-run until the first failure
 st test --label quarantined          # only the quarantined tests
 st run sushitrack_tests -- --gtest_filter='Small_TrackletTest.*'

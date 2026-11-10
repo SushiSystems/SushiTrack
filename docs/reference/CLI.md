@@ -51,7 +51,7 @@ is picked up with no CLI change. [Test suites](../guides/TESTING.md) says what e
 | Flag | Effect |
 |---|---|
 | `--label, -l <label>` | `small`, `medium`, `large` or `quarantined`; repeatable. Default: `small` and `medium`. Quarantined tests run only when named |
-| `--filter, -f <regex>` | `ctest -R` over `Suite.Case` test names |
+| `--filter, -f <regex>` | `ctest -R` over the shard names, `<program>.<size>_shard_<i>of<N>` |
 | `--repeat, -r <n>` | `ctest --repeat until-fail:<n>`: re-run each test until it fails; flaky-test hunting |
 | `--jobs, -j <n>` | Run up to N tests concurrently (`ctest --parallel`) |
 | `--cli` | Run the pytest suite of the `st` package instead of CTest, with the same labels |

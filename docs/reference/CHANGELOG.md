@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-11-10 — tests: Registered the cases of each test program as CTest shards per size and gave one Kalman factory check a suite of its own, since `TEST` and `TEST_P` cannot share one (RW-42).
 - 2026-11-10 — logging: Added `LogThrottle::admit(suppressed, generation)`, which counts against a generation the caller gives; `admit(suppressed)` passes the process-wide one (`log_throttle.hpp`).
 - 2026-11-10 — general: Give the configuration search a seam so its empty-search test sees no real folder (RW-37, `bb3624f`).
 - 2026-11-10 — general: Rule what a match_thresh above 1 does: the code accepts every pair, the test says none (RW-39, `f2c3f31`).

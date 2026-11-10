@@ -8,7 +8,6 @@
 
 if(SUSHITRACK_BUILD_TESTS)
     find_package(GTest REQUIRED)
-    include(GoogleTest)
     file(GLOB_RECURSE SUSHITRACK_TEST_SOURCES CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/*/test_*.cpp")
     list(FILTER SUSHITRACK_TEST_SOURCES EXCLUDE REGEX "/applications/")

@@ -84,7 +84,7 @@ INSTANTIATE_TEST_SUITE_P(EveryRegisteredType, Small_GenericKalmanFactoryTest,
 /**
  * @brief A type its registry does not hold builds nothing, and the registry logs one ERROR.
  */
-TEST(Small_GenericKalmanFactoryTest, UnregisteredTypeBuildsNothing)
+TEST(Small_GenericKalmanFactoryUnregisteredTest, UnregisteredTypeBuildsNothing)
 {
     const CapturedLog log(SushiLog::LogLevel::Error);
     const KalmanFilterRegistry registry;
