@@ -109,5 +109,6 @@ TEST(Small_SIoUCostCalculatorTest, SingleCostOfAPartialOverlapIsTheHandValue)
     const std::shared_ptr<Tracklet> b = make_t(40.f, 40.f, 100.f, 100.f);
 
     EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<float>(
-        calc.calculate_single(a, b), 2.0 - 9.0 / 41.0 - std::exp(-4.0 / 49.0), K_ROUNDED_OPERATIONS)));
+        calc.calculate_single(a, b), 2.0 - 9.0 / 41.0 - std::exp(-4.0 / 49.0),
+        K_ROUNDED_OPERATIONS)));
 }
