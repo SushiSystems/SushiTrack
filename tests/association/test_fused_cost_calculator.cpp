@@ -50,7 +50,8 @@ using namespace SushiTrack;
 
 namespace
 {
-    /// @brief Bound of 1 - cos(a, a) on a unit vector times the direct weight: four rounded operations of unit roundoff on a magnitude of 1.
+    /// @brief Bound of 1 - cos(a, a) on a unit vector times the direct weight: four rounded
+    ///        operations of unit roundoff on a magnitude of 1.
     const double K_COSINE_BOUND = 4.0 * TestSupport::unit_roundoff<float>();
 } // namespace
 
@@ -118,7 +119,9 @@ TEST(Small_FusedCostCalculatorTest, EmptyCollectionProducesEmptyMatrix)
 }
 
 /**
- * @brief The batch cost of the pair is 0: identical features have a distance of 0, under the threshold of 0.3, so the direct assignment path returns 0 times its weight of 0.5, whatever the 30 px offset.
+ * @brief The batch cost of the pair is 0: identical features have a distance of 0, under the
+ *        threshold of 0.3, so the direct assignment path returns 0 times its weight of 0.5,
+ *        whatever the 30 px offset.
  */
 TEST(Small_FusedCostCalculatorTest, BatchDirectAssignmentCostIgnoresTheBoxOffset)
 {
