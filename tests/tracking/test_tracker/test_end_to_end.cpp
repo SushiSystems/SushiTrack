@@ -560,14 +560,14 @@ class Small_TrackerVariableDtTest : public ::testing::Test
 };
 
 /**
- * @brief A one-second gap that equals the one-second buffer leaves the track Lost, not retired,
- *        with a finite box and a lost time of one second.
+ * @brief A one-second gap leaves the track Lost with a finite box and a lost time of one second.
  *
- * The empty frame marks the track Lost with a lost time of exactly 1.0. The timeout is
- * 30 / 30 = 1.0 s and the policy retires a track only above timeout + 1e-4, so 1.0 > 1.0001
- * is false. The prediction step is capped at 5 steps, which keeps the box finite.
+ * The empty frame marks the track Lost with a lost time of exactly 1.0. cleanup_lost looks at
+ * the lost list of the frame before, so the track is first checked on the next frame; its
+ * 1.0 s equals the timeout 30 / 30 and the policy retires only above timeout + 1e-4.
+ * The prediction step is capped at 5 steps, which keeps the box finite.
  */
-TEST_F(Small_TrackerVariableDtTest, OneSecondGapEqualToTheBufferLeavesTheTrackLost)
+TEST_F(Small_TrackerVariableDtTest, OneSecondGapLeavesTheTrackLost)
 {
     std::vector<sushitrack_track_t> out(4);
     const sushitrack_object_t seed = make_det(100.0f, 200.0f);
