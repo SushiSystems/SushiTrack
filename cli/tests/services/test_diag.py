@@ -18,18 +18,28 @@ from sushitrack_cli.services import diag
 pytestmark = pytest.mark.medium
 
 
-def test_git_missing_answers_none(tmp_path, session):
+def _repository_detail(session, tmp_path):
+    """Run the status report over an empty tree and return the detail cell of its repository row."""
+    paths = SimpleNamespace(root=tmp_path, build=tmp_path / "build", package=tmp_path / "package",
+                            benchmark_names=lambda: [], data_root=lambda name: tmp_path / name)
+    assert diag.status(SimpleNamespace(), paths, workspace=session.workspace) == 0
+    (call,) = [call for call in session.console.calls if call.kind == "table"]
+    (row,) = [row for row in call.args[1] if row[0] == "repository"]
+    return row[2]
+
+
+def test_status_names_the_checkout_folder_when_git_is_missing(tmp_path, session):
+    """Shows the repository path in place of a revision when git is not installed."""
     session.runner.script(127)
 
-    assert diag._git_describe(session.workspace, SimpleNamespace(root=tmp_path)) is None
+    assert str(tmp_path) in _repository_detail(session, tmp_path)
 
 
-def test_git_describe_joins_branch_commit_and_dirt(tmp_path, session):
+def test_status_joins_branch_commit_and_dirt(tmp_path, session):
+    """Shows "branch @ commit (dirty)" for a branch with a changed file."""
     session.runner.script(0, ("main",)).script(0, ("abc123",)).script(0, (" M x",))
 
-    described = diag._git_describe(session.workspace, SimpleNamespace(root=tmp_path))
-
-    assert described == "main @ abc123 (dirty)"
+    assert "main @ abc123 (dirty)" in _repository_detail(session, tmp_path)
 
 
 def test_env_dump_shows_the_run_dirs_of_the_tree_first_on_the_search_path(tmp_path, session):
