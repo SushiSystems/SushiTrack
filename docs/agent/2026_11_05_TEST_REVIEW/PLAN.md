@@ -1,23 +1,21 @@
 # Test review: plan
 
-**Status:** Open — M1 to M4 applied (2026-11-10); M5 to M13 untouched; the owner chooses inline or parallel
+**Status:** Open — M1 to M6 applied (2026-11-10); M7 half applied; M8 to M13 untouched; the owner chooses inline or parallel
 
-**Resume note (M5, cli/services).** M1 to M4 are applied and pushed, one commit per file except the
-config commit, which carries `test_config.py` and the new `test_legacy_tool_keys.py` together. Open
-from M1: the `FrameRecorder` lost-events row is backlog `RW-38`, since a 64-event ring is the smallest
-the profiler accepts but whether a run overflows it depends on the consumer thread's speed, so no
-deterministic test exists without a drain seam. The `tracker_process_c` throwing-update row is written
-with `ThrowingTrackerAdapter` (`applications/tracker_bridge/throwing_tracker_adapter.hpp`). Open from
-M3: `MatchThreshGreaterThanOneIsTolerated` is unchanged, backlog `RW-39` (a decision): the record asks
-for an assertion that no track is confirmed, the solver accepts every pair at a threshold of 5, and a
-track started in frame 1 is confirmed, so the record cannot be applied as written. The two
-`Small_SushiTrackCLogTest` resizes of M3 are void: `CapturedLog` is the scoped sink they waited for.
-Several M4 records predate T5 and were already met: `test_env.py` stubs sushicore's `snapshot_vcvars`,
-`test_config.py` passes a `warn` callback, and `test_library_packages.py` runs on the session. M4 added
-`console.is_built()` and `console.config_sources()` as the seam for `test_console.py`. No compiler and
-no `build*/compile_commands.json` exist on this machine, so no C++ syntax check ran, and no Python
-test ran. The `Totals` table of `REPORT.md` was not recounted. Start M5 with
-`cli/tests/services/test_artifacts.py`.
+**Resume note (M7, configuration).** M5 and M6 are applied and pushed, one commit per file. RW-39 is closed
+(decision 13 of `REPORT.md`). Records already met and not redone in M5: every `test_build.py` "same fixture"
+rewrite and the stub of `test_diag.py`, `test_runner.py` and the sandbox rows of `test_tests.py` (T5 moved them
+onto the session); the three `test_the_service_uses_the_shared_runner` deletes (the tests were gone);
+`test_checks.py` and the kept rows. M6: the docker word and malformed-config rewrites were met. M5 added a
+`parse_latency` seam to `profile_record.py` and the stand-in evaluator of `test_label.py`. `st env` is checked
+on its help page only, since running it reads the machine's compiler environment. M7 is done except the
+records that wait on a seam: `MissingFileNamedByTheEnvironmentIsRefusedAndLogged` (the Windows
+`_putenv_s` empty-value claim was not re-checked), `NothingNamedAndNothingFoundSucceedsAtInfo` (RW-37), and the
+two adds of the loader (`SUSHITRACK_CONFIG` with a null path, and `K_MAX_SEARCH_DEPTH`), which need the search
+seam of RW-37. No compiler and no `build*/compile_commands.json` exist on this machine, so no C++ syntax check
+ran (`test_config_loader.cpp` and `compile_configuration_log_category.cpp` are unchecked), and no Python test
+ran; each Python file was parsed with `ast`. The `Totals` table of `REPORT.md` was not recounted. Start M8 with
+`tests/detection/test_object.cpp`.
 
 Applies the verdicts of `REPORT.md`, in hierarchy order: the shared helpers, adapters and seams the
 rewrites need come first, then the defects the review found, then each module's tests. A module job
@@ -39,9 +37,9 @@ writes each add. Nothing in a module job changes production code except a seam a
 | M2 | the tests of `association` (17 files): 20 rewrite, 1 resize, 6 merge, 6 delete | T1, T2, T3, T4, T5, T6, T7 | done |
 | M3 | the tests of `c_api` (5 files): 11 rewrite, 9 resize, 3 split, 1 merge, 6 delete | T1, T2, T3, T4, T5, T6, T7 | done (one rewrite open as RW-39) |
 | M4 | the tests of `cli` (8 files): 21 rewrite, 3 resize, 2 delete | T1, T2, T3, T4, T5, T6, T7 | done |
-| M5 | the tests of `cli/services` (12 files): 44 rewrite, 5 resize, 2 split, 4 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
-| M6 | the tests of `cli/test_cli` (2 files): 8 rewrite, 4 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
-| M7 | the tests of `configuration` (2 files): 19 rewrite, 1 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
+| M5 | the tests of `cli/services` (12 files): 44 rewrite, 5 resize, 2 split, 4 delete | T1, T2, T3, T4, T5, T6, T7 | done |
+| M6 | the tests of `cli/test_cli` (2 files): 8 rewrite, 4 delete | T1, T2, T3, T4, T5, T6, T7 | done |
+| M7 | the tests of `configuration` (2 files): 19 rewrite, 1 delete | T1, T2, T3, T4, T5, T6, T7 | partial (two rewrites and two adds wait on RW-37) |
 | M8 | the tests of `detection` (2 files): 3 rewrite, 3 merge, 7 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
 | M9 | the tests of `filtering` (12 files): 23 rewrite, 3 resize, 4 split, 8 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
 | M10 | the tests of `logging` (3 files): 4 rewrite, 5 resize, 1 delete | T1, T2, T3, T4, T5, T6, T7 | todo |
