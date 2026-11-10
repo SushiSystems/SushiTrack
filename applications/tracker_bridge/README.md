@@ -8,6 +8,7 @@ benchmark and the Python inference pipeline. It is a library, not a program.
 | `tracker_adapter.hpp` | `TrackerAdapter`, the interface |
 | `sushitrack_adapter.hpp` | `SushiTrackAdapter`, which drives SushiTrack through its public C API, from given parameters or from the defaults overlaid with a configuration file |
 | `byte_track_adapter.hpp`, `oc_sort_adapter.hpp` | The reference trackers from `third_party/bytetrack` and `third_party/ocsort`, built from a settings file or from a parsed settings document |
+| `throwing_tracker_adapter.hpp` | `ThrowingTrackerAdapter`, an in-memory adapter whose `update` always throws, for the tests of a caller's failure handling |
 | `mot_detection.hpp`, `track_result.hpp` | What an adapter takes in and hands back |
 | `json_settings.hpp` | Reads the reference trackers' settings from a file or a stream and logs a missing file, a missing section and a key that is not a number |
 | `tracker_bridge_log_category.hpp` | `K_TRACKER_BRIDGE_LOG_CATEGORY`, under which the adapters and the C entry points log |
