@@ -28,16 +28,20 @@
  */
 
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 
 #include <SushiTrack/c_api/sushitrack_c.h>
+#include <SushiTrack/configuration/config_loader.hpp>
 
 #include <c_detection_builders.hpp>
 #include <captured_log.hpp>
@@ -209,6 +213,32 @@ namespace
         return doc;
     }
 
+    /**
+     * @brief Loads the shipped file over the defaults through the library loader.
+     * @return The params the library loader produced.
+     */
+    sushitrack_params_t load_shipped_params()
+    {
+        sushitrack_params_t params{};
+        sushitrack_get_default_params(&params);
+        EXPECT_EQ(sushitrack_load_params_from_json(config_path().c_str(), &params),
+                  SUSHITRACK_SUCCESS);
+        return params;
+    }
+
+    /**
+     * @brief Loads the JSON text @p text over the defaults through SushiTrack::load_params.
+     * @return The params the loader produced.
+     */
+    sushitrack_params_t load_params_from_text(const std::string& text)
+    {
+        sushitrack_params_t params{};
+        sushitrack_get_default_params(&params);
+        std::istringstream document(text);
+        EXPECT_EQ(SushiTrack::load_params(document, "inline document", params), SUSHITRACK_SUCCESS);
+        return params;
+    }
+
 } // namespace
 
 // Medium_ConfigLoaderBaselineTest
@@ -247,16 +277,14 @@ TEST(Medium_ConfigLoaderBaselineTest, BasicSectionContainsAllDocumentedSwitches)
 // Medium_ConfigLoaderBasicFieldsTest
 
 /**
- * @brief Round-trip of the five numeric basic fields into Params.
+ * @brief The library loader brings the five numeric basic fields of the shipped file into Params.
  */
 TEST(Medium_ConfigLoaderBasicFieldsTest, BasicNumericFieldsRoundTripIntoParams)
 {
     Json doc = load_config_json();
     ASSERT_FALSE(doc.empty());
 
-    sushitrack_params_t p{};
-    sushitrack_get_default_params(&p);
-    apply_config_to_params(doc, p);
+    const sushitrack_params_t p = load_shipped_params();
 
     const Json& b = doc["sushitrack"]["basic"];
     EXPECT_EQ(p.frame_rate, b["frame_rate"].get<int>());
@@ -267,16 +295,15 @@ TEST(Medium_ConfigLoaderBasicFieldsTest, BasicNumericFieldsRoundTripIntoParams)
 }
 
 /**
- * @brief All five enable_* switches round-trip with integer type.
+ * @brief The library loader brings the three enable_* switches of the shipped file into Params
+ *        with integer type.
  */
 TEST(Medium_ConfigLoaderBasicFieldsTest, EnableFlagsRoundTripIntoParams)
 {
     Json doc = load_config_json();
     ASSERT_FALSE(doc.empty());
 
-    sushitrack_params_t p{};
-    sushitrack_get_default_params(&p);
-    apply_config_to_params(doc, p);
+    const sushitrack_params_t p = load_shipped_params();
 
     const Json& b = doc["sushitrack"]["basic"];
     EXPECT_EQ(p.enable_tentative, b["enable_tentative"].get<int>());
@@ -287,7 +314,7 @@ TEST(Medium_ConfigLoaderBasicFieldsTest, EnableFlagsRoundTripIntoParams)
 // Medium_ConfigLoaderAdvancedFieldsTest
 
 /**
- * @brief Fixture providing a loader-populated Params instance.
+ * @brief Fixture providing the Params the library loader makes of the shipped file.
  */
 class Medium_ConfigLoaderAdvancedFieldsTest : public ::testing::Test
 {
@@ -299,8 +326,7 @@ class Medium_ConfigLoaderAdvancedFieldsTest : public ::testing::Test
         {
             doc_ = load_config_json();
             ASSERT_FALSE(doc_.empty());
-            sushitrack_get_default_params(&params_);
-            apply_config_to_params(doc_, params_);
+            params_ = load_shipped_params();
         }
 };
 
@@ -330,8 +356,7 @@ TEST_F(Medium_ConfigLoaderAdvancedFieldsTest, CoordinateSystemFieldsAreApplied)
 }
 
 /**
- * @brief ReID fields, including the documented but in past tests-untested
- *        reid_direct_assignment_weight (Verified Omission #2), are applied.
+ * @brief ReID fields, including reid_direct_assignment_weight, are applied.
  */
 TEST_F(Medium_ConfigLoaderAdvancedFieldsTest, ReIDFieldsIncludingDirectAssignmentWeightAreApplied)
 {
@@ -348,8 +373,7 @@ TEST_F(Medium_ConfigLoaderAdvancedFieldsTest, ReIDFieldsIncludingDirectAssignmen
 }
 
 /**
- * @brief Tentative-logic fast/slow/vslow tiers are applied — the in past tests
- *        untested fields called out in Omission #2.
+ * @brief Tentative-logic fields, including the fast, slow and very slow tiers, are applied.
  */
 TEST_F(Medium_ConfigLoaderAdvancedFieldsTest, TentativeLogicTiersAreApplied)
 {
@@ -381,39 +405,34 @@ TEST_F(Medium_ConfigLoaderAdvancedFieldsTest, MahalanobisGatingFieldsAreApplied)
 // Medium_ConfigLoaderDefaultsTest
 
 /**
- * @brief A document missing the "basic" section must not perturb the basic
- *        fields of Params — they should remain at the GetDefaultParams baseline.
+ * @brief A document missing the "basic" section does not perturb the basic fields: they stay at
+ *        the GetDefaultParams baseline while the association field of the document applies.
  */
 TEST(Medium_ConfigLoaderDefaultsTest, MissingBasicSectionLeavesDefaults)
 {
-    Json doc = Json::object();
-    doc["sushitrack"]["advanced"]["association"]["primary_assoc_mode"] = 0;
+    sushitrack_params_t defaults{};
+    sushitrack_get_default_params(&defaults);
 
-    sushitrack_params_t p{};
-    sushitrack_get_default_params(&p);
-    const int default_frame_rate = p.frame_rate;
-    apply_config_to_params(doc, p);
+    const sushitrack_params_t p = load_params_from_text(
+        R"({"sushitrack": {"advanced": {"association": {"primary_assoc_mode": 0}}}})");
 
-    EXPECT_EQ(p.frame_rate, default_frame_rate);
+    EXPECT_EQ(p.frame_rate, defaults.frame_rate);
+    EXPECT_EQ(defaults.primary_assoc_mode, 1);
     EXPECT_EQ(p.primary_assoc_mode, 0);
 }
 
 /**
- * @brief A completely empty document must leave Params equal to defaults.
+ * @brief A document with an empty root leaves every field of Params equal to the defaults.
  */
 TEST(Medium_ConfigLoaderDefaultsTest, EmptyDocumentLeavesAllDefaults)
 {
-    Json doc = Json::object();
+    sushitrack_params_t defaults{};
+    sushitrack_get_default_params(&defaults);
 
-    sushitrack_params_t before{};
-    sushitrack_get_default_params(&before);
-    sushitrack_params_t after = before;
-    apply_config_to_params(doc, after);
+    const sushitrack_params_t after = load_params_from_text(R"({"sushitrack": {}})");
 
-    EXPECT_EQ(after.frame_rate, before.frame_rate);
-    EXPECT_EQ(after.track_buffer, before.track_buffer);
-    EXPECT_FLOAT_EQ(after.match_thresh, before.match_thresh);
-    EXPECT_EQ(after.enable_reid, before.enable_reid);
+    // The struct holds only 4-byte integers and floats, so it has no padding to differ in.
+    EXPECT_EQ(std::memcmp(&after, &defaults, sizeof(defaults)), 0);
 }
 
 // Medium_ConfigLoaderTrackerSmokeTest
@@ -423,12 +442,7 @@ TEST(Medium_ConfigLoaderDefaultsTest, EmptyDocumentLeavesAllDefaults)
  */
 TEST(Medium_ConfigLoaderTrackerSmokeTest, LoadedParamsBuildTrackerSuccessfully)
 {
-    Json doc = load_config_json();
-    ASSERT_FALSE(doc.empty());
-
-    sushitrack_params_t p{};
-    sushitrack_get_default_params(&p);
-    apply_config_to_params(doc, p);
+    const sushitrack_params_t p = load_shipped_params();
 
     sushitrack_tracker_t hdl = sushitrack_create(&p);
     ASSERT_NE(hdl, nullptr);
@@ -436,16 +450,12 @@ TEST(Medium_ConfigLoaderTrackerSmokeTest, LoadedParamsBuildTrackerSuccessfully)
 }
 
 /**
- * @brief Params produced by the loader must survive a one-detection Update.
+ * @brief Params produced by the library loader survive a one-detection Update: the shipped file
+ *        turns tentative tracking on, so the one track is Tentative and unconfirmed.
  */
 TEST(Medium_ConfigLoaderTrackerSmokeTest, LoadedParamsSurviveSingleDetectionUpdate)
 {
-    Json doc = load_config_json();
-    ASSERT_FALSE(doc.empty());
-
-    sushitrack_params_t p{};
-    sushitrack_get_default_params(&p);
-    apply_config_to_params(doc, p);
+    sushitrack_params_t p = load_shipped_params();
     p.time_aware = 1; // ensure dt argument is honoured
 
     sushitrack_tracker_t hdl = sushitrack_create(&p);
@@ -459,8 +469,10 @@ TEST(Medium_ConfigLoaderTrackerSmokeTest, LoadedParamsSurviveSingleDetectionUpda
     d.score = 0.9f;
     d.label = 1;
     std::vector<sushitrack_track_t> out(4);
-    int n = CDetections::update_frame(hdl, &d, 1, out.data(), 4, 0.04f);
-    EXPECT_GE(n, 0);
+
+    EXPECT_EQ(CDetections::update_frame(hdl, &d, 1, out.data(), 4, 0.04f), 1);
+    EXPECT_EQ(out[0].state, CDetections::K_TENTATIVE);
+    EXPECT_EQ(out[0].is_confirmed, 0);
 
     sushitrack_destroy(hdl);
 }
@@ -703,33 +715,34 @@ TEST(Medium_ConfigLoaderStrictReaderTest, FractionInAnIntegerFieldIsRefused)
 }
 
 /**
- * @brief A key no section reads is refused, whether it sits in a section or beside one.
+ * @brief A key no section reads is refused, in a section, in the advanced block or beside the
+ *        root, in both documented shapes (with and without the `sushitrack` root).
  */
-TEST(Medium_ConfigLoaderStrictReaderTest, UnknownKeyIsRefusedWhereverItSits)
+class Medium_ConfigLoaderUnknownKeyTest
+    : public ::testing::TestWithParam<std::pair<const char*, const char*>>
+{
+};
+
+TEST_P(Medium_ConfigLoaderUnknownKeyTest, UnknownKeyIsRefusedWhereverItSits)
 {
     const TempConfigFolder folder;
     SushiTrack::CapturedLog log;
     sushitrack_params_t params{};
     sushitrack_get_default_params(&params);
+    const std::string path = folder.write("typo.json", GetParam().first);
 
-    const std::string in_section =
-        folder.write("typo_in_section.json", R"({"basic": {"frame_rat": 30}})");
-    EXPECT_EQ(sushitrack_load_params_from_json(in_section.c_str(), &params),
+    EXPECT_EQ(sushitrack_load_params_from_json(path.c_str(), &params),
               SUSHITRACK_INVALID_ARGUMENT);
-    EXPECT_EQ(log.count("basic.frame_rat: unknown key"), 1);
-
-    const std::string in_advanced = folder.write(
-        "typo_in_advanced.json", R"({"sushitrack": {"advanced": {"asociation": {}}}})");
-    EXPECT_EQ(sushitrack_load_params_from_json(in_advanced.c_str(), &params),
-              SUSHITRACK_INVALID_ARGUMENT);
-    EXPECT_EQ(log.count("sushitrack.advanced.asociation: unknown key"), 1);
-
-    const std::string at_root =
-        folder.write("typo_at_root.json", R"({"sushitrack": {}, "extra": 1})");
-    EXPECT_EQ(sushitrack_load_params_from_json(at_root.c_str(), &params),
-              SUSHITRACK_INVALID_ARGUMENT);
-    EXPECT_EQ(log.count("extra: unknown key"), 1);
+    EXPECT_EQ(log.count(GetParam().second), 1);
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    Positions, Medium_ConfigLoaderUnknownKeyTest,
+    ::testing::Values(
+        std::make_pair(R"({"basic": {"frame_rat": 30}})", "basic.frame_rat: unknown key"),
+        std::make_pair(R"({"sushitrack": {"advanced": {"asociation": {}}}})",
+                       "sushitrack.advanced.asociation: unknown key"),
+        std::make_pair(R"({"sushitrack": {}, "extra": 1})", "extra: unknown key")));
 
 /**
  * @brief A flag written true or false and an integer written with a zero fraction are accepted.
@@ -777,5 +790,12 @@ TEST(Medium_ConfigLoaderCreateTest, RefusedFileGivesNoTracker)
 
     EXPECT_EQ(sushitrack_create_from_config(path.c_str()), nullptr);
     EXPECT_EQ(log.count("refused_for_create.json"), 1);
+}
+
+/**
+ * @brief sushitrack_create_from_config returns no tracker for a file that does not exist.
+ */
+TEST(Medium_ConfigLoaderCreateTest, MissingFileGivesNoTracker)
+{
     EXPECT_EQ(sushitrack_create_from_config("no/such/file.json"), nullptr);
 }
