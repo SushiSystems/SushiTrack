@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-11-10 — general: Rule what a match_thresh above 1 does: the code accepts every pair, the test says none (RW-39, `f2c3f31`).
 - 2026-11-09 — docs: Aligned `docs/guides/TESTING.md` with the testing skill's sizes and named the timeouts the build still has to change (RW-36).
 - 2026-11-09 — tests: Deleted `test_test_budget_settings.py` and `K_TEST_BUDGET`, whose skill-table test always skipped here and checked nothing.
 - 2026-11-09 — tests: Made the four weak CLI checks assert what they claim: every env spelling of a bool field, each README, the runtime library name per platform, and the one error line of an unchoosable package.
