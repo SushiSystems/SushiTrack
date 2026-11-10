@@ -63,7 +63,7 @@ TEST(Small_CosineCostCalculatorTest, IdenticalFeaturesCostIsZero)
     CostMatrix m;
     calc.calculate(av, bv, m);
 
-    EXPECT_NEAR(m(0, 0), 0.f, 1e-4f);
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_error(m(0, 0), 0.0, K_COSINE_BOUND)));
 }
 
 /** @brief Orthogonal features → cosine similarity 0 → cost ≈ 1. */
@@ -77,7 +77,7 @@ TEST(Small_CosineCostCalculatorTest, OrthogonalFeaturesCostIsOne)
     CostMatrix m;
     calc.calculate(av, bv, m);
 
-    EXPECT_NEAR(m(0, 0), 1.f, 1e-4f);
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_error(m(0, 0), 1.0, K_COSINE_BOUND)));
 }
 
 /** @brief A tracklet with no feature on either side costs 1 against one that has a feature. */
