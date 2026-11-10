@@ -21,5 +21,15 @@ def current():
     return _lazy.get()
 
 
+def is_built() -> bool:
+    """Return whether the console has been built yet; importing this module does not build it."""
+    return _lazy.built
+
+
+def config_sources():
+    """Return the config files the console layers, lowest first; none outside a checkout."""
+    return _lazy.sources()
+
+
 # PEP 562: an attribute resolves on first access, so importing this module reads no file.
 __getattr__ = _lazy.attribute

@@ -72,4 +72,6 @@ console built at import time would stop every `st` invocation outside a checkout
 included. The module assigns `__getattr__` (PEP 562) instead: attributes resolve on first access,
 so importing it never touches the filesystem or the project layout.
 
-The lifecycle lives in `LazyConsole`. `cli/tests/test_console.py` pins that this CLI is wired to it.
+The lifecycle lives in `LazyConsole`. `console.is_built()` and `console.config_sources()` expose
+whether it has built and which files it layers, and `cli/tests/test_console.py` pins that this CLI is
+wired to it through them.
