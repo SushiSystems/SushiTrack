@@ -23,7 +23,8 @@
 
 /**
  * @file compile_association_log_category.cpp
- * @brief Checks at compile time that the association category belongs to `sushitrack`, module `association`.
+ * @brief Checks at compile time that the association category belongs to `sushitrack`, module
+ *        `association`.
  * @author Mustafa Garip
  */
 
