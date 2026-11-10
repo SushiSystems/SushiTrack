@@ -21,6 +21,9 @@ pytestmark = pytest.mark.medium
 
 MISSING = "definitely-not-a-program-4b7e"
 
+#: The file name of the planted program on each OS; Windows finds a program by its extension.
+K_PROBE_NAMES = {"nt": "st_probe.exe", "posix": "st_probe"}
+
 
 def _runner():
     """Build a runner that records instead of printing."""
@@ -81,8 +84,7 @@ def test_capture_reports_a_missing_executable_in_its_stderr():
 
 
 def test_resolve_prefers_the_path_the_caller_handed_over(tmp_path):
-    name = "st_probe.exe" if os.name == "nt" else "st_probe"
-    planted = tmp_path / name
+    planted = tmp_path / K_PROBE_NAMES[os.name]
     planted.write_text("", encoding="utf-8")
     planted.chmod(0o755)
     found = process.RUNNER.resolve_exe(planted.stem, {"PATH": str(tmp_path)})
