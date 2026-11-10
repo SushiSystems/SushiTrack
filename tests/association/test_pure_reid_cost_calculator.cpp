@@ -41,9 +41,16 @@
 #include <SushiTrack/tracking/tracklet.hpp>
 
 #include <gating_log_fixture.hpp>
+#include <support/tolerance.hpp>
 #include <tracklet_builders.hpp>
 
 using namespace SushiTrack;
+
+namespace
+{
+    /// @brief Bound of 1 - cos(a, a) on a unit vector: a dot product, two norms and a quotient, four rounded operations of unit roundoff on a magnitude of 1.
+    const double K_COSINE_BOUND = 4.0 * TestSupport::unit_roundoff<float>();
+} // namespace
 
 // PureReIDCostCalculator
 
@@ -118,21 +125,32 @@ TEST(Small_PureReIDCostCalculatorTest, EmptyCollectionProducesEmptyMatrix)
 }
 
 /**
- * @brief calculate_single returns the same value as the corresponding batch cell
- *        for a pair that passes the threshold.
+ * @brief The batch cost of the pair is 0: identical features have a cosine distance of 0, under the threshold of 0.4, and the box offset plays no part.
  */
-TEST(Small_PureReIDCostCalculatorTest, SingleMatchesBatch)
+TEST(Small_PureReIDCostCalculatorTest, BatchCostOfIdenticalFeaturesIsZero)
 {
     PureReIDCostCalculator calc(0.4f, 9.4877f, NullGateValidator::get_instance());
-
-    auto a = make_feat_t(0.f, 0.f, 4, 3);
-    auto b = make_feat_t(30.f, 0.f, 4, 3);
-
-    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    std::vector<std::shared_ptr<Tracklet>> av{make_feat_t(0.f, 0.f, 4, 3)};
+    std::vector<std::shared_ptr<Tracklet>> bv{make_feat_t(30.f, 0.f, 4, 3)};
     CostMatrix m;
+
     calc.calculate(av, bv, m);
 
-    EXPECT_NEAR(m(0, 0), calc.calculate_single(a, b), 1e-5f);
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_error(m(0, 0), 0.0, K_COSINE_BOUND)));
+}
+
+/**
+ * @brief The single cost of the same pair is the same value.
+ */
+TEST(Small_PureReIDCostCalculatorTest, SingleCostOfIdenticalFeaturesIsZero)
+{
+    PureReIDCostCalculator calc(0.4f, 9.4877f, NullGateValidator::get_instance());
+    const std::shared_ptr<Tracklet> a = make_feat_t(0.f, 0.f, 4, 3);
+    const std::shared_ptr<Tracklet> b = make_feat_t(30.f, 0.f, 4, 3);
+
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_error(calc.calculate_single(a, b), 0.0, K_COSINE_BOUND)));
 }
 
 /** @brief Counts the gating log lines of one call. */
