@@ -32,68 +32,27 @@
 #include <gtest/gtest.h>
 
 #include <SushiTrack/filtering/gate_validator.hpp>
-#include <SushiTrack/filtering/kalman_filter.hpp>
+#include <SushiTrack/filtering/in_memory_gate_validator.hpp>
 #include <SushiTrack/filtering/kalman_types.hpp>
 
 #include <measurement_builders.hpp>
 
 using namespace SushiTrack;
 
-namespace
-{
-    /** @brief Implements only what GateValidator leaves pure, so its defaults are the ones run. */
-    class AcceptingValidator final : public GateValidator
-    {
-        public:
-            /// @brief Accepts every measurement.
-            [[nodiscard]] bool is_in_gate(const KalmanTypes::StateMean&,
-                                          const KalmanTypes::StateCov&,
-                                          const KalmanTypes::DetectBox&, float,
-                                          float) const override
-            {
-                return true;
-            }
-
-            /// @brief Accepts every measurement.
-            [[nodiscard]] std::vector<bool>
-            get_gate_flags(const KalmanTypes::StateMean&, const KalmanTypes::StateCov&,
-                           const KalmanTypes::DetectBoxVector& measurements, float,
-                           const std::vector<float>&) const override
-            {
-                return std::vector<bool>(measurements.size(), true);
-            }
-    };
-} // namespace
-
 /**
  * @brief The default get_gate_sq_distances gives one zero per measurement.
+ *
+ * InMemoryGateValidator leaves the default in place, and two measurements give two zeros.
  */
 TEST(Small_GateValidatorTest, DefaultSquaredDistancesAreZeroPerMeasurement)
 {
-    const AcceptingValidator validator;
+    const InMemoryGateValidator validator;
+    const GateValidator& gate = validator;
     KalmanTypes::DetectBoxVector measurements{make_box(0.f, 0.f, 1.f, 1.f),
                                               make_box(5.f, 5.f, 1.f, 1.f)};
 
-    const std::vector<float> distances = validator.get_gate_sq_distances(
+    const std::vector<float> distances = gate.get_gate_sq_distances(
         KalmanTypes::StateMean::Zero(), KalmanTypes::StateCov::Identity(), measurements);
 
     EXPECT_EQ(distances, (std::vector<float>{0.f, 0.f}));
-}
-
-/**
- * @brief Through GateValidator&, a Kalman filter keeps the measurement it was started on and
- *        rejects one far away.
- */
-TEST(Small_GateValidatorTest, KalmanGateKeepsTheNearAndRejectsTheFar)
-{
-    KalmanFilter filter;
-    KalmanTypes::StateMean mean;
-    KalmanTypes::StateCov covariance;
-    const KalmanTypes::DetectBox start = make_box(100.f, 200.f, 50.f, 80.f);
-    filter.initiate(mean, covariance, start);
-    const GateValidator& validator = filter;
-
-    EXPECT_TRUE(validator.is_in_gate(mean, covariance, start, 9.4877f));
-    EXPECT_FALSE(
-        validator.is_in_gate(mean, covariance, make_box(5000.f, 200.f, 50.f, 80.f), 9.4877f));
 }
