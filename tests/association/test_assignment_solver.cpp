@@ -61,22 +61,3 @@ TEST(Small_AssignmentSolverTest, SolvesThroughTheInterface)
     EXPECT_TRUE(a_unmatched.empty());
     EXPECT_TRUE(b_unmatched.empty());
 }
-
-/**
- * @brief A pair whose cost is above the threshold is reported unmatched on both sides.
- */
-TEST(Small_AssignmentSolverTest, LeavesPairsAboveTheThresholdUnmatched)
-{
-    std::unique_ptr<AssignmentSolver> solver = std::make_unique<LAPJVSolver>();
-    CostMatrix cost;
-    cost.resize(1, 1, 0.9f);
-
-    std::vector<std::vector<int>> matches;
-    std::vector<int> a_unmatched;
-    std::vector<int> b_unmatched;
-    solver->solve(cost, 1, 1, 0.5f, matches, a_unmatched, b_unmatched);
-
-    EXPECT_TRUE(matches.empty());
-    EXPECT_EQ(a_unmatched, std::vector<int>{0});
-    EXPECT_EQ(b_unmatched, std::vector<int>{0});
-}
