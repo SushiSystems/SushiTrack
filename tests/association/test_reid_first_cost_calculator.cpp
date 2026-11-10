@@ -47,7 +47,8 @@ using namespace SushiTrack;
 
 namespace
 {
-    /// @brief Rounded operations from a box to its IoU cost: corners, areas, intersection, union and
+    /// @brief Rounded operations from a box to its IoU cost: corners, areas, intersection, union
+    ///        and
     ///        the quotient.
     constexpr std::size_t K_IOU_OPERATIONS = 10;
 
@@ -139,7 +140,8 @@ TEST(Small_ReIDFirstCostCalculatorTest, EmptyCollectionProducesEmptyMatrix)
 }
 
 /**
- * @brief The batch cost of the pair is 0: identical features have a distance of 0, under the confidence threshold of 0.3, and 0 times the direct assignment weight of 0.2 is 0.
+ * @brief The batch cost of the pair is 0: identical features have a distance of 0, under the
+ *        confidence threshold of 0.3, and 0 times the direct assignment weight of 0.2 is 0.
  */
 TEST(Small_ReIDFirstCostCalculatorTest, BatchCostOfIdenticalFeaturesIsZero)
 {
