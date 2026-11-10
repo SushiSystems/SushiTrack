@@ -42,9 +42,16 @@
 #include <SushiTrack/tracking/tracklet.hpp>
 
 #include <gating_log_fixture.hpp>
+#include <support/tolerance.hpp>
 #include <tracklet_builders.hpp>
 
 using namespace SushiTrack;
+
+namespace
+{
+    /// @brief Rounded operations from a box to its IoU cost: corners, areas, intersection, union and the quotient.
+    constexpr std::size_t K_ROUNDED_OPERATIONS = 10;
+} // namespace
 
 // GatedIoUCostCalculator
 
@@ -123,21 +130,34 @@ TEST(Small_GatedIoUCostCalculatorTest, EmptyCollectionProducesEmptyMatrix)
 }
 
 /**
- * @brief calculate_single returns the same value as the corresponding batch cell.
+ * @brief The batch cost of the pair is the hand value 6/13: intersection 70 x 100 = 7000 over union 20000 - 7000 = 13000 gives IoU 7/13, and the null gate passes the cell.
  */
-TEST(Small_GatedIoUCostCalculatorTest, SingleMatchesBatch)
+TEST(Small_GatedIoUCostCalculatorTest, BatchCostOfAPartialOverlapIsTheHandValue)
 {
     auto iou = std::make_shared<IoUCostCalculator>();
     GatedIoUCostCalculator calc(9.4877f, NullGateValidator::get_instance(), iou);
-
-    auto a = make_t(0.f, 0.f, 100.f, 100.f);
-    auto b = make_t(30.f, 0.f, 100.f, 100.f);
-
-    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    std::vector<std::shared_ptr<Tracklet>> av{make_t(0.f, 0.f, 100.f, 100.f)};
+    std::vector<std::shared_ptr<Tracklet>> bv{make_t(30.f, 0.f, 100.f, 100.f)};
     CostMatrix m;
+
     calc.calculate(av, bv, m);
 
-    EXPECT_NEAR(m(0, 0), calc.calculate_single(a, b), 1e-5f);
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_relative_error<float>(m(0, 0), 6.0 / 13.0, K_ROUNDED_OPERATIONS)));
+}
+
+/**
+ * @brief The single cost of the same pair is the same value.
+ */
+TEST(Small_GatedIoUCostCalculatorTest, SingleCostOfAPartialOverlapIsTheHandValue)
+{
+    auto iou = std::make_shared<IoUCostCalculator>();
+    GatedIoUCostCalculator calc(9.4877f, NullGateValidator::get_instance(), iou);
+    const std::shared_ptr<Tracklet> a = make_t(0.f, 0.f, 100.f, 100.f);
+    const std::shared_ptr<Tracklet> b = make_t(30.f, 0.f, 100.f, 100.f);
+
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_relative_error<float>(calc.calculate_single(a, b), 6.0 / 13.0, K_ROUNDED_OPERATIONS)));
 }
 
 /** @brief Counts the gating log lines of one call. */
