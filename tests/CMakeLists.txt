@@ -16,6 +16,17 @@ if(SUSHITRACK_BUILD_TESTS)
         TEST_SOURCES ${SUSHITRACK_TEST_SOURCES}
         ENVIRONMENT "SUSHITRACK_CONFIG=${PROJECT_SOURCE_DIR}/assets/sushitrack.json")
 
+    # A header with no runtime promise keeps compile_<name>.cpp, whose static_asserts are its
+    # test: the build of this object library is the check.
+    file(GLOB_RECURSE SUSHITRACK_COMPILE_CHECKS CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/*/compile_*.cpp")
+    list(FILTER SUSHITRACK_COMPILE_CHECKS EXCLUDE REGEX "/applications/")
+    if(SUSHITRACK_COMPILE_CHECKS)
+        add_library(sushitrack_compile_checks OBJECT ${SUSHITRACK_COMPILE_CHECKS})
+        target_compile_features(sushitrack_compile_checks PRIVATE cxx_std_17)
+        target_link_libraries(sushitrack_compile_checks PRIVATE sushitrack_static)
+    endif()
+
     if(SUSHITRACK_BUILD_APPLICATIONS)
         file(GLOB_RECURSE SUSHITRACK_APPLICATION_TEST_SOURCES CONFIGURE_DEPENDS
             "${CMAKE_CURRENT_SOURCE_DIR}/applications/*/test_*.cpp")

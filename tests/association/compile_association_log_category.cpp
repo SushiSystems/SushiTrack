@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* test_association_log_category.cpp                                      */
+/* compile_association_log_category.cpp                                   */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -22,22 +22,14 @@
 /**************************************************************************/
 
 /**
- * @file test_association_log_category.cpp
- * @brief Tests the category the association area logs under.
+ * @file compile_association_log_category.cpp
+ * @brief Checks at compile time that the association category belongs to `sushitrack`, module `association`.
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-
 #include <SushiTrack/association/association_log_category.hpp>
 
-using namespace SushiTrack;
-
-/**
- * @brief The category belongs to `sushitrack` and its module is `association`.
- */
-TEST(Small_AssociationLogCategoryTest, NamesTheProjectAndTheModule)
-{
-    EXPECT_EQ(K_ASSOCIATION_LOG_CATEGORY.project().name(), "sushitrack");
-    EXPECT_EQ(K_ASSOCIATION_LOG_CATEGORY.module(), "association");
-}
+static_assert(SushiTrack::K_ASSOCIATION_LOG_CATEGORY.project().name() == "sushitrack",
+              "the association category belongs to the sushitrack project");
+static_assert(SushiTrack::K_ASSOCIATION_LOG_CATEGORY.module() == "association",
+              "the association category names the association module");
