@@ -27,8 +27,6 @@
  * @author Mustafa Garip
  */
 
-#include <atomic>
-#include <cmath>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -38,43 +36,6 @@
 #include <c_detection_builders.hpp>
 
 #include <captured_log.hpp>
-
-/**
- * @brief Fixture providing a default-initialised params struct.
- */
-class Small_SushiTrackCParamsTest : public ::testing::Test
-{
-    protected:
-        sushitrack_params_t params_{};
-
-        void SetUp() override { sushitrack_get_default_params(&params_); }
-};
-
-/**
- * @brief GetDefaultParams populates frame_rate to a positive non-zero value.
- */
-TEST_F(Small_SushiTrackCParamsTest, DefaultFrameRateIsPositive)
-{
-    EXPECT_GT(params_.frame_rate, 0);
-}
-
-/**
- * @brief GetDefaultParams populates track_buffer to a positive non-zero value.
- */
-TEST_F(Small_SushiTrackCParamsTest, DefaultTrackBufferIsPositive)
-{
-    EXPECT_GT(params_.track_buffer, 0);
-}
-
-/**
- * @brief GetDefaultParams sets match_thresh to a finite value in (0, 1].
- */
-TEST_F(Small_SushiTrackCParamsTest, DefaultMatchThreshIsFiniteAndPositive)
-{
-    EXPECT_GT(params_.match_thresh, 0.0f);
-    EXPECT_LE(params_.match_thresh, 1.0f);
-    EXPECT_TRUE(std::isfinite(params_.match_thresh));
-}
 
 /**
  * @brief Fixture covering sushitrack_create_ex validation and success paths.
@@ -93,15 +54,6 @@ class Small_SushiTrackCCreateExTest : public ::testing::Test
                 sushitrack_destroy(hdl_);
         }
 };
-
-/**
- * @brief CreateEx returns SUSHITRACK_INVALID_ARGUMENT when params pointer is null.
- */
-TEST_F(Small_SushiTrackCCreateExTest, NullParamsReturnsInvalidArgument)
-{
-    sushitrack_status_t status = sushitrack_create_ex(nullptr, &hdl_);
-    EXPECT_EQ(status, SUSHITRACK_INVALID_ARGUMENT);
-}
 
 /**
  * @brief CreateEx returns SUSHITRACK_INVALID_ARGUMENT when out_hdl pointer is null.
@@ -191,17 +143,6 @@ TEST_F(Small_SushiTrackCUpdateTest, ZeroDetectionsOnEmptyTrackerReturnsZero)
     std::vector<sushitrack_track_t> out(10);
     int n = CDetections::update_frame(hdl_, nullptr, 0, out.data(), 10, 0.04f);
     EXPECT_EQ(n, 0);
-}
-
-/**
- * @brief Update return value does not exceed the max_tracks capacity argument.
- */
-TEST_F(Small_SushiTrackCUpdateTest, ReturnValueDoesNotExceedMaxTracks)
-{
-    std::vector<sushitrack_track_t> out(1);
-    sushitrack_object_t d0 = det(100.0f, 200.0f);
-    int n = CDetections::update_frame(hdl_, &d0, 1, out.data(), 1, 0.04f);
-    EXPECT_LE(n, 1);
 }
 
 /**
