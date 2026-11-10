@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* test_c_api_log_category.cpp                                            */
+/* compile_c_api_log_category.cpp                                         */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                               SushiTrack                               */
@@ -22,22 +22,14 @@
 /**************************************************************************/
 
 /**
- * @file test_c_api_log_category.cpp
- * @brief Tests the category the c_api area logs under.
+ * @file compile_c_api_log_category.cpp
+ * @brief Checks at compile time that the c_api category belongs to `sushitrack`, module `c_api`.
  * @author Mustafa Garip
  */
 
-#include <gtest/gtest.h>
-
 #include <SushiTrack/c_api/c_api_log_category.hpp>
 
-using namespace SushiTrack;
-
-/**
- * @brief The category belongs to `sushitrack` and its module is `c_api`.
- */
-TEST(Small_CAPILogCategoryTest, NamesTheProjectAndTheModule)
-{
-    EXPECT_EQ(K_C_API_LOG_CATEGORY.project().name(), "sushitrack");
-    EXPECT_EQ(K_C_API_LOG_CATEGORY.module(), "c_api");
-}
+static_assert(SushiTrack::K_C_API_LOG_CATEGORY.project().name() == "sushitrack",
+              "the c_api category belongs to the sushitrack project");
+static_assert(SushiTrack::K_C_API_LOG_CATEGORY.module() == "c_api",
+              "the c_api category names the c_api module");
