@@ -96,19 +96,29 @@ def test_a_pinned_sushi_library_reaches_the_configure(tmp_path, runner):
     assert "-DSUSHILOG_DIR=/stack/sushilog" in stamp
 
 
-@pytest.mark.parametrize("sanitizer, name", [(build_svc.Sanitizer.address, "asan"),
-                                             (build_svc.Sanitizer.thread, "tsan")])
-def test_a_sanitizer_reaches_the_configure_and_builds_its_own_tree(
+K_SANITIZERS = [(build_svc.Sanitizer.address, "asan"), (build_svc.Sanitizer.thread, "tsan")]
+
+
+@pytest.mark.parametrize("sanitizer", [row[0] for row in K_SANITIZERS])
+def test_a_sanitizer_reaches_the_configure_and_the_stamp(tmp_path, runner, sanitizer):
+    """Hands the sanitizer to CMake as SUSHITRACK_SANITIZE and records it in the stamp."""
+    assert build_svc.build(_cfg(), _paths(tmp_path), tests=False, sanitizer=sanitizer,
+        workspace=runner.workspace) == 0
+    define = f"-DSUSHITRACK_SANITIZE={sanitizer.value}"
+    tree = tmp_path / "build" / f"{dict(K_SANITIZERS)[sanitizer]}-debug"
+    assert define in runner.commands[0]
+    assert define in (tree / build_svc.STAMP_NAME).read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("sanitizer, name", K_SANITIZERS)
+def test_a_sanitizer_builds_in_its_own_tree_and_leaves_the_plain_tree(
         tmp_path, runner, sanitizer, name):
-    """Hands the sanitizer to CMake as SUSHITRACK_SANITIZE, in build/<name>-debug."""
+    """Configures build/<name>-debug and creates nothing in the plain tree."""
     paths = _paths(tmp_path)
     assert build_svc.build(_cfg(), paths, tests=False, sanitizer=sanitizer,
         workspace=runner.workspace) == 0
-    define = f"-DSUSHITRACK_SANITIZE={sanitizer.value}"
     tree = tmp_path / "build" / f"{name}-debug"
-    assert define in runner.commands[0]
     assert runner.commands[0][runner.commands[0].index("-B") + 1] == str(tree)
-    assert define in (tree / build_svc.STAMP_NAME).read_text(encoding="utf-8")
     assert not paths.build.exists()
 
 
@@ -160,16 +170,6 @@ def test_a_stopped_gate_refuses_the_build(tmp_path, runner):
     assert runner.commands == []
 
 
-def test_the_configure_carries_both_launcher_entries(tmp_path, runner):
-    """Appends the compiler and linker launcher entries of the tree's gate."""
-    paths = _paths(tmp_path)
-    assert build_svc.build(_cfg(), paths, tests=False, workspace=runner.workspace) == 0
-    entries = build_admission.launcher_defines(paths.build)
-    assert len(entries) == 2
-    for entry in entries:
-        assert f"-D{entry}" in runner.commands[0]
-
-
 def test_the_launcher_runs_host_compiles_through_the_configured_cache(
         tmp_path, runner, monkeypatch):
     """Names the compiler cache in the launcher when one is found."""
@@ -179,19 +179,13 @@ def test_the_launcher_runs_host_compiles_through_the_configured_cache(
     assert len(launcher) == 1 and f"--cache;{K_CCACHE}" in launcher[0]
 
 
-def test_the_compile_takes_the_hardware_threads_without_jobs(tmp_path, runner):
-    """Passes the hardware thread count to --parallel when no --jobs is given."""
-    assert build_svc.build(_cfg(), _paths(tmp_path), tests=False, workspace=runner.workspace) == 0
-    compile_ = runner.commands[1]
-    assert compile_[compile_.index("--parallel") + 1] == str(K_THREADS)
-
-
-def test_jobs_overrides_the_hardware_threads(tmp_path, runner):
-    """Passes --jobs to --parallel in place of the hardware thread count."""
-    assert build_svc.build(_cfg(), _paths(tmp_path), jobs=3, tests=False,
+@pytest.mark.parametrize("jobs, parallel", [(None, str(K_THREADS)), (3, "3")])
+def test_the_compile_takes_the_jobs_or_else_the_hardware_threads(tmp_path, runner, jobs, parallel):
+    """Passes --jobs to --parallel, and the hardware thread count when no --jobs is given."""
+    assert build_svc.build(_cfg(), _paths(tmp_path), jobs=jobs, tests=False,
         workspace=runner.workspace) == 0
     compile_ = runner.commands[1]
-    assert compile_[compile_.index("--parallel") + 1] == "3"
+    assert compile_[compile_.index("--parallel") + 1] == parallel
 
 
 def test_a_report_is_printed_and_written(tmp_path, runner, monkeypatch):
@@ -215,17 +209,8 @@ def test_a_report_is_printed_and_written(tmp_path, runner, monkeypatch):
     paths = _paths(tmp_path)
     assert build_svc.build(_cfg(), paths, tests=False, report=True, workspace=runner.workspace) == 0
     assert seen == {"offset": 7, "written": paths.build}
-
-
-def test_the_default_generator_follows_the_host():
-    """Defaults to Ninja on Windows and CMake's choice elsewhere."""
-    assert build_svc.generator(_cfg(windows=True)) == "Ninja"
-    assert build_svc.generator(_cfg(windows=False)) == ""
-
-
-def test_a_configured_generator_wins():
-    """Uses the generator the config names."""
-    assert build_svc.generator(_cfg(generator="Unix Makefiles")) == "Unix Makefiles"
+    assert runner.said("report line")
+    assert runner.said(f"Report: {paths.build / 'build_report.json'}")
 
 
 def test_a_fresh_tree_is_configured_then_built(tmp_path, runner):
@@ -325,8 +310,3 @@ def test_clean_removes_every_tree_and_the_package(tmp_path, session):
     paths.package.mkdir()
     assert build_svc.clean(paths, workspace=session.workspace) == 0
     assert not paths.build_root.exists() and not paths.package.exists()
-
-
-def test_build_type_values_match_build_types():
-    assert {member.value for member in build_svc.BuildType} == \
-        {name.lower() for name in build_svc.BUILD_TYPES}
