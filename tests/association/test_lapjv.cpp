@@ -58,17 +58,26 @@ TEST(Small_LAPJVTest, FindsTheMinimumCostPermutation)
 }
 
 /**
- * @brief resize grows every buffer to the size asked for and never shrinks one.
+ * @brief A workspace that was asked for 5 and then for 2 still solves a 5 x 5 problem: the second
+ *        resize did not shrink what the first one grew.
  */
-TEST(Small_LAPJVTest, WorkspaceResizeOnlyGrows)
+TEST(Small_LAPJVTest, WorkspaceResizedDownStillSolvesTheLargerProblem)
 {
+    // The cheap cell of row r is column (r + 2) % 5.
+    std::vector<double> data(25, 9.0);
+    std::vector<double*> rows;
+    for (int row = 0; row < 5; ++row)
+    {
+        data[row * 5 + (row + 2) % 5] = 1.0;
+        rows.push_back(&data[row * 5]);
+    }
+    std::vector<int> x(5, -1);
+    std::vector<int> y(5, -1);
     LAPJVWorkspace workspace;
     workspace.resize(5);
     workspace.resize(2);
 
-    EXPECT_EQ(workspace.free_rows.size(), 5u);
-    EXPECT_EQ(workspace.v.size(), 5u);
-    EXPECT_EQ(workspace.cols.size(), 5u);
-    EXPECT_EQ(workspace.d.size(), 5u);
-    EXPECT_EQ(workspace.pred.size(), 5u);
+    ASSERT_EQ(lapjv_internal(5, rows.data(), x.data(), y.data(), &workspace), 0);
+
+    EXPECT_EQ(x, (std::vector<int>{2, 3, 4, 0, 1}));
 }
