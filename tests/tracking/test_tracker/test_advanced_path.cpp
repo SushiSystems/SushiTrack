@@ -27,7 +27,6 @@
  * @author Mustafa Garip
  */
 
-#include <cmath>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -36,39 +35,34 @@
 
 #include <c_detection_builders.hpp>
 
+using CDetections::find_by_id;
+using CDetections::make_det_with_feat;
+using CDetections::update_frame;
+
 namespace
 {
-
-    sushitrack_object_t make_det_with_feat(float x, float y, const float* feat, int feat_dim,
-                                           float score = 0.9f)
+    /**
+     * @brief Feeds a box with @p feature down the first three frames, 5 px per frame, and
+     *        returns the id of its track after the third, or -1 when a frame gave no track.
+     */
+    int64_t confirm_target(sushitrack_tracker_t tracker, const std::vector<float>& feature)
     {
-        sushitrack_object_t o{};
-        o.x = x;
-        o.y = y;
-        o.width = 50.0f;
-        o.height = 100.0f;
-        o.score = score;
-        o.label = 1;
-        o.feat = feat;
-        o.feat_dim = feat_dim;
-        return o;
+        std::vector<sushitrack_track_t> out(8);
+        int64_t track_id = -1;
+        for (int frame = 0; frame < 3; ++frame)
+        {
+            const sushitrack_object_t detection =
+                make_det_with_feat(100.0f, 100.0f + frame * 5.0f, feature.data(), 512, 0.9f);
+            if (update_frame(tracker, &detection, 1, out.data(), 8, 0.04f) < 1)
+                return -1;
+            track_id = out[0].track_id;
+        }
+        return track_id;
     }
-
-    const sushitrack_track_t* find_by_id(const std::vector<sushitrack_track_t>& out, int n,
-                                         int64_t id)
-    {
-        for (int i = 0; i < n; ++i)
-            if (out[static_cast<std::size_t>(i)].track_id == id)
-                return &out[static_cast<std::size_t>(i)];
-        return nullptr;
-    }
-
 } // namespace
 
 /**
- * @brief Integration test validating the Advanced Path (ReID + Mahalanobis Gating).
- *
- * Closes Gap 3 from RELEASE_READINESS.md: "Mahalanobis + fused path lacks end-to-end coverage."
+ * @brief Fixture for the advanced path: ReID and Mahalanobis gating on, the age cascade off.
  */
 class Small_TrackerAdvancedPathTest : public ::testing::Test
 {
@@ -100,43 +94,27 @@ class Small_TrackerAdvancedPathTest : public ::testing::Test
         void TearDown() override { sushitrack_destroy(hdl_); }
 };
 
+/**
+ * @brief With ReID and the Mahalanobis gate, a decoy at the predicted place does not take the
+ *        id of a confirmed target that reappears 10 px away with its own feature.
+ *
+ * The Kalman output blends prediction and measurement, so the track lands between x = 100 (the
+ * decoy) and x = 110 (the target); a track that followed the decoy stays near 100, one that
+ * followed the target is above 105.
+ */
 TEST_F(Small_TrackerAdvancedPathTest, ReIDAndMahalanobisEndToEnd)
 {
     std::vector<sushitrack_track_t> out(8);
-
-    // Frame 1 to 3: Detect target to confirm the tracklet
-    int64_t target_id = -1;
-    for (int i = 0; i < 3; ++i)
-    {
-        sushitrack_object_t d =
-            make_det_with_feat(100.0f, 100.0f + i * 5.0f, target_feat_.data(), 512, 0.9f);
-        int n = CDetections::update_frame(hdl_, &d, 1, out.data(), 8, 0.04f);
-        ASSERT_GE(n, 1);
-        if (i == 2)
-        {
-            target_id = out[0].track_id;
-        }
-    }
+    const int64_t target_id = confirm_target(hdl_, target_feat_);
     ASSERT_NE(target_id, -1);
+    const sushitrack_object_t decoy = make_det_with_feat(100.0f, 115.0f, decoy_feat_.data(), 512);
+    const sushitrack_object_t target = make_det_with_feat(110.0f, 115.0f, target_feat_.data(), 512);
+    const sushitrack_object_t detections[2] = {decoy, target};
 
-    // Frame 4: An object appears at the exact same location, but with a different feature (Decoy) And our true target object appears a bit further away (Mahalanobis gate should catch it, and ReID should match it)
+    const int n = update_frame(hdl_, detections, 2, out.data(), 8, 0.04f);
 
-    // Decoy object at the predicted location (IoU is high, but ReID feature is very different)
-    sushitrack_object_t decoy = make_det_with_feat(100.0f, 115.0f, decoy_feat_.data(), 512, 0.9f);
-
-    // True object further away (IoU is lower, but ReID feature matches perfectly) Placed at 110, so it's still well within the Mahalanobis gate.
-    sushitrack_object_t target = make_det_with_feat(110.0f, 115.0f, target_feat_.data(), 512, 0.9f);
-
-    sushitrack_object_t dets_f4[2] = {decoy, target};
-    int n4 = CDetections::update_frame(hdl_, dets_f4, 2, out.data(), 8, 0.04f);
-    ASSERT_GE(n4, 1);
-
-    // Check if the true object retained the target_id
-    const sushitrack_track_t* t = find_by_id(out, n4, target_id);
-    ASSERT_NE(t, nullptr)
-        << "The tracker failed to associate the target using ReID and Mahalanobis gating.";
-
-    // The decoy sits at the predicted location (x~=100); the ReID-matched target is at x=110. The Kalman output is the filtered estimate, not the raw detection: it blends prediction and measurement as x = 100 + K*(110-100), which lands near 107.6 for this covariance. Asserting equality with the raw 110 would test "did the KF ignore its own prediction", not the ReID association. Instead assert the track moved decisively toward the target (x>105) rather than staying at the decoy (x~=100), which is the property this test actually validates and is robust to the Kalman gain.
-    EXPECT_GT(t->x, 105.0f)
-        << "Tracker associated the ID with the decoy object instead of using ReID.";
+    ASSERT_GE(n, 1);
+    const sushitrack_track_t* kept = find_by_id(out, n, target_id);
+    ASSERT_NE(kept, nullptr) << "the target lost its id";
+    EXPECT_GT(kept->x, 105.0f) << "the id followed the decoy";
 }
