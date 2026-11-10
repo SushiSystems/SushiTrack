@@ -413,6 +413,12 @@ Small_ByteTrackAdapterTest.IsNamedBytetrack | rewrite | 1 | Forbidden kind: a ge
 Small_ByteTrackAdapterTest.MissingSettingsKeepTheDefaults | rewrite | 1 | Forbidden kind: a small test reaches a file. The constructor reads "this/path/does/not/exist.json" through read_json_settings. The check (an empty frame gives no track) holds for any defaults, so the promise that defaults hold is not observed. Rewrite: the defaults must show in the tracks; the file reach needs a string seam (owner's decision) or the test moves to medium | tests/applications/tracker_bridge/test_byte_track_adapter.cpp; applications/tracker_bridge/byte_track_adapter.hpp; applications/tracker_bridge/json_settings.hpp
 ```
 
+### `tests/applications/tracker_bridge/test_default_trackers.cpp`
+
+```
+Small_DefaultTrackersTest.RegistersTheThreeReferenceNames | keep | 9 | register_default_trackers: an empty registry ends up holding bytetrack, ocsort and sushitrack. The registry is owned by the test and no creator runs, so no file or environment is reached; the oracle is the specified list of names | tests/applications/tracker_bridge/test_default_trackers.cpp; applications/tracker_bridge/default_trackers.hpp; applications/tracker_bridge/tracker_registry.hpp
+```
+
 ### `tests/applications/tracker_bridge/test_json_settings.cpp`
 
 ```
@@ -471,6 +477,13 @@ Small_TrackerBridgeTest.NegativeCountsAreRefused | rewrite | 1 | Forbidden kind:
 
 ```
 Small_TrackerBridgeLogCategoryTest.NamesTheProjectAndTheModule | delete | 1 | Forbidden kind: a log category constant, with no behaviour of its own. No promise row | tests/applications/tracker_bridge/test_tracker_bridge_log_category.cpp; applications/tracker_bridge/tracker_bridge_log_category.hpp
+```
+
+### `tests/applications/tracker_bridge/test_tracker_builder.cpp`
+
+```
+Small_TrackerBuilderTest.BuildsEveryRegisteredTracker | split | 3 | Name and body join results that can break apart: each registered name builds a tracker; an unknown name gives nullptr; a null name gives nullptr. A loop over names sits in the body. Split into one row per registered name (parametrised), an unknown-name test and a null-name test | tests/applications/tracker_bridge/test_tracker_builder.cpp; applications/tracker_bridge/tracker_builder.hpp; applications/tracker_bridge/tracker_registry.hpp
+Small_TrackerBuilderTest.RefusedNamesAreLogged | split | 3 | Two refusals in one body: an unknown name logs one ERROR that lists the registered names, and a null name logs one ERROR. Split into two tests, the first asserting the whole list. A creator that throws is a third refusal no test holds: add a row that gives nullptr and one ERROR naming the message | tests/applications/tracker_bridge/test_tracker_builder.cpp; applications/tracker_bridge/tracker_builder.hpp; tests/captured_log.hpp
 ```
 
 ### `tests/applications/tracker_bridge/test_tracker_registry.cpp`
