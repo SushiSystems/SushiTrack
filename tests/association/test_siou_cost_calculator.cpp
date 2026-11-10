@@ -81,7 +81,10 @@ TEST(Small_SIoUCostCalculatorTest, SeparatedBoxesCostPositive)
 }
 
 /**
- * @brief The batch cost of a partial overlap pair is the hand value: IoU is 9/41; the centres differ by 40 px on both axes, so the angle cost is 1 and gamma = 1; the normalised offset is 40 / 140 on each axis, so the distance cost is 2 (1 - exp(-4/49)); the widths and heights are equal, so the shape cost is 0; cost = 1 - (IoU - distance cost / 2).
+ * @brief The batch cost of a partial overlap pair is the hand value: IoU is 9/41; the centres
+ *        differ by 40 px on both axes, so the angle cost is 1 and gamma = 1; the normalised offset
+ *        is 40 / 140 on each axis, so the distance cost is 2 (1 - exp(-4/49)); the widths and
+ *        heights are equal, so the shape cost is 0; cost = 1 - (IoU - distance cost / 2).
  */
 TEST(Small_SIoUCostCalculatorTest, BatchCostOfAPartialOverlapIsTheHandValue)
 {
