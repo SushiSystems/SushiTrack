@@ -50,6 +50,7 @@
 #include <SushiTrack/profiling/sushitrack_profiler_parts.hpp>
 
 #include <mot_engine_log_category.hpp>
+#include <profile_loss.hpp>
 
 namespace MOTEngine
 {
@@ -168,16 +169,7 @@ namespace MOTEngine
                                 problem);
         }
 
-        recording.dropped = stopped.record.drops.outside_periods +
-                            stopped.record.drops.open_at_stop;
-        for (const SushiProfiler::ThreadRecord& thread : stopped.record.threads)
-            recording.dropped += thread.dropped + thread.late;
-        if (recording.dropped != 0U)
-        {
-            SUSHITRACK_LOG_WARN(K_MOT_ENGINE_LOG_CATEGORY,
-                                "The profile of {} lost {} events; its timings are incomplete.",
-                                impl_->path.string(), recording.dropped);
-        }
+        recording.dropped = account_for_lost_events(stopped.record, impl_->path);
 
         std::ofstream file(impl_->path, std::ios::binary);
         file << SushiProfiler::write_record(stopped.record);

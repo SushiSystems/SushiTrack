@@ -5,7 +5,7 @@
 
 # Builds the mot_engine benchmark and mot_engine_runner, the part its tests link.
 
-add_library(mot_engine_runner STATIC frame_recorder.cpp mot_runner.cpp)
+add_library(mot_engine_runner STATIC frame_recorder.cpp mot_runner.cpp profile_loss.cpp)
 target_include_directories(mot_engine_runner PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(mot_engine_runner PUBLIC tracker_adapters)
 sushitrack_link_profiling(mot_engine_runner)
