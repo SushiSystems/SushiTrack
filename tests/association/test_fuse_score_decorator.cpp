@@ -46,7 +46,8 @@ using namespace SushiTrack;
 
 namespace
 {
-    /// @brief Rounded operations from a box to the fused cost: the IoU chain of 10 plus the clamp, the product and the subtraction.
+    /// @brief Rounded operations from a box to the fused cost: the IoU chain of 10 plus the clamp,
+    ///        the product and the subtraction.
     constexpr std::size_t K_ROUNDED_OPERATIONS = 13;
 } // namespace
 
@@ -107,7 +108,8 @@ TEST(Small_FuseScoreDecoratorTest, SentinelCellsPreserved)
 }
 
 /**
- * @brief The batch cost of the pair is the hand value 1 - (1 - c) * 0.7 with c = 6/13, the IoU cost of the 30 px shift (intersection 7000 over union 13000), which is 8.1/13.
+ * @brief The batch cost of the pair is the hand value 1 - (1 - c) * 0.7 with c = 6/13, the IoU cost
+ *        of the 30 px shift (intersection 7000 over union 13000), which is 8.1/13.
  */
 TEST(Small_FuseScoreDecoratorTest, BatchFusedCostIsTheHandValue)
 {
