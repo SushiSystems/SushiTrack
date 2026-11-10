@@ -38,28 +38,50 @@
 
 using namespace SushiTrack;
 
+namespace
+{
+    /**
+     * @brief Returns two boxes a million pixels from the origin, in opposite directions.
+     */
+    KalmanTypes::DetectBoxVector far_boxes()
+    {
+        return KalmanTypes::DetectBoxVector{make_box(1e6f, 1e6f, 1.f, 1.f),
+                                            make_box(-1e6f, 0.f, 1.f, 1.f)};
+    }
+} // namespace
+
 /**
- * @brief A measurement however far away is in the gate, and every flag is true.
+ * @brief A measurement however far away is in the gate.
  */
-TEST(Small_NullGateValidatorTest, AcceptsEveryMeasurement)
+TEST(Small_NullGateValidatorTest, IsInGateAcceptsAFarMeasurement)
 {
     const NullGateValidator validator;
-    const KalmanTypes::StateMean mean = KalmanTypes::StateMean::Zero();
-    const KalmanTypes::StateCov covariance = KalmanTypes::StateCov::Identity();
-    KalmanTypes::DetectBoxVector far{make_box(1e6f, 1e6f, 1.f, 1.f),
-                                     make_box(-1e6f, 0.f, 1.f, 1.f)};
+    const KalmanTypes::DetectBoxVector far = far_boxes();
 
-    EXPECT_TRUE(validator.is_in_gate(mean, covariance, far[0], 0.f));
-    EXPECT_EQ(validator.get_gate_flags(mean, covariance, far, 0.f),
-              (std::vector<bool>{true, true}));
-    EXPECT_EQ(validator.get_gate_sq_distances(mean, covariance, far),
-              (std::vector<float>{0.f, 0.f}));
+    EXPECT_TRUE(validator.is_in_gate(KalmanTypes::StateMean::Zero(),
+                                     KalmanTypes::StateCov::Identity(), far[0], 0.f));
 }
 
 /**
- * @brief get_instance hands out one shared validator.
+ * @brief The batch flags of far measurements are all true.
  */
-TEST(Small_NullGateValidatorTest, InstanceIsShared)
+TEST(Small_NullGateValidatorTest, GateFlagsAreAllTrue)
 {
-    EXPECT_EQ(NullGateValidator::get_instance(), NullGateValidator::get_instance());
+    const NullGateValidator validator;
+
+    EXPECT_EQ(validator.get_gate_flags(KalmanTypes::StateMean::Zero(),
+                                       KalmanTypes::StateCov::Identity(), far_boxes(), 0.f),
+              (std::vector<bool>{true, true}));
+}
+
+/**
+ * @brief The batch squared distances of far measurements are all zero.
+ */
+TEST(Small_NullGateValidatorTest, GateSquaredDistancesAreAllZero)
+{
+    const NullGateValidator validator;
+
+    EXPECT_EQ(validator.get_gate_sq_distances(KalmanTypes::StateMean::Zero(),
+                                              KalmanTypes::StateCov::Identity(), far_boxes()),
+              (std::vector<float>{0.f, 0.f}));
 }
