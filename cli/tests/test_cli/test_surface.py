@@ -15,7 +15,6 @@ from importlib.metadata import version
 from pathlib import Path
 
 import pytest
-import typer.main
 from typer.testing import CliRunner
 
 from sushitrack_cli import cli
@@ -67,19 +66,28 @@ def test_describe_lists_every_visible_command_and_no_hidden_one():
     assert _described() == K_VISIBLE
 
 
-def test_test_is_the_shared_command_and_offers_the_sanitizer_and_the_own_suite():
-    """Takes `test` from sushicore's one declaration, with `--sanitize` and `--cli` shown."""
-    command = typer.main.get_command(cli.app).commands["test"]
-    assert command.callback.__module__ == "sushicore.testing.commands"
-    shown = {name for parameter in command.params if not parameter.hidden for name in parameter.opts}
-    assert {"--sanitize", "--cli", "--all"} <= shown
+def test_test_offers_the_sanitizer_and_the_own_suite():
+    """Lists `--sanitize`, `--cli` and `--all` on the help page of `st test`."""
+    result = _invoke("test", "--help")
+    assert result.exit_code == 0, result.output
+    page = _plain(result.output)
+    assert {"--sanitize", "--cli", "--all"} <= set(page.split())
 
 
-def test_config_and_env_are_the_shared_declarations():
-    """Takes `config` and `env` from sushicore's one declaration."""
-    group = typer.main.get_command(cli.app)
-    for name in ("config", "env"):
-        assert group.commands[name].callback.__module__ == "sushicore.diag_commands"
+def test_config_prints_the_resolved_configuration(tmp_path, monkeypatch):
+    """Runs `st config` in a checkout and prints the resolved settings table."""
+    _marked_checkout(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    result = _invoke("config")
+    assert result.exit_code == 0, result.output
+    assert "Resolved configuration" in result.output
+
+
+def test_env_offers_every_variable_with_all():
+    """Lists `--all` on the help page of `st env`."""
+    result = _invoke("env", "--help")
+    assert result.exit_code == 0, result.output
+    assert "--all" in _plain(result.output).split()
 
 
 def _marked_checkout(root: Path) -> None:
