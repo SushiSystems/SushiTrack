@@ -991,10 +991,8 @@ namespace SushiTrack
                 new_lost.push_back(s);
             }
         }
-        for (auto& s : lost_tracklets_curr)
-        {
-            new_lost.push_back(s);
-        }
+        // A Lost track that stays unmatched is in both lists; merge them so it appears once.
+        new_lost = joint_tracklets(new_lost, lost_tracklets_curr);
 
         lost_tracklets_ = sub_tracklets(new_lost, tracked_tracklets_);
         lost_tracklets_ = sub_tracklets(lost_tracklets_, removed_tracklets_curr);
