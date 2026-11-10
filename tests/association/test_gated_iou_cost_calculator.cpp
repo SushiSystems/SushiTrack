@@ -49,7 +49,8 @@ using namespace SushiTrack;
 
 namespace
 {
-    /// @brief Rounded operations from a box to its IoU cost: corners, areas, intersection, union and the quotient.
+    /// @brief Rounded operations from a box to its IoU cost: corners, areas, intersection, union
+    ///        and the quotient.
     constexpr std::size_t K_ROUNDED_OPERATIONS = 10;
 } // namespace
 
@@ -130,7 +131,8 @@ TEST(Small_GatedIoUCostCalculatorTest, EmptyCollectionProducesEmptyMatrix)
 }
 
 /**
- * @brief The batch cost of the pair is the hand value 6/13: intersection 70 x 100 = 7000 over union 20000 - 7000 = 13000 gives IoU 7/13, and the null gate passes the cell.
+ * @brief The batch cost of the pair is the hand value 6/13: intersection 70 x 100 = 7000 over union
+ *        20000 - 7000 = 13000 gives IoU 7/13, and the null gate passes the cell.
  */
 TEST(Small_GatedIoUCostCalculatorTest, BatchCostOfAPartialOverlapIsTheHandValue)
 {
