@@ -37,22 +37,65 @@
 
 #include <SushiProfiler/zones/macros.hpp>
 
+#include <SushiTrack/profiling/profile_sink.hpp>
+
+/// @brief Tells the sink installed on this thread, if any, that a zone was entered.
+#define SUSHITRACK_DETAIL_SINK_ZONE(level, name, group)                                            \
+    do                                                                                             \
+    {                                                                                              \
+        if constexpr ((level) <= SUSHITRACK_PROFILE_LEVEL)                                         \
+        {                                                                                          \
+            if (::SushiTrack::ProfileSink* sushitrack_sink = ::SushiTrack::active_profile_sink())  \
+                sushitrack_sink->zone(name, group);                                                \
+        }                                                                                          \
+    } while (false)
+
+/// @brief Records one counter sample at SushiProfiler and at the sink installed on this thread.
+#define SUSHITRACK_DETAIL_COUNTER(level, name, unit, op, value)                                    \
+    do                                                                                             \
+    {                                                                                              \
+        if constexpr ((level) <= SUSHITRACK_PROFILE_LEVEL)                                         \
+        {                                                                                          \
+            const double sushitrack_sample = static_cast<double>(value);                           \
+            if (::SushiTrack::ProfileSink* sushitrack_sink = ::SushiTrack::active_profile_sink())  \
+                sushitrack_sink->counter(name, ::SushiTrack::ProfileCounterOp::op,                 \
+                                         sushitrack_sample);                                       \
+            SP_COUNTER_AT(SUSHITRACK_PROFILE_LEVEL, level, name, unit, op, sushitrack_sample);     \
+        }                                                                                          \
+    } while (false)
+
+/// @brief Records one instant at SushiProfiler and at the sink installed on this thread.
+#define SUSHITRACK_DETAIL_INSTANT(level, name)                                                     \
+    do                                                                                             \
+    {                                                                                              \
+        if constexpr ((level) <= SUSHITRACK_PROFILE_LEVEL)                                         \
+        {                                                                                          \
+            if (::SushiTrack::ProfileSink* sushitrack_sink = ::SushiTrack::active_profile_sink())  \
+                sushitrack_sink->instant(name);                                                    \
+            SP_INSTANT_AT(SUSHITRACK_PROFILE_LEVEL, level, name);                                  \
+        }                                                                                          \
+    } while (false)
+
 /// @brief Records the rest of the scope as a stage zone of @p group, level 1.
-#define SUSHITRACK_ZONE(name, group) SP_ZONE_AT(SUSHITRACK_PROFILE_LEVEL, 1, name, group)
+#define SUSHITRACK_ZONE(name, group)                                                               \
+    SUSHITRACK_DETAIL_SINK_ZONE(1, name, group);                                                   \
+    SP_ZONE_AT(SUSHITRACK_PROFILE_LEVEL, 1, name, group)
 
 /// @brief Records the rest of the scope as a fine zone of @p group, level 2.
-#define SUSHITRACK_ZONE_FINE(name, group) SP_ZONE_AT(SUSHITRACK_PROFILE_LEVEL, 2, name, group)
+#define SUSHITRACK_ZONE_FINE(name, group)                                                          \
+    SUSHITRACK_DETAIL_SINK_ZONE(2, name, group);                                                   \
+    SP_ZONE_AT(SUSHITRACK_PROFILE_LEVEL, 2, name, group)
 
 /// @brief Records @p value at a counter folded by CounterOp @p op (Add, Set, Max, Min), level 1.
 #define SUSHITRACK_COUNTER(name, unit, op, value)                                                  \
-    SP_COUNTER_AT(SUSHITRACK_PROFILE_LEVEL, 1, name, unit, op, static_cast<double>(value))
+    SUSHITRACK_DETAIL_COUNTER(1, name, unit, op, value)
 
 /// @brief Records @p value at a counter folded by CounterOp @p op, level 2.
 #define SUSHITRACK_COUNTER_FINE(name, unit, op, value)                                             \
-    SP_COUNTER_AT(SUSHITRACK_PROFILE_LEVEL, 2, name, unit, op, static_cast<double>(value))
+    SUSHITRACK_DETAIL_COUNTER(2, name, unit, op, value)
 
 /// @brief Records an occurrence now, level 2.
-#define SUSHITRACK_INSTANT(name) SP_INSTANT_AT(SUSHITRACK_PROFILE_LEVEL, 2, name)
+#define SUSHITRACK_INSTANT(name) SUSHITRACK_DETAIL_INSTANT(2, name)
 
 #else
 
