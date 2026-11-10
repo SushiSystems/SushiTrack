@@ -6,18 +6,23 @@
 
 from __future__ import annotations
 
-import runpy
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
 pytestmark = pytest.mark.medium
 
+#: The cli/ folder, where `python -m sushitrack_cli` finds the package.
+K_CLI_FOLDER = Path(__file__).resolve().parents[1]
 
-def test_running_the_package_runs_the_cli_entry(monkeypatch, capsys):
-    monkeypatch.setattr("sys.argv", ["st", "--version"])
 
-    with pytest.raises(SystemExit) as raised:
-        runpy.run_module("sushitrack_cli", run_name="__main__")
+def test_running_the_package_prints_the_help_page():
+    """Prints the help page, with its first group heading on a line of its own, and exits 0."""
+    result = subprocess.run(
+        [sys.executable, "-m", "sushitrack_cli", "--help"],
+        cwd=K_CLI_FOLDER, capture_output=True, text=True, timeout=120, check=False)
 
-    assert raised.value.code == 0
-    assert capsys.readouterr().out.startswith("sushitrack-cli ")
+    assert result.returncode == 0, result.stderr
+    assert "Project" in [line.rstrip() for line in result.stdout.splitlines()]
