@@ -39,9 +39,16 @@
 #include <SushiTrack/association/iou_cost_calculator.hpp>
 #include <SushiTrack/tracking/tracklet.hpp>
 
+#include <support/tolerance.hpp>
 #include <tracklet_builders.hpp>
 
 using namespace SushiTrack;
+
+namespace
+{
+    /// @brief Rounded operations from a box to the fused cost: the IoU chain of 10 plus the clamp, the product and the subtraction.
+    constexpr std::size_t K_ROUNDED_OPERATIONS = 13;
+} // namespace
 
 // FuseScoreDecorator
 
@@ -99,20 +106,35 @@ TEST(Small_FuseScoreDecoratorTest, SentinelCellsPreserved)
     EXPECT_GE(m(0, 0), 1e3f);
 }
 
-/** @brief calculate_single applies the same formula as the batch path. */
-TEST(Small_FuseScoreDecoratorTest, SingleMatchesBatch)
+/**
+ * @brief The batch cost of the pair is the hand value 1 - (1 - c) * 0.7 with c = 6/13, the IoU cost of the 30 px shift (intersection 7000 over union 13000), which is 8.1/13.
+ */
+TEST(Small_FuseScoreDecoratorTest, BatchFusedCostIsTheHandValue)
 {
     auto inner = std::make_shared<IoUCostCalculator>();
     FuseScoreDecorator dec(inner);
-
-    auto a = make_t(0.f, 0.f, 100.f, 100.f, 0.9f);
-    auto b = make_t(30.f, 0.f, 100.f, 100.f, 0.7f);
-
-    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    std::vector<std::shared_ptr<Tracklet>> av{make_t(0.f, 0.f, 100.f, 100.f, 0.9f)};
+    std::vector<std::shared_ptr<Tracklet>> bv{make_t(30.f, 0.f, 100.f, 100.f, 0.7f)};
     CostMatrix m;
+
     dec.calculate(av, bv, m);
 
-    EXPECT_NEAR(m(0, 0), dec.calculate_single(a, b), 1e-5f);
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_relative_error<float>(m(0, 0), 1.0 - (7.0 / 13.0) * 0.7, K_ROUNDED_OPERATIONS)));
+}
+
+/**
+ * @brief The single cost of the same pair is the same value.
+ */
+TEST(Small_FuseScoreDecoratorTest, SingleFusedCostIsTheHandValue)
+{
+    auto inner = std::make_shared<IoUCostCalculator>();
+    FuseScoreDecorator dec(inner);
+    const std::shared_ptr<Tracklet> a = make_t(0.f, 0.f, 100.f, 100.f, 0.9f);
+    const std::shared_ptr<Tracklet> b = make_t(30.f, 0.f, 100.f, 100.f, 0.7f);
+
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_relative_error<float>(dec.calculate_single(a, b), 1.0 - (7.0 / 13.0) * 0.7, K_ROUNDED_OPERATIONS)));
 }
 
 /**
