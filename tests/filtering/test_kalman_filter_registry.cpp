@@ -27,63 +27,107 @@
  * @author Mustafa Garip
  */
 
-#include <cmath>
+#include <memory>
 #include <string>
 
-#include <Eigen/Dense>
 #include <gtest/gtest.h>
 
 #include <SushiTrack/filtering/gated_state_predictor.hpp>
+#include <SushiTrack/filtering/kalman_filter.hpp>
 #include <SushiTrack/filtering/kalman_filter_registry.hpp>
-#include <SushiTrack/filtering/kalman_types.hpp>
 
 #include <captured_log.hpp>
 
 using namespace SushiTrack;
 
-using StateMean = KalmanTypes::StateMean;
-
-using StateCov = KalmanTypes::StateCov;
-
-using DetectBox = KalmanTypes::DetectBox;
-
-// KalmanFilterRegistry
-
-/**
- * @brief An unregistered type yields no filter and one ERROR line naming the type.
- */
-TEST(Small_KalmanFilterRegistryTest, UnregisteredTypeLogsTheTypeAndReturnsNull)
+namespace
 {
-    std::unique_ptr<GatedStatePredictor> filter;
-    std::string logged;
+    /** @brief The type no test registers anywhere. */
+    constexpr int K_UNREGISTERED_TYPE = 987654;
+
+    /** @brief The type the registration tests register twice. */
+    constexpr int K_TWICE_REGISTERED_TYPE = 987001;
+
+    /** @brief A creator that builds nothing. */
+    std::unique_ptr<GatedStatePredictor> create_nothing(bool)
     {
-        CapturedLog log(SushiLog::LogLevel::Error);
-        const KalmanFilterRegistry registry;
-        filter = registry.create(987654, false);
-        logged = log.last("Unregistered Kalman type requested");
+        return nullptr;
     }
 
-    EXPECT_EQ(filter, nullptr);
-    EXPECT_NE(logged.find("Unregistered Kalman type requested: 987654"), std::string::npos)
-        << "logged: " << logged;
+    /** @brief A creator that builds a linear KalmanFilter. */
+    std::unique_ptr<GatedStatePredictor> create_linear(bool enable_xyah)
+    {
+        return std::make_unique<KalmanFilter>(enable_xyah);
+    }
+} // namespace
+
+/**
+ * @brief An unregistered type yields no filter.
+ */
+TEST(Small_KalmanFilterRegistryTest, UnregisteredTypeReturnsNull)
+{
+    const KalmanFilterRegistry registry;
+
+    EXPECT_EQ(registry.create(K_UNREGISTERED_TYPE, false), nullptr);
 }
 
 /**
- * @brief Registering one type twice logs one WARN naming it, and the later creator wins.
+ * @brief An unregistered type logs one ERROR line naming the type.
  */
-TEST(Small_KalmanFilterRegistryTest, RegisteringATypeTwiceWarnsAndTheLaterCreatorWins)
+TEST(Small_KalmanFilterRegistryTest, UnregisteredTypeLogsOneErrorNamingTheType)
 {
-    CapturedLog log;
-    KalmanFilterRegistry registry;
-    const auto none = [](bool)
-    {
-        return std::unique_ptr<GatedStatePredictor>();
-    };
-    registry.register_creator(987001, none);
-    EXPECT_EQ(log.count("registered twice"), 0);
+    const CapturedLog log(SushiLog::LogLevel::Error);
+    const KalmanFilterRegistry registry;
 
-    registry.register_creator(987001, none);
+    const std::unique_ptr<GatedStatePredictor> filter = registry.create(K_UNREGISTERED_TYPE, false);
+
+    EXPECT_EQ(log.count("Unregistered Kalman type requested: 987654"), 1);
+    EXPECT_EQ(log.level_of("Unregistered Kalman type requested"), SushiLog::LogLevel::Error);
+}
+
+/**
+ * @brief Registering a type once logs no warning.
+ */
+TEST(Small_KalmanFilterRegistryTest, RegisteringATypeOnceDoesNotWarn)
+{
+    const CapturedLog log;
+    KalmanFilterRegistry registry;
+
+    registry.register_creator(K_TWICE_REGISTERED_TYPE, create_nothing);
+
+    EXPECT_EQ(log.count("registered twice"), 0);
+}
+
+/**
+ * @brief Registering one type twice logs one WARN naming it.
+ */
+TEST(Small_KalmanFilterRegistryTest, RegisteringATypeTwiceWarnsOnce)
+{
+    const CapturedLog log;
+    KalmanFilterRegistry registry;
+    registry.register_creator(K_TWICE_REGISTERED_TYPE, create_nothing);
+
+    registry.register_creator(K_TWICE_REGISTERED_TYPE, create_nothing);
 
     EXPECT_EQ(log.count("Kalman type 987001 registered twice"), 1);
     EXPECT_EQ(log.level_of("registered twice"), SushiLog::LogLevel::Warn);
+}
+
+/**
+ * @brief After a type is registered twice, create() calls the later creator.
+ *
+ * The first creator builds nothing and the second builds a KalmanFilter, so a non-null result
+ * of that class can only come from the second.
+ */
+TEST(Small_KalmanFilterRegistryTest, TheLaterCreatorWinsWhenATypeIsRegisteredTwice)
+{
+    KalmanFilterRegistry registry;
+    registry.register_creator(K_TWICE_REGISTERED_TYPE, create_nothing);
+    registry.register_creator(K_TWICE_REGISTERED_TYPE, create_linear);
+
+    const std::unique_ptr<GatedStatePredictor> filter =
+        registry.create(K_TWICE_REGISTERED_TYPE, false);
+
+    ASSERT_NE(filter, nullptr);
+    EXPECT_NE(dynamic_cast<KalmanFilter*>(filter.get()), nullptr);
 }
