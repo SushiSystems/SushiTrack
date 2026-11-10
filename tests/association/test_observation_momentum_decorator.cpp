@@ -41,6 +41,7 @@
 #include <SushiTrack/tracking/tracker.hpp>
 #include <SushiTrack/tracking/tracklet.hpp>
 
+#include <support/tolerance.hpp>
 #include <tracklet_builders.hpp>
 
 using namespace SushiTrack;
@@ -49,6 +50,10 @@ using namespace SushiTrack;
 
 namespace
 {
+    /// @brief Rounded operations from the inner cost to the momentum-adjusted cost: the direction
+    ///        cosine, the weight, the decay and the subtraction.
+    constexpr std::size_t K_ROUNDED_OPERATIONS = 8;
+
     /** @brief Inner calculator returning a fixed cost, isolating the momentum term. */
     class ConstCost : public CostCalculator
     {
@@ -217,20 +222,17 @@ TEST(Small_ObservationMomentumDecoratorTest, TrackWithoutVelocityIsGatedOff)
     EXPECT_NEAR(m(0, 0), 0.5f, 1e-4f);
 }
 
-/** @brief calculate_single agrees with the batch path. */
-TEST(Small_ObservationMomentumDecoratorTest, SingleMatchesBatch)
+/** @brief The single cost of a detection straight ahead is the hand value 0.5 - 0.2 = 0.3. */
+TEST(Small_ObservationMomentumDecoratorTest, SingleCostOfAnAlignedDetectionIsTheHandValue)
 {
     auto t = make_cruiser(100.f, 200.f, 10.f, 5);
     float cx, cy;
     last_obs_center(t, cx, cy);
     auto ahead = det_at_center(cx + 100.f, cy);
-
     ObservationMomentumDecorator dec(std::make_shared<ConstCost>(0.5f), 0.2f, 0.5f, 5);
-    std::vector<std::shared_ptr<Tracklet>> av{t}, bv{ahead};
-    CostMatrix m;
-    dec.calculate(av, bv, m);
 
-    EXPECT_NEAR(dec.calculate_single(t, ahead), m(0, 0), 1e-5f);
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<float>(
+        dec.calculate_single(t, ahead), 0.3, K_ROUNDED_OPERATIONS)));
 }
 
 /**
