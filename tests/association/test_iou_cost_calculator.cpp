@@ -38,9 +38,17 @@
 #include <SushiTrack/association/iou_cost_calculator.hpp>
 #include <SushiTrack/tracking/tracklet.hpp>
 
+#include <support/tolerance.hpp>
 #include <tracklet_builders.hpp>
 
 using namespace SushiTrack;
+
+namespace
+{
+    /// @brief Rounded operations on the longest path from a box to its cost, counted from the
+    ///        formula: corners, areas, intersection, union, quotients and the penalty terms.
+    constexpr std::size_t K_ROUNDED_OPERATIONS = 10;
+} // namespace
 
 // IoUCostCalculator
 
@@ -115,17 +123,31 @@ TEST(Small_IoUCostCalculatorTest, EmptyBCollectionProducesEmptyMatrix)
     EXPECT_TRUE(m.empty());
 }
 
-/** @brief calculate_single agrees with the batch matrix for an overlapping pair. */
-TEST(Small_IoUCostCalculatorTest, SingleMatchesBatch)
+/**
+ * @brief The batch cost of a partial overlap pair is the hand value: intersection 50 x 100 = 5000 over union 20000 - 5000 = 15000 gives IoU 1/3 and cost 2/3.
+ */
+TEST(Small_IoUCostCalculatorTest, BatchCostOfAPartialOverlapIsTheHandValue)
 {
     IoUCostCalculator calc;
-    auto a = make_t(0.f, 0.f, 100.f, 100.f);
-    auto b = make_t(50.f, 0.f, 100.f, 100.f);
-
-    std::vector<std::shared_ptr<Tracklet>> av{a}, bv{b};
+    std::vector<std::shared_ptr<Tracklet>> av{make_t(0.f, 0.f, 100.f, 100.f)};
+    std::vector<std::shared_ptr<Tracklet>> bv{make_t(50.f, 0.f, 100.f, 100.f)};
     CostMatrix m;
+
     calc.calculate(av, bv, m);
 
-    float single = calc.calculate_single(a, b);
-    EXPECT_NEAR(m(0, 0), single, 1e-5f);
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<float>(
+        m(0, 0), 2.0 / 3.0, K_ROUNDED_OPERATIONS)));
+}
+
+/**
+ * @brief The single cost of the same pair is the same hand value.
+ */
+TEST(Small_IoUCostCalculatorTest, SingleCostOfAPartialOverlapIsTheHandValue)
+{
+    IoUCostCalculator calc;
+    const std::shared_ptr<Tracklet> a = make_t(0.f, 0.f, 100.f, 100.f);
+    const std::shared_ptr<Tracklet> b = make_t(50.f, 0.f, 100.f, 100.f);
+
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<float>(
+        calc.calculate_single(a, b), 2.0 / 3.0, K_ROUNDED_OPERATIONS)));
 }
