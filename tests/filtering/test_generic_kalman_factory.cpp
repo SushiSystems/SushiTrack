@@ -28,6 +28,7 @@
  */
 
 #include <memory>
+#include <typeinfo>
 
 #include <gtest/gtest.h>
 
@@ -43,32 +44,42 @@
 
 using namespace SushiTrack;
 
+namespace
+{
+    /**
+     * @brief One registered type and the class the factory must build for it.
+     */
+    struct TypeRow
+    {
+            int type;
+            const std::type_info* built;
+    };
+
+    /** @brief Runs each kalman_type of the library registry: 0 linear, 1 NSA, 2 IMM. */
+    class Small_GenericKalmanFactoryTest : public ::testing::TestWithParam<TypeRow>
+    {
+    };
+} // namespace
+
 /**
- * @brief The factory builds what its registry holds for its type.
+ * @brief The factory builds the class its registry holds for its type: 0 a KalmanFilter, 1 an
+ *        NSAKalmanFilter, 2 an IMMFilter.
  */
-TEST(Small_GenericKalmanFactoryTest, BuildsWhatItsRegistryHoldsForTheType)
+TEST_P(Small_GenericKalmanFactoryTest, BuildsWhatItsRegistryHoldsForTheType)
 {
     const std::unique_ptr<KalmanFilterRegistry> registry = TestSupport::library_kalman_registry();
 
-    const std::unique_ptr<StatePredictor> nsa = GenericKalmanFactory(1, false, *registry).create();
+    const std::unique_ptr<StatePredictor> built =
+        GenericKalmanFactory(GetParam().type, false, *registry).create();
 
-    EXPECT_NE(dynamic_cast<NSAKalmanFilter*>(nsa.get()), nullptr);
+    ASSERT_NE(built, nullptr);
+    EXPECT_EQ(typeid(*built), *GetParam().built);
 }
 
-/**
- * @brief Through the library's registry, types 0, 1 and 2 build a KalmanFilter, an
- *        NSAKalmanFilter and an IMMFilter.
- */
-TEST(Medium_GenericKalmanFactoryTest, BuildsTheRegisteredTypes)
-{
-    const std::unique_ptr<StatePredictor> linear = GenericKalmanFactory(0).create();
-    const std::unique_ptr<StatePredictor> nsa = GenericKalmanFactory(1).create();
-    const std::unique_ptr<StatePredictor> imm = GenericKalmanFactory(2).create();
-
-    EXPECT_NE(dynamic_cast<KalmanFilter*>(linear.get()), nullptr);
-    EXPECT_NE(dynamic_cast<NSAKalmanFilter*>(nsa.get()), nullptr);
-    EXPECT_NE(dynamic_cast<IMMFilter*>(imm.get()), nullptr);
-}
+INSTANTIATE_TEST_SUITE_P(EveryRegisteredType, Small_GenericKalmanFactoryTest,
+                         ::testing::Values(TypeRow{0, &typeid(KalmanFilter)},
+                                           TypeRow{1, &typeid(NSAKalmanFilter)},
+                                           TypeRow{2, &typeid(IMMFilter)}));
 
 /**
  * @brief A type its registry does not hold builds nothing, and the registry logs one ERROR.
