@@ -33,6 +33,7 @@
 
 #include <captured_log.hpp>
 #include <oc_sort_adapter.hpp>
+#include <throwing_tracker_adapter.hpp>
 #include <tracker_adapter.hpp>
 #include <tracker_bridge.h>
 #include <tracker_bridge_log_category.hpp>
@@ -193,6 +194,46 @@ TEST(Small_TrackerBridgeTest, NegativeCountsLogOneError)
 
     EXPECT_EQ(log.count("tracker_process_c refused: num_detections is -1"), 1);
     EXPECT_EQ(log.level_of("tracker_process_c refused"), SushiLog::LogLevel::Error);
+}
+
+/**
+ * @brief A tracker whose update throws yields ERROR and zero results, and the exception does not
+ *        leave the entry point.
+ */
+TEST(Small_TrackerBridgeTest, ThrowingUpdateYieldsErrorAndNoResults)
+{
+    TrackerBridge::ThrowingTrackerAdapter adapter;
+    const CDetection det{100.f, 100.f, 50.f, 80.f, 0.9f, 1, nullptr, 0};
+    std::vector<CTrackResult> results(4);
+    int count = -1;
+    tracker_bridge_status_t status = TRACKER_BRIDGE_OK;
+
+    EXPECT_NO_THROW(status = tracker_process_c(handle_of(adapter), &det, 1, results.data(), &count,
+                                               4));
+
+    EXPECT_EQ(status, TRACKER_BRIDGE_ERROR);
+    EXPECT_EQ(count, 0);
+}
+
+/**
+ * @brief A tracker whose update throws logs one ERROR that names the detection count and the
+ *        exception text.
+ */
+TEST(Small_TrackerBridgeTest, ThrowingUpdateLogsOneError)
+{
+    SushiTrack::CapturedLog log(SushiLog::LogLevel::Trace,
+                                {TrackerBridge::K_TRACKER_BRIDGE_LOG_CATEGORY});
+    TrackerBridge::ThrowingTrackerAdapter adapter;
+    const CDetection det{100.f, 100.f, 50.f, 80.f, 0.9f, 1, nullptr, 0};
+    std::vector<CTrackResult> results(4);
+    int count = -1;
+
+    tracker_process_c(handle_of(adapter), &det, 1, results.data(), &count, 4);
+
+    EXPECT_EQ(log.count("tracker_process_c failed on 1 detections: the throwing adapter always "
+                        "fails; no track was written"),
+              1);
+    EXPECT_EQ(log.level_of("tracker_process_c failed"), SushiLog::LogLevel::Error);
 }
 
 /**
