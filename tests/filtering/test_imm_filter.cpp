@@ -27,7 +27,8 @@
  * @author Mustafa Garip
  */
 
-#include <cmath>
+#include <algorithm>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -35,12 +36,32 @@
 #include <SushiTrack/filtering/kalman_types.hpp>
 
 #include <measurement_builders.hpp>
+#include <support/tolerance.hpp>
 
 using namespace SushiTrack;
+
+namespace
+{
+    /**
+     * @brief Runs one predict and one update per entry of @p xs, each update with a box whose x is
+     *        that entry.
+     */
+    void feed(IMMFilter& filter, KalmanTypes::StateMean& mean, KalmanTypes::StateCov& covariance,
+              const std::vector<float>& xs)
+    {
+        for (const float x : xs)
+        {
+            filter.predict(mean, covariance, 1.0f);
+            filter.update(mean, covariance, make_box(x, 200.f, 50.f, 80.f), 0.9f);
+        }
+    }
+} // namespace
 
 /**
  * @brief A started filter holds the constant-velocity prior: manoeuvre 0.2 (CA and CT), stationary
  *        0.1 (NCP).
+ *
+ * CA, NCP and CT start at 0.10f; 0.10f + 0.10f is exactly 0.2f, since doubling is exact.
  */
 TEST(Small_IMMFilterTest, StartsOnTheConstantVelocityPrior)
 {
@@ -49,12 +70,17 @@ TEST(Small_IMMFilterTest, StartsOnTheConstantVelocityPrior)
     KalmanTypes::StateCov covariance;
     filter.initiate(mean, covariance, make_box(100.f, 200.f, 50.f, 80.f), 0.9f);
 
-    EXPECT_NEAR(filter.maneuver_probability(), 0.2f, 1e-5f);
-    EXPECT_NEAR(filter.stationary_probability(), 0.1f, 1e-5f);
+    EXPECT_FLOAT_EQ(filter.maneuver_probability(), 0.2f);
+    EXPECT_FLOAT_EQ(filter.stationary_probability(), 0.1f);
 }
 
 /**
- * @brief The mode probabilities stay a distribution through predict and update.
+ * @brief The mode probabilities stay a distribution through predict and update, and the state
+ *        stays finite.
+ *
+ * Four products divided by their sum: the sum carries 3 roundings, each division 1, and adding
+ * three of the four 2 more, so the excess over 1 is at most 6u to first order, u the float unit
+ * roundoff. The helper's threshold of 16 also covers the reset to the mixed prior.
  */
 TEST(Small_IMMFilterTest, ModeProbabilitiesStayWithinZeroAndOne)
 {
@@ -62,22 +88,24 @@ TEST(Small_IMMFilterTest, ModeProbabilitiesStayWithinZeroAndOne)
     KalmanTypes::StateMean mean;
     KalmanTypes::StateCov covariance;
     filter.initiate(mean, covariance, make_box(100.f, 200.f, 50.f, 80.f), 0.9f);
-    for (int frame = 1; frame <= 10; ++frame)
-    {
-        filter.predict(mean, covariance, 1.0f);
-        filter.update(mean, covariance, make_box(100.f + 4.f * frame, 200.f, 50.f, 80.f), 0.9f);
-    }
+    feed(filter, mean, covariance,
+         {104.f, 108.f, 112.f, 116.f, 120.f, 124.f, 128.f, 132.f, 136.f, 140.f});
 
     const float manoeuvre = filter.maneuver_probability();
     const float stationary = filter.stationary_probability();
     EXPECT_GE(manoeuvre, 0.f);
     EXPECT_GE(stationary, 0.f);
-    EXPECT_LE(manoeuvre + stationary, 1.f + 1e-5f);
-    EXPECT_TRUE(std::isfinite(mean(0)));
+    const double excess = std::max(0.0, static_cast<double>(manoeuvre) + stationary - 1.0);
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_error(excess, 0.0, 6.0 * TestSupport::unit_roundoff<float>())));
+    EXPECT_TRUE(mean.allFinite());
 }
 
 /**
  * @brief restore_checkpoint brings back the mode probabilities save_checkpoint took.
+ *
+ * The restore copies the saved probabilities and derives the manoeuvre sum from them with the
+ * same addition, so the value is bit for bit the saved one.
  */
 TEST(Small_IMMFilterTest, RestoreCheckpointBringsBackTheModeProbabilities)
 {
@@ -88,13 +116,9 @@ TEST(Small_IMMFilterTest, RestoreCheckpointBringsBackTheModeProbabilities)
     filter.save_checkpoint();
     const float saved = filter.maneuver_probability();
 
-    for (int frame = 1; frame <= 5; ++frame)
-    {
-        filter.predict(mean, covariance, 1.0f);
-        filter.update(mean, covariance, make_box(100.f + 40.f * frame * frame, 200.f, 50.f, 80.f),
-                      0.9f);
-    }
+    // x = 100 + 40 f^2 for f = 1..5
+    feed(filter, mean, covariance, {140.f, 260.f, 460.f, 740.f, 1100.f});
     filter.restore_checkpoint();
 
-    EXPECT_NEAR(filter.maneuver_probability(), saved, 1e-6f);
+    EXPECT_FLOAT_EQ(filter.maneuver_probability(), saved);
 }
