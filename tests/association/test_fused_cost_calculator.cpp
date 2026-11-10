@@ -75,7 +75,7 @@ TEST(Small_FusedCostCalculatorTest, NullGateIdenticalFeaturesDirectAssignment)
     CostMatrix m;
     calc.calculate(av, bv, m);
 
-    EXPECT_NEAR(m(0, 0), 0.f, 1e-4f);
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_error(m(0, 0), 0.0, K_COSINE_BOUND)));
 }
 
 /**
