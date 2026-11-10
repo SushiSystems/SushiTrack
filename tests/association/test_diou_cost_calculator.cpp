@@ -49,6 +49,11 @@ namespace
     /// @brief Rounded operations on the longest path from a box to its cost, counted from the
     ///        formula: corners, areas, intersection, union, quotients and the penalty terms.
     constexpr std::size_t K_ROUNDED_OPERATIONS = 24;
+
+    /// @brief Bound of the cost of identical boxes: the cost is 1 minus a ratio of magnitude 1 that
+    ///        K_ROUNDED_OPERATIONS rounded operations built, each adding at most the unit roundoff.
+    constexpr double K_IDENTICAL_BOXES_BOUND =
+        static_cast<double>(K_ROUNDED_OPERATIONS) * TestSupport::unit_roundoff<float>();
 } // namespace
 
 // DIoUCostCalculator
@@ -64,7 +69,8 @@ TEST(Small_DIoUCostCalculatorTest, IdenticalBoxesCostIsZero)
     CostMatrix m;
     calc.calculate(av, bv, m);
 
-    EXPECT_NEAR(m(0, 0), 0.f, 1e-4f);
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_error(m(0, 0), 0.0, K_IDENTICAL_BOXES_BOUND)));
 }
 
 /** @brief Separated boxes (no overlap) give a cost > 0. */
