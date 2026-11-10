@@ -1,8 +1,8 @@
 # Test review: plan
 
-**Status:** Open — 17 of 20 jobs done; M1, M2 and M13 failed on records not applied as written, listed under "Not done as written"; the owner chooses inline or parallel
+**Status:** Open — 19 of 20 jobs done; M13 failed on one add not applied as written, listed under "Not done as written"; the owner chooses inline or parallel
 
-**Resume note (M13, tracking).** M13 is applied, one commit per file: every file of `tests/tracking/` except the compile checks, with `test_tracking_log_category.cpp` replaced by `compile_tracking_log_category.cpp`. The Adds of tracking are written: the single-model Cruising and zero manoeuvre probability, the last seen state while coasting, the ORU metamorphic pair and the history eviction (inside `FullFeatureHistoryEvictsItsOldestFeature`). Two items stay open. RW-40: the two profiling resize records need an in-memory profiler sink port that SushiProfiler does not offer, so `TentativeStageNamesItsOwnZone` and `OverflowIsCountedAsDroppedTracks` stay medium. RW-41: the OCM add (a crossing scene where OCM on and off assign differently) needs costs that cannot be derived by hand without a compiler, and the two OCM scene tests also pass with OCM off. Two oracles keep the value the old tests held and are not re-derived from the IMM mixing: the Cruising regime after the ramp and the Maneuvering frames after the jerk in `test_kinematic_regimes.cpp`. No compiler and no `build*/compile_commands.json` exist on this machine, so no C++ syntax check ran for any file changed since M7, and no test ran; every new expected value has its hand derivation in the test comment. The commit hook (comment rules, test mirror) ran and passed for each commit. The `Totals` table of `REPORT.md` was recounted from the records (597 tests, 34 adds); the `Verdicts by question` and `Modules` tables follow it.
+**Resume note (M13, tracking).** M13 is applied, one commit per file: every file of `tests/tracking/` except the compile checks, with `test_tracking_log_category.cpp` replaced by `compile_tracking_log_category.cpp`. The Adds of tracking are written: the single-model Cruising and zero manoeuvre probability, the last seen state while coasting, the ORU metamorphic pair and the history eviction (inside `FullFeatureHistoryEvictsItsOldestFeature`). One item stays open. RW-40 is applied since: `ProfileSink` and `MemoryProfileSink` (decision 15 of `REPORT.md`) carry the two resizes and the zone rewrite. RW-41: the OCM add (a crossing scene where OCM on and off assign differently) needs costs that cannot be derived by hand without a compiler, and the two OCM scene tests also pass with OCM off. Two oracles keep the value the old tests held and are not re-derived from the IMM mixing: the Cruising regime after the ramp and the Maneuvering frames after the jerk in `test_kinematic_regimes.cpp`. No compiler and no `build*/compile_commands.json` exist on this machine, so no C++ syntax check ran for any file changed since M7, and no test ran; every new expected value has its hand derivation in the test comment. The commit hook (comment rules, test mirror) ran and passed for each commit. The `Totals` table of `REPORT.md` was recounted from the records (597 tests, 34 adds); the `Verdicts by question` and `Modules` tables follow it.
 
 Applies the verdicts of `REPORT.md`, in hierarchy order: the shared helpers, adapters and seams the
 rewrites need come first, then the defects the review found, then each module's tests. A module job
@@ -20,8 +20,8 @@ writes each add. Nothing in a module job changes production code except a seam a
 | T5 | The CLI runner fixtures replaced by sushicore's in-memory runner and console | sushicore T1 | done |
 | T6 | The defects of this report, each with a test that fails first; `docs/guides/TESTING.md` aligned with the skill |  | done |
 | T7 | `tools/testing/check_test_additions.py`, `tools/tests/test_check_test_additions.py` deleted |  | done |
-| M1 | the tests of `applications` (14 files): 21 rewrite, 2 resize, 7 split, 1 merge, 5 delete | T1, T2, T3, T4, T5, T6, T7 | failed |
-| M2 | the tests of `association` (17 files): 20 rewrite, 1 resize, 6 merge, 6 delete | T1, T2, T3, T4, T5, T6, T7 | failed |
+| M1 | the tests of `applications` (14 files): 21 rewrite, 2 resize, 7 split, 1 merge, 5 delete | T1, T2, T3, T4, T5, T6, T7 | done |
+| M2 | the tests of `association` (17 files): 20 rewrite, 1 resize, 6 merge, 6 delete | T1, T2, T3, T4, T5, T6, T7 | done |
 | M3 | the tests of `c_api` (5 files): 11 rewrite, 9 resize, 3 split, 1 merge, 6 delete | T1, T2, T3, T4, T5, T6, T7 | done |
 | M4 | the tests of `cli` (8 files): 21 rewrite, 3 resize, 2 delete | T1, T2, T3, T4, T5, T6, T7 | done |
 | M5 | the tests of `cli/services` (12 files): 44 rewrite, 5 resize, 2 split, 4 delete | T1, T2, T3, T4, T5, T6, T7 | done |
@@ -38,20 +38,9 @@ writes each add. Nothing in a module job changes production code except a seam a
 
 A job whose status is `failed` keeps every record below until its test exists as the record says.
 
-**M1 (`applications`).** All 14 files carry their records; one add is missing.
+**M13 (`tracking`).** One add is open.
 
-- Add `FrameRecorder: events the capture loses are counted in dropped and logged WARN` (medium, contract). No test makes the capture lose events. REPORT: `## Adds`, and decision 12(a), which builds a missing seam instead of dropping the record. Backlog: RW-38.
-
-**M2 (`association`).** One add is missing.
-
-- Add `ReIDFirstCostCalculator: a pair with features beyond the threshold costs (1 - w) * reid_dist + w * iou_d` (small, formula at `source/association/reid_first_cost_calculator.cpp:130`). `test_reid_first_cost_calculator.cpp` checks the direct assignment and the geometry fallback only. REPORT: `## Adds`, and decision 12(d), which keeps a promise covered. Backlog: none filed.
-
-**M13 (`tracking`).** Three records and one add are open.
-
-- Resize `Medium_TrackerProfilingTest.TentativeStageNamesItsOwnZone` to small, through an in-memory profiler sink port. The test is still medium. REPORT: the `test_profiling.cpp` record, question 8, and decision 12(a). Backlog: RW-40.
-- Resize `Medium_TrackerProfilingTest.OverflowIsCountedAsDroppedTracks` to small, through the same port. Still medium. REPORT: the same record and decision. Backlog: RW-40.
-- Rewrite `EveryLevelOneZoneAppearsInEachFrame` so zone presence is checked through an in-memory sink. `Medium_TrackerLevelOneZonesTest` still reads the real profiler session. REPORT: the `test_profiling.cpp` record. Backlog: RW-40, whose Done when names the two resizes only.
-- Add `tracker: OCM re-ranking changes the primary association when enabled` (small, metamorphic, OCM on and off assign differently on a crossing scene). Not written; the two OCM scene tests also pass with OCM off. REPORT: `## Adds`. Backlog: RW-41.
+- Add `tracker: OCM re-ranking changes the primary association when enabled` (small, metamorphic, OCM on and off assign differently on a crossing scene). Not written. The two tracks' predicted boxes come from the IMM filter, so a scene where the momentum bonus alone decides the assignment cannot be derived by hand, and a test that guesses the outcome would be a pasted expectation. The direction bonus itself is tested at its unit in `tests/association/test_observation_momentum_decorator.cpp`. REPORT: `## Adds`. Backlog: RW-41.
 
 ## Acceptance
 
