@@ -72,9 +72,9 @@ dispatch: J15 review, 6 chunks — haiku high, 1 round each, passed, rung 1
 
 | Tests | Keep | Rewrite | Resize | Split | Merge | Delete | Characterize | Add |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 594 | 180 | 244 | 34 | 23 | 47 | 66 | 0 | 35 |
+| 597 | 181 | 244 | 34 | 25 | 47 | 66 | 0 | 34 |
 
-Kept as they stand: 180 of 594 (30%).
+Kept as they stand: 181 of 597 (30%).
 
 ## Verdicts by question
 
@@ -85,11 +85,12 @@ Kept as they stand: 180 of 594 (30%).
 | delete | 1 | a forbidden kind | 40 |
 | resize | 8 | wrong size | 34 |
 | rewrite | 2 | cannot fail | 24 |
-| split | 3 | no single promise | 23 |
+| split | 3 | no single promise | 25 |
 | delete | 4 | a duplicate | 21 |
 | rewrite | 7 | a long-test sign | 15 |
 | rewrite | 6 | oracle is the code | 13 |
 | rewrite | 8 | wrong size | 8 |
+| rewrite | 5 | a promise between units | 2 |
 | delete | 3 | no single promise | 5 |
 
 ## Modules
@@ -99,7 +100,7 @@ Kept as they stand: 180 of 594 (30%).
 | `tracking` | 25 | 151 | 26 | 63 | 4 | 5 | 36 | 17 | 0 |
 | `cli/services` | 12 | 74 | 19 | 44 | 5 | 2 | 0 | 4 | 0 |
 | `filtering` | 12 | 43 | 5 | 23 | 3 | 4 | 0 | 8 | 0 |
-| `applications` | 14 | 38 | 2 | 21 | 2 | 7 | 1 | 5 | 0 |
+| `applications` | 14 | 41 | 3 | 21 | 2 | 9 | 1 | 5 | 0 |
 | `association` | 17 | 91 | 58 | 20 | 1 | 0 | 6 | 6 | 0 |
 | `c_api` | 5 | 49 | 19 | 11 | 9 | 3 | 1 | 6 | 0 |
 | `cli` | 8 | 57 | 31 | 21 | 3 | 0 | 0 | 2 | 0 |
