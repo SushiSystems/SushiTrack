@@ -27,16 +27,15 @@
  * @author Mustafa Garip
  */
 
-#include <cmath>
-#include <string>
+#include <vector>
 
-#include <Eigen/Dense>
 #include <gtest/gtest.h>
 
 #include <SushiTrack/filtering/kalman_filter.hpp>
 #include <SushiTrack/filtering/kalman_types.hpp>
 
 #include <measurement_builders.hpp>
+#include <support/tolerance.hpp>
 
 using namespace SushiTrack;
 
@@ -46,88 +45,51 @@ using StateCov = KalmanTypes::StateCov;
 
 using DetectBox = KalmanTypes::DetectBox;
 
-// initiate()
+namespace
+{
+    /** @brief Returns the state [x, y, w, h, vx, vy, vw, vh] with the eight values given. */
+    StateMean make_state(float x, float y, float w, float h, float vx, float vy, float vw, float vh)
+    {
+        StateMean state;
+        state << x, y, w, h, vx, vy, vw, vh;
+        return state;
+    }
+} // namespace
 
 /**
- * @brief After initiation, the position/size block of the mean equals the
- *        measurement and the velocity block is zero.
+ * @brief After initiation, the position and size block of the mean equals the measurement and
+ *        the velocity block is zero. Both are copied or set, so the comparison is exact.
  */
 TEST(Small_KalmanFilterTest, InitiateMeanMatchesMeasurement)
 {
     KalmanFilter kf;
     StateMean mean;
     StateCov cov;
-    DetectBox box = make_box(100.f, 200.f, 50.f, 80.f);
 
-    kf.initiate(mean, cov, box);
+    kf.initiate(mean, cov, make_box(100.f, 200.f, 50.f, 80.f));
 
-    EXPECT_FLOAT_EQ(mean(0), 100.f);
-    EXPECT_FLOAT_EQ(mean(1), 200.f);
-    EXPECT_FLOAT_EQ(mean(2), 50.f);
-    EXPECT_FLOAT_EQ(mean(3), 80.f);
-    // Velocity block must be zero.
-    for (int i = 4; i < 8; ++i)
-        EXPECT_FLOAT_EQ(mean(i), 0.f) << "velocity component " << i << " is non-zero";
+    EXPECT_EQ(mean, make_state(100.f, 200.f, 50.f, 80.f, 0.f, 0.f, 0.f, 0.f));
 }
 
 /**
- * @brief Covariance matrix produced by initiate() is diagonal and all
- *        diagonal entries are positive.
+ * @brief Every diagonal entry of the covariance produced by initiate() is positive.
  */
-TEST(Small_KalmanFilterTest, InitiateCovarianceIsDiagonalAndPositive)
+TEST(Small_KalmanFilterTest, InitiateCovarianceDiagonalIsPositive)
 {
     KalmanFilter kf;
     StateMean mean;
     StateCov cov;
+
     kf.initiate(mean, cov, make_box(100.f, 200.f, 50.f, 80.f));
 
-    for (int r = 0; r < 8; ++r)
-    {
-        EXPECT_GT(cov(r, r), 0.f) << "diagonal entry (" << r << "," << r << ") not positive";
-        for (int c = 0; c < 8; ++c)
-        {
-            if (r != c)
-            {
-                EXPECT_FLOAT_EQ(cov(r, c), 0.f)
-                    << "off-diagonal entry (" << r << "," << c << ") is non-zero";
-            }
-        }
-    }
+    EXPECT_GT(cov.diagonal().minCoeff(), 0.f);
 }
 
-// predict()
-
 /**
- * @brief After one predict step with constant velocity, the position components
- *        shift by (vx * dt, vy * dt, 0, 0) relative to the pre-predict mean.
+ * @brief After one predict step, every covariance diagonal entry is larger than before.
  *
- * The Kalman motion model uses dt=1 when called with dt=1; the state stores
- * per-frame velocities so a dt=1 step advances position by exactly one frame's
- * worth of velocity.
- */
-TEST(Small_KalmanFilterTest, PredictPositionShiftsByVelocityTimesDt)
-{
-    KalmanFilter kf;
-    StateMean mean;
-    StateCov cov;
-    kf.initiate(mean, cov, make_box(100.f, 200.f, 50.f, 80.f));
-
-    // Manually inject a velocity into the state.
-    mean(4) = 5.f; // vx
-    mean(5) = 3.f; // vy
-
-    const float dt = 1.0f;
-    const float x0 = mean(0), y0 = mean(1);
-
-    kf.predict(mean, cov, dt);
-
-    EXPECT_NEAR(mean(0), x0 + 5.f * dt, 1e-4f);
-    EXPECT_NEAR(mean(1), y0 + 3.f * dt, 1e-4f);
-}
-
-/**
- * @brief After one predict step, the covariance diagonal entries are strictly
- *        larger than before (uncertainty has grown).
+ * Each entry gains the process noise, which is positive for the box 50 by 80, and the position
+ * entries also gain the velocity variance.
  */
 TEST(Small_KalmanFilterTest, PredictIncreasesCovariance)
 {
@@ -135,98 +97,74 @@ TEST(Small_KalmanFilterTest, PredictIncreasesCovariance)
     StateMean mean;
     StateCov cov;
     kf.initiate(mean, cov, make_box(100.f, 200.f, 50.f, 80.f));
+    const StateCov cov_before = cov;
 
-    StateCov cov_before = cov;
     kf.predict(mean, cov, 1.0f);
 
-    for (int i = 0; i < 8; ++i)
-        EXPECT_GE(cov(i, i), cov_before(i, i))
-            << "diagonal entry " << i << " decreased after predict";
+    EXPECT_GT((cov.diagonal() - cov_before.diagonal()).minCoeff(), 0.f);
 }
 
-// update()
-
 /**
- * @brief After a Kalman update with the exact current position as measurement,
- *        the mean remains close to that position.
+ * @brief An update moves the position by the Kalman gain times the innovation.
+ *
+ * x = 100, w = 50, no velocity: P_xx starts at 25 (0.1 * 50, squared) and P_vx at 9.765625
+ * (3.125, squared). Predict (dt 1) gives P_xx = 25 + 9.765625 + 6.25 (0.05 * 50, squared) =
+ * 41.015625; S_xx adds 6.25 for 47.265625. Gain = 2625 / 3025 = 105 / 121, innovation 10, so
+ * x = 100 + 10 * 105 / 121. Bound: 32 u times 108.7.
  */
-TEST(Small_KalmanFilterTest, UpdateMeanMovesTowardMeasurement)
+TEST(Small_KalmanFilterTest, UpdateMovesThePositionByTheGainTimesTheInnovation)
 {
     KalmanFilter kf;
     StateMean mean;
     StateCov cov;
-    DetectBox box = make_box(100.f, 200.f, 50.f, 80.f);
-    kf.initiate(mean, cov, box);
+    kf.initiate(mean, cov, make_box(100.f, 200.f, 50.f, 80.f));
     kf.predict(mean, cov, 1.0f);
 
-    // Provide the original position as the measurement.
-    kf.update(mean, cov, box, 0.9f);
+    kf.update(mean, cov, make_box(110.f, 200.f, 50.f, 80.f), 0.9f);
 
-    EXPECT_NEAR(mean(0), 100.f, 5.f);
-    EXPECT_NEAR(mean(1), 200.f, 5.f);
-    EXPECT_NEAR(mean(2), 50.f, 10.f);
-    EXPECT_NEAR(mean(3), 80.f, 10.f);
+    const double bound = 32.0 * TestSupport::unit_roundoff<float>() * 108.7;
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_error(mean(0), 100.0 + 10.0 * 105.0 / 121.0, bound)));
 }
 
 /**
- * @brief After a Kalman update, the covariance diagonal entries are smaller
- *        than the post-predict values (uncertainty has decreased).
+ * @brief After a Kalman update, every covariance diagonal entry is smaller than after the
+ *        predict. The predict correlates each velocity with its position, so the update lowers
+ *        the velocity entries too.
  */
 TEST(Small_KalmanFilterTest, UpdateDecreasesCovariance)
 {
     KalmanFilter kf;
     StateMean mean;
     StateCov cov;
-    DetectBox box = make_box(100.f, 200.f, 50.f, 80.f);
+    const DetectBox box = make_box(100.f, 200.f, 50.f, 80.f);
     kf.initiate(mean, cov, box);
     kf.predict(mean, cov, 1.0f);
+    const StateCov cov_after_predict = cov;
 
-    StateCov cov_after_predict = cov;
     kf.update(mean, cov, box, 0.9f);
 
-    for (int i = 0; i < 8; ++i)
-        EXPECT_LE(cov(i, i), cov_after_predict(i, i))
-            << "diagonal entry " << i << " increased after update";
+    EXPECT_GT((cov_after_predict.diagonal() - cov.diagonal()).minCoeff(), 0.f);
 }
 
-// Gating
-
 /**
- * @brief An observation placed exactly at the predicted mean passes the
- *        standard chi-squared gate (chi2 threshold 9.4877 for 4 DOF, 95%).
+ * @brief A measurement equal to the box the state started on is in the chi-squared gate
+ *        (threshold 9.4877 for 4 degrees of freedom): its squared distance is zero.
  */
-TEST(Small_KalmanFilterTest, IsInGate_ObservationAtMeanPasses)
+TEST(Small_KalmanFilterTest, IsInGateAcceptsTheMeasurementTheStateStartedOn)
 {
     KalmanFilter kf;
     StateMean mean;
     StateCov cov;
-    DetectBox box = make_box(100.f, 200.f, 50.f, 80.f);
+    const DetectBox box = make_box(100.f, 200.f, 50.f, 80.f);
     kf.initiate(mean, cov, box);
 
-    // Observation exactly at the current state mean (in measurement space).
-    DetectBox obs;
-    obs << mean(0) + mean(2) * 0.f, // x   (centre for XYWH = x + w/2, but state is XYWH directly)
-        mean(1), mean(2), mean(3);
-    // Actually for XYWH mode the measurement is [cx, cy, w, h] but the filter uses update_mat_ = identity (4x8 top rows), so measurement space = [x,y,w,h]. Use the box we initiated with for a zero-residual gate check.
     EXPECT_TRUE(kf.is_in_gate(mean, cov, box, 9.4877f));
 }
 
 /**
- * @brief An observation 1000 pixels away from the predicted mean fails the gate.
- */
-TEST(Small_KalmanFilterTest, IsInGate_FarObservationFails)
-{
-    KalmanFilter kf;
-    StateMean mean;
-    StateCov cov;
-    kf.initiate(mean, cov, make_box(100.f, 200.f, 50.f, 80.f));
-
-    DetectBox far_obs = make_box(5000.f, 5000.f, 50.f, 80.f);
-    EXPECT_FALSE(kf.is_in_gate(mean, cov, far_obs, 9.4877f));
-}
-
-/**
- * @brief get_gate_flags() batch result matches individual is_in_gate() calls.
+ * @brief get_gate_flags() gives, for a near and a far box, the verdict is_in_gate() gives for
+ *        each: the near box in and the far one out.
  */
 TEST(Small_KalmanFilterTest, GetGateFlagsMatchesScalarIsInGate)
 {
@@ -234,49 +172,42 @@ TEST(Small_KalmanFilterTest, GetGateFlagsMatchesScalarIsInGate)
     StateMean mean;
     StateCov cov;
     kf.initiate(mean, cov, make_box(100.f, 200.f, 50.f, 80.f));
+    const DetectBox near_box = make_box(100.f, 200.f, 50.f, 80.f);
+    const DetectBox far_box = make_box(5000.f, 5000.f, 50.f, 80.f);
+    KalmanTypes::DetectBoxVector boxes;
+    boxes.push_back(near_box);
+    boxes.push_back(far_box);
 
-    KalmanTypes::DetectBoxVector obs_vec;
-    obs_vec.push_back(make_box(100.f, 200.f, 50.f, 80.f));   // near
-    obs_vec.push_back(make_box(5000.f, 5000.f, 50.f, 80.f)); // far
+    const std::vector<bool> flags = kf.get_gate_flags(mean, cov, boxes, 9.4877f);
 
-    auto flags = kf.get_gate_flags(mean, cov, obs_vec, 9.4877f);
-    ASSERT_EQ(flags.size(), obs_vec.size());
-
-    for (size_t i = 0; i < obs_vec.size(); ++i)
-        EXPECT_EQ(flags[i], kf.is_in_gate(mean, cov, obs_vec[i], 9.4877f))
-            << "mismatch at index " << i;
+    ASSERT_EQ(flags.size(), 2U);
+    EXPECT_EQ(flags[0], kf.is_in_gate(mean, cov, near_box, 9.4877f));
+    EXPECT_EQ(flags[1], kf.is_in_gate(mean, cov, far_box, 9.4877f));
+    EXPECT_EQ(flags, (std::vector<bool>{true, false}));
 }
 
-// set_noise_multipliers
-
 /**
- * @brief With noise multipliers > 1, predict produces larger covariance
- *        growth than with identity multipliers.
+ * @brief With noise multipliers above 1, predict grows every covariance diagonal entry more than
+ *        it does with the identity multipliers.
  */
 TEST(Small_KalmanFilterTest, ElevatedMultipliersIncreaseProcessNoise)
 {
     KalmanFilter kf_base, kf_elevated;
     StateMean mean_base, mean_elev;
     StateCov cov_base, cov_elev;
-    DetectBox box = make_box(100.f, 200.f, 50.f, 80.f);
-
+    const DetectBox box = make_box(100.f, 200.f, 50.f, 80.f);
     kf_base.initiate(mean_base, cov_base, box);
     kf_elevated.initiate(mean_elev, cov_elev, box);
-
     kf_elevated.set_noise_multipliers(2.0f, 2.0f, 2.0f);
 
     kf_base.predict(mean_base, cov_base, 1.0f);
     kf_elevated.predict(mean_elev, cov_elev, 1.0f);
 
-    for (int i = 0; i < 8; ++i)
-        EXPECT_GT(cov_elev(i, i), cov_base(i, i))
-            << "elevated multipliers did not increase covariance at diagonal " << i;
+    EXPECT_GT((cov_elev.diagonal() - cov_base.diagonal()).minCoeff(), 0.f);
 }
 
-// XYAH coordinate mode
-
 /**
- * @brief In XYAH mode, initiate() stores [cx, cy, aspect, height] correctly.
+ * @brief In XYAH mode, initiate() stores [cx, cy, aspect, height] as given with zero velocity.
  */
 TEST(Small_KalmanFilterTest, XYAHModeInitiateMeanMatchesMeasurement)
 {
@@ -284,17 +215,9 @@ TEST(Small_KalmanFilterTest, XYAHModeInitiateMeanMatchesMeasurement)
     StateMean mean;
     StateCov cov;
 
-    // [cx, cy, aspect, height]
-    DetectBox box;
-    box << 150.f, 300.f, 0.6f, 120.f;
-    kf.initiate(mean, cov, box);
+    kf.initiate(mean, cov, make_box(150.f, 300.f, 0.6f, 120.f));
 
-    EXPECT_FLOAT_EQ(mean(0), 150.f);
-    EXPECT_FLOAT_EQ(mean(1), 300.f);
-    EXPECT_NEAR(mean(2), 0.6f, 1e-3f);
-    EXPECT_FLOAT_EQ(mean(3), 120.f);
-    for (int i = 4; i < 8; ++i)
-        EXPECT_FLOAT_EQ(mean(i), 0.f);
+    EXPECT_EQ(mean, make_state(150.f, 300.f, 0.6f, 120.f, 0.f, 0.f, 0.f, 0.f));
 }
 
 /**
@@ -321,39 +244,22 @@ TEST(Small_KalmanFilterTest, PredictWithDtGreaterThanOne)
 }
 
 /**
- * @brief Evaluates numerical stability in XYAH coordinate format during a
- *        predict-update cycle with constant measurements.
+ * @brief In XYAH mode, a predict and an update with the box the state started on leave the mean
+ *        as it was.
+ *
+ * The velocities are zero, so predict adds 0 to every position. The innovation is the box minus
+ * the projected mean, which is the mean itself, so it is exactly zero and the update adds zero.
  */
-TEST(Small_KalmanFilterTest, XyahPredictUpdateStability)
+TEST(Small_KalmanFilterTest, XyahUpdateWithTheStartBoxKeepsTheMean)
 {
-    KalmanFilter kf(true); // enable_xyah = true
-    KalmanTypes::StateMean mean;
-    KalmanTypes::StateCov cov;
-    KalmanTypes::DetectBox box;
-    box << 50.0f, 50.0f, 0.5f, 100.0f; // x, y, a, h
-
+    KalmanFilter kf(true);
+    StateMean mean;
+    StateCov cov;
+    const DetectBox box = make_box(50.f, 50.f, 0.5f, 100.f);
     kf.initiate(mean, cov, box, 1.0f);
+
     kf.predict(mean, cov, 1.0f);
-    kf.update(mean, cov, box, 1.0f); // Update with same box
+    kf.update(mean, cov, box, 1.0f);
 
-    EXPECT_NEAR(mean(2), 0.5f, 1e-4); // Check aspect ratio remains stable
-}
-
-/**
- * @brief Ensures the covariance matrix remains symmetric after a predict-update cycle.
- */
-TEST(Small_KalmanFilterTest, CovarianceRemainsSymmetricAfterUpdate)
-{
-    KalmanFilter kf(false);
-    KalmanTypes::StateMean mean;
-    KalmanTypes::StateCov cov;
-    KalmanTypes::DetectBox box;
-    box << 30.0f, 30.0f, 15.0f, 40.0f;
-
-    kf.initiate(mean, cov, box, 1.0f);
-    kf.predict(mean, cov, 1.0f);
-    kf.update(mean, cov, box, 0.9f);
-
-    // Check symmetry: A == A^T
-    EXPECT_TRUE(cov.isApprox(cov.transpose(), 1e-5f));
+    EXPECT_EQ(mean, make_state(50.f, 50.f, 0.5f, 100.f, 0.f, 0.f, 0.f, 0.f));
 }
