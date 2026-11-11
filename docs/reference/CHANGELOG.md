@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-11-11 — cli: Required sushicore 0.13.2, whose test command fails a run of a current tree that breaks a time limit, and told it whether the targets `st build` builds are current; the large shards each hold the one accelerator slot.
 - 2026-11-10 — profiling: Added the `ProfileSink` port and its `MemoryProfileSink` adapter, which the zone, counter and instant macros also report to (RW-40, `d80e000`).
 - 2026-11-10 — benchmarks: Made `FrameRecorder` sum its lost events through `account_for_lost_events` (RW-38, `b1297fa`).
 - 2026-11-10 — cli: Required sushicore 0.12.2, which narrows a sharded test run by `--filter` and reruns a failed shard's cases.

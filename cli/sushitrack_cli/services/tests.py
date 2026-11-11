@@ -60,6 +60,12 @@ def module_tests(context, panel=None, workspace=None):
             cfg.tool, build_dir, space.build_env(cfg.tool, build_dir, paths.config),
             config=_config_flag(cfg, build_dir), **options)
 
+    def rebuilt(build_dir):
+        cfg, paths = context()
+        targets = (build_svc.LIBRARY_TARGET, *build_svc.APPLICATION_TARGETS, *build_svc.TEST_TARGETS)
+        return space.driver.tree_is_current(cfg.tool, build_dir,
+                                            space.build_env(cfg.tool, build_dir, paths.config), targets=targets)
+
     def run_cli_tests(selection: LabelSelection):
         _, paths = context()
         console.header("Test (st package)")
@@ -69,7 +75,7 @@ def module_tests(context, panel=None, workspace=None):
 
     return ModuleTests(
         profile=PROFILE, project_root=lambda: context()[1].root, console=lambda: console,
-        build_tree=tree, run_ctest=run_ctest, run=space.runner.run, check_tree=check_tree, panel=panel,
+        build_tree=tree, run_ctest=run_ctest, run=space.runner.run, rebuilt=rebuilt, check_tree=check_tree, panel=panel,
         sanitized=SanitizedTests(names=tuple(item.value for item in build_svc.Sanitizer),
                                  build=build_sanitized, tree=sanitized_tree),
         cli_tests=run_cli_tests)
