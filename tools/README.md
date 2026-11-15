@@ -1,14 +1,15 @@
 # tools
 
 The eleven checkers every Sushi Systems repository carries, the license block writer and their
-tests. Every file here except this README and `settings.py` is a copy of `tools/` in SushiSkills,
-made by `checking/copy_shared_tools.py`; a rule is fixed there first and copied here.
+tests. Every file here except this README and `settings.py` is a copy of `tools/` in SushiCore,
+recorded in `shared_tools.lock` and checked by `checking/check_shared_tools.py`;
+a rule is fixed in SushiCore first and taken from there.
 
 | Path | Checks | Takes |
 | --- | --- | --- |
 | `check_all.py` | Nothing itself; runs the eleven checkers and the checker tests, and prints only what failed | Repository root |
 | `checking/checker.py` | Nothing itself; runs a checker's rule table and prints findings | |
-| `checking/copy_shared_tools.py` | Nothing; copies the shared tools from a SushiSkills checkout, or lists the files that differ with `--report` | Repository root, `--from` |
+| `checking/check_shared_tools.py` | That the shared files match `shared_tools.lock` | Repository root |
 | `checking/ignored_paths.py` | Nothing itself; names the files and folders git ignores, which no checker reads | |
 | `settings.py` | Nothing; holds the settings of this repository | |
 | `documentation/check_source_comments.py` | License block, file header, block ceiling, comment runs, separators, history words, `@date` | Files or folders |

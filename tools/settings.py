@@ -4,7 +4,7 @@
 # Licensed under the Apache License 2.0. See LICENSE.
 """Holds the settings of one repository that the shared checkers read.
 
-copy_shared_tools.py writes this file only when a repository has none, and never overwrites it.
+The shared-tools sync writes this file only when a repository has none, and never overwrites it.
 """
 
 from __future__ import annotations
@@ -42,6 +42,9 @@ K_MODULE_MANIFEST = 'sushi-module.toml'
 K_MODULE_DEPENDENCY_FILE = 'cli/sushistack.deps.toml'
 K_MODULE_HEADINGS = ('## Standalone', '## With SushiHub')
 K_MODULE_WORKSPACE_READ = '\\bhub (?:install|add|link|doctor|status|pin)\\b|SUSHISTACK_HOME|\\.sushistack\\b|workspace\\.toml'
+
+K_TRAILER_SINCE = "fe2c0172d36753eeefc4957a81c29e91b342c37c"
+K_DOCS_FOLLOW_SINCE = "fe2c0172d36753eeefc4957a81c29e91b342c37c"
 
 # The time limits of the testing skill, read by tools/testing/test_budget.py.
 K_TEST_TIMES: dict[str, float] = {
