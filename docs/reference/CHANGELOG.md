@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- 2026-11-21 — cli: Breaking change: Removed `st build --clean`, and made `st clean` the shared command, which removes trees only with `--yes` (RW-44).
+- 2026-11-21 — cli: Breaking change: Removed `st build --clean`, and made `st clean` the shared command, which removes trees only with `--yes` (RW-44, `fee395f`).
 - 2026-11-21 — cli: Renamed `st run --select` to `st run --pick`, which lists the built examples, each with its description; `--all` lists every program, and `--select` stays a hidden alias until 2027-03-25 (RW-43, `ddf8a51`).
 - 2026-11-16 — dependencies: Moved the SushiLog pin to v0.4.1 with `hub bump`, so every module pins one SushiLog; the build and the tests pass on it (`cli/sushistack.deps.toml`).
 - 2026-11-16 — tools: Took the shared tools from SushiCore v0.14.1, which leaves out its two own checkers and writes this repository's licence header, through `hub bump` (`tools/shared_tools.lock`).
