@@ -73,7 +73,7 @@ def test_datasets_found_when_a_sequence_has_ground_truth(st_paths, tmp_path):
 ])
 def test_missing_docker_fix_follows_the_platform(st_paths, monkeypatch, system, fix):
     monkeypatch.setattr(checks.platform, "system", lambda: system)
-    monkeypatch.setattr(sushicore_checks.probe, "binary_works", lambda exe: False)
+    monkeypatch.setattr(sushicore_checks.probe, "binary_works", lambda exe, runner=None: False)
     assert _by_name(st_checks(st_paths))["docker"].run().fix == fix
 
 

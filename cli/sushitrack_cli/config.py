@@ -19,6 +19,7 @@ from pathlib import Path
 from sushicore.build_admission import hardware_threads
 from sushicore.build_tree import K_DEFAULT_BUILD_TYPE, tree_dir
 from sushicore.config_base import load_tool_config
+from sushicore.errors import ProjectRootNotFoundError
 from sushicore.module_config import ModuleConfig
 from sushicore.profile import ModuleProfile
 from sushicore.stack_config import StackConfig
@@ -240,7 +241,7 @@ def load_tool(root=None):
     """
     try:
         config_dir(root)
-    except SystemExit:
+    except ProjectRootNotFoundError:
         plat = platform.system().lower()
         tool = load_tool_config(ToolSettings, [], plat, PROFILE.env_overrides())
     else:
@@ -263,7 +264,7 @@ def load_config(root=None, warn=None):
     cfg.tool = load_tool(root)
     try:
         cfg_dir = config_dir(root)
-    except SystemExit:
+    except ProjectRootNotFoundError:
         _apply_env(cfg, warn)  # still usable outside a checkout (e.g. `st doctor`)
         return cfg
     for name in CONFIG_NAMES:
@@ -285,7 +286,7 @@ def load_appearance(root=None):
     document = {}
     try:
         cfg_dir = config_dir(root)
-    except SystemExit:
+    except ProjectRootNotFoundError:
         cfg_dir = None
     if cfg_dir is not None:
         for name in CONFIG_NAMES:
