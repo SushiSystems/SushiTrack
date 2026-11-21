@@ -44,6 +44,27 @@ namespace
 {
     /** @brief Lane split of the two-object scene: A runs above this y, B below it. */
     constexpr float K_LANE_SPLIT = 275.0f;
+
+    /** @brief Returns the parameters of the full stack: the defaults with every refinement on. */
+    sushitrack_params_t full_stack_params()
+    {
+        sushitrack_params_t params = {};
+        sushitrack_get_default_params(&params);
+        params.time_aware = 1;
+        params.enable_reid = 1;
+        params.enable_mahalanobis = 1;
+        params.enable_tentative = 1;
+        params.kalman_type = 2;
+        params.primary_assoc_mode = 1;
+        params.frame_rate = 25;
+        params.track_buffer = 30;
+        params.track_thresh = 0.2f;
+        params.high_thresh = 0.4f;
+        params.match_thresh = 0.9f;
+        params.tentative_fast_thresh = 0.85f;
+        params.tentative_fast_hits = 1;
+        return params;
+    }
 } // namespace
 
 /**
@@ -76,20 +97,7 @@ class Small_TrackerFullStackTest : public ::testing::Test
 
         void SetUp() override
         {
-            sushitrack_get_default_params(&params_);
-            params_.time_aware = 1;
-            params_.enable_reid = 1;
-            params_.enable_mahalanobis = 1;
-            params_.enable_tentative = 1;
-            params_.kalman_type = 2;
-            params_.primary_assoc_mode = 1;
-            params_.frame_rate = 25;
-            params_.track_buffer = 30;
-            params_.track_thresh = 0.2f;
-            params_.high_thresh = 0.4f;
-            params_.match_thresh = 0.9f;
-            params_.tentative_fast_thresh = 0.85f;
-            params_.tentative_fast_hits = 1;
+            params_ = full_stack_params();
             hdl_ = sushitrack_create(&params_);
             ASSERT_NE(hdl_, nullptr);
 
@@ -246,68 +254,93 @@ TEST_F(Small_TrackerFullStackTest, OccludedObjectIsRecoveredByItsFeature)
         << "object B lost its id at the reappearance";
 }
 
+namespace
+{
 /**
- * @brief Fixture of a single object that accelerates and weaves for 120 frames at a score that
- *        swings between 0.4 and 0.9; it runs the whole sequence once.
+ * @brief What the long run showed: the id the track confirmed with and the frames that broke a promise.
+ */
+struct LongRunOutcome
+{
+        bool built = false;
+        int64_t confirmed_id = -1;
+        int frames_without_confirmed_id = 0;
+        int frames_with_bad_geometry = 0;
+};
+
+/**
+ * @brief Feeds a single object that accelerates and weaves for 120 frames at a score that swings
+ *        between 0.4 and 0.9, and returns what the run showed.
  *
  * The first frame seeds a tentative track. Once a frame reports the track Tracked and confirmed,
  * its id is frozen and every later frame must show that id.
  */
-class Small_TrackerFullStackLongRunTest : public Small_TrackerFullStackTest
+LongRunOutcome run_long_sequence()
+{
+    LongRunOutcome outcome;
+    sushitrack_params_t params = full_stack_params();
+    sushitrack_tracker_t hdl = sushitrack_create(&params);
+    if (hdl == nullptr)
+        return outcome;
+    outcome.built = true;
+    const std::vector<float> feat = one_hot_feature(128, 0);
+    std::vector<sushitrack_track_t> out(4);
+    const sushitrack_object_t seed = make_det_with_feat(100.0f, 200.0f, feat.data(), 128, 0.95f);
+    if (update_frame(hdl, seed, out.data(), 4, 0.04f) < 1)
+        outcome.built = false;
+
+    float x = 100.0f;
+    float y = 200.0f;
+    for (int k = 1; outcome.built && k <= 120; ++k)
+    {
+        const float frame = static_cast<float>(k);
+        x += 2.0f + 0.02f * frame;
+        y += 4.0f * std::sin(0.1f * frame);
+        const float score = 0.4f + 0.5f * std::abs(std::sin(0.3f * frame));
+        const sushitrack_object_t detection = make_det_with_feat(x, y, feat.data(), 128, score);
+        const int n = update_frame(hdl, detection, out.data(), 4, 0.04f);
+        if (n < 1)
+            continue;
+        if (outcome.confirmed_id == -1)
+        {
+            if (out[0].state == K_TRACKED && out[0].is_confirmed == 1)
+                outcome.confirmed_id = out[0].track_id;
+            continue;
+        }
+        const sushitrack_track_t* track = find_by_id(out, n, outcome.confirmed_id);
+        if (track == nullptr)
+            ++outcome.frames_without_confirmed_id;
+        else if (!geometry_is_sane(*track))
+            ++outcome.frames_with_bad_geometry;
+    }
+    sushitrack_destroy(hdl);
+    return outcome;
+}
+} // namespace
+
+/**
+ * @brief Fixture of the long run; the sequence runs once for the whole suite, not once per test.
+ */
+class Small_TrackerFullStackLongRunTest : public ::testing::Test
 {
     protected:
-        int64_t confirmed_id_ = -1;
-        int frames_without_confirmed_id_ = 0;
-        int frames_with_bad_geometry_ = 0;
-
-        void SetUp() override
+        static void SetUpTestSuite()
         {
-            Small_TrackerFullStackTest::SetUp();
-            run_sequence();
+            outcome_ = run_long_sequence();
         }
 
-    private:
-        void run_sequence()
-        {
-            std::vector<sushitrack_track_t> out(4);
-            const sushitrack_object_t seed =
-                make_det_with_feat(100.0f, 200.0f, feat_a_.data(), K_DIM, 0.95f);
-            ASSERT_GE(update_frame(hdl_, seed, out.data(), 4, 0.04f), 1);
-
-            float x = 100.0f;
-            float y = 200.0f;
-            for (int k = 1; k <= 120; ++k)
-            {
-                const float frame = static_cast<float>(k);
-                x += 2.0f + 0.02f * frame;
-                y += 4.0f * std::sin(0.1f * frame);
-                const float score = 0.4f + 0.5f * std::abs(std::sin(0.3f * frame));
-                const sushitrack_object_t detection =
-                    make_det_with_feat(x, y, feat_a_.data(), K_DIM, score);
-                const int n = update_frame(hdl_, detection, out.data(), 4, 0.04f);
-                if (n < 1)
-                    continue;
-                if (confirmed_id_ == -1)
-                {
-                    if (out[0].state == K_TRACKED && out[0].is_confirmed == 1)
-                        confirmed_id_ = out[0].track_id;
-                    continue;
-                }
-                const sushitrack_track_t* track = find_by_id(out, n, confirmed_id_);
-                if (track == nullptr)
-                    ++frames_without_confirmed_id_;
-                else if (!geometry_is_sane(*track))
-                    ++frames_with_bad_geometry_;
-            }
-        }
+        static LongRunOutcome outcome_;
 };
+
+LongRunOutcome Small_TrackerFullStackLongRunTest::outcome_;
 
 /**
  * @brief The track becomes Tracked and confirmed at some frame of the run.
  */
 TEST_F(Small_TrackerFullStackLongRunTest, TrackConfirmsDuringTheRun)
 {
-    EXPECT_NE(confirmed_id_, -1);
+    ASSERT_TRUE(outcome_.built);
+
+    EXPECT_NE(outcome_.confirmed_id, -1);
 }
 
 /**
@@ -316,9 +349,9 @@ TEST_F(Small_TrackerFullStackLongRunTest, TrackConfirmsDuringTheRun)
  */
 TEST_F(Small_TrackerFullStackLongRunTest, ConfirmedIdIsShownOnEveryLaterFrame)
 {
-    ASSERT_NE(confirmed_id_, -1);
+    ASSERT_NE(outcome_.confirmed_id, -1);
 
-    EXPECT_EQ(frames_without_confirmed_id_, 0);
+    EXPECT_EQ(outcome_.frames_without_confirmed_id, 0);
 }
 
 /**
@@ -326,7 +359,7 @@ TEST_F(Small_TrackerFullStackLongRunTest, ConfirmedIdIsShownOnEveryLaterFrame)
  */
 TEST_F(Small_TrackerFullStackLongRunTest, ConfirmedTrackGeometryStaysSane)
 {
-    ASSERT_NE(confirmed_id_, -1);
+    ASSERT_NE(outcome_.confirmed_id, -1);
 
-    EXPECT_EQ(frames_with_bad_geometry_, 0);
+    EXPECT_EQ(outcome_.frames_with_bad_geometry, 0);
 }
