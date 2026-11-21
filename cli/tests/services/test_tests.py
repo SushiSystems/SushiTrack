@@ -78,4 +78,4 @@ def test_a_stale_tree_is_refused_with_the_clean_hint(tmp_path, session):
     build.mkdir(parents=True)
     (build / "CMakeCache.txt").write_text("CMAKE_HOME_DIRECTORY:INTERNAL=/workspace\n",
                                           encoding="utf-8")
-    assert "st build --clean" in _module(tmp_path, session).check_tree(build)
+    assert "st clean --yes" in _module(tmp_path, session).check_tree(build)

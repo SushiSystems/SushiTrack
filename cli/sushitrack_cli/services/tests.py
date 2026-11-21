@@ -51,7 +51,7 @@ def module_tests(context, panel=None, workspace=None):
         if cmake_cache.is_stale(build_dir, paths.root):
             return (f"{build_dir} was configured for a different source path "
                     f"(e.g. a Docker volume build reused on this host).\n"
-                    f"  - run `st build --clean` to reconfigure it cleanly first.")
+                    f"  - run `st clean --yes`, then `st build`, to reconfigure it cleanly.")
         return None
 
     def run_ctest(build_dir, **options):

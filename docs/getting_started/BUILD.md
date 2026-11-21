@@ -8,7 +8,6 @@ time.
 st build                      # library + test programs (default)
 st build --no-test            # library only
 st build --type release       # debug (default) | release | relwithdebinfo | minsizerel
-st build --clean              # wipe the tree first; combinable with the above
 st build -j 4                 # parallel jobs (default: the hardware threads)
 st build --report             # time and peak memory per kind of edge
 st build -D CMAKE_UNITY_BUILD=ON   # extra -D passed straight to cmake
@@ -37,7 +36,7 @@ The type is fixed when a tree is created, so switching type never recompiles a t
 configure of another type into an existing tree is refused. Debug is the default; Release is
 for releases and for measurements, so build it with `--type release`. `st test`, `st run`
 and the other commands that read a tree use the tree of the configured build type, which is
-Debug unless `[build] type` or `ST_BUILD_TYPE` says otherwise. `st clean` removes every tree.
+Debug unless `[build] type` or `ST_BUILD_TYPE` says otherwise. `st clean --yes` removes every tree; `st clean` alone only lists them.
 
 cmake configure runs only when the settings (tests on/off, generator, extra defines, the
 SushiLog path, the launcher) differ from what the tree was configured with, which

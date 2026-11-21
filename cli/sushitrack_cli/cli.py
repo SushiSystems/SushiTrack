@@ -23,6 +23,7 @@ from sushicore.backlog import register_backlog_commands
 from sushicore.docs_bundle import register_docs_commands
 from sushicore.design import register_design_commands
 from sushicore.provision.commands import ModuleProvision, register_provision_commands
+from sushicore.clean_command import CleanExtra, register_clean_command
 from sushicore.root_options import register_root_options
 from sushicore.run_options import list_all_option, old_pick_option, pick_option
 from sushicore.testing import register_test_command
@@ -88,8 +89,6 @@ def build(
     no_test: bool = typer.Option(
         False, "--no-test",
         help="Skip the test targets (library only). Tests are built by default."),
-    clean: bool = typer.Option(
-        False, "--clean", help="Delete the build tree before configuring."),
     jobs: Optional[int] = typer.Option(
         None, "--jobs", "-j", help="Parallel build jobs (default: the hardware threads)."),
     deploy: Optional[DeployKind] = typer.Option(
@@ -113,7 +112,7 @@ def build(
     cfg, paths = context()
     build_type = build_svc.normalize_build_type(type.value) if type else None
     code = build_svc.build(
-        cfg, paths, build_type=build_type, clean=clean, jobs=jobs,
+        cfg, paths, build_type=build_type, jobs=jobs,
         tests=not no_test,
         defines=[f"-D{item}" for item in (define or [])], sanitizer=sanitize,
         report=report, workspace=ctx.obj)
@@ -150,19 +149,17 @@ def run(
                                  workspace=ctx.obj))
 
 
-@app.command("clean", rich_help_panel=K_PROJECT,
-             epilog="st clean\nst clean --predictions  # Only the benchmarks' pred/ folders")
-def clean(
-    ctx: typer.Context,
-    predictions: bool = typer.Option(
-        False, "--predictions",
-        help="Remove the pred/ folder of every benchmark sequence instead of the build tree."),
-):
-    """Remove the build tree and the assembled package directory, or the predictions."""
-    _, paths = context()
-    if predictions:
-        raise typer.Exit(label_svc.clean_predictions(paths, workspace=ctx.obj))
-    raise typer.Exit(build_svc.clean(paths, workspace=ctx.obj))
+register_clean_command(
+    app, lambda ctx: build_svc.clean_target(context()[1], workspace=ctx.obj),
+    program=PROFILE.program, panel=K_PROJECT,
+    names={None: build_svc.K_DEFAULT_TREE,
+           **{sanitizer.value: name for sanitizer, name in build_svc.K_SANITIZER_TREES.items()}},
+    build_types=[build_type.value for build_type in BuildType], whole_build=True,
+    with_all=build_svc.package_folders,
+    extra=CleanExtra("--predictions",
+                     "Select the pred/ folder of every benchmark sequence, which a clean of the "
+                     "build never takes.",
+                     lambda target: label_svc.prediction_folders(target.paths)))
 
 
 @app.command(

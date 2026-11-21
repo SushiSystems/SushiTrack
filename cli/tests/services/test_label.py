@@ -111,16 +111,14 @@ def test_eval_refuses_an_unknown_benchmark(tmp_path, session):
     assert session.said("Available: mot17, mot20")
 
 
-def test_clean_predictions_removes_every_pred_folder(tmp_path, session):
-    """Removes each sequence's pred/ folder and keeps its detections."""
+def test_prediction_folders_names_every_pred_folder_and_no_detections(tmp_path):
+    """Names each sequence's pred/ folder, so a clean of predictions keeps the detections."""
     sequence = tmp_path / "mot17" / "data" / "MOT17-02-DPM"
     (sequence / "pred" / "sushitrack").mkdir(parents=True)
     (sequence / "det").mkdir()
     paths = SimpleNamespace(benchmark_names=lambda: ["mot17"],
                             data_root=lambda name: tmp_path / name / "data")
-    assert label.clean_predictions(paths, workspace=session.workspace) == 0
-    assert not (sequence / "pred").exists()
-    assert (sequence / "det").exists()
+    assert label.prediction_folders(paths) == [sequence / "pred"]
 
 
 def test_a_line_the_engine_prints_that_is_not_timing_is_skipped_with_a_warning(checkout, session):

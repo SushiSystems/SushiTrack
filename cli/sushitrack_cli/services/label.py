@@ -4,7 +4,6 @@
 # Licensed under the Apache License 2.0. See LICENSE.
 """The MOT label-based benchmark pipeline behind `st eval`."""
 
-import shutil
 from pathlib import Path
 
 from ..errors import UnknownTrackerError
@@ -206,24 +205,7 @@ def _evaluate_benchmark(space, cfg, paths, benchmark, names, trackers, compare, 
                                  compare=compare, workspace=space)
 
 
-def clean_predictions(paths, workspace=None):
-    """Remove the pred/ folder of every sequence of every benchmark.
-
-    Args:
-        workspace: What the clean prints through; none uses the real console.
-
-    Returns:
-        0 when every pred/ folder is gone, 1 when one could not be removed.
-    """
-    console = (workspace or current_workspace()).console
-    console.header("Clean predictions")
-    removed = 0
-    for benchmark in paths.benchmark_names():
-        for prediction in sorted(paths.data_root(benchmark).glob("*/pred")):
-            shutil.rmtree(prediction, ignore_errors=True)
-            if prediction.exists():
-                console.error(f"Could not remove {prediction}; close whatever holds a file in it.")
-                return 1
-            removed += 1
-    console.success(f"Removed {removed} pred/ folder(s).")
-    return 0
+def prediction_folders(paths):
+    """Return the pred/ folder of every sequence of every benchmark, in name order."""
+    return [prediction for benchmark in paths.benchmark_names()
+            for prediction in sorted(paths.data_root(benchmark).glob("*/pred"))]

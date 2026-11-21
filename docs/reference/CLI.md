@@ -10,7 +10,7 @@ Commands are flat: `st <command> [flags]`, with `st container <action>` and
 | `st eval` | MOT label benchmark + TrackEval metrics (not a CTest suite) |
 | `st infer` | YOLOX video inference pipeline through `tracker_bridge` |
 | `st run` | Run a built executable, by name or from a picker |
-| `st clean` | Remove every tree under `build/` and `package/` |
+| `st clean` | List the build trees, and remove them and `package/` only with `--yes` |
 | `st deploy {cpp,python}` | Assemble `package/` from the current build |
 | `st status` | What is built, what is missing, which data sets are present |
 | `st setup [--dry-run] [--yes] [--toolchain NAME] [--no-gpu]` | Provision the dependencies in `cli/sushistack.deps.toml`, then run the doctor |
@@ -35,7 +35,6 @@ prints which layer each value came from.
 |---|---|
 | `--type, -t <type>` | `debug` (default) / `release` / `relwithdebinfo` / `minsizerel`; each type builds in `build/default-<type>` |
 | `--no-test` | Build the library only; test targets are built by default |
-| `--clean` | Remove the tree of the build before configuring |
 | `--jobs, -j <n>` | Parallel build jobs (default: the hardware threads) |
 | `--report` | Print the time and peak memory per kind of edge and write `build_report.json` into the tree |
 | `-D VAR=VALUE` | Extra `-D` option forwarded to cmake (repeatable) |
@@ -151,14 +150,27 @@ resolution.
 
 ## `st clean`
 
-Removes every tree under `build/` and the assembled package directory (`package/` by
-default, overridable in the `paths` section of `cli/config.toml`).
-`--predictions` removes the `pred/` folder of every benchmark sequence instead, and leaves
-the build tree.
+Says which build trees it would remove, with their sizes, and removes them only with `--yes`.
+Without it nothing is removed and the exit code is 2, so a script that expected the trees gone
+sees that they are not. `st build` takes no `--clean`: a build never removes the tree it
+configures.
+
+| Flag | Effect |
+|---|---|
+| `--type, -t <type>` | Select the tree of this build type, repeatable. Without it and `--sanitize`, every tree is selected |
+| `--sanitize <address\|thread>` | Select the trees of that sanitizer |
+| `--all` | Select `build/` whole: every tree, the gate's state and the generated files |
+| `--predictions` | Select the `pred/` folder of every benchmark sequence instead; a clean of the build never takes it |
+| `--yes, -y` | Remove what the command listed |
+
+A clean that no `--type` or `--sanitize` narrows also removes the assembled package directory
+(`package/` by default, overridable in the `paths` section of `cli/config.toml`).
 
 ```bash
-st clean
-st clean --predictions
+st clean                      # list every tree, remove none
+st clean --yes                # remove every tree and package/
+st clean --type debug --yes   # remove build/default-debug only
+st clean --predictions --yes  # remove the pred/ folders
 ```
 
 ## `st run`

@@ -16,7 +16,7 @@ platforms, run the deploy once on each.
 ```bash
 st build --deploy cpp        # C/C++ package
 st build --deploy python     # Python package
-st build --clean --deploy cpp   # clean rebuild, then deploy
+st clean --yes && st build --deploy cpp   # clean rebuild, then deploy
 ```
 
 Deploy reuses the same artefacts a plain `st build` produces; it never needs

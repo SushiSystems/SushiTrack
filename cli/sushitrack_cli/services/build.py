@@ -6,10 +6,12 @@
 
 import enum
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
 
 from sushicore import build_admission, build_report, cmake_cache
 from sushicore.build_tree import refuse_another_build_type, tree_dir
+from sushicore.cmake_driver import CleanTreeError
 from sushicore.provision.sushi_packages import PackageError
 
 from .. import library_packages
@@ -133,7 +135,7 @@ def _configure_args(space, cfg, paths, build_dir, build_type, tests, generator_n
     return args + list(defines)
 
 
-def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
+def build(cfg, paths, build_type=None, jobs=None, tests=True,
           defines=(), sanitizer=None, report=False, workspace=None):
     """Configure when needed, then build st's targets in the tree of the build type.
 
@@ -155,11 +157,6 @@ def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
     defines = (*sanitizer_defines(sanitizer), *defines)
     refuse_another_build_type(build_dir, build_type, [item.removeprefix("-D") for item in defines])
     build_admission.refuse_a_stopped_gate(build_dir)
-
-    if clean and build_dir.exists():
-        console.info(f"Removing build directory: {build_dir}")
-        if not _remove_tree(space, build_dir):
-            return 1
 
     console.info(f"Tree: {build_dir}")
     console.info(f"Type: {build_type}  |  tests: {'ON' if tests else 'OFF'}"
@@ -217,27 +214,42 @@ def build(cfg, paths, build_type=None, clean=False, jobs=None, tests=True,
     return 0
 
 
-def clean(paths, workspace=None):
-    """Remove every build tree and the assembled package directory.
+class _TreeRemover:
+    """Removes a folder for the shared `clean` command and says so."""
 
-    Args:
-        workspace: What the clean prints through; none uses the real console.
+    def __init__(self, console) -> None:
+        self._console = console
 
-    Returns:
-        0 when both are gone, 1 when one of them could not be removed.
-    """
-    space = workspace or current_workspace()
-    console = space.console
-    console.header("Clean")
-    removed = []
-    for target in (paths.build_root, paths.package):
+    def clean_tree(self, target: Path) -> None:
+        """Removes *target*.
+
+        Raises:
+            CleanTreeError: Something of it remains, such as a file another program holds open.
+        """
+        self._console.info(f"Removing {target}")
+        shutil.rmtree(target, ignore_errors=True)
         if target.exists():
-            console.info(f"Removing {target}")
-            if not _remove_tree(space, Path(target)):
-                return 1
-            removed.append(Path(target).name)
-    if not removed:
-        console.info("Nothing to remove; the tree is already clean.")
-    else:
-        console.success(f"Removed: {', '.join(removed)}.")
-    return 0
+            raise CleanTreeError(
+                f"Could not remove {target}; close whatever holds a file in it and retry.")
+        self._console.success(f"{target} removed.")
+
+
+@dataclass(frozen=True)
+class CleanTarget:
+    """What the shared `clean` command acts on: the checkout, where it prints, and the paths."""
+
+    root: Path
+    console: object
+    driver: _TreeRemover
+    paths: object
+
+
+def clean_target(paths, workspace=None) -> CleanTarget:
+    """Returns the checkout *paths* names, with the console of *workspace* or the real one."""
+    console = (workspace or current_workspace()).console
+    return CleanTarget(Path(paths.root), console, _TreeRemover(console), paths)
+
+
+def package_folders(target: CleanTarget) -> list[Path]:
+    """Returns the assembled package directory, which a clean of every tree removes as well."""
+    return [Path(target.paths.package)]

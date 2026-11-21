@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import pytest
 from sushicore import build_admission
 from sushicore.build_tree import K_DEFAULT_BUILD_TYPE
+from sushicore.cmake_driver import CleanTreeError
 from sushicore.errors import ConfigError
 
 from sushitrack_cli.config import Config
@@ -273,40 +274,40 @@ def test_a_stale_tree_reconfigures(tmp_path, runner, generator, sentinel):
     assert [c[1] for c in runner.commands] == ["-S", "--build"]
 
 
-def test_clean_removes_the_tree_before_configuring(tmp_path, runner):
-    """Deletes the old tree and configures a fresh one."""
-    paths = _configured_tree(tmp_path, "OFF|Ninja", sentinel="build.ninja")
-    (paths.build / "leftover.o").write_text("", encoding="utf-8")
-    assert build_svc.build(_cfg(), paths, clean=True, tests=False, workspace=runner.workspace) == 0
-    assert not (paths.build / "leftover.o").exists()
-    assert [c[1] for c in runner.commands] == ["-S", "--build"]
-
-
-@pytest.mark.parametrize("stamp, clean", [("OFF|Ninja", True), ("ON|Ninja", False)])
-def test_build_stops_at_a_tree_it_could_not_remove(tmp_path, monkeypatch, runner,
-                                                   stamp, clean):
-    """Returns 1 and runs no cmake when the clean or the reconfigure removal fails."""
+def test_build_stops_at_a_tree_it_could_not_remove(tmp_path, monkeypatch, runner):
+    """Returns 1 and runs no cmake when the reconfigure removal fails."""
     monkeypatch.setattr(build_svc.shutil, "rmtree", lambda target, ignore_errors=False: None)
-    paths = _configured_tree(tmp_path, stamp, sentinel="build.ninja")
-    assert build_svc.build(_cfg(), paths, clean=clean, tests=False, workspace=runner.workspace) == 1
+    paths = _configured_tree(tmp_path, "ON|Ninja", sentinel="build.ninja")
+    assert build_svc.build(_cfg(), paths, tests=False, workspace=runner.workspace) == 1
     assert runner.commands == []
 
 
-def test_clean_reports_a_tree_it_could_not_remove(tmp_path, monkeypatch, session):
-    """Returns 1 and names the directory when the build folder survives the removal."""
+def test_the_clean_target_removes_a_tree_and_says_so(tmp_path, session):
+    """The remover of the shared clean command deletes the folder and reports it."""
+    paths = _paths(tmp_path)
+    paths.build.mkdir(parents=True)
+    target = build_svc.clean_target(paths, workspace=session.workspace)
+
+    target.driver.clean_tree(paths.build)
+
+    assert not paths.build.exists()
+    assert session.said(f"{paths.build} removed.")
+
+
+def test_the_clean_target_raises_when_a_tree_survives_the_removal(tmp_path, monkeypatch, session):
+    """The remover raises, naming the directory, when a file keeps the folder alive."""
     monkeypatch.setattr(build_svc.shutil, "rmtree", lambda target, ignore_errors=False: None)
     paths = _paths(tmp_path)
     paths.build_root.mkdir()
-    assert build_svc.clean(paths, workspace=session.workspace) == 1
-    assert session.said(f"Could not remove {paths.build_root}")
-    assert not session.said("Removed:")
+    target = build_svc.clean_target(paths, workspace=session.workspace)
+
+    with pytest.raises(CleanTreeError, match="Could not remove"):
+        target.driver.clean_tree(paths.build_root)
 
 
-def test_clean_removes_every_tree_and_the_package(tmp_path, session):
-    """Returns 0 and leaves neither the build folder nor the package directory."""
+def test_a_clean_of_every_tree_also_names_the_package_directory(tmp_path, session):
+    """The package directory is removed with the trees, so the shared clean is told about it."""
     paths = _paths(tmp_path)
-    (paths.build_root / "default-release").mkdir(parents=True)
-    paths.build.mkdir()
-    paths.package.mkdir()
-    assert build_svc.clean(paths, workspace=session.workspace) == 0
-    assert not paths.build_root.exists() and not paths.package.exists()
+    target = build_svc.clean_target(paths, workspace=session.workspace)
+
+    assert build_svc.package_folders(target) == [paths.package]
