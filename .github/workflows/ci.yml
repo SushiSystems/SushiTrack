@@ -34,6 +34,8 @@ jobs:
         shell: bash
         run: echo "python tools/check_all.py . && st test --cli"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
       # The manual cites files inside the submodules, which the documentation checker looks up.
       - name: Fetch the submodules
         run: git submodule update --init --depth 1
