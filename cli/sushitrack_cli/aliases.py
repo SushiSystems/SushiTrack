@@ -17,6 +17,7 @@ K_REMOVED_AFTER = date(2027, 3, 25)
 
 #: The table st registers its old command words through.
 ALIASES = AliasTable(PROFILE.program, (
+    Alias("st run --select", "st run --pick", K_REMOVED_AFTER),
     Alias("st docker build", "st container build", K_REMOVED_AFTER),
     Alias("st docker run", "st container run", K_REMOVED_AFTER),
 ))

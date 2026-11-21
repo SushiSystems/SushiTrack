@@ -24,6 +24,7 @@ from sushicore.docs_bundle import register_docs_commands
 from sushicore.design import register_design_commands
 from sushicore.provision.commands import ModuleProvision, register_provision_commands
 from sushicore.root_options import register_root_options
+from sushicore.run_options import list_all_option, old_pick_option, pick_option
 from sushicore.testing import register_test_command
 from sushicore.typer_help import help_group
 
@@ -128,7 +129,8 @@ register_test_command(app, test_svc.module_tests(context, panel=K_PROJECT))
     "run",
     rich_help_panel=K_PROJECT,
     context_settings=K_FORWARDING,
-    epilog="st run  # Pick from a list\n"
+    epilog="st run  # Pick an example from a list\n"
+           "st run --pick --all  # Pick from every program, tests and benchmarks included\n"
            "st run sushitrack_tests\n"
            "st run sushitrack_tests -- --gtest_filter='Small_TrackletTest.*'",
 )
@@ -137,14 +139,15 @@ def run(
     target: Optional[str] = typer.Argument(
         None, help="Executable name (exact, then substring match). "
                     "Omit to pick from a list."),
-    select: bool = typer.Option(
-        False, "--select", "-s",
-        help="Always show the picker, even when a target is given."),
+    pick: bool = pick_option(),
+    select: bool = old_pick_option(ALIASES, "st run --select", "--select", "-s"),
+    list_all: bool = list_all_option(),
 ):
     """Run a built executable."""
     cfg, paths = context()
-    raise typer.Exit(run_svc.run(cfg, paths, target=target, select=select,
-                                 forwarded=list(ctx.args), workspace=ctx.obj))
+    raise typer.Exit(run_svc.run(cfg, paths, target=target, pick=pick or select,
+                                 list_all=list_all, forwarded=list(ctx.args),
+                                 workspace=ctx.obj))
 
 
 @app.command("clean", rich_help_panel=K_PROJECT,

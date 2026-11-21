@@ -4,56 +4,24 @@
 # Licensed under the Apache License 2.0. See LICENSE.
 """Run a built executable, by name or by picking one interactively."""
 
-from ..workspace import Workspace, current_workspace
+from sushicore.run_program import run_program
+
+from ..workspace import current_workspace
 from .artifacts import EXECUTABLES
 
 
-def _select(space: Workspace, paths):
-    """List the build tree's executables and prompt for one.
+def run(cfg, paths, target=None, pick=False, list_all=False, forwarded=(), workspace=None):
+    """Run *target* (exact name, then substring match), or the program picked. Returns its exit code.
 
-    Falls back to an error rather than a prompt when stdin is not a terminal, so
-    a scripted `st run --select` fails loudly instead of hanging.
-    """
-    console = space.console
-    executables = EXECUTABLES.find(paths.build)
-    if not executables:
-        console.error("No executables found. Run `st build` first.")
-        return None
-
-    rows = [[f"[cmd]{index}[/cmd]", exe.name, f"[dim]{exe.relative_to(paths.root)}[/dim]"]
-            for index, exe in enumerate(executables, 1)]
-    console.table(["#", "Name", "Path"], rows, title="Available executables")
-
-    try:
-        raw = input("Select a number: ").strip()
-    except (EOFError, KeyboardInterrupt):
-        console.warn("Nothing selected.")
-        return None
-    if not raw.isdigit() or not 1 <= int(raw) <= len(executables):
-        console.error(f"Invalid selection '{raw}'.")
-        return None
-    return executables[int(raw) - 1]
-
-
-def run(cfg, paths, target=None, select=False, forwarded=(), workspace=None):
-    """Run *target* (exact name, then substring match). Returns its exit code.
+    With no target the pick runs, as `st run` always did.
 
     Args:
+        pick: Prompts for one built example from a list and ignores *target*.
+        list_all: Makes the prompt list every program, not only the examples.
         workspace: What the run prints and starts the program through; none uses the real ones.
     """
     space = workspace or current_workspace()
-    console = space.console
-    if select or not target:
-        binary = _select(space, paths)
-        if binary is None:
-            return 1
-    else:
-        binary = EXECUTABLES.match(paths.build, target)
-        if binary is None:
-            console.error(f"No executable matching '{target}' under {paths.build}. "
-                          f"Run `st run` with no target to list what is available.")
-            return 1
-
-    console.header(f"Run {binary.name}")
-    return space.runner.run([str(binary), *forwarded], paths.root,
-                            env=space.build_env(cfg.tool, paths.build, paths.config))
+    return run_program(
+        EXECUTABLES, space.console, space.runner, build_dir=paths.build, project_root=paths.root,
+        env=space.build_env(cfg.tool, paths.build, paths.config), target=target,
+        pick=pick or not target, list_all=list_all, app_args=forwarded)

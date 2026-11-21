@@ -18,6 +18,7 @@ pytestmark = pytest.mark.small
 @pytest.mark.parametrize("old, new", [
     ("st docker build", "st container build"),
     ("st docker run", "st container run"),
+    ("st run --select", "st run --pick"),
 ])
 def test_each_old_spelling_names_its_replacement_and_the_shared_date(old, new):
     """Maps each old spelling to its new one with the estate's removal date."""
@@ -28,7 +29,7 @@ def test_each_old_spelling_names_its_replacement_and_the_shared_date(old, new):
 
 @pytest.mark.parametrize("days_after_the_last_day, expired_spellings", [
     (0, []),
-    (1, ["st docker build", "st docker run"]),
+    (1, ["st docker build", "st docker run", "st run --select"]),
 ])
 def test_an_alias_expires_the_day_after_its_last_day(days_after_the_last_day, expired_spellings):
     """Lists no row on the last day and every row on the day after it."""

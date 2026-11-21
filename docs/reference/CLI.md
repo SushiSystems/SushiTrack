@@ -164,15 +164,19 @@ st clean --predictions
 ## `st run`
 
 Runs an executable from the build tree. The target is matched by exact name first, then
-by substring; with no target, or with `--select`, `st` lists the executables and asks
-which one to run. Arguments after `--` go to the executable.
+by substring; with no target, or with `--pick`, `st` lists the built examples, each with the
+`@brief` of its source, and asks which one to run. Arguments after `--` go to the executable.
 
 | Flag | Effect |
 |---|---|
-| `--select, -s` | Show the picker even when a target is given |
+| `--pick` | Show the picker even when a target is given |
+| `--all` | With `--pick`, list every program of the tree, tests and benchmarks included |
+
+`--select, -s` is the old spelling of `--pick`, hidden, and removed after 2027-03-25.
 
 ```bash
 st run
+st run --pick --all
 st run sushitrack_tests
 st run sushitrack_tests -- --gtest_filter='Small_TrackletTest.*'
 ```
