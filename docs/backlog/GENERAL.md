@@ -9,7 +9,6 @@
 | RW-6 | P2 | decision | Decide whether contributions from outside are accepted | the owner has named the contributor agreement, or ruled contributions out |  |  | 2026-10-19 |
 | RW-7 | P2 | decision | Decide whether the SushiTrack migration is closed | `docs/design/SUSHITRACK_MIGRATION/README.md` carries a `Shipped` status, or a phase with work left |  | `docs/design/SUSHITRACK_MIGRATION/README.md` | 2026-10-19 |
 | RW-36 | P2 | open | Set the CTest size timeouts to the testing skill's 1, 10 and 120 seconds | cmake/SushiTrackTests.cmake gives small 1 s, medium 10 s and large 120 s per case and docs/guides/TESTING.md says so |  | `docs/guides/TESTING.md` | 2026-11-09 |
-| RW-43 | P2 | open | Run st run through the shared picker and rename --select to --pick | st run --pick picks an example, --all lists every program and --select still works as a hidden alias |  | `cli/sushitrack_cli/services/runner.py` | 2026-11-21 |
 
 ## Known issues
 
