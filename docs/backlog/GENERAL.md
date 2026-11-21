@@ -9,7 +9,6 @@
 | RW-6 | P2 | decision | Decide whether contributions from outside are accepted | the owner has named the contributor agreement, or ruled contributions out |  |  | 2026-10-19 |
 | RW-7 | P2 | decision | Decide whether the SushiTrack migration is closed | `docs/design/SUSHITRACK_MIGRATION/README.md` carries a `Shipped` status, or a phase with work left |  | `docs/design/SUSHITRACK_MIGRATION/README.md` | 2026-10-19 |
 | RW-36 | P2 | open | Set the CTest size timeouts to the testing skill's 1, 10 and 120 seconds | cmake/SushiTrackTests.cmake gives small 1 s, medium 10 s and large 120 s per case and docs/guides/TESTING.md says so |  | `docs/guides/TESTING.md` | 2026-11-09 |
-| RW-45 | P2 | open | Never remove a build tree in a build; refuse one CMake cannot reuse | st build keeps every tree, refuses another generator or source folder, and names st clean |  |  | 2026-11-21 |
 
 ## Known issues
 
