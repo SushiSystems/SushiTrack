@@ -9,13 +9,14 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from sushicore import build_admission, build_report, cmake_cache
+from sushicore import build_admission, build_report
 from sushicore.build_tree import refuse_another_build_type, tree_dir
 from sushicore.cmake_driver import CleanTreeError
 from sushicore.provision.sushi_packages import PackageError
+from sushicore.tree_reuse import refuse_unreusable_tree
 
 from .. import library_packages
-from ..config import K_DEFAULT_TREE
+from ..config import K_DEFAULT_TREE, PROFILE
 from ..errors import UnknownBuildTypeError
 from ..workspace import Workspace, current_workspace
 
@@ -88,15 +89,6 @@ def generator(cfg) -> str:
     return "Ninja" if cfg.tool.is_windows else ""
 
 
-def _remove_tree(space: Workspace, target: Path) -> bool:
-    """Deletes *target* and returns whether it is gone, reporting a tree that survived."""
-    shutil.rmtree(target, ignore_errors=True)
-    if not target.exists():
-        return True
-    space.console.error(f"Could not remove {target}; close whatever holds a file in it and retry.")
-    return False
-
-
 def _stamp_key(tests, generator_name, defines):
     """Join the settings that force a reconfigure when they change.
 
@@ -105,17 +97,13 @@ def _stamp_key(tests, generator_name, defines):
     return "|".join(["ON" if tests else "OFF", generator_name, *sorted(defines)])
 
 
-def _needs_configure(space: Workspace, build_dir: Path, generator_name: str, stamp_key: str,
-                     root: Path) -> bool:
-    """Return whether the tree must be configured from scratch."""
+def _needs_configure(space: Workspace, build_dir: Path, generator_name: str,
+                     stamp_key: str) -> bool:
+    """Return whether the tree must be configured, in place, before it is compiled."""
     if generator_name in _SENTINEL_GENERATORS:
-        if space.driver.needs_configure(build_dir, generator_name, root=root):
+        if space.driver.needs_configure(build_dir, generator_name):
             return True
     elif not build_dir.is_dir():
-        return True
-    elif cmake_cache.is_stale(build_dir, root):
-        space.console.warn("Build tree was configured for a different source path "
-                     "(e.g. a Docker volume build); reconfiguring from scratch.")
         return True
     if not (build_dir / "CMakeCache.txt").is_file():
         return True
@@ -157,6 +145,8 @@ def build(cfg, paths, build_type=None, jobs=None, tests=True,
     defines = (*sanitizer_defines(sanitizer), *defines)
     refuse_another_build_type(build_dir, build_type, [item.removeprefix("-D") for item in defines])
     build_admission.refuse_a_stopped_gate(build_dir)
+    refuse_unreusable_tree(driver, build_dir, generator=generator_name, root=paths.root,
+                           program=PROFILE.program)
 
     console.info(f"Tree: {build_dir}")
     console.info(f"Type: {build_type}  |  tests: {'ON' if tests else 'OFF'}"
@@ -177,10 +167,7 @@ def build(cfg, paths, build_type=None, jobs=None, tests=True,
                    build_dir, build_admission.compiler_cache(cfg.tool.ccache_exe))))
     stamp_key = _stamp_key(tests, generator_name, defines)
 
-    configure = _needs_configure(space, build_dir, generator_name, stamp_key, paths.root)
-    if configure and build_dir.exists() and not _remove_tree(space, build_dir):
-        return 1
-    # Recorded before the environment is read, and after a tree was removed, so it survives.
+    configure = _needs_configure(space, build_dir, generator_name, stamp_key)
     library_packages.record_run_dirs(build_dir, packages.run_dirs(cfg.tool.platform))
     env = space.build_env(cfg.tool, build_dir)
 

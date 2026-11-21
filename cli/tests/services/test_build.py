@@ -265,21 +265,30 @@ def test_a_stamp_mismatch_reconfigures(tmp_path, runner):
 
 @pytest.mark.parametrize("generator, sentinel",
                          [("", "Makefile"), ("Visual Studio 17 2022", None)])
-def test_a_stale_tree_reconfigures(tmp_path, runner, generator, sentinel):
-    """Reconfigures a tree whose cache names another source directory."""
+def test_a_tree_of_another_source_folder_is_refused_and_kept(tmp_path, runner, generator,
+                                                             sentinel):
+    """Stops a build at a tree whose cache names another source directory; the tree stays."""
     paths = _configured_tree(tmp_path, f"OFF|{generator}", sentinel=sentinel,
                              home=tmp_path / "elsewhere")
-    assert build_svc.build(_cfg(generator=generator, windows=False), paths,
-                           tests=False, workspace=runner.workspace) == 0
-    assert [c[1] for c in runner.commands] == ["-S", "--build"]
+    (paths.build / "object.o").write_text("", encoding="utf-8")
 
+    with pytest.raises(ConfigError) as refused:
+        build_svc.build(_cfg(generator=generator, windows=False), paths, tests=False,
+                        workspace=runner.workspace)
 
-def test_build_stops_at_a_tree_it_could_not_remove(tmp_path, monkeypatch, runner):
-    """Returns 1 and runs no cmake when the reconfigure removal fails."""
-    monkeypatch.setattr(build_svc.shutil, "rmtree", lambda target, ignore_errors=False: None)
-    paths = _configured_tree(tmp_path, "ON|Ninja", sentinel="build.ninja")
-    assert build_svc.build(_cfg(), paths, tests=False, workspace=runner.workspace) == 1
+    assert "`st clean`" in str(refused.value)
     assert runner.commands == []
+    assert (paths.build / "object.o").is_file()
+
+
+def test_a_stamp_mismatch_keeps_the_files_of_the_tree(tmp_path, runner):
+    """Configures in place: a build never removes the tree it configures again."""
+    paths = _configured_tree(tmp_path, "ON|Ninja", sentinel="build.ninja")
+    (paths.build / "object.o").write_text("", encoding="utf-8")
+
+    assert build_svc.build(_cfg(), paths, tests=False, workspace=runner.workspace) == 0
+
+    assert (paths.build / "object.o").is_file()
 
 
 def test_the_clean_target_removes_a_tree_and_says_so(tmp_path, session):
