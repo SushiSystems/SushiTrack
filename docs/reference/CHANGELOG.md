@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-11-23 — tests: Expected the CMake module folder SushiCore 0.16 adds to the configure argv of `st build` (`test_build.py`).
 - 2026-11-21 — cli: Breaking change: `st build` no longer removes the tree it configures; it refuses a tree of another generator or source folder and names `st clean`, and configures any other difference in place (RW-45, `36542c4`).
 - 2026-11-21 — cli: Breaking change: Removed `st build --clean`, and made `st clean` the shared command, which removes trees only with `--yes` (RW-44, `fee395f`).
 - 2026-11-21 — cli: Renamed `st run --select` to `st run --pick`, which lists the built examples, each with its description; `--all` lists every program, and `--select` stays a hidden alias until 2027-03-25 (RW-43, `ddf8a51`).

@@ -12,6 +12,7 @@ import pytest
 from sushicore import build_admission
 from sushicore.build_tree import K_DEFAULT_BUILD_TYPE
 from sushicore.cmake_driver import CleanTreeError
+from sushicore.cmake_modules import with_cmake_modules
 from sushicore.errors import ConfigError
 
 from sushitrack_cli.config import Config
@@ -215,15 +216,15 @@ def test_a_report_is_printed_and_written(tmp_path, runner, monkeypatch):
 
 
 def test_a_fresh_tree_is_configured_then_built(tmp_path, runner):
-    """Emits the configure and build argv st's policy asks for, launcher entries last."""
+    """Emits the configure and build argv st's policy asks for, with SushiCore's CMake modules."""
     paths = _paths(tmp_path)
     assert build_svc.build(_cfg(), paths, build_type="Debug", jobs=3,
         workspace=runner.workspace) == 0
     configure, compile_ = runner.commands
     launchers = [f"-D{entry}" for entry in build_admission.launcher_defines(paths.build)]
-    assert configure == ["cmake", "-S", str(tmp_path), "-B", str(paths.build),
-                         "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Debug",
-                         "-DSUSHITRACK_BUILD_TESTS=ON", *launchers]
+    assert configure == with_cmake_modules(["cmake", "-S", str(tmp_path), "-B", str(paths.build),
+                                            "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Debug",
+                                            "-DSUSHITRACK_BUILD_TESTS=ON", *launchers])
     assert compile_ == ["cmake", "--build", str(paths.build), "--config", "Debug",
                         "--parallel", "3", "--target", "sushitrack",
                         "--target", "tracker_bridge", "--target", "mot_engine",
