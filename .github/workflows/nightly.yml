@@ -51,6 +51,9 @@ jobs:
           restore-keys: ccache-linux-gcc-release-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}-
       - name: Fetch SushiLog and SushiProfiler
         run: st setup --yes --no-gpu
+      - name: Install the library CLIs setup fetched
+        shell: bash
+        run: python -m pip install ~/.sushisystems/sources/*/*/cli
       - name: Build
         run: st build
       - name: Run the quarantined tests
