@@ -72,6 +72,11 @@ def _build(session, tmp_path, tool, **options):
     return code, paths
 
 
+def _configure(session):
+    """Return the cmake configure command the build ran, the one that names its source folder."""
+    return next(command for command in session.commands if "-S" in command)
+
+
 @pytest.mark.parametrize(("build_type", "package_type"), [
     ("Debug", "release"),
     ("MinSizeRel", "release"),
@@ -90,7 +95,7 @@ def test_the_configure_passes_each_package_and_the_compiler(tmp_path, runner):
     code, _ = _build(runner, tmp_path, _tool([]))
 
     assert code == 0
-    configure = runner.commands[0]
+    configure = _configure(runner)
     assert f"-DSushiLog_DIR={K_LOG_CONFIG}" in configure
     assert f"-DSushiProfiler_DIR={K_PROFILER_CONFIG}" in configure
     assert "-DCMAKE_CXX_COMPILER=clang++" in configure
@@ -99,7 +104,7 @@ def test_the_configure_passes_each_package_and_the_compiler(tmp_path, runner):
 def test_the_configure_passes_no_checkout_directory(tmp_path, runner):
     _build(runner, tmp_path, _tool([]))
 
-    assert not [item for item in runner.commands[0] if item.startswith("-DSUSHILOG_DIR")]
+    assert not [item for item in _configure(runner) if item.startswith("-DSUSHILOG_DIR")]
 
 
 def test_the_configure_stamp_records_the_packages_and_the_compiler(tmp_path, runner):
