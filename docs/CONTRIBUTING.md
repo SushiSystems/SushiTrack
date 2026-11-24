@@ -54,7 +54,7 @@ All public library code lives in the `SushiTrack` namespace. The C ABI layer in 
 
 Comments follow the `source-comments` skill: a comment says what a thing does, in Doxygen
 form. The reason for a design goes in a document under `docs/design/`, which the comment may
-cite by path. `tools/documentation/check_source_comments.py` checks the shape; the findings it still reports
+cite by path. `sushicore.tools.documentation.check_source_comments` checks the shape; the findings it still reports
 are in [Remaining work](backlog/README.md).
 
 ### Includes
@@ -89,8 +89,8 @@ repository uses. A change carries its documentation in the same commit:
 Before a commit that touches `docs/`, both of these print nothing:
 
 ```bash
-python tools/documentation/check_docs_layout.py .
-python tools/documentation/check_changelog.py .
+python -m sushicore.tools.documentation.check_docs_layout .
+python -m sushicore.tools.documentation.check_changelog .
 ```
 
 ### Source files

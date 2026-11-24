@@ -22,7 +22,7 @@ size's timeout times the cases it holds. The quarantined cases of a size run apa
 `<program>.<size>_quarantined`.
 
 Each shard writes its cases to `test_results/gtest/<shard>.xml` in the build tree, which
-`tools/testing/test_budget.py --cases <folder>` reads. A suite name belongs to one fixture in a
+`python -m sushicore.tools.testing.test_budget --cases <folder>` reads. A suite name belongs to one fixture in a
 program: `TEST` and `TEST_P` cannot share a suite name. The name a parameter generator returns
 holds no `-`, which a GoogleTest filter reads as the start of its exclusions.
 

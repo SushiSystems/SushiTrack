@@ -81,7 +81,7 @@
 - 2026-10-26 — cli: Warned on an unknown config key, a bad integer, an uncreatable cache folder and a PERF line that does not parse (`cli/sushitrack_cli/config.py`).
 - 2026-10-26 — docs: Opened the SushiTrack profiling design topic and the profiler keys page (`docs/design/SUSHITRACK_PROFILING/README.md`).
 - 2026-10-26 — deps: Upgraded sushicore to 0.9.5 and moved the Sushi library pins to `[sushisystems.<name>]` tables (`cli/sushistack.deps.toml`).
-- 2026-10-21 — docs: Reshaped the migration design document into the five sections with a phase table, and copied the design format checker (`docs/design/SUSHITRACK_MIGRATION/README.md`, `tools/documentation/check_design_format.py`).
+- 2026-10-21 — docs: Reshaped the migration design document into the five sections with a phase table, and copied the design format checker (`docs/design/SUSHITRACK_MIGRATION/README.md`, `sushicore.tools.documentation.check_design_format`).
 - 2026-10-21 — ci: Added the nightly workflow, which runs `ci.yml` with ThreadSanitizer against SushiLog's main, then the quarantined tests without gating (`.github/workflows/nightly.yml`, `ci.yml`, `.github/actions/sushilog/action.yml`).
 - 2026-10-21 — ci: Pinned the actions of `release.yml` to the commit hashes `ci.yml` uses (`.github/workflows/release.yml`).
 - 2026-10-21 — docs: Corrected the size KI-10 gives for the benchmark annotations in the history (`KNOWN_ISSUES.md`).
@@ -119,13 +119,13 @@
 - 2026-10-19 — build: Added the clang-format and EditorConfig files the editors find at the root (`.clang-format`, `.editorconfig`).
 - 2026-10-19 — build: Moved the Dockerfile and the conda environment under .config and the default tracker configuration under assets (`.config/README.md`, `assets/sushitrack.json`).
 - 2026-10-19 — docs: Rewrote the backlog and the known issues as numbered entries with state, acceptance and fix fields (`docs/backlog/README.md`, `docs/backlog/README.md`).
-- 2026-10-19 — tools: Copied the ten shared checkers and `check_all.py` from SushiSkills and ran them in CI (`tools/check_all.py`, `tools/checking/`, `tools/settings.py`, `.github/workflows/ci.yml`).
+- 2026-10-19 — tools: Copied the ten shared checkers and `check_all.py` from SushiSkills and ran them in CI (`sushicore.tools.check_all`, `sushicore.tools.checking`, `tools/settings.py`, `.github/workflows/ci.yml`).
 - 2026-10-07 — ci: Passed the repository's secrets to the CI the release job calls (`.github/workflows/release.yml`).
 - 2026-10-07 — ci: Added the release job that builds the documentation bundle after CI and attaches it to the tag's release (`.github/workflows/release.yml`, `ci.yml`).
 - 2026-10-07 — cli: Added `st docs bundle`, registered from SushiCore, and the publish list (`cli/sushitrack_cli/cli.py`, `docs/publish.toml`).
 - 2026-10-07 — docs: Added the frequently asked questions page (`docs/guides/FAQ.md`).
 - 2026-10-07 — licence: Named Mustafa Garip and Sushi Systems as the copyright holders in the licence and notice files (`LICENSE`, `NOTICE.md`).
-- 2026-10-06 — licence: Restored the three-section license box and named both holders in the copyright line of every source file (`tools/licensing/write_license_block.py`, `tools/documentation/check_source_comments.py`).
+- 2026-10-06 — licence: Restored the three-section license box and named both holders in the copyright line of every source file (`sushicore.tools.licensing.write_license_block`, `sushicore.tools.documentation.check_source_comments`).
 - 2026-10-05 — core: Added catch-all handlers to the C entry points that log a non-std exception and return the call's failure value (`source/sushitrack_c.cpp`, `source/config_loader.cpp`).
 - 2026-10-05 — core: Replaced the per-pair gating log lines with one line per cost-matrix call (`source/distance_strategies.cpp`).
 - 2026-10-05 — core: Passed exception text and the unregistered Kalman type to the logger as arguments of a literal format (`source/sushitrack_c.cpp`, `include/SushiTrack/kalman_filter_registry.hpp`).
